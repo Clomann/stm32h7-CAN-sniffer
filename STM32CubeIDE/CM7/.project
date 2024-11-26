@@ -60,6 +60,11 @@
 			<locationURI>PARENT-2-WORKSPACE_LOCATION/STM32Cube/Repository/STM32Cube_FW_H7_V1.11.0/Utilities</locationURI>
 		</link>
 		<link>
+			<name>readme.txt</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/readme.txt</locationURI>
+		</link>
+		<link>
 			<name>Doc/readme.txt</name>
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/readme.txt</locationURI>
