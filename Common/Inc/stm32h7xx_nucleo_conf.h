@@ -55,6 +55,8 @@
 #define BSP_BUTTON_USER_IT_PRIORITY         15U
 
 #define BUS_SPI1_BAUDRATE                   18000000
+
+#define TEST_SPI_PLL2 1
 /**
   * @}
   */

@@ -71,8 +71,8 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
     /*##-2- Configure peripheral GPIO ##########################################*/
     /* SPI SS GPIO pin configuration  */
     GPIO_InitStruct.Pin       = SPI1_SS_PIN;
-	GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-	GPIO_InitStruct.Pull      = GPIO_PULLDOWN;
+	GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;// GPIO_MODE_AF_PP;
+	GPIO_InitStruct.Pull      = GPIO_PULLUP;
 	GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
 	GPIO_InitStruct.Alternate = SPI1_SS_AF;
 	HAL_GPIO_Init(SPI1_SS_GPIO_PORT, &GPIO_InitStruct);
@@ -87,11 +87,17 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
 
     /* SPI MISO GPIO pin configuration  */
     GPIO_InitStruct.Pin = SPI1_MISO_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = SPI1_MISO_AF;
     HAL_GPIO_Init(SPI1_MISO_GPIO_PORT, &GPIO_InitStruct);
 
     /* SPI MOSI GPIO pin configuration  */
     GPIO_InitStruct.Pin = SPI1_MOSI_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = SPI1_MOSI_AF;
     HAL_GPIO_Init(SPI1_MOSI_GPIO_PORT, &GPIO_InitStruct);
 

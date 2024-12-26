@@ -105,7 +105,11 @@ int main(void)
 /* Set the SPI3 parameters */
   SpiHandle4.Instance               = SPI4;
   SpiHandle4.Init.Mode              = SPI_MODE_SLAVE;
+#if TEST_SPI_PLL2
+  SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+#else
   SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+#endif
   SpiHandle4.Init.Direction         = SPI_DIRECTION_2LINES;
   SpiHandle4.Init.CLKPhase          = SPI_PHASE_1EDGE;
   SpiHandle4.Init.CLKPolarity       = SPI_POLARITY_LOW;
