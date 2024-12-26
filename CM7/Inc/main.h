@@ -78,6 +78,9 @@
 #define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
 
 /* Exported functions ------------------------------------------------------- */
+uint8_t Spi_CsEnable();
+
+#define WAIT_FOR_USER_BUTTON	(1U)
 
 #endif /* __MAIN_H */
 
