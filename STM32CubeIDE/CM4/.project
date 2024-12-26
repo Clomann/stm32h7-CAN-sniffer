@@ -45,11 +45,6 @@
 			<locationURI>PARENT-2-WORKSPACE_LOCATION/STM32Cube/Repository/STM32Cube_FW_H7_V1.11.0/Drivers</locationURI>
 		</link>
 		<link>
-			<name>Inc</name>
-			<type>2</type>
-			<location>C:/Users/cbromann/STM32CubeIDE/workspace_1.16.1/SPI_FullDuplex_ComDMA/CM7/Inc</location>
-		</link>
-		<link>
 			<name>Middlewares</name>
 			<type>2</type>
 			<locationURI>PARENT-2-WORKSPACE_LOCATION/STM32Cube/Repository/STM32Cube_FW_H7_V1.11.0/Middlewares</locationURI>
