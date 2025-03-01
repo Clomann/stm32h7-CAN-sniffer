@@ -2,3 +2,4 @@
 \STM32CubeIDE\CM7\Debug\*
 Debug
 doxygen
+cmake/
