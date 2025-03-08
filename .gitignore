@@ -2,5 +2,6 @@
 \STM32CubeIDE\CM7\Debug\*
 Debug
 doxygen
-cmake/
+build/
+_bin/
 .DS_Store
