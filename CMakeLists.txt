@@ -45,13 +45,14 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
 
-    ${PROJ_PATH}/CM7/Inc/Sd.c
     ${PROJ_PATH}/CM7/Inc/FileHandler.c
 
     ${PROJ_PATH}/drivers/spi/Spi_Cmds.c
 
-    ${PROJ_PATH}/adapters/fatfs_spi/DiskIoFacade.c
-    ${PROJ_PATH}/adapters/fatfs_spi/MmcAdapter.c
+    ${PROJ_PATH}/adapters/fatfs_sd/DiskIoFacade.c
+    ${PROJ_PATH}/adapters/fatfs_sd/MmcAdapter.c
+
+    ${PROJ_PATH}/middleware/Sd/Sd.c
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
@@ -210,7 +211,9 @@ set(include_path_DIRS               # Modified
 
     ${PROJ_PATH}/drivers/spi
 
-    ${PROJ_PATH}/adapters/fatfs_spi
+    ${PROJ_PATH}/adapters/fatfs_sd
+
+    ${PROJ_PATH}/middleware/Sd
 
     ${PROJ_PATH}/Common/Inc
 
