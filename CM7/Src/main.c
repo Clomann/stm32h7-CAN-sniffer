@@ -20,10 +20,13 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include <string.h>
 #include "main.h"
-#include "Spi_Cmds.h"
-#include "Sd.h"
+
+//#include "SD.h"
+//#include "Spi_Cmds.h"
+#include "MmcAdapter.h"
+#include "string.h"
+#include "FileHandler.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -35,32 +38,14 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
-enum {
-  TRANSFER_WAIT,
-  TRANSFER_COMPLETE,
-  TRANSFER_ERROR
-};
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-/* SPI handler declaration */
-SPI_HandleTypeDef SpiHandle1;
-
-/* Buffer used for transmission */
-uint8_t aTxBuffer[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
-static uint8_t SPI_CMD_READ_BUFFER[512] = {0};
-
-/* Buffer used for reception */
-#define BUFFER_ALIGNED_SIZE (((BUFFERSIZE+31)/32)*32)
-ALIGN_32BYTES(uint8_t aRxBuffer[BUFFER_ALIGNED_SIZE]);
-
-/* transfer state */
-__IO uint32_t wTransferState = TRANSFER_WAIT;
 
 #define USE_HAL_SPI_REGISTER_CALLBACKS = 1U;
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
 
-#define CS_ACTIVE_HIGH 0
+static AppConfigType AppConfig;
 
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
@@ -68,533 +53,77 @@ static void SystemClock_Config(void);
 static void Error_Handler(void);
 static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
 static void CPU_CACHE_Enable(void);
-uint8_t SD_Spi_PowerUp(void);
-
-//static uint8_t Spi_Receive(uint8_t *r, uint8_t);
-static uint8_t Spi_PollForResponse(uint8_t *);
-static uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
-static uint8_t Spi_SendReceiveMsg(const uint8_t *, uint8_t *, uint8_t);
-
-static uint8_t SD_Spi_Initialize(uint8_t);
-void SD_Spi_ReadBlock(uint32_t, uint8_t *);
-uint8_t SD_Spi_WaitTillIdle();
 
 /* Private functions ---------------------------------------------------------*/
 
-uint8_t SD_readSingleBlock(uint32_t address, Spi_R1Response * pResponse);
+FATFS FatFs;		/* FatFs work area needed for each volume */
+FIL Fil;			/* File object needed for each open file */
 
-uint8_t Spi_CsEnable()
+static int FatFS_SD_LoadConfig(char *data, uint32_t *len)
 {
-#if CS_ACTIVE_HIGH
-	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-#else
-	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-#endif
-	return 0;
-}
+	FRESULT fr;
+  uint32_t BytesRead = 0U;
+  int32_t FileSize = 0U;
 
-static inline uint8_t Spi_CsDisable()
-{
-#if CS_ACTIVE_HIGH
-	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-#else
-	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-#endif
-	return 0;
-}
+	fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
 
-uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
-{
-	SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
-	Spi_SendReceiveMsg(aTxSpiCmd, aRxBuffer, COUNTOF(aTxSpiCmd));
+  if (fr == FR_OK)
+    fr = f_open(&Fil, "conf.txt", FA_READ);	/* Create a file */
 
-	return 0;
-}
-
-uint8_t SD_Spi_GoIdleState(Spi_R1Response * pResponse)
-{
-    // assert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsEnable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-    SD_Spi_SendCommand(SD_SPI_CMD0, 0x00000000);
-    Spi_PollForResponse(&pResponse->byte);
-
-    // deassert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsDisable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-    return 0;
-}
-
-uint8_t SD_Spi_SendIfCond(Spi_R1Response * pResponse)
-{
-    // assert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsEnable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-    // send CMD8
-	SD_Spi_SendCommand(SD_SPI_CMD8, 0x00000000);
-	Spi_PollForResponse(&pResponse->byte);
-
-    // deassert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsDisable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-	return 0;
-}
-
-uint8_t SD_Spi_SendApp(Spi_R1Response * pResponse)
-{
-	// assert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsEnable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-	SD_Spi_SendCommand(SD_SPI_CMD55, 0x00000000); // Precede ACMD41 with CMD55
-	Spi_CsDisable();
-
-	Spi_CsEnable();
-	Spi_PollForResponse(&pResponse->byte);
-
-	// deassert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsDisable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-	return 0;
-}
-
-uint8_t SD_Spi_SendOpCond(Spi_R1Response * pResponse)
-{
-    // assert chip select
-//	Spi_CsDisable();
-//    Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsEnable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-	SD_Spi_SendCommand(SD_SPI_ACMD41, 0x40000000); // Precede ACMD41 with CMD55
-	Spi_CsDisable();
-
-	Spi_CsEnable();
-	Spi_PollForResponse(&pResponse->byte);
-    // deassert chip select
-//    Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsDisable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-    return 0;
-}
-
-uint8_t SD_Spi_ReadOCR(Spi_R1Response * pResponse)
-{
-    // assert chip select
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsEnable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-	SD_Spi_SendCommand(SD_SPI_CMD58, 0x00000000);
-	Spi_PollForResponse(&pResponse->byte);
-
-    // deassert chip select
-//    Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	Spi_CsDisable();
-//	Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-    return 0;
-}
-
-
-uint8_t SD_Spi_ReadRes7(uint8_t * pRxBuffer)
-{
-	Spi_CsEnable();
-	Spi_SendReceiveMsg(aTxSpiDummy4, pRxBuffer, COUNTOF(aTxSpiDummy4)); // Read CMD8 response
-	Spi_CsEnable();
-
-	return 0;
-}
-
-/**
-  * @brief  Initializes the card and determines its type (e.g., SDSC, SDHC, SDXC).
-			Sets up the card for further operations.
-  * @param  None
-  * @retval None
-  */
-uint8_t SD_Spi_Initialize(uint8_t CsLine)
-{
-	uint8_t RetVal;
-	uint8_t counter;
-	uint32_t OcrByte;
-	Spi_R1Response response;
-	OCR_Register OcrResponse;
-	uint8_t ocr[4];
-
-	RetVal = 0x00;
-
-	HAL_Delay(100);
-	SD_Spi_PowerUp();
-	HAL_Delay(100);
-	SD_Spi_GoIdleState(&response);
-
-
-	if (0x01 == response.byte)
-	{
-		// SD card successfully initialized
-		SD_Spi_WaitTillIdle();
-		SD_Spi_SendIfCond(&response);
-
-		if ((response.byte & 0x3F) == 0x01)  // Ignore bit 6 (Erase Reset)
-		{
-			SD_Spi_ReadRes7(aRxBuffer);
-			memcpy(ocr, aRxBuffer, 4);
-			SD_Spi_WaitTillIdle();
-
-			if (ocr[2] == 0x01 && ocr[3] == 0xAA) {
-				counter = 0;
-				do
-				{
-					SD_Spi_SendApp(&response);
-
-					if (counter > 100)
-					{
-						RetVal = 3;
-					}
-
-					if (response.byte < 0x02 && 0 == RetVal)
-					{
-
-					}
-					SD_Spi_SendOpCond(&response);
-
-					HAL_Delay(10);
-
-					counter++;
-				} while (response.byte != 0x00 && 0 == RetVal);  // Wait for idle state to clear
-
-				while (0U == RetVal && 0U == OcrResponse.cpusb)
-				{
-					HAL_Delay(10);
-
-					SD_Spi_WaitTillIdle();
-
-					// Send CMD58 to read OCR and check CCS bit
-					SD_Spi_ReadOCR(&response);
-
-					if (response.byte == 0x00) {
-
-						SD_Spi_ReadRes7(aRxBuffer);
-						OcrByte = (aRxBuffer[0] << 24) 	| (aRxBuffer[1] << 16) | (aRxBuffer[2] << 8) | aRxBuffer[3];
-						SD_Spi_Ocr2Bitfield(OcrByte, &OcrResponse);
-						if (IS_CARD_READY(OcrByte))
-						{
-							// card is a ver. 2.0 or later high capacity SD card (SDHC) or extended capacity SD card (SCXC)
-						}
-						else
-						{
-							// card is a ver. 2.0 or later standard capacity SD memory card
-						}
-					}
-				}
-
-			}
-			else
-			{
-				RetVal = 2;
-			}
-		}
-	}
-	else
-	{
-		RetVal = 1;
+	if (fr == FR_OK) {
+    FileSize = f_size(&Fil);
+    f_read(&Fil, data, FileSize, &BytesRead);
+		fr = f_close(&Fil);							/* Close the file */
 	}
 
-	return RetVal;
+  *len = BytesRead;
+
+  return fr;
 }
 
-uint8_t Spi_Send(uint8_t * pTxBuffer, uint8_t TxBytes)
+static void FatFS_SD_CreateFile()
 {
-	uint8_t RetVal;
+  UINT bw;
+	FRESULT fr;
+  uint32_t BytesWritten;
+  const char Text[] = "Hello from Clemens' uC:  \n";
+  uint8_t Data[4096]; 
 
-	RetVal = HAL_SPI_Transmit_DMA(&SpiHandle1, pTxBuffer, TxBytes);
+  strncpy(Data, Text, strlen(Text));
 
-	if (RetVal == HAL_BUSY)
-	{
+	fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
+  // fr = f_mount(&FatFs, "", 1U);
+	
+  if (fr == FR_OK)
+    fr = f_open(&Fil, "newfile.txt", FA_OPEN_APPEND | FA_WRITE | FA_READ );	/* Create a file */
 
+	if (fr == FR_OK) {
+    f_lseek(&Fil, f_size(&Fil));  // Move file pointer to the end
+    f_write(&Fil, Text, strlen(Text), &BytesWritten);
+		fr = f_close(&Fil);							/* Close the file */
 	}
-	else if (RetVal != HAL_OK)
-	{
-	  /* Transfer error in transmission process */
-	  Error_Handler();
-	}
-
-	while (wTransferState == TRANSFER_WAIT)
-	{
-	}
-
-	// Wait until the SPI is no longer busy
-	while (HAL_SPI_GetState(&SpiHandle1) != HAL_SPI_STATE_READY) {}
-
-	return RetVal;
 }
 
-//uint8_t Spi_Receive(uint8_t * pRxBuffer, uint8_t RxBytes)
-//{
-//	uint8_t RetVal;
-//
-//#if CS_ACTIVE_HIGH
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-//#else
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-//#endif
-//
-//	RetVal = HAL_SPI_Receive_DMA(&SpiHandle1, pRxBuffer, RxBytes);
-//
-//	if (RetVal == HAL_BUSY)
+static void FatFS_SD_WriteFile()
+{
+  #define BLOCKS_READ 4U 
+  BYTE buff[BLOCKS_READ * SD_SECTOR_LENGTH];
+	LBA_t sector;
+	UINT count;
+
+	if (0 == MMCAdapter_initialize())
+	{
+		sector = 0U;
+		count = BLOCKS_READ;
+    MMCAdapter_read(buff, sector, count);
+  }
+
+//	for (uint16_t h=0; h < SD_BLOCK_COUNT; h++)
 //	{
+//		MMCAdapter_read(buff, sector, count);
 //
 //	}
-//	else if (RetVal != HAL_OK)
-//	{
-//	  /* Transfer error in transmission process */
-//	  Error_Handler();
-//	}
-//
-//	while (wTransferState == TRANSFER_WAIT)
-//	{
-//	}
-//
-//	// Wait until the SPI is no longer busy
-//	while (HAL_SPI_GetState(&SpiHandle1) != HAL_SPI_STATE_READY) {}
-//
-//#if CS_ACTIVE_HIGH
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-//#else
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-//#endif
-//
-//	SCB_InvalidateDCache_by_Addr ((uint32_t *)pRxBuffer, RxBytes);
-//
-//	return RetVal;
-//}
 
-uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
-{
-	uint8_t RetVal;
-
-	SCB_CleanDCache_by_Addr ((uint32_t *)pTxBuffer, TxBytes);
-
-	RetVal = HAL_SPI_TransmitReceive_DMA(&SpiHandle1, pTxBuffer, pRxBuffer, TxBytes);
-
-	if (RetVal == HAL_BUSY)
-	{
-
-	}
-	else if (RetVal != HAL_OK)
-	{
-	  /* Transfer error in transmission process */
-	  Error_Handler();
-	}
-
-	while (wTransferState == TRANSFER_WAIT)
-	{
-	}
-
-	// Wait until the SPI is no longer busy
-	while (HAL_SPI_GetState(&SpiHandle1) != HAL_SPI_STATE_READY) {}
-
-	SCB_InvalidateDCache_by_Addr ((uint32_t *)pRxBuffer, TxBytes);
-
-	return RetVal;
-}
-
-uint8_t Spi_ParseResponse(const uint8_t * buffer, uint8_t length, uint8_t * response)
-{
-	uint8_t RetVal = 1;
-
-	*response = 0xFF;
-
-	for (int i=0; i<length; i++)
-	{
-		if (0xFF != buffer[i])
-		{
-			*response = buffer[i];
-			RetVal = 0;
-		}
-	}
-
-	return RetVal;
-}
-
-uint8_t Spi_readByte(uint8_t * pResponse)
-{
-	uint8_t RetVal;
-
-	RetVal = Spi_SendReceiveMsg((uint8_t*)aTxSpiDummy1, (uint8_t *)aRxBuffer, COUNTOF(aTxSpiDummy1));
-
-	Spi_ParseResponse(aRxBuffer, COUNTOF(aTxSpiDummy1), pResponse);
-
-	return RetVal;
-}
-
-uint8_t Spi_PollForResponse(uint8_t * pResponse)
-{
-	uint8_t NoResponseReceived;
-	uint8_t RetVal;
-	uint8_t counter;
-	const uint8_t RetryCount = 10;
-
-	counter = 0;
-	NoResponseReceived = 1;
-
-	do
-	{
-		Spi_readByte(pResponse);
-
-		if (0xFF != *pResponse)
-		{
-			NoResponseReceived = 0;
-		}
-
-		counter++;
-	} while (NoResponseReceived && (RetryCount > counter) );
-
-	if (0 == NoResponseReceived)
-	{
-		RetVal = 0;
-	}
-	else
-	{
-		RetVal = 1;
-	}
-
-	return RetVal;
-}
-
-uint8_t Spi_goHighSpeed()
-{
-	uint8_t RetVal;
-
-	RetVal = 0U;
-
-	if(HAL_SPI_Init(&SpiHandle1) != HAL_OK)
-	{
-		/* Initialization Error */
-		Error_Handler();
-		RetVal = 1U;
-	}
-
-	/*##-1- Configure the SPI peripheral #######################################*/
-	/* Set the SPI1 parameters */
-	SpiHandle1.Instance               = SPI1;
-	SpiHandle1.Init.Mode              = SPI_MODE_MASTER;
-#if TEST_SPI_PLL2
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16; // <-----
-#else
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-#endif
-	SpiHandle1.Init.Direction         = SPI_DIRECTION_2LINES;
-	SpiHandle1.Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
-	SpiHandle1.Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
-	SpiHandle1.Init.DataSize          = SPI_DATASIZE_8BIT;
-	SpiHandle1.Init.FirstBit          = SPI_FIRSTBIT_MSB;
-	SpiHandle1.Init.TIMode            = SPI_TIMODE_DISABLE;
-	SpiHandle1.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-	SpiHandle1.Init.CRCPolynomial     = 7;
-	SpiHandle1.Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
-	SpiHandle1.Init.NSS               = SPI_NSS_SOFT;
-	SpiHandle1.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
-	SpiHandle1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
-
-	if(HAL_SPI_Init(&SpiHandle1) != HAL_OK)
-	{
-		/* Initialization Error */
-		Error_Handler();
-		RetVal = 1U;
-	}
-
-	return RetVal;
-}
-
-/*******************************************************************************
- Read single 512 byte block
- token = 0xFE - Successful read
- token = 0x0X - Data error
- token = 0xFF - Timeout
-*******************************************************************************/
-uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
-{
-	uint8_t RetVal;
-	uint8_t readAttempts;
-	uint8_t Crc1;
-	uint8_t Crc2;
-	Spi_R1Response resp;
-
-	RetVal = 0U;
-
-	Spi_CsEnable();
-
-	SD_Spi_SendCommand(SD_SPI_CMD17, address);
-	Spi_PollForResponse(&pResponse->byte);
-
-	if(pResponse->byte != 0xFF)
-	{
-        // wait for a response token (timeout = 100ms)
-        readAttempts = 0;
-        while(++readAttempts != SD_MAX_READ_ATTEMPTS)
-        {
-        	Spi_PollForResponse(&pResponse->byte);
-        	if(pResponse->byte != 0xFF)
-			{
-				break;
-			}
-        }
-
-        // if response token is 0xFE
-        if(pResponse->byte == SD_SPI_CMD_START_TOKEN)
-        {
-            // read 512 byte block
-            for(uint16_t i = 0; i < SD_BLOCK_LENGTH; i++)
-			{
-            	Spi_readByte(&resp.byte);
-				SPI_CMD_READ_BUFFER[i] = resp.byte;
-			}
-
-            // read 16-bit CRC
-            Spi_readByte(&Crc1);
-            Spi_readByte(&Crc2);
-
-            if (0 != Crc1 && 0 != Crc2)
-            {
-            	RetVal = 0U;
-            }
-        }
-        else
-        {
-        	RetVal = 1U;
-        }
-	}
-
-	Spi_CsDisable();
-
-	return RetVal;
-}
-
-/*
- * @brief Reads the File Allocation Table
- */
-uint8_t SD_Spi_readFAT(Spi_R1Response * pResponse)
-{
-	uint8_t RetVal;
-
-	RetVal = 0U;
-
-	SD_Spi_readSingleBlock(0U, pResponse);
-
-	return RetVal;
 }
 
 /**
@@ -606,8 +135,13 @@ int main(void)
 {
   int32_t timeout;
   uint32_t spiClockSource;
-  Spi_R1Response resp;
+  HAL_StatusTypeDef HalStatus;
+  struct Config { 
+    char data[1024U];
+    uint32_t len;
+  } Config = {0U};
 
+  char buffer[] = "{\"foo\":\"abc\",\"bar\":{\"foo\":\"xyz\"}}";
   /* Configure the MPU attributes */
   MPU_Config();
 
@@ -682,28 +216,10 @@ int main(void)
   BSP_LED_Init(LED3);
 
    /*##-1- Configure the SPI peripheral #######################################*/
-   /* Set the SPI1 parameters */
-  SpiHandle1.Instance               = SPI1;
-  SpiHandle1.Init.Mode              = SPI_MODE_MASTER;
-#if TEST_SPI_PLL2
-  SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
-#else
-  SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-#endif
-  SpiHandle1.Init.Direction         = SPI_DIRECTION_2LINES;
-  SpiHandle1.Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
-  SpiHandle1.Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
-  SpiHandle1.Init.DataSize          = SPI_DATASIZE_8BIT;
-  SpiHandle1.Init.FirstBit          = SPI_FIRSTBIT_MSB;
-  SpiHandle1.Init.TIMode            = SPI_TIMODE_DISABLE;
-  SpiHandle1.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-  SpiHandle1.Init.CRCPolynomial     = 7;
-  SpiHandle1.Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
-  SpiHandle1.Init.NSS               = SPI_NSS_SOFT;
-  SpiHandle1.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
-  SpiHandle1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
 
-  if(HAL_SPI_Init(&SpiHandle1) != HAL_OK)
+  HalStatus = SPI_Init();
+
+  if(HalStatus != HAL_OK)
   {
     /* Initialization Error */
     Error_Handler();
@@ -716,7 +232,7 @@ int main(void)
   while (1)
   {
 	//aTxBuffer[0] = counter++;
-	SCB_CleanDCache_by_Addr ((uint32_t *)aTxBuffer, BUFFERSIZE);
+//	SCB_CleanDCache_by_Addr ((uint32_t *)aTxBuffer, BUFFERSIZE);
 #ifdef WAIT_FOR_USER_BUTTON
 	/* Configure User push-button button */
 	BSP_PB_Init(BUTTON_USER,BUTTON_MODE_GPIO);
@@ -727,20 +243,19 @@ int main(void)
 	  HAL_Delay(100);
 	}
 	BSP_LED_Off(LED1);
-
 #endif
 
 	/*##-2- Start the Full Duplex Communication process ########################*/
 	/* While the SPI in TransmitReceive process, user can transmit data through
 	   "aTxBuffer" buffer & receive data through "aRxBuffer" */
-
-
-	while (0 != SD_Spi_Initialize(0));
-
-	for (uint16_t h=0; h < SD_BLOCK_COUNT; h++)
-	{
-		SD_Spi_readSingleBlock(h, &resp);
-	}
+  Spi_PwrOn();
+  if (0U == FatFS_SD_LoadConfig(Config.data, &Config.len) )
+  {
+    FileHandler_LoadConfig(Config.data, Config.len, &AppConfig);
+  }
+  FatFS_SD_CreateFile();
+  Spi_PwrOff();
+	//FatFS_SD_WriteFile();
 
 	/*##-3- Wait for the end of the transfer ###################################*/
 	/*  Before starting a new communication transfer, you must wait the callback call
@@ -749,96 +264,33 @@ int main(void)
 		transfer, but application may perform other tasks while transfer operation
 		is ongoing. */
 
-	/* Invalidate cache prior to access by CPU */
-	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, BUFFERSIZE);
-
-	switch(wTransferState)
-	{
-	  case TRANSFER_COMPLETE :
-	/*##-4- Compare the sent and received
-	 *  buffers ##############################*/
-		if(Buffercmp((uint8_t*)aTxBuffer, (uint8_t*)aRxBuffer, BUFFERSIZE))
-		{
-		  /* Processing Error */
-		  //Error_Handler();
-		  BSP_LED_On(LED3);
-		}
-		else
-		{
-			BSP_LED_Off(LED3);
-		}
-		break;
-	  default :
-		Error_Handler();
-		break;
-	}
+//	/* Invalidate cache prior to access by CPU */
+//	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, BUFFERSIZE);
+//
+//	switch(wTransferState)
+//	{
+//	  case TRANSFER_COMPLETE :
+//	/*##-4- Compare the sent and received
+//	 *  buffers ##############################*/
+//		if(Buffercmp((uint8_t*)aTxBuffer, (uint8_t*)aRxBuffer, BUFFERSIZE))
+//		{
+//		  /* Processing Error */
+//		  //Error_Handler();
+//		  BSP_LED_On(LED3);
+//		}
+//		else
+//		{
+//			BSP_LED_Off(LED3);
+//		}
+//		break;
+//	  default :
+//		Error_Handler();
+//		break;
+//	}
   }
 }
 
 
-uint8_t Spi_SendReceive()
-{
-	return 0;
-}
-
-uint8_t SD_Spi_PowerUp(void)
-{
-	Spi_CsDisable();
-	Spi_SendReceiveMsg((uint8_t*)aTxSpiInit, (uint8_t *)aRxBuffer, COUNTOF(aTxSpiInit));
-	return 0;
-}
-
-uint8_t SD_Spi_WaitTillIdle()
-{
-	uint8_t RetVal = 1;
-	uint8_t counter;
-	const uint8_t RetryCount = 10;
-
-	Spi_CsEnable();
-
-	// wait till card is idle
-	do
-	{
-		Spi_SendReceiveMsg(aTxSpiDummy1, aRxBuffer, COUNTOF(aTxSpiDummy1));
-	} while( 0xFF != aRxBuffer[0] && ( RetryCount > counter++) );
-
-	Spi_CsDisable();
-
-	if (0xFF == aRxBuffer[0])
-	{
-		RetVal = 1;
-	}
-	else
-	{
-		RetVal = 0;
-	}
-	return RetVal;
-}
-
-void SD_Spi_ReadBlock(uint32_t blockAddress, uint8_t *buffer) {
-    uint8_t response;
-
-    SD_Spi_CreateCommand(SD_SPI_CMD17, blockAddress, aTxSpiCmd);
-
-    Spi_SendReceiveMsg((uint8_t *)aTxSpiCmd, (uint8_t *)aRxBuffer, COUNTOF(aTxSpiCmd));
-
-    do {
-    	Spi_PollForResponse(&response);
-    } while (response != 0xFE);
-
-    // Assert CS (low)
-    HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-
-    // Read the data block (512 bytes)
-    HAL_SPI_Receive_DMA(&SpiHandle1, buffer, 512);
-
-    // Read the 2-byte CRC
-    uint8_t crc[2];
-    HAL_SPI_Receive_DMA(&SpiHandle1, crc, 2);
-
-    // Deassert CS (high)
-    HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-}
 
 /**
   * @brief  System Clock Configuration
@@ -939,36 +391,6 @@ static void SystemClock_Config(void)
   }
 
 }
-/**
-  * @brief  TxRx Transfer completed callback.
-  * @param  hspi: SPI handle
-  * @note   This example shows a simple way to report end of DMA TxRx transfer, and
-  *         you can add your own implementation.
-  * @retval None
-  */
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-
-  /* Turn LED1 on: Transfer in transmission process is complete */
-  BSP_LED_On(LED1);
-  /* Turn LED2 on: Transfer in reception process is complete */
-  BSP_LED_On(LED2);
-  wTransferState = TRANSFER_COMPLETE;
-}
-
-
-/**
-  * @brief  SPI error callbacks.
-  * @param  hspi: SPI handle
-  * @note   This example shows a simple way to report transfer error, and you can
-  *         add your own implementation.
-  * @retval None
-  */
-void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
-{
-  wTransferState = TRANSFER_ERROR;
-}
-
 
 /**
   * @brief  This function is executed in case of error occurrence.
