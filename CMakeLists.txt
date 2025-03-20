@@ -42,7 +42,6 @@ set(EXECUTABLE                      ${CMAKE_PROJECT_NAME})
 #
 set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/main.c
-    ${PROJ_PATH}/CM7/Src/Spi_Cmds.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
 
@@ -50,6 +49,8 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Inc/MmcAdapter.c
     ${PROJ_PATH}/CM7/Inc/Sd.c
     ${PROJ_PATH}/CM7/Inc/FileHandler.c
+
+    ${PROJ_PATH}/drivers/spi/Spi_Cmds.c
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
@@ -205,6 +206,9 @@ set(sources_SRCS                    # Modified
 #
 set(include_path_DIRS               # Modified
     ${PROJ_PATH}/CM7/Inc
+
+    ${PROJ_PATH}/drivers/spi
+
     ${PROJ_PATH}/Common/Inc
 
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Inc
