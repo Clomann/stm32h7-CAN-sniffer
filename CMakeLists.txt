@@ -49,6 +49,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Inc/DiskIoFacade.c
     ${PROJ_PATH}/CM7/Inc/MmcAdapter.c
     ${PROJ_PATH}/CM7/Inc/Sd.c
+    ${PROJ_PATH}/CM7/Inc/FileHandler.c
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
@@ -62,6 +63,8 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/libs/ff15a/source/ff.c
     ${PROJ_PATH}/libs/ff15a/source/ffsystem.c
     ${PROJ_PATH}/libs/ff15a/source/ffunicode.c
+
+    ${PROJ_PATH}/libs/coreJSON/source/core_json.c
     
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.c
@@ -214,6 +217,8 @@ set(include_path_DIRS               # Modified
     ${STM32_HAL_PATH}/Utilities/Fonts
 
     ${PROJ_PATH}/libs/ff15a/source/
+
+    ${PROJ_PATH}/libs/coreJSON/source/include/
 )
 
 #
