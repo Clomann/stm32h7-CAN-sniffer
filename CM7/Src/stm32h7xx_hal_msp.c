@@ -19,6 +19,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+#include "SpiCfg.h"
+
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
   */
@@ -69,13 +71,21 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
     DMA1_CLK_ENABLE();
 
     /*##-2- Configure peripheral GPIO ##########################################*/
+    /* SPI PWR GPIO pin configuration  */
+    GPIO_InitStruct.Pin       = SPI1_PWR_PIN;
+    GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;// GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = SPI1_PWR_AF;
+    HAL_GPIO_Init(SPI1_PWR_GPIO_PORT, &GPIO_InitStruct);
+
     /* SPI SS GPIO pin configuration  */
     GPIO_InitStruct.Pin       = SPI1_SS_PIN;
-	GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;// GPIO_MODE_AF_PP;
-	GPIO_InitStruct.Pull      = GPIO_PULLUP;
-	GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
-	GPIO_InitStruct.Alternate = SPI1_SS_AF;
-	HAL_GPIO_Init(SPI1_SS_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;// GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = SPI1_SS_AF;
+    HAL_GPIO_Init(SPI1_SS_GPIO_PORT, &GPIO_InitStruct);
 
     /* SPI SCK GPIO pin configuration  */
     GPIO_InitStruct.Pin       = SPI1_SCK_PIN;
