@@ -45,7 +45,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
 
-    ${PROJ_PATH}/CM7/Inc/FileHandler.c
+    ${PROJ_PATH}/app/FileHandler.c
 
     ${PROJ_PATH}/drivers/spi/Spi_Cmds.c
 
@@ -208,6 +208,8 @@ set(sources_SRCS                    # Modified
 #
 set(include_path_DIRS               # Modified
     ${PROJ_PATH}/CM7/Inc
+
+    ${PROJ_PATH}/app
 
     ${PROJ_PATH}/drivers/spi
 
