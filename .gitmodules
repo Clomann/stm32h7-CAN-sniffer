@@ -1,3 +1,6 @@
 [submodule "Drivers"]
 	path = libs/STM32_HAL/STM32H7
 	url = https://github.com/STMicroelectronics/STM32CubeH7.git
+[submodule "libs/coreJSON"]
+	path = libs/coreJSON
+	url = https://github.com/FreeRTOS/coreJSON.git
