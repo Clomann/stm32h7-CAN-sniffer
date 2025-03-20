@@ -23,7 +23,6 @@ typedef enum {
 	RES_PARERR		/* 4: Invalid Parameter */
 } DRESULT;
 
-
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
 
