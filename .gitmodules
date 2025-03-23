@@ -4,3 +4,6 @@
 [submodule "libs/coreJSON"]
 	path = libs/coreJSON
 	url = https://github.com/FreeRTOS/coreJSON.git
+[submodule "libs/lwip-tcpip"]
+	path = libs/lwip-tcpip
+	url = https://github.com/lwip-tcpip/lwip.git
