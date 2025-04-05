@@ -34,11 +34,13 @@
 /* Private variables ---------------------------------------------------------*/
 /* SPI handler declared in "main.c" file */
 extern SPI_HandleTypeDef SpiHandle1;
+extern ETH_HandleTypeDef heth;
 
 /* Private function prototypes -----------------------------------------------*/
 void SPI1_IRQHandler(void);
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
+void ETH_IRQHandler(void);
 
 
 /* Private functions ---------------------------------------------------------*/
@@ -181,6 +183,20 @@ void SPI1_DMA_TX_IRQHandler(void)
 {
   HAL_DMA_IRQHandler(SpiHandle1.hdmatx);
 }
+
+/**
+  * @brief This function handles Ethernet global interrupt.
+  */
+ void ETH_IRQHandler(void)
+ {
+   /* USER CODE BEGIN ETH_IRQn 0 */
+ 
+   /* USER CODE END ETH_IRQn 0 */
+   HAL_ETH_IRQHandler(&heth);
+   /* USER CODE BEGIN ETH_IRQn 1 */
+ 
+   /* USER CODE END ETH_IRQn 1 */
+ }
 
 /**
   * @brief  This function handles PPP interrupt request.

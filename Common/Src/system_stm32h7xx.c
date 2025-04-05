@@ -134,7 +134,7 @@ void SystemInit (void)
   /*SEVONPEND enabled so that an interrupt coming from the CPU(n) interrupt signal is
     detectable by the CPU after a WFI/WFE instruction.*/ 
  SCB->SCR |= SCB_SCR_SEVONPEND_Msk;
-
+ 
 #ifdef CORE_CM7 
   /* Reset the RCC clock configuration to the default reset state ------------*/
   /* Set HSION bit */

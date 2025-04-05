@@ -6,7 +6,7 @@
 **
 **
 **  Abstract    : Linker script for STM32H7 series
-**                1024Kbytes FLASH and 192Kbytes RAM
+**                1024Kbytes FLASH and 192Kbytes RAM_D1
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -44,8 +44,11 @@ _Min_Stack_Size = 0x400 ; /* required amount of stack */
 MEMORY
 {
 FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
-RAM (xrw)      : ORIGIN = 0x24000000, LENGTH = 128K
-ITCMRAM (xrw)      : ORIGIN = 0x00000000, LENGTH = 64K
+DTCMRAM (xrw)     : ORIGIN = 0x20000000, LENGTH = 128K
+RAM_D1 (xrw)      : ORIGIN = 0x24000000, LENGTH = 512K
+RAM_D2 (xrw)      : ORIGIN = 0x30000000, LENGTH = 288K
+RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 64K
+ITCMRAM (xrw)     : ORIGIN = 0x00000000, LENGTH = 64K
 }
 
 /* Define output sections */
@@ -86,7 +89,7 @@ SECTIONS
   } >FLASH
 
   .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
-  .ARM : {
+  .ARM (READONLY) : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
@@ -98,14 +101,14 @@ SECTIONS
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
   } >FLASH
-  .init_array :
+  .init_array (READONLY) :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
   } >FLASH
-  .fini_array :
+  .fini_array (READONLY) :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
@@ -116,7 +119,7 @@ SECTIONS
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
-  /* Initialized data sections goes into RAM, load LMA copy after code */
+  /* Initialized data sections goes into RAM_D1, load LMA copy after code */
   .data : 
   {
     . = ALIGN(4);
@@ -126,7 +129,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >RAM_D1 AT> FLASH
 
   
   /* Uninitialized data section */
@@ -143,9 +146,9 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >RAM
+  } >RAM_D1
 
-  /* User_heap_stack section, used to check that there is enough RAM left */
+  /* User_heap_stack section, used to check that there is enough RAM_D1 left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -154,9 +157,18 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
+  } >RAM_D1
 
-  
+  .lwip_sec (NOLOAD): {
+    . = ABSOLUTE(0x30000000);
+    *(.RxDecripSection) 
+    
+    . = ABSOLUTE(0x30000200);
+    *(.TxDecripSection)
+    
+    . = ABSOLUTE(0x30000400);
+    *(.Rx_PoolSection) 
+  } >RAM_D2 AT> ROM
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
