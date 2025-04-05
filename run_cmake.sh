@@ -1,4 +1,6 @@
-rm -rf build
-mkdir -p build
+rm -rf ./build
+mkdir -p ./build
 
-cmake --preset "Debug" -B build
+if [ -d build ]; then
+    cmake --preset "Debug" -B ./build/
+fi
