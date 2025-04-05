@@ -43,7 +43,7 @@
 /* #define HAL_DFSDM_MODULE_ENABLED */
 #define HAL_DMA_MODULE_ENABLED
 /* #define HAL_DMA2D_MODULE_ENABLED */
-/* #define HAL_ETH_MODULE_ENABLED */
+#define HAL_ETH_MODULE_ENABLED
 #define HAL_EXTI_MODULE_ENABLED
 /* #define HAL_FDCAN_MODULE_ENABLED */
 #define HAL_FLASH_MODULE_ENABLED
@@ -60,7 +60,7 @@
 /* #define HAL_LPTIM_MODULE_ENABLED */
 /* #define HAL_LTDC_MODULE_ENABLED */
 /* #define HAL_MDIOS_MODULE_ENABLED */
-/* #define HAL_MDMA_MODULE_ENABLED */
+#define HAL_MDMA_MODULE_ENABLED
 /* #define HAL_MMC_MODULE_ENABLED */
 /* #define HAL_NAND_MODULE_ENABLED */
 /* #define HAL_NOR_MODULE_ENABLED */
@@ -81,7 +81,7 @@
 #define HAL_SPI_MODULE_ENABLED
 /* #define HAL_SRAM_MODULE_ENABLED */
 /* #define HAL_SWPMI_MODULE_ENABLED */
-/* #define HAL_TIM_MODULE_ENABLED */
+ #define HAL_TIM_MODULE_ENABLED
  #define HAL_UART_MODULE_ENABLED
  #define HAL_USART_MODULE_ENABLED
 /* #define HAL_WWDG_MODULE_ENABLED */
@@ -158,8 +158,8 @@
 /* #define  USE_SD_TRANSCEIVER           1U   */            /*!< use uSD Transceiver */
 
 /* ########################### Ethernet Configuration ######################### */
-#define ETH_TX_DESC_CNT         4  /* number of Ethernet Tx DMA descriptors */
-#define ETH_RX_DESC_CNT         4  /* number of Ethernet Rx DMA descriptors */
+#define ETH_TX_DESC_CNT         8  /* number of Ethernet Tx DMA descriptors */
+#define ETH_RX_DESC_CNT         12  /* number of Ethernet Rx DMA descriptors */
 
 #define ETH_MAC_ADDR0    ((uint8_t)0x02)
 #define ETH_MAC_ADDR1    ((uint8_t)0x00)

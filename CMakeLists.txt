@@ -46,6 +46,11 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
 
     ${PROJ_PATH}/app/FileHandler.c
+    ${PROJ_PATH}/app/ethernetif.c
+    ${PROJ_PATH}/app/lwip.c
+
+    ${PROJ_PATH}/app/tcp_echoserver.c
+    ${PROJ_PATH}/app/app_ethernet.c
 
     ${PROJ_PATH}/drivers/spi/Spi_Cmds.c
 
@@ -68,6 +73,52 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/libs/ff15a/source/ffunicode.c
 
     ${PROJ_PATH}/libs/coreJSON/source/core_json.c
+
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/bridgeif_fdb.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/bridgeif.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/ethernet.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/FILES 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/lowpan6_ble.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/lowpan6_common.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/lowpan6.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/slipif.c 
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/zepif.c
+
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/autoip.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/dhcp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/etharp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/icmp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/igmp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/ip4_addr.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/ip4_frag.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/ip4.c
+
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/lwiperf/lwiperf.c
+
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/netif/ethernet.c
+
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/altcp_alloc.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/altcp_tcp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/altcp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/def.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/dns.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/inet_chksum.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/init.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ip.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/mem.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/memp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/netif.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/pbuf.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/raw.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/stats.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/sys.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/tcp_in.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/tcp_out.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/tcp.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/timeouts.c 
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/udp.c
+
+    ${STM32_HAL_PATH}/Drivers/BSP/Components/lan8742/lan8742.c
     
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_adc.c
@@ -219,6 +270,8 @@ set(include_path_DIRS               # Modified
 
     ${PROJ_PATH}/Common/Inc
 
+    ${STM32_HAL_PATH}//Drivers/BSP/Components/lan8742
+
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Inc
     ${STM32_HAL_PATH}/Drivers/CMSIS/Device/ST/STM32H7xx/Include
     ${STM32_HAL_PATH}/Drivers/CMSIS/Include
@@ -231,6 +284,13 @@ set(include_path_DIRS               # Modified
     ${PROJ_PATH}/libs/ff15a/source/
 
     ${PROJ_PATH}/libs/coreJSON/source/include/
+
+    # LwIP dependencies
+    # ${PROJ_PATH}/libs/lwip-tcpip/src/include
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/system
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/apps
 )
 
 #
@@ -240,6 +300,7 @@ set(symbols_SYMB                    # Modified
     "STM32H745xx"
     "USE_HAL_DRIVER"
     "CORE_CM7"
+    "NO_SYS=1"
     "USE_STM32H7XX_NUCLEO_144_MB1363"
 )
 
