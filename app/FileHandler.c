@@ -10,7 +10,7 @@ static int FileHandler_GetValue(
     char const *key, 
     uint32_t keyLen, 
     char **value, 
-    uint32_t *valLen
+    size_t *valLen
 )
 {
     JSONStatus_t result;
@@ -23,12 +23,12 @@ static int FileHandler_GetValue(
     if( result == JSONSuccess )
     {
         // The pointer "value" will point to a location in the "buffer".
-        char save = value[ *valLen ];
+        char save = (*value)[ *valLen ];
         // After saving the character, set it to a null byte for printing.
-        *value[ *valLen ] = '\0';
+        (*value)[ *valLen ] = '\0';
         
         // // Restore the original character.
-        *value[ *valLen ] = save;  
+        (*value)[ *valLen ] = save;  
     }
 
     return result;

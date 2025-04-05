@@ -194,9 +194,11 @@ uint8_t Spi_readByte(uint8_t * pResponse)
 uint8_t Spi_writByte(const uint8_t *data)
 {
 	uint8_t RetVal;
-	uint8_t RespDummy;
+	uint8_t RespDummy = 0U;
 
-	RetVal = Spi_SendReceiveMsg((uint8_t*)data, (uint8_t *)RespDummy, 1U);
+	(void) RespDummy;
+
+	RetVal = Spi_SendReceiveMsg((uint8_t const *)data, (uint8_t *)&RespDummy, 1U);
 
 	return RetVal;
 }
