@@ -27,6 +27,13 @@
 #include "MmcAdapter.h"
 #include "string.h"
 #include "FileHandler.h"
+#include "lwip.h"
+#include "lwip/init.h"
+#include "lwiperf.h"
+#include "tcp_echoserver.h"
+#include "ethernetif.h"
+#include "app_ethernet.h"
+
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -50,8 +57,7 @@ static AppConfigType AppConfig;
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
 static void SystemClock_Config(void);
-static void Error_Handler(void);
-static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
+// static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
@@ -62,8 +68,8 @@ FIL Fil;			/* File object needed for each open file */
 static int FatFS_SD_LoadConfig(char *data, uint32_t *len)
 {
 	FRESULT fr;
-  uint32_t BytesRead = 0U;
-  int32_t FileSize = 0U;
+  UINT BytesRead = 0U;
+  uint32_t FileSize = 0U;
 
 	fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
 
@@ -83,11 +89,10 @@ static int FatFS_SD_LoadConfig(char *data, uint32_t *len)
 
 static void FatFS_SD_CreateFile()
 {
-  UINT bw;
 	FRESULT fr;
-  uint32_t BytesWritten;
+  UINT BytesWritten;
   const char Text[] = "Hello from Clemens' uC:  \n";
-  uint8_t Data[4096]; 
+  char Data[4096]; 
 
   strncpy(Data, Text, strlen(Text));
 
@@ -104,26 +109,101 @@ static void FatFS_SD_CreateFile()
 	}
 }
 
-static void FatFS_SD_WriteFile()
+// static void FatFS_SD_WriteFile()
+// {
+//   #define BLOCKS_READ 4U 
+//   BYTE buff[BLOCKS_READ * SD_SECTOR_LENGTH];
+// 	LBA_t sector;
+// 	UINT count;
+
+// 	if (0 == MMCAdapter_initialize())
+// 	{
+// 		sector = 0U;
+// 		count = BLOCKS_READ;
+//     MMCAdapter_read(buff, sector, count);
+//   }
+
+// //	for (uint16_t h=0; h < SD_BLOCK_COUNT; h++)
+// //	{
+// //		MMCAdapter_read(buff, sector, count);
+// //
+// //	}
+
+// }
+
+static void lwip_example_test(struct netif * netif)
 {
-  #define BLOCKS_READ 4U 
-  BYTE buff[BLOCKS_READ * SD_SECTOR_LENGTH];
-	LBA_t sector;
-	UINT count;
+ /* Initialize the LwIP stack */
+ lwip_init();
 
-	if (0 == MMCAdapter_initialize())
-	{
-		sector = 0U;
-		count = BLOCKS_READ;
-    MMCAdapter_read(buff, sector, count);
+  /* TCP echo server Init */
+  tcp_echoserver_init();
+
+  /* Infinite loop */
+  while (1)
+  {
+    /* Read a received packet from the Ethernet buffers and send it
+       to the lwIP for handling */
+    ethernetif_input(netif);
+
+    /* Handle timeouts */
+    sys_check_timeouts();
+
+#if LWIP_NETIF_LINK_CALLBACK
+    Ethernet_Link_Periodic_Handle(netif);
+#endif
+
+#if LWIP_DHCP
+    DHCP_Periodic_Handle(netif);
+#endif
   }
+}
 
-//	for (uint16_t h=0; h < SD_BLOCK_COUNT; h++)
-//	{
-//		MMCAdapter_read(buff, sector, count);
-//
-//	}
+static void StartDefaultTask()
+{
+  uint32_t *state;
+  struct netif * gnetif;
 
+  /* init code for LWIP */
+  gnetif = MX_LWIP_Init();
+
+  lwip_example_test(gnetif);
+
+  ethernet_link_probe(gnetif);
+
+  ethernet_link_thread(gnetif);
+  
+  /* USER CODE BEGIN 5 */
+  /* ETH_CODE: Adding lwiperf to measure TCP/IP performance.
+     * iperf 2.0.6 (or older?) is required for the tests. Newer iperf2 versions
+     * might work without data check, but they send different headers.
+     * iperf3 is not compatible at all.
+     * Adding lwiperf.c file to the project is necessary.
+     * The default include path should already contain
+     * 'lwip/apps/lwiperf.h'
+     */
+    LOCK_TCPIP_CORE();
+    state = lwiperf_start_tcp_server_default(NULL, NULL);
+
+    if (NULL != state)
+    {
+      ip4_addr_t remote_addr;
+      IP4_ADDR(&remote_addr, 192, 168, 1, 1);
+      state = lwiperf_start_tcp_client_default(&remote_addr, NULL, NULL);
+    }
+    
+    UNLOCK_TCPIP_CORE();
+
+    if (NULL != state)
+    {
+
+      /* Infinite loop */
+      for(;;)
+      {
+        osDelay(1000);
+      }
+    }
+  /* USER CODE END 5 */
 }
 
 /**
@@ -141,7 +221,6 @@ int main(void)
     uint32_t len;
   } Config = {0U};
 
-  char buffer[] = "{\"foo\":\"abc\",\"bar\":{\"foo\":\"xyz\"}}";
   /* Configure the MPU attributes */
   MPU_Config();
 
@@ -245,6 +324,8 @@ int main(void)
 	BSP_LED_Off(LED1);
 #endif
 
+  StartDefaultTask();
+
 	/*##-2- Start the Full Duplex Communication process ########################*/
 	/* While the SPI in TransmitReceive process, user can transmit data through
 	   "aTxBuffer" buffer & receive data through "aRxBuffer" */
@@ -314,90 +395,91 @@ int main(void)
   * @param  None
   * @retval None
   */
-static void SystemClock_Config(void)
-{
-  RCC_ClkInitTypeDef RCC_ClkInitStruct;
-  RCC_OscInitTypeDef RCC_OscInitStruct;
-  HAL_StatusTypeDef ret = HAL_OK;
-
-  /*!< Supply configuration update enable */
-  HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
-  /* The voltage scaling allows optimizing the power consumption when the device is
-     clocked below the maximum system frequency, to update the voltage scaling value
-     regarding system frequency refer to product datasheet.  */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
-
-  /* Enable HSE Oscillator and activate PLL with HSE as source */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
-  RCC_OscInitStruct.HSIState = RCC_HSI_OFF;
-  RCC_OscInitStruct.CSIState = RCC_CSI_OFF;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-
-  RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 100;
-  RCC_OscInitStruct.PLL.PLLFRACN = 0;
-  RCC_OscInitStruct.PLL.PLLP = 2;
-  RCC_OscInitStruct.PLL.PLLR = 2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
-
-  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
-  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
-  ret = HAL_RCC_OscConfig(&RCC_OscInitStruct);
-  if(ret != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-#if TEST_SPI_PLL2
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-  PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1 | RCC_PERIPHCLK_SPI4;
-  PeriphClkInitStruct.PLL2.PLL2M = 2;
-  PeriphClkInitStruct.PLL2.PLL2N = 96;
-  PeriphClkInitStruct.PLL2.PLL2FRACN = 1;
-  PeriphClkInitStruct.PLL2.PLL2P = 20;
-  PeriphClkInitStruct.PLL2.PLL2Q = 20;
-  PeriphClkInitStruct.PLL2.PLL2R = 2;
-
-  PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
-  PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_2;
-
-  ret = HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
-  // Configure and enable PLL2
-  if (HAL_OK != ret) {
-      Error_Handler();  // Configuration failed
-  }
-#endif
-
-/* Select PLL as system clock source and configure  bus clocks dividers */
-  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_D1PCLK1 | RCC_CLOCKTYPE_PCLK1 | \
-                                 RCC_CLOCKTYPE_PCLK2  | RCC_CLOCKTYPE_D3PCLK1);
-
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
-  ret = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4);
-  if(ret != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-}
+ static void SystemClock_Config(void)
+ {
+   RCC_ClkInitTypeDef RCC_ClkInitStruct;
+   RCC_OscInitTypeDef RCC_OscInitStruct;
+   HAL_StatusTypeDef ret = HAL_OK;
+ 
+   /*!< Supply configuration update enable */
+   HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
+   /* The voltage scaling allows optimizing the power consumption when the device is
+      clocked below the maximum system frequency, to update the voltage scaling value
+      regarding system frequency refer to product datasheet.  */
+   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+ 
+   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+ 
+   /* Enable HSE Oscillator and activate PLL with HSE as source */
+   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+   RCC_OscInitStruct.HSIState = RCC_HSI_OFF;
+   RCC_OscInitStruct.CSIState = RCC_CSI_OFF;
+   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+ 
+   RCC_OscInitStruct.PLL.PLLM = 4;
+   RCC_OscInitStruct.PLL.PLLN = 400;
+   RCC_OscInitStruct.PLL.PLLFRACN = 0;
+   RCC_OscInitStruct.PLL.PLLP = 2;
+   RCC_OscInitStruct.PLL.PLLR = 2;
+   RCC_OscInitStruct.PLL.PLLQ = 2;
+ 
+   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
+   RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
+   ret = HAL_RCC_OscConfig(&RCC_OscInitStruct);
+   if(ret != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+ #if TEST_SPI_PLL2
+   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+   PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
+   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1 | RCC_PERIPHCLK_SPI4;
+   PeriphClkInitStruct.PLL2.PLL2M = 2;
+   PeriphClkInitStruct.PLL2.PLL2N = 96;
+   PeriphClkInitStruct.PLL2.PLL2FRACN = 1;
+   PeriphClkInitStruct.PLL2.PLL2P = 20;
+   PeriphClkInitStruct.PLL2.PLL2Q = 20;
+   PeriphClkInitStruct.PLL2.PLL2R = 2;
+ 
+   PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+   PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_2;
+ 
+   ret = HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+   // Configure and enable PLL2
+   if (HAL_OK != ret) {
+       Error_Handler();  // Configuration failed
+   }
+ #endif
+ 
+ /* Select PLL as system clock source and configure  bus clocks dividers */
+   RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | \
+                                  RCC_CLOCKTYPE_D1PCLK1 | RCC_CLOCKTYPE_PCLK1 | \
+                                  RCC_CLOCKTYPE_PCLK2  | RCC_CLOCKTYPE_D3PCLK1);
+ 
+   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
+   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
+   RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
+   RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
+   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
+   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
+   ret = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5);
+   if(ret != HAL_OK)
+   {
+     Error_Handler();
+   }
+ 
+ }
 
 /**
   * @brief  This function is executed in case of error occurrence.
   * @param  None
   * @retval None
   */
-static void Error_Handler(void)
+void Error_Handler(void)
 {
   BSP_LED_Off(LED1);
   /* Turn LED3 on */
@@ -412,20 +494,20 @@ static void Error_Handler(void)
   * @retval 0  : pBuffer1 identical to pBuffer2
   *         >0 : pBuffer1 differs from pBuffer2
   */
-static uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
-{
-  while (BufferLength--)
-  {
-    if((*pBuffer1) != *pBuffer2)
-    {
-      return BufferLength;
-    }
-    pBuffer1++;
-    pBuffer2++;
-  }
+// static uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
+// {
+//   while (BufferLength--)
+//   {
+//     if((*pBuffer1) != *pBuffer2)
+//     {
+//       return BufferLength;
+//     }
+//     pBuffer1++;
+//     pBuffer2++;
+//   }
 
-  return 0;
-}
+//   return 0;
+// }
 
 
 /**
@@ -454,6 +536,38 @@ static void MPU_Config(void)
   MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
 
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+  /* Configure the MPU attributes as Device not cacheable
+     for ETH DMA descriptors */
+     MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+     MPU_InitStruct.BaseAddress = 0x30000000;
+     MPU_InitStruct.Size = MPU_REGION_SIZE_1KB;
+     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+     MPU_InitStruct.IsBufferable = MPU_ACCESS_BUFFERABLE;
+     MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+     MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+     MPU_InitStruct.Number = MPU_REGION_NUMBER1;
+     MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+     MPU_InitStruct.SubRegionDisable = 0x00;
+     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+   
+     HAL_MPU_ConfigRegion(&MPU_InitStruct);
+   
+     /* Configure the MPU attributes as Normal Non Cacheable
+        for LwIP RAM heap which contains the Tx buffers */
+     MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+     MPU_InitStruct.BaseAddress = 0x30004000;
+     MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
+     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+     MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+     MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+     MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+     MPU_InitStruct.Number = MPU_REGION_NUMBER2;
+     MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
+     MPU_InitStruct.SubRegionDisable = 0x00;
+     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+   
+     HAL_MPU_ConfigRegion(&MPU_InitStruct);
 
   /* Enable the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
