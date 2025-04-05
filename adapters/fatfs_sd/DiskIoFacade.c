@@ -187,24 +187,24 @@ uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 	return result;
 }
 
-uint8_t RAM_disk_ioctl(
+DRESULT RAM_disk_ioctl(
 		BYTE cmd,		/* Control code */
 		void *buff		/* Buffer to send/receive control data */
 )
 {
-	uint8_t result;
+	DRESULT result;
 
 	result = 0U;
 
 	return result;
 }
 
-uint8_t USB_disk_ioctl(
+DRESULT USB_disk_ioctl(
 		BYTE cmd,		/* Control code */
 		void *buff		/* Buffer to send/receive control data */
 )
 {
-	uint8_t result;
+	DRESULT result;
 
 	result = 0U;
 
