@@ -41,6 +41,8 @@ uint32_t DHCPfineTimer = 0;
 uint8_t DHCP_state = DHCP_OFF;
 #endif
 
+static uint32_t EthLinkStatePrev = 0U;
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 /**
@@ -86,11 +88,22 @@ void ethernet_link_status_updated(struct netif *netif)
   */
 void Ethernet_Link_Periodic_Handle(struct netif *netif)
 {
+  uint8_t EthLinkChanged = 0U;
+
   /* Ethernet Link every 100ms */
   if (HAL_GetTick() - EthernetLinkTimer >= 100)
   {
     EthernetLinkTimer = HAL_GetTick();
     ethernet_link_check_state(netif);
+
+    EthLinkChanged = netif_is_link_up(netif) != EthLinkStatePrev;
+    EthLinkStatePrev = netif_is_link_up(netif);
+
+    if (EthLinkChanged)
+    {
+      ethernet_link_status_updated(netif);
+    }
+    
   }
 }
 #endif
