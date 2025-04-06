@@ -103,6 +103,8 @@ struct netif * MX_LWIP_Init(void)
   IP4_ADDR(&netmask, NETMASK_ADDRESS[0], NETMASK_ADDRESS[1] , NETMASK_ADDRESS[2], NETMASK_ADDRESS[3]);
   IP4_ADDR(&gw, GATEWAY_ADDRESS[0], GATEWAY_ADDRESS[1], GATEWAY_ADDRESS[2], GATEWAY_ADDRESS[3]);
 
+  ipaddr.addr = IPADDR_ANY;  // Let DHCP assign the address
+
   /* add the network interface (IPv4/IPv6) with RTOS */
 #if NO_SYS==0
   res = netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &tcpip_input);
@@ -117,6 +119,10 @@ struct netif * MX_LWIP_Init(void)
   {
     /* When the netif is fully configured this function must be called */
     netif_set_up(&gnetif);
+
+    volatile err_t restmp;
+    restmp = dhcp_start(&gnetif);
+    (void) restmp;
   }
   else
   {
