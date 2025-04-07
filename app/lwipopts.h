@@ -119,6 +119,18 @@
 
 
 #define LWIP_DHCP 1
+#define LWIP_HTTPD 0
+
+/** Set this to 1 to support CGI */
+#define LWIP_HTTPD_CGI            1
+
+/** Set this to 1 to support SSI (Server-Side-Includes) */
+#define LWIP_HTTPD_SSI            1
+
+#define LWIP_TCP 1
+
+#define HTTPD_USE_CUSTOM_FSDATA 1
+#define LWIP_HTTPD_CUSTOM_FILES 0
 
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */

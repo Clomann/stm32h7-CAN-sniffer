@@ -44,6 +44,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/main.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
+    ${PROJ_PATH}/CM7/Src/httpd_cgi_ssi.c
 
     ${PROJ_PATH}/app/FileHandler.c
     ${PROJ_PATH}/app/ethernetif.c
@@ -94,6 +95,9 @@ set(sources_SRCS                    # Modified
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/ipv4/ip4.c
 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/lwiperf/lwiperf.c
+    # ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/http/fsdata.c
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/http/httpd.c
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/http/fs.c
 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/netif/ethernet.c
 
@@ -291,6 +295,7 @@ set(include_path_DIRS               # Modified
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/system
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/apps
+    ${STM32_HAL_PATH}Middlewares/Third_Party/LwIP/src/apps/http/
 )
 
 #

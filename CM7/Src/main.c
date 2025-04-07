@@ -34,6 +34,8 @@
 #include "ethernetif.h"
 #include "app_ethernet.h"
 
+#include "httpd.h"
+#include "http_cgi_ssi.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -131,13 +133,15 @@ static void FatFS_SD_CreateFile()
 
 // }
 
-static void lwip_example_test(struct netif * netif)
+static void lwip_main(struct netif * netif)
 {
  /* Initialize the LwIP stack */
  lwip_init();
 
   /* TCP echo server Init */
   tcp_echoserver_init();
+
+  http_server_init();
 
   /* Infinite loop */
   while (1)
@@ -167,7 +171,7 @@ static void StartDefaultTask()
   /* init code for LWIP */
   gnetif = MX_LWIP_Init();
 
-  lwip_example_test(gnetif);
+  lwip_main(gnetif);
 
   ethernet_link_probe(gnetif);
 
