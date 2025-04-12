@@ -46,12 +46,13 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
     
     ${PROJ_PATH}/app/FileHandler.c
-    ${PROJ_PATH}/app/app_ethernet.c
-    ${PROJ_PATH}/app/ethernetif.c
-    ${PROJ_PATH}/app/fs_custom.c
-    ${PROJ_PATH}/CM7/Src/httpd_cgi_ssi.c
-    ${PROJ_PATH}/app/lwip.c
-    ${PROJ_PATH}/app/tcp_echoserver.c
+
+    ${PROJ_PATH}/app/http/src/app_ethernet.c
+    ${PROJ_PATH}/app/http/src/ethernetif.c
+    ${PROJ_PATH}/app/http/src/fs_custom.c
+    ${PROJ_PATH}/app/http/src/httpd_cgi_ssi.c
+    ${PROJ_PATH}/app/http/src/lwip.c
+    ${PROJ_PATH}/app/http/src/tcp_echoserver.c
 
     ${PROJ_PATH}/drivers/spi/Spi_Cmds.c
 
@@ -265,6 +266,8 @@ set(include_path_DIRS               # Modified
     ${PROJ_PATH}/CM7/Inc
 
     ${PROJ_PATH}/app
+    ${PROJ_PATH}/app/fs
+    ${PROJ_PATH}/app/http/inc
 
     ${PROJ_PATH}/drivers/spi
 
