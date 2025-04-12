@@ -31,58 +31,109 @@ tSSIHandler ADC_Page_SSI_Handler;
 uint32_t ADC_not_configured=1;
 
 /* we will use character "t" as tag for CGI */
-char const* TAGCHAR="t";
+char const* TAGCHAR[] = {
+  "baudrate",  // index=0
+  "mode",  // index=1
+};
+
 char const** TAGS=&TAGCHAR;
 
 u16_t Handler(int iIndex, char *pcInsert, int iInsertLen);
 
 /* CGI handler for LED control */
 const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
+const char * CAN_config_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
 void httpd_ssi_init(void);
 void httpd_cgi_init(void);
 
 /* Html request for "/leds.cgi" will start LEDS_CGI_Handler */
 const tCGI LEDS_CGI={"/leds.cgi", LEDS_CGI_Handler};
+const tCGI CAN_CFG_CGI={"/can.cgi", CAN_config_CGI_Handler};
 
 /* Cgi call table, only one CGI used */
 tCGI CGI_TAB[1];
+
+static uint32_t storedBaudRate = 250000;
+static uint32_t storedMode = 1;
 
 /**
   * @brief  ADC_Handler : SSI handler for ADC page
   */
 u16_t Handler(int iIndex, char *pcInsert, int iInsertLen)
 {
-  /* We have only one SSI handler iIndex = 0 */
-  if (iIndex ==0)
-  {
-    char Digit1=0, Digit2=0, Digit3=0, Digit4=0;
-    uint32_t ADCVal = 0;
-
-    // ADCVal = BSP_POT_GetLevel(POT1);
-    
-    /*Convert ADC value from % to regular conversion result */
-    ADCVal = (ADCVal * 0xFFF) / 100;
-
-    /* convert to Voltage,  step = 0.8 mV */
-    ADCVal = (uint32_t)(ADCVal * 0.8);
-
-    /* get digits to display */
-
-    Digit1= ADCVal/1000;
-    Digit2= (ADCVal-(Digit1*1000))/100;
-    Digit3= (ADCVal-((Digit1*1000)+(Digit2*100)))/10;
-    Digit4= ADCVal -((Digit1*1000)+(Digit2*100)+ (Digit3*10));
-
-    /* prepare data to be inserted in html */
-    *pcInsert       = (char)(Digit1+0x30);
-    *(pcInsert + 1) = (char)(Digit2+0x30);
-    *(pcInsert + 2) = (char)(Digit3+0x30);
-    *(pcInsert + 3) = (char)(Digit4+0x30);
-
-    /* 4 characters need to be inserted in html*/
-    return 4;
+  //   iIndex=0 => "opt250"
+  //   iIndex=1 => "opt500"
+  //   storedBaudRate is the previously selected baud
+  switch (iIndex) {
+    case 0: // "baudrate"
+        if (storedBaudRate == 250000) {
+            snprintf(pcInsert, iInsertLen, "250 kbit/s");
+        } else if (storedBaudRate == 500000) {
+            snprintf(pcInsert, iInsertLen, "500 kbit/s");
+        } else {
+            *pcInsert = '\0';
+        }
+        return (u16_t)strlen(pcInsert);
+    case 1: // "mode"
+        if (storedMode == 1) {
+            snprintf(pcInsert, iInsertLen, "normal");
+        } else if (storedMode == 2) {
+            snprintf(pcInsert, iInsertLen, "listen only");
+        } else {
+            *pcInsert = '\0';
+        }
+        return (u16_t)strlen(pcInsert);        
+    default:
+        break;
   }
+  
   return 0;
+}
+
+const char * CAN_config_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+  uint32_t i=0;
+uint8_t tmp[254];
+  if (iIndex==1)
+  {
+    /* Check cgi parameter */
+    for (i=0; i<(uint32_t)iNumParams; i++)
+    {
+      memcpy(tmp, pcParam, 254);
+      /* check parameter "led" */
+      if (strcmp(pcParam[i] , "baudrate")==0)
+      {
+        /* Switch LED1 ON if 1 */
+        if(strcmp(pcValue[i], "250000") ==0)
+        {
+          storedBaudRate = 250000;
+        }
+        /* Switch LED2 ON if 2 */
+        else if(strcmp(pcValue[i], "500000") ==0)
+        {
+          storedBaudRate = 500000;
+        }
+
+      }
+      else if (strcmp(pcParam[i] , "mode")==0)
+      {
+        /* Switch LED1 ON if 1 */
+        if(strcmp(pcValue[i], "1") ==0)
+        {
+          storedMode = 1;
+        }
+        /* Switch LED2 ON if 2 */
+        else if(strcmp(pcValue[i], "2") ==0)
+        {
+          storedMode = 2;
+        }
+
+      }
+    }
+  }
+  
+  /* uri to send after cgi call*/
+  return "/can.shtml";
 }
 
 /**
@@ -102,7 +153,7 @@ const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char 
     // BSP_LED_Off(LED4);
 
     /* Check cgi parameter : application GET /leds.cgi?led=2&led=4 */
-    for (i=0; i<iNumParams; i++)
+    for (i=0; i<(uint32_t)iNumParams; i++)
     {
       /* check parameter "led" */
       if (strcmp(pcParam[i] , "led")==0)
@@ -133,7 +184,7 @@ const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char 
     }
   }
   /* uri to send after cgi call*/
-  return "/STM32H7xxLED.html";
+  return "/can.shtml";
 }
 
 /**
@@ -144,12 +195,11 @@ void http_server_init(void)
   /* Httpd Init */
   httpd_init();
 
-  /* configure SSI handlers (ADC page SSI) */
-  http_set_ssi_handler(Handler, (char const **)TAGS, 1);
+  /* configure SSI handlers */
+  http_set_ssi_handler(Handler, (char const **)TAGS, 4);
 
-  /* configure CGI handlers (LEDs control CGI) */
+  /* configure CGI handlers */
   CGI_TAB[0] = LEDS_CGI;
-  http_set_cgi_handlers(CGI_TAB, 1);
+  CGI_TAB[1] = CAN_CFG_CGI;
+  http_set_cgi_handlers(CGI_TAB, 2);
 }
-
-
