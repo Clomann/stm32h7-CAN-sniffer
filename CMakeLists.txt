@@ -44,14 +44,14 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/main.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
-    ${PROJ_PATH}/CM7/Src/httpd_cgi_ssi.c
-
+    
     ${PROJ_PATH}/app/FileHandler.c
-    ${PROJ_PATH}/app/ethernetif.c
-    ${PROJ_PATH}/app/lwip.c
-
-    ${PROJ_PATH}/app/tcp_echoserver.c
     ${PROJ_PATH}/app/app_ethernet.c
+    ${PROJ_PATH}/app/ethernetif.c
+    ${PROJ_PATH}/app/fs_custom.c
+    ${PROJ_PATH}/CM7/Src/httpd_cgi_ssi.c
+    ${PROJ_PATH}/app/lwip.c
+    ${PROJ_PATH}/app/tcp_echoserver.c
 
     ${PROJ_PATH}/drivers/spi/Spi_Cmds.c
 
