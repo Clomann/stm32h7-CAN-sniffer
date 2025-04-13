@@ -36,7 +36,7 @@ char const* TAGCHAR[] = {
   "mode",  // index=1
 };
 
-char const** TAGS=&TAGCHAR;
+char const** TAGS = (char const**)&TAGCHAR;
 
 u16_t Handler(int iIndex, char *pcInsert, int iInsertLen);
 
