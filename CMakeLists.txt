@@ -46,6 +46,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
     
     ${PROJ_PATH}/app/FileHandler.c
+    ${PROJ_PATH}/app/HttpAbs.c
 
     ${PROJ_PATH}/app/http/src/app_ethernet.c
     ${PROJ_PATH}/app/http/src/ethernetif.c
