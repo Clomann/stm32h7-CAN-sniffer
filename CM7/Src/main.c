@@ -27,15 +27,7 @@
 #include "MmcAdapter.h"
 #include "string.h"
 #include "FileHandler.h"
-#include "lwip.h"
-#include "lwip/init.h"
-#include "lwiperf.h"
-#include "tcp_echoserver.h"
-#include "ethernetif.h"
-#include "app_ethernet.h"
-
-#include "httpd.h"
-#include "http_cgi_ssi.h"
+#include "HttpAbs.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -133,80 +125,14 @@ static void FatFS_SD_CreateFile()
 
 // }
 
-static void lwip_main(struct netif * netif)
-{
- /* Initialize the LwIP stack */
- lwip_init();
-
-  /* TCP echo server Init */
-  tcp_echoserver_init();
-
-  http_server_init();
-
-  /* Infinite loop */
-  while (1)
-  {
-    /* Read a received packet from the Ethernet buffers and send it
-       to the lwIP for handling */
-    ethernetif_input(netif);
-
-    /* Handle timeouts */
-    sys_check_timeouts();
-
-#if LWIP_NETIF_LINK_CALLBACK
-    Ethernet_Link_Periodic_Handle(netif);
-#endif
-
-#if LWIP_DHCP
-    DHCP_Periodic_Handle(netif);
-#endif
-  }
-}
-
 static void StartDefaultTask()
 {
-  uint32_t *state;
-  struct netif * gnetif;
+  http_init();
 
-  /* init code for LWIP */
-  gnetif = MX_LWIP_Init();
-
-  lwip_main(gnetif);
-
-  ethernet_link_probe(gnetif);
-
-  ethernet_link_thread(gnetif);
-  
-  /* USER CODE BEGIN 5 */
-  /* ETH_CODE: Adding lwiperf to measure TCP/IP performance.
-     * iperf 2.0.6 (or older?) is required for the tests. Newer iperf2 versions
-     * might work without data check, but they send different headers.
-     * iperf3 is not compatible at all.
-     * Adding lwiperf.c file to the project is necessary.
-     * The default include path should already contain
-     * 'lwip/apps/lwiperf.h'
-     */
-    LOCK_TCPIP_CORE();
-    state = lwiperf_start_tcp_server_default(NULL, NULL);
-
-    if (NULL != state)
-    {
-      ip4_addr_t remote_addr;
-      IP4_ADDR(&remote_addr, 192, 168, 1, 1);
-      state = lwiperf_start_tcp_client_default(&remote_addr, NULL, NULL);
-    }
-    
-    UNLOCK_TCPIP_CORE();
-
-    if (NULL != state)
-    {
-
-      /* Infinite loop */
-      for(;;)
-      {
-        osDelay(1000);
-      }
-    }
+  while (1)
+  {
+    http_poll();
+  }
   /* USER CODE END 5 */
 }
 
