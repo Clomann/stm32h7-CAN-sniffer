@@ -29,14 +29,13 @@ typedef struct {
 
 static CustomHandlerState reqState;
 
-int
-fs_open_custom(struct fs_file *file, const char *name)
+int fs_open_custom(struct fs_file *file, const char *name)
 {
     if (strcmp(name, "/can_trace") == 0) {
         reqState.index = 0;
         reqState.stage = 0;
         reqState.callcount = 0;
-        strncpy(reqState.name, name, sizeof(reqState.name));
+        strncpy(reqState.name, (char *)name, sizeof(reqState.name));
 
         file->pextension = &reqState;
         file->data = NULL;
@@ -50,7 +49,7 @@ fs_open_custom(struct fs_file *file, const char *name)
 
 #define CAN_LOG_BUFFER_SIZE 8U
 
-fs_state_free(struct fs_file *file, void *state)
+void fs_state_free(struct fs_file *file, void *state)
 {
   LWIP_UNUSED_ARG(file);
   if (state != NULL) {
@@ -59,8 +58,7 @@ fs_state_free(struct fs_file *file, void *state)
 
 #define CHUNK_SIZE  (512U)
 
-int
-fs_read_custom(struct fs_file *file, char *buffer, int count)
+int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
     uint32_t len = 0U;
     CustomHandlerState *state = (CustomHandlerState *)file->pextension;

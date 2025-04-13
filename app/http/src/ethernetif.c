@@ -473,6 +473,8 @@ static struct pbuf * low_level_input(struct netif *netif)
   struct pbuf *p = NULL;
   volatile HAL_StatusTypeDef status;
 
+  (void) status;
+
   if(RxAllocStatus == RX_ALLOC_OK)
   {
     status = HAL_ETH_ReadData(&heth, (void **)&p);
