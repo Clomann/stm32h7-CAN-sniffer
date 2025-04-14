@@ -35,7 +35,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
         reqState.index = 0;
         reqState.stage = 0;
         reqState.callcount = 0;
-        strncpy(reqState.name, (char *)name, sizeof(reqState.name));
+        strncpy((char *)reqState.name, name, sizeof(reqState.name));
 
         file->pextension = &reqState;
         file->data = NULL;
