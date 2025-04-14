@@ -14,8 +14,6 @@ static struct netif * gnetif;
 
 void http_init()
 {
-    uint32_t *state;
-  
     /* init code for LWIP */
     gnetif = MX_LWIP_Init();
   
