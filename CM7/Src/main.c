@@ -57,9 +57,8 @@ static void CPU_CACHE_Enable(void);
 /* Private functions ---------------------------------------------------------*/
 
 FATFS FatFs;		/* FatFs work area needed for each volume */
-FIL Fil;			/* File object needed for each open file */
 
-static int FatFS_SD_LoadConfig(char *data, uint32_t *len)
+static int FatFS_SD_LoadConfig(FIL *file, char *data, uint32_t *len)
 {
 	FRESULT fr;
   UINT BytesRead = 0U;
@@ -68,12 +67,12 @@ static int FatFS_SD_LoadConfig(char *data, uint32_t *len)
 	fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
 
   if (fr == FR_OK)
-    fr = f_open(&Fil, "conf.txt", FA_READ);	/* Create a file */
+    fr = f_open(file, "conf.txt", FA_READ);	/* Create a file */
 
 	if (fr == FR_OK) {
-    FileSize = f_size(&Fil);
-    f_read(&Fil, data, FileSize, &BytesRead);
-		fr = f_close(&Fil);							/* Close the file */
+    FileSize = f_size(file);
+    f_read(file, data, FileSize, &BytesRead);
+		fr = f_close(file);							/* Close the file */
 	}
 
   *len = BytesRead;
@@ -81,26 +80,32 @@ static int FatFS_SD_LoadConfig(char *data, uint32_t *len)
   return fr;
 }
 
-static void FatFS_SD_CreateFile()
+static FRESULT FatFS_SD_OpenFileForWrite(FIL *file, const char *name)
 {
-	FRESULT fr;
-  UINT BytesWritten;
-  const char Text[] = "Hello from Clemens' uC:  \n";
-  char Data[4096]; 
-
-  strncpy(Data, Text, strlen(Text));
-
-	fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
+  FRESULT fr;
+  
+  fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
   // fr = f_mount(&FatFs, "", 1U);
 	
   if (fr == FR_OK)
-    fr = f_open(&Fil, "newfile.txt", FA_OPEN_APPEND | FA_WRITE | FA_READ );	/* Create a file */
+    fr = f_open(file, name, FA_OPEN_APPEND | FA_WRITE | FA_READ );	/* Create a file */
 
-	if (fr == FR_OK) {
-    f_lseek(&Fil, f_size(&Fil));  // Move file pointer to the end
-    f_write(&Fil, Text, strlen(Text), &BytesWritten);
-		fr = f_close(&Fil);							/* Close the file */
-	}
+  return fr;
+}
+
+static void FatFS_SD_WriteFile(FIL *file, const char *content, const uint32_t len)
+{
+  UINT BytesWritten;
+  uint32_t FileSize = 0U;
+
+  FileSize = f_size(file);
+  f_lseek(file, FileSize);  // Move file pointer to the end
+  f_write(file, content, len, &BytesWritten);
+}
+
+static FRESULT FatFS_SD_CloseFile(FIL *file)
+{
+  return f_close(file);							/* Close the file */
 }
 
 // static void FatFS_SD_WriteFile()
@@ -125,17 +130,6 @@ static void FatFS_SD_CreateFile()
 
 // }
 
-static void StartDefaultTask()
-{
-  http_init();
-
-  while (1)
-  {
-    http_poll();
-  }
-  /* USER CODE END 5 */
-}
-
 /**
   * @brief  Main program
   * @param  None
@@ -143,6 +137,10 @@ static void StartDefaultTask()
   */
 int main(void)
 {
+  static FIL TestWriteFileHandle;
+  static FIL CanLogWriteFileHandle;
+  static FIL CanLogReadFileHandle;
+  static FIL ConfigReadFileHandle;
   int32_t timeout;
   uint32_t spiClockSource;
   HAL_StatusTypeDef HalStatus;
@@ -242,7 +240,7 @@ int main(void)
   {
 	//aTxBuffer[0] = counter++;
 //	SCB_CleanDCache_by_Addr ((uint32_t *)aTxBuffer, BUFFERSIZE);
-#ifdef WAIT_FOR_USER_BUTTON
+#if WAIT_FOR_USER_BUTTON
 	/* Configure User push-button button */
 	BSP_PB_Init(BUTTON_USER,BUTTON_MODE_GPIO);
 	/* Wait for User push-button press before starting the Communication */
@@ -254,19 +252,42 @@ int main(void)
 	BSP_LED_Off(LED1);
 #endif
 
-  StartDefaultTask();
+  http_init();
+
+  /* USER CODE END 5 */
 
 	/*##-2- Start the Full Duplex Communication process ########################*/
 	/* While the SPI in TransmitReceive process, user can transmit data through
 	   "aTxBuffer" buffer & receive data through "aRxBuffer" */
   Spi_PwrOn();
-  if (0U == FatFS_SD_LoadConfig(Config.data, &Config.len) )
+  if (0U == FatFS_SD_LoadConfig(&ConfigReadFileHandle, Config.data, &Config.len) )
   {
-    FileHandler_LoadConfig(Config.data, Config.len, &AppConfig);
+    FileHandler_ParseConfig(Config.data, Config.len, &AppConfig);
   }
-  FatFS_SD_CreateFile();
+
+  const char ConfigFileName[] = "newfile.txt";
+  const char ConfigContent[] = "Hello from Clemens' uC:  \n";
+  
+  if ( 0 == FatFS_SD_OpenFileForWrite(&TestWriteFileHandle, ConfigFileName) )
+  {
+    FatFS_SD_WriteFile(&TestWriteFileHandle, ConfigContent, sizeof(ConfigContent)-1); 
+  }
+
+  const char CanLogFilename[] = "can.log";
+  if ( 0 == FatFS_SD_OpenFileForWrite(&CanLogWriteFileHandle, CanLogFilename) )
+  {
+    FatFS_SD_WriteFile(&CanLogWriteFileHandle, ConfigContent, sizeof(ConfigContent)-1); 
+  }
+  
+  FatFS_SD_CloseFile(&TestWriteFileHandle);
+  FatFS_SD_CloseFile(&CanLogWriteFileHandle);
+
   Spi_PwrOff();
-	//FatFS_SD_WriteFile();
+	
+  while (1)
+  {
+    http_poll();
+  }
 
 	/*##-3- Wait for the end of the transfer ###################################*/
 	/*  Before starting a new communication transfer, you must wait the callback call
