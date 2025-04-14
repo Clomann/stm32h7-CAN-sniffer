@@ -105,22 +105,25 @@ static int IpStringToIntArray(const char *ip, uint8_t len, uint8_t *arr)
     return (ElemCount == 4U) ? SUCCESS : ERROR_INVALID_FORMAT; // Ensure exactly 4 octets
 }
 
-int FileHandler_LoadConfig(char *buffer, uint32_t len, AppConfigType *cfg)
+int FileHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
 {
     // Variables used in this example.
     JSONStatus_t result;
     size_t bufferLength = len;
-    char queryKey1[] = "CAN1.Baudrate";
-    size_t queryKeyLength1 = sizeof( queryKey1 ) - 1;
-    char queryKey2[] = "HTTP.IP";
-    size_t queryKeyLength2 = sizeof( queryKey2 ) - 1;
-    
+    const char queryKey1[] = "CAN1.Baudrate";
+    const size_t queryKeyLength1 = sizeof( queryKey1 ) - 1;
+    const char queryKey2[] = "CAN1.Mode";
+    const size_t queryKeyLength2 = sizeof( queryKey2 ) - 1;
+    const char queryKey3[] = "HTTP.IP";
+    const size_t queryKeyLength3 = sizeof( queryKey3 ) - 1;
+
     char TmpBuf[64];
 
     char * value;
     size_t valueLength;
 
     uint32_t Baudrate;
+    uint32_t Mode;
     uint8_t IP[4U];
 
     // Calling JSON_Validate() is not necessary if the document is guaranteed to be valid.
@@ -128,15 +131,26 @@ int FileHandler_LoadConfig(char *buffer, uint32_t len, AppConfigType *cfg)
 
     if( result == JSONSuccess )
     {
-        
-        if( JSONSuccess == (result = FileHandler_GetValue( buffer, bufferLength, queryKey1, queryKeyLength1, &value, &valueLength ) ) )
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey1, queryKeyLength1, &value, &valueLength);
+        if( JSONSuccess ==  result )
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if ( 0U == m_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
                 cfg->baudrate = Baudrate;
         }
-        if( JSONSuccess == (result = FileHandler_GetValue( buffer, bufferLength, queryKey2, queryKeyLength2, &value, &valueLength ) ) ) 
+        
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey2, queryKeyLength2, &value, &valueLength );
+        if( JSONSuccess == result ) 
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if (0U == m_ConvertToInteger(TmpBuf, &Mode, 10U))
+                cfg->mode = Mode;
+        }
+
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey3, queryKeyLength3, &value, &valueLength );
+        if( JSONSuccess == result ) 
         {
             if (0U == IpStringToIntArray(value, valueLength, IP))
                 memcpy(cfg->ip, IP, 4U);
