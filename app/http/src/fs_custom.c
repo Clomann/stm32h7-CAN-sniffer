@@ -3,6 +3,8 @@
 
 #include <string.h>
 
+#include "FileHandler.h"
+
 #include "test_can_trace.c"
 
 struct fs_custom_data {
@@ -28,20 +30,34 @@ typedef struct {
 } CustomHandlerState;
 
 static CustomHandlerState reqState;
+static FatFsDeviceType CanLogReadFileDevice;
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
+    const char CanLogFilename[] = "can.log";
+    int FileSize = 0U;
+
     if (strcmp(name, "/can_trace") == 0) {
         reqState.index = 0;
         reqState.stage = 0;
         reqState.callcount = 0;
         strncpy((char *)reqState.name, name, sizeof(reqState.name));
 
+        if ( 0 != FatFS_SD_OpenFileForRead(&(CanLogReadFileDevice.file), CanLogFilename) )
+        {
+            return 0;
+        }
+
+        (void) FatFS_SD_GetFileSize(&CanLogReadFileDevice.file, &FileSize);
+
+        CanLogReadFileDevice.readTargetSize = FileSize;
+
         file->pextension = &reqState;
         file->data = NULL;
-        file->len = CAN_TRACE_DATA_LENGTH;  // tell lwip the total file size
+        file->len = FileSize;  // tell lwip the total file size
         file->index = 0;
         file->is_custom_file = 1;
+    
         return 1;
     }
     return 0;  // Fallback to default file system
@@ -70,22 +86,23 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
     if (strcmp(state->name, "/can_trace") == 0)
     {
         volatile uint32_t FileIndex = state->callcount * CHUNK_SIZE;
-        if (FileIndex >= CAN_TRACE_DATA_LENGTH)
+        
+        if (FileIndex >= CanLogReadFileDevice.readTargetSize)
         {
             state->callcount = 0;
             return FS_READ_EOF;
         }
 
-        if (CAN_TRACE_DATA_LENGTH > FileIndex + CHUNK_SIZE)
+        if (CanLogReadFileDevice.readTargetSize > FileIndex + CHUNK_SIZE)
         {
             len = CHUNK_SIZE;
-            memcpy(buffer, &CAN_TRACE_DATA[FileIndex], len);
         }
         else
         {
-            len = CAN_TRACE_DATA_LENGTH - FileIndex ;
-            memcpy(buffer, &CAN_TRACE_DATA[FileIndex], len);
+            len = CanLogReadFileDevice.readTargetSize - FileIndex ;   
         }
+
+        FatFS_SD_ReadFile(&CanLogReadFileDevice.file, buffer, len);
 
         state->callcount++;
     }
@@ -95,6 +112,13 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
 
 void fs_close_custom(struct fs_file *file)
 {
+    CustomHandlerState *state = (CustomHandlerState *)file->pextension;
+
+    if (strcmp(state->name, "/can_trace") == 0)
+    {
+        FatFS_SD_CloseFile(&(CanLogReadFileDevice.file));
+    }
+        
     file->pextension = NULL; // optional cleanup
 }
 
