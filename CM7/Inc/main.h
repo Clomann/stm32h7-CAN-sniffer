@@ -34,7 +34,7 @@
 
 /* Exported functions ------------------------------------------------------- */
 
-#define WAIT_FOR_USER_BUTTON	(1U)
+#define WAIT_FOR_USER_BUTTON	(0U)
 
 void Error_Handler(void);
 

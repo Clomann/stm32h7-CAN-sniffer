@@ -24,8 +24,8 @@
 
 //#include "SD.h"
 //#include "Spi_Cmds.h"
-#include "MmcAdapter.h"
-#include "string.h"
+
+#include <string.h>
 #include "FileHandler.h"
 #include "HttpAbs.h"
 
@@ -56,58 +56,6 @@ static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
 
-FATFS FatFs;		/* FatFs work area needed for each volume */
-
-static int FatFS_SD_LoadConfig(FIL *file, char *data, uint32_t *len)
-{
-	FRESULT fr;
-  UINT BytesRead = 0U;
-  uint32_t FileSize = 0U;
-
-	fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
-
-  if (fr == FR_OK)
-    fr = f_open(file, "conf.txt", FA_READ);	/* Create a file */
-
-	if (fr == FR_OK) {
-    FileSize = f_size(file);
-    f_read(file, data, FileSize, &BytesRead);
-		fr = f_close(file);							/* Close the file */
-	}
-
-  *len = BytesRead;
-
-  return fr;
-}
-
-static FRESULT FatFS_SD_OpenFileForWrite(FIL *file, const char *name)
-{
-  FRESULT fr;
-  
-  fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
-  // fr = f_mount(&FatFs, "", 1U);
-	
-  if (fr == FR_OK)
-    fr = f_open(file, name, FA_OPEN_APPEND | FA_WRITE | FA_READ );	/* Create a file */
-
-  return fr;
-}
-
-static void FatFS_SD_WriteFile(FIL *file, const char *content, const uint32_t len)
-{
-  UINT BytesWritten;
-  uint32_t FileSize = 0U;
-
-  FileSize = f_size(file);
-  f_lseek(file, FileSize);  // Move file pointer to the end
-  f_write(file, content, len, &BytesWritten);
-}
-
-static FRESULT FatFS_SD_CloseFile(FIL *file)
-{
-  return f_close(file);							/* Close the file */
-}
-
 // static void FatFS_SD_WriteFile()
 // {
 //   #define BLOCKS_READ 4U 
@@ -137,10 +85,10 @@ static FRESULT FatFS_SD_CloseFile(FIL *file)
   */
 int main(void)
 {
-  static FIL TestWriteFileHandle;
-  static FIL CanLogWriteFileHandle;
-  static FIL CanLogReadFileHandle;
-  static FIL ConfigReadFileHandle;
+  static FatFsDeviceType TestWriteFileDevice;
+  static FatFsDeviceType CanLogWriteFileDevice;
+  static FatFsDeviceType ConfigReadFileDevice;
+  uint8_t run;
   int32_t timeout;
   uint32_t spiClockSource;
   HAL_StatusTypeDef HalStatus;
@@ -252,7 +200,7 @@ int main(void)
 	BSP_LED_Off(LED1);
 #endif
 
-  http_init();
+
 
   /* USER CODE END 5 */
 
@@ -260,7 +208,7 @@ int main(void)
 	/* While the SPI in TransmitReceive process, user can transmit data through
 	   "aTxBuffer" buffer & receive data through "aRxBuffer" */
   Spi_PwrOn();
-  if (0U == FatFS_SD_LoadConfig(&ConfigReadFileHandle, Config.data, &Config.len) )
+  if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice.file, Config.data, &Config.len) )
   {
     FileHandler_ParseConfig(Config.data, Config.len, &AppConfig);
   }
@@ -268,26 +216,40 @@ int main(void)
   const char ConfigFileName[] = "newfile.txt";
   const char ConfigContent[] = "Hello from Clemens' uC:  \n";
   
-  if ( 0 == FatFS_SD_OpenFileForWrite(&TestWriteFileHandle, ConfigFileName) )
+  if ( RES_OK == FatFS_SD_Mount() )
   {
-    FatFS_SD_WriteFile(&TestWriteFileHandle, ConfigContent, sizeof(ConfigContent)-1); 
-  }
+    if ( 0 == FatFS_SD_OpenFileForWrite(&(TestWriteFileDevice.file), ConfigFileName) )
+    {
+      FatFS_SD_WriteFile(&(TestWriteFileDevice.file), ConfigContent, sizeof(ConfigContent)-1); 
+    }
 
-  const char CanLogFilename[] = "can.log";
-  if ( 0 == FatFS_SD_OpenFileForWrite(&CanLogWriteFileHandle, CanLogFilename) )
-  {
-    FatFS_SD_WriteFile(&CanLogWriteFileHandle, ConfigContent, sizeof(ConfigContent)-1); 
+    const char CanLogFilename[] = "can.log";
+    char Buffer[512U] = {'\0'};
+    uint32_t FileSize = 0U; 
+    if ( 0 == FatFS_SD_OpenFileForRead(&(CanLogWriteFileDevice.file), CanLogFilename) )
+    {
+      // FatFS_SD_StartRead(&CanLogWriteFileDevice.file, &FileSize); 
+      // FatFS_SD_Read(&CanLogWriteFileDevice.file, Buffer, sizeof(Buffer)-1); 
+    }
+    FatFS_SD_CloseFile(&(CanLogWriteFileDevice.file));
+    FatFS_SD_CloseFile(&(TestWriteFileDevice.file));
+    
+
+    
   }
-  
-  FatFS_SD_CloseFile(&TestWriteFileHandle);
-  FatFS_SD_CloseFile(&CanLogWriteFileHandle);
 
   Spi_PwrOff();
 	
-  while (1)
+  http_init();
+
+  run = 1U;
+
+  while (run)
   {
     http_poll();
   }
+
+  FatFS_SD_Unmount();
 
 	/*##-3- Wait for the end of the transfer ###################################*/
 	/*  Before starting a new communication transfer, you must wait the callback call
