@@ -69,7 +69,7 @@ result = RES_ERROR;
 switch (cmd)
 {
 /* Generic command (Used by FatFs) */
-case CTRL_SYNC: break;
+case CTRL_SYNC:
 	result = MMCAdapter_CtrlSync();
 	break;
 case GET_SECTOR_COUNT:
@@ -110,7 +110,9 @@ case ISDIO_WRITE:
 case ISDIO_MRITE:
 	result = RES_ERROR;
 	break;
-default: result = RES_PARERR; break;
+default: 
+	result = RES_PARERR; 
+	break;
 }
 return result;
 }
