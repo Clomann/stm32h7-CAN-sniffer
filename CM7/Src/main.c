@@ -38,6 +38,18 @@
   */
 
 /* Private typedef -----------------------------------------------------------*/
+
+typedef struct {
+  struct {
+    const char * filename;
+    uint32_t count;
+    uint32_t timestamp;
+    uint8_t openRes;
+    FatFsDeviceType writeFileDevice;
+  } CanLog;
+  uint8_t mountRes;
+} AppControlDataType;
+
 /* Private define ------------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,7 +58,20 @@
 #define USE_HAL_SPI_REGISTER_CALLBACKS = 1U;
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
 
+uint8_t run;
 static AppConfigType AppConfig;
+static const char CanLogFileName[] = "can.log";
+
+static AppControlDataType AppCtrlData = { 
+  .CanLog = {
+    .filename = CanLogFileName,
+    .count = 0,
+    .timestamp = 0,
+    .openRes = 1,
+    .writeFileDevice.readTargetSize = 0U,
+  },
+  .mountRes = 1,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
@@ -56,27 +81,53 @@ static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
 
-// static void FatFS_SD_WriteFile()
-// {
-//   #define BLOCKS_READ 4U 
-//   BYTE buff[BLOCKS_READ * SD_SECTOR_LENGTH];
-// 	LBA_t sector;
-// 	UINT count;
+static void appCanLogHandlerInit(AppControlDataType *data)
+{
+  if ( RES_OK == data->mountRes)
+  {
+    data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
+                                    &(data->CanLog.writeFileDevice), 
+                                    data->CanLog.filename);
+  }
+  else 
+  {
+    data->CanLog.openRes = 1U;
+  }
+}
 
-// 	if (0 == MMCAdapter_initialize())
-// 	{
-// 		sector = 0U;
-// 		count = BLOCKS_READ;
-//     MMCAdapter_read(buff, sector, count);
-//   }
+static void appCanLogHandlerPoll(AppControlDataType *data)
+{
+  uint32_t timedelta;
+  const char TestData[] = "This is some test strinng to see if the file was written.\n";
 
-// //	for (uint16_t h=0; h < SD_BLOCK_COUNT; h++)
-// //	{
-// //		MMCAdapter_read(buff, sector, count);
-// //
-// //	}
+  timedelta = HAL_GetTick() - data->CanLog.timestamp;
+  
+  if ( 0 != data->CanLog.openRes || timedelta<1000 )
+  {    
+  }
+  else if (FR_OK == FatFS_SD_WriteFile(
+              &(data->CanLog.writeFileDevice), 
+              TestData, 
+              sizeof(TestData)-1))
+  {
+    FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
+    data->CanLog.timestamp =  HAL_GetTick();
+  }
+  else
+  {
+    data->CanLog.timestamp =  HAL_GetTick();
+  }
+}
 
-// }
+static void appCanLogHandlerDeInit(AppControlDataType * data)
+{
+  if ( 0 == data->CanLog.openRes )
+  { 
+    FatFS_SD_CloseFile(&(data->CanLog.writeFileDevice));
+  }
+
+  FatFS_SD_Unmount();
+}
 
 /**
   * @brief  Main program
@@ -85,10 +136,7 @@ static void CPU_CACHE_Enable(void);
   */
 int main(void)
 {
-  static FatFsDeviceType TestWriteFileDevice;
-  static FatFsDeviceType CanLogWriteFileDevice;
   static FatFsDeviceType ConfigReadFileDevice;
-  uint8_t run;
   int32_t timeout;
   uint32_t spiClockSource;
   HAL_StatusTypeDef HalStatus;
@@ -213,43 +261,25 @@ int main(void)
     FileHandler_ParseConfig(Config.data, Config.len, &AppConfig);
   }
 
-  const char ConfigFileName[] = "newfile.txt";
-  const char ConfigContent[] = "Hello from Clemens' uC:  \n";
-  
-  if ( RES_OK == FatFS_SD_Mount() )
-  {
-    if ( 0 == FatFS_SD_OpenFileForWrite(&(TestWriteFileDevice.file), ConfigFileName) )
-    {
-      FatFS_SD_WriteFile(&(TestWriteFileDevice.file), ConfigContent, sizeof(ConfigContent)-1); 
-    }
-
-    const char CanLogFilename[] = "can.log";
-    char Buffer[512U] = {'\0'};
-    uint32_t FileSize = 0U; 
-    if ( 0 == FatFS_SD_OpenFileForRead(&(CanLogWriteFileDevice.file), CanLogFilename) )
-    {
-      // FatFS_SD_StartRead(&CanLogWriteFileDevice.file, &FileSize); 
-      // FatFS_SD_Read(&CanLogWriteFileDevice.file, Buffer, sizeof(Buffer)-1); 
-    }
-    FatFS_SD_CloseFile(&(CanLogWriteFileDevice.file));
-    FatFS_SD_CloseFile(&(TestWriteFileDevice.file));
-    
-
-    
-  }
-
-  Spi_PwrOff();
-	
   http_init();
 
   run = 1U;
+  
+  if (0 != AppCtrlData.mountRes)
+    AppCtrlData.mountRes = FatFS_SD_Mount();
+
+  appCanLogHandlerInit(&AppCtrlData);
 
   while (run)
   {
     http_poll();
+
+    appCanLogHandlerPoll(&AppCtrlData);
   }
 
-  FatFS_SD_Unmount();
+  appCanLogHandlerDeInit(&AppCtrlData);
+
+  Spi_PwrOff();
 
 	/*##-3- Wait for the end of the transfer ###################################*/
 	/*  Before starting a new communication transfer, you must wait the callback call

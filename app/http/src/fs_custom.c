@@ -35,7 +35,7 @@ static FatFsDeviceType CanLogReadFileDevice;
 int fs_open_custom(struct fs_file *file, const char *name)
 {
     const char CanLogFilename[] = "can.log";
-    int FileSize = 0U;
+    uint32_t FileSize = 0U;
 
     if (strcmp(name, "/can_trace") == 0) {
         reqState.index = 0;
@@ -43,12 +43,12 @@ int fs_open_custom(struct fs_file *file, const char *name)
         reqState.callcount = 0;
         strncpy((char *)reqState.name, name, sizeof(reqState.name));
 
-        if ( 0 != FatFS_SD_OpenFileForRead(&(CanLogReadFileDevice.file), CanLogFilename) )
+        if ( 0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, CanLogFilename) )
         {
             return 0;
         }
 
-        (void) FatFS_SD_GetFileSize(&CanLogReadFileDevice.file, &FileSize);
+        (void) FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize);
 
         CanLogReadFileDevice.readTargetSize = FileSize;
 
@@ -102,7 +102,7 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
             len = CanLogReadFileDevice.readTargetSize - FileIndex ;   
         }
 
-        FatFS_SD_ReadFile(&CanLogReadFileDevice.file, buffer, len);
+        FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
 
         state->callcount++;
     }
@@ -116,7 +116,7 @@ void fs_close_custom(struct fs_file *file)
 
     if (strcmp(state->name, "/can_trace") == 0)
     {
-        FatFS_SD_CloseFile(&(CanLogReadFileDevice.file));
+        FatFS_SD_CloseFile(&CanLogReadFileDevice);
     }
         
     file->pextension = NULL; // optional cleanup
