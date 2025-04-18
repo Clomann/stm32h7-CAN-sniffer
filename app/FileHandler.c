@@ -212,24 +212,41 @@ FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name)
   return fr;
 }
 
-void FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint32_t len)
+FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
 {
-  UINT BytesWritten;
-  uint32_t FileSize = 0U;
+    FRESULT res;
 
-  FileSize = f_size(&dev->file);
-  f_lseek(&dev->file, FileSize);  // Move file pointer to the end
-  f_write(&dev->file, content, len, &BytesWritten);
+    res = f_sync(&dev->file);
+
+    return res;
 }
 
-int FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t len)
+FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint32_t len)
+{
+    FRESULT res;
+    UINT BytesWritten;
+    uint32_t FileSize = 0U;
+
+    FileSize = f_size(&dev->file);
+    f_lseek(&dev->file, FileSize);  // Move file pointer to the end
+    f_write(&dev->file, content, len, &BytesWritten);
+
+    if ( len == BytesWritten )
+        res = FR_OK;
+    else
+        res = FR_DISK_ERR;
+
+    return res;
+}
+
+FRESULT FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t len)
 {
 	FRESULT fr;
     UINT BytesRead = 0U;
 
     fr = f_read(&dev->file, data, len, &BytesRead);
 
-    if (BytesRead != len) fr = RES_ERROR;
+    if (BytesRead != len) fr = FR_DISK_ERR;
 
     return fr;
 }
@@ -241,6 +258,10 @@ FRESULT FatFS_SD_CloseFile(FatFsDeviceType *dev)
 
 FRESULT FatFS_SD_GetFileSize(FatFsDeviceType *dev, uint32_t *size)
 {
+    FRESULT res;
+
+    res = FR_OK;
+
     *size = f_size(&dev->file);
-    return RES_OK;							/* Close the file */
+    return res;							/* Close the file */
 }
