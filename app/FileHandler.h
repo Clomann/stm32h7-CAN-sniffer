@@ -13,6 +13,7 @@ typedef struct {
 FRESULT FatFS_SD_Mount(void);
 FRESULT FatFS_SD_Unmount(void);
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name);
+FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name);
 FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name);
 FRESULT FatFS_SD_Flush(FatFsDeviceType *dev);
 FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint32_t len);

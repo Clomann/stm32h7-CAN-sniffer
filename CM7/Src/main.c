@@ -52,6 +52,13 @@ typedef struct {
     uint8_t openRes;
     FatFsDeviceType writeFileDevice;
   } CanLog;
+  struct {
+    const char * filename;
+    uint32_t count;
+    uint32_t timestamp;
+    uint8_t openRes;
+    FatFsDeviceType writeFileDevice;
+  } Config;
   uint8_t mountRes;
 } AppControlDataType;
 
@@ -66,10 +73,18 @@ typedef struct {
 uint8_t run;
 static AppConfigType AppConfig;
 static const char CanLogFileName[] = "can.log";
+static const char ConfigFileName[] = "conf.txt";
 
 static AppControlDataType AppCtrlData = { 
   .CanLog = {
     .filename = CanLogFileName,
+    .count = 0,
+    .timestamp = 0,
+    .openRes = 1,
+    .writeFileDevice.readTargetSize = 0U,
+  },
+  .Config = {
+    .filename = ConfigFileName,
     .count = 0,
     .timestamp = 0,
     .openRes = 1,
@@ -87,6 +102,22 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
+
+static void appConfigHandlerInit(AppControlDataType *data)
+{
+  SettingsHandler_Init(&AppConfig);
+
+  if ( RES_OK == data->mountRes)
+  {
+    data->Config.openRes = FatFS_SD_OpenFileForOverWrite(
+                              &(data->Config.writeFileDevice),
+                              data->Config.filename);
+  }
+  else 
+  {
+    data->Config.openRes = 1U;
+  }
+}
 
 static void appCanLogHandlerInit(AppControlDataType *data)
 {
@@ -162,8 +193,6 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   { 
     FatFS_SD_CloseFile(&(data->CanLog.writeFileDevice));
   }
-
-  FatFS_SD_Unmount();
 }
 
 /**
@@ -307,17 +336,28 @@ int main(void)
     AppCtrlData.mountRes = FatFS_SD_Mount();
 
   appCanLogHandlerInit(&AppCtrlData);
+  
+  appConfigHandlerInit(&AppCtrlData);
 
   while (run)
   {
     http_poll();
 
     appCanLogHandlerPoll(&AppCtrlData);
+
+    if (0 == AppCtrlData.Config.openRes)
+    {
+      SettingsHandler_Poll(&AppCtrlData.Config.writeFileDevice, &AppConfig);
+    }
   }
 
   appCanLogHandlerDeInit(&AppCtrlData);
 
+  if (0 == AppCtrlData.mountRes)
+    FatFS_SD_Unmount();
+
   Spi_PwrOff();
+  
 
 	/*##-3- Wait for the end of the transfer ###################################*/
 	/*  Before starting a new communication transfer, you must wait the callback call

@@ -5,6 +5,8 @@
 #include "SettingsHandler.h"
 #include "core_json.h"
 
+#define SETTINGS_HANDLER_JSON_BUFFER_SIZE 256U
+
 static AppConfigType * AppSettings;
 
 void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
@@ -24,13 +26,14 @@ void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcV
           if(strcmp(pcValue[i], "250000") ==0)
           {
             AppSettings->baudrate = 250000;
+            AppSettings->updated = 1U;
           }
           /* Switch LED2 ON if 2 */
           else if(strcmp(pcValue[i], "500000") ==0)
           {
             AppSettings->baudrate = 500000;
+            AppSettings->updated = 1U;
           }
-  
         }
         else if (strcmp(pcParam[i] , "mode")==0)
         {
@@ -38,11 +41,13 @@ void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcV
           if(strcmp(pcValue[i], "1") ==0)
           {
             AppSettings->mode = 1;
+            AppSettings->updated = 1U;
           }
           /* Switch LED2 ON if 2 */
           else if(strcmp(pcValue[i], "2") ==0)
           {
             AppSettings->mode = 2;
+            AppSettings->updated = 1U;
           }
   
         }
@@ -266,8 +271,51 @@ uint8_t SettingsHandler_Init(AppConfigType *cfg)
     return 0U;
 }
 
-uint8_t SettingsHandler_Store(AppConfigType *cfg)
+static uint8_t m_CreateJSonString(AppConfigType *cfg, char *json, uint32_t maxLength, uint32_t *len)
 {
-    AppSettings = cfg;
+    // Create the JSON string
+    snprintf(json, maxLength,
+    "{\n"
+    "    \"CAN1\":{\n"
+    "        \"Baudrate\":%ld,\n"
+    "        \"Mode\":%d\n"
+    "    },\n"
+    "    \"HTTP\":{\n"
+    "        \"IP\":\"%d.%d.%d.%d\"\n"
+    "    }\n"
+    "}\n",
+    cfg->baudrate,
+    cfg->mode,
+    cfg->ip[0U],
+    cfg->ip[1U],
+    cfg->ip[2U],
+    cfg->ip[3U]);
+
+    *len = strnlen(json, maxLength);
     return 0U;
+}
+
+static uint8_t m_StoreConfig(FatFsDeviceType *dev, AppConfigType *cfg)
+{
+    uint32_t ConfigLength;
+    char json_buffer[SETTINGS_HANDLER_JSON_BUFFER_SIZE];
+
+    m_CreateJSonString(cfg, json_buffer, sizeof(json_buffer), &ConfigLength);
+    
+    FatFS_SD_WriteFile(dev, json_buffer, ConfigLength);
+    FatFS_SD_CloseFile(dev);
+
+    cfg->updated = 0U;
+    
+    return 0U;
+}
+
+uint8_t SettingsHandler_Poll(FatFsDeviceType *dev, AppConfigType *cfg)
+{
+    if (1U == cfg->updated)
+    {
+        return m_StoreConfig(dev, cfg);
+    }
+
+    return 1U;
 }

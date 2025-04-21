@@ -22,6 +22,15 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
   return fr;
 }
 
+FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
+{  
+  FRESULT fr;
+
+  fr = f_open(&dev->file, name, FA_CREATE_ALWAYS | FA_WRITE );	/* Create a file */
+
+  return fr;
+}
+
 FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name)
 {  
   FRESULT fr;
