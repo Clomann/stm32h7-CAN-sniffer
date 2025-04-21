@@ -24,12 +24,20 @@
  extern "C" {
 #endif
 
+// #ifndef APP_UPDATE_SETTING_DEFINED
+// #error "You must implement app_update_setting() to use HTTP settings update!"
+// #endif
+
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/   
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 void http_server_init(void);
+
+/* Shim functions ------------------------------------------------------- */
+void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
+int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen);
 
 #ifdef __cplusplus
 }

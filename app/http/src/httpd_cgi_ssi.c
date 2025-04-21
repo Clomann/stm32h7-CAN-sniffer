@@ -53,84 +53,17 @@ const tCGI CAN_CFG_CGI={"/can.cgi", CAN_config_CGI_Handler};
 /* Cgi call table, only one CGI used */
 tCGI CGI_TAB[1];
 
-static uint32_t storedBaudRate = 250000;
-static uint32_t storedMode = 1;
-
 /**
   * @brief  ADC_Handler : SSI handler for ADC page
   */
 u16_t Handler(int iIndex, char *pcInsert, int iInsertLen)
 {
-  //   iIndex=0 => "opt250"
-  //   iIndex=1 => "opt500"
-  //   storedBaudRate is the previously selected baud
-  switch (iIndex) {
-    case 0: // "baudrate"
-        if (storedBaudRate == 250000) {
-            snprintf(pcInsert, iInsertLen, "250 kbit/s");
-        } else if (storedBaudRate == 500000) {
-            snprintf(pcInsert, iInsertLen, "500 kbit/s");
-        } else {
-            *pcInsert = '\0';
-        }
-        return (u16_t)strlen(pcInsert);
-    case 1: // "mode"
-        if (storedMode == 1) {
-            snprintf(pcInsert, iInsertLen, "normal");
-        } else if (storedMode == 2) {
-            snprintf(pcInsert, iInsertLen, "listen only");
-        } else {
-            *pcInsert = '\0';
-        }
-        return (u16_t)strlen(pcInsert);        
-    default:
-        break;
-  }
-  
-  return 0;
+  return http_app_get_setting(iIndex, pcInsert, iInsertLen);
 }
 
 const char * CAN_config_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {
-  uint32_t i=0;
-uint8_t tmp[254];
-  if (iIndex==1)
-  {
-    /* Check cgi parameter */
-    for (i=0; i<(uint32_t)iNumParams; i++)
-    {
-      memcpy(tmp, pcParam, 254);
-      /* check parameter "led" */
-      if (strcmp(pcParam[i] , "baudrate")==0)
-      {
-        /* Switch LED1 ON if 1 */
-        if(strcmp(pcValue[i], "250000") ==0)
-        {
-          storedBaudRate = 250000;
-        }
-        /* Switch LED2 ON if 2 */
-        else if(strcmp(pcValue[i], "500000") ==0)
-        {
-          storedBaudRate = 500000;
-        }
-
-      }
-      else if (strcmp(pcParam[i] , "mode")==0)
-      {
-        /* Switch LED1 ON if 1 */
-        if(strcmp(pcValue[i], "1") ==0)
-        {
-          storedMode = 1;
-        }
-        /* Switch LED2 ON if 2 */
-        else if(strcmp(pcValue[i], "2") ==0)
-        {
-          storedMode = 2;
-        }
-
-      }
-    }
-  }
+  http_app_set_setting(iIndex, iNumParams, pcParam, pcValue);
   
   /* uri to send after cgi call*/
   return "/can.shtml";
