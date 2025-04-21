@@ -636,7 +636,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 	default:
 		Spi_CsDisable();
 		// TODO: power on and off (somehow the SD card gets unresponsive after a while)
-		RetVal = SD_Spi_Initialize(0U);
+		RetVal = SD_E_CMD_LOST_CONNECTON;
 		break;
 	}
 

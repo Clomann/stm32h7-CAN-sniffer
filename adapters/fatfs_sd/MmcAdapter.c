@@ -53,6 +53,10 @@ uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
 		{
 			SD_Spi_GetReadBytes(&buff[i * SD_SECTOR_LENGTH]);
 		}
+		else if (RetVal == SD_E_CMD_LOST_CONNECTON)
+		{
+			/* caller needs to re-power and re-initialize the SD card */
+		}
 		else
 		{
 			RetVal = RES_ERROR;

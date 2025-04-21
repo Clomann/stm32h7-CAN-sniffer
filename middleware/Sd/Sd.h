@@ -33,6 +33,7 @@
 #define SD_E_CMD_NO_R1				 1U /*!< The card did not send R1 after receiving a command */
 #define SD_E_CMD_NO_DATA_RESP_TOKEN	 2U /*!< The card sent 0xFF after receiving a command */
 #define SD_E_CMD_NO_GOING_IDLE	 	 3U /*!< The card did never sent 0xFF */
+#define SD_E_CMD_LOST_CONNECTON	 	 4U /*!< The card did never sent 0xFF */
 
 /**
  * Enumeration listing the implemented SPI commands.
