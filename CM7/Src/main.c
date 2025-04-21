@@ -19,6 +19,8 @@
   ******************************************************************************
   */
 
+#define APP_UPDATE_SETTING_DEFINED
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
@@ -26,9 +28,11 @@
 //#include "Spi_Cmds.h"
 
 #include <string.h>
+
 #include "FileHandler.h"
 #include "HttpAbs.h"
 #include "CanLogBuffer.h"
+#include "SettingsHandler.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -291,7 +295,8 @@ int main(void)
   Spi_PwrOn();
   if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice, Config.data, &Config.len) )
   {
-    FileHandler_ParseConfig(Config.data, Config.len, &AppConfig);
+    SettingsHandler_ParseConfig(Config.data, Config.len, &AppConfig);
+    SettingsHandler_Init(&AppConfig);
   }
 
   http_init();

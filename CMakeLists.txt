@@ -59,6 +59,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/app/FileHandler.c
     ${PROJ_PATH}/app/HttpAbs.c
     ${PROJ_PATH}/app/CanLogBuffer.c
+    ${PROJ_PATH}/app/SettingsHandler.c
 
     ${PROJ_PATH}/app/http/src/app_ethernet.c
     ${PROJ_PATH}/app/http/src/ethernetif.c
