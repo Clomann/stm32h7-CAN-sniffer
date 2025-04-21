@@ -5,3 +5,4 @@ doxygen/output
 build/*
 _bin/
 .DS_Store
+_deps/

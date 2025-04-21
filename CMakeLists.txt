@@ -20,6 +20,17 @@ message("Build type: "              ${CMAKE_BUILD_TYPE})
 project(SPI_FullDuplex_ComDMA_CM7)          # Modified
 enable_language(C CXX ASM)
 
+# thrid party libs
+include(FetchContent)
+
+FetchContent_Declare(
+  lwrb
+  GIT_REPOSITORY https://github.com/MaJerle/lwrb.git
+  GIT_TAG        main  # or a specific tag/commit
+)
+
+FetchContent_MakeAvailable(lwrb)
+
 #
 # Core MCU flags, CPU, instruction set and FPU setup
 # Needs to be set properly for your MCU
@@ -47,6 +58,7 @@ set(sources_SRCS                    # Modified
     
     ${PROJ_PATH}/app/FileHandler.c
     ${PROJ_PATH}/app/HttpAbs.c
+    ${PROJ_PATH}/app/CanLogBuffer.c
 
     ${PROJ_PATH}/app/http/src/app_ethernet.c
     ${PROJ_PATH}/app/http/src/ethernetif.c
@@ -315,6 +327,8 @@ set(symbols_SYMB                    # Modified
 
 # Executable files
 add_executable(${EXECUTABLE} ${sources_SRCS})
+
+target_link_libraries(${EXECUTABLE} PRIVATE lwrb)
 
 # Include paths
 target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})

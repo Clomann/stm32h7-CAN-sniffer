@@ -28,6 +28,7 @@
 #include <string.h>
 #include "FileHandler.h"
 #include "HttpAbs.h"
+#include "CanLogBuffer.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -73,6 +74,8 @@ static AppControlDataType AppCtrlData = {
   .mountRes = 1,
 };
 
+uint8_t Data[BLOCK_SIZE] = {0};
+
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
 static void SystemClock_Config(void);
@@ -83,6 +86,8 @@ static void CPU_CACHE_Enable(void);
 
 static void appCanLogHandlerInit(AppControlDataType *data)
 {
+  CanLogBuffer_Init();
+
   if ( RES_OK == data->mountRes)
   {
     data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
@@ -95,27 +100,55 @@ static void appCanLogHandlerInit(AppControlDataType *data)
   }
 }
 
+static void appCanLogFillDummyEntry(CanLogEntryType *dummy, uint32_t timestamp)
+{
+  dummy->timestamp_us.lsb = timestamp & 0xFFFF;
+  dummy->timestamp_us.msb = (timestamp >> 16) & 0xFF;
+  dummy->dlc = 0x11;
+  memset( &dummy->can_id, 0x22, sizeof(dummy->can_id) );
+  memset( dummy->data, 0x33, sizeof(dummy->data) );
+}
+
 static void appCanLogHandlerPoll(AppControlDataType *data)
 {
+  uint32_t timestamp;
   uint32_t timedelta;
-  const char TestData[] = "This is some test strinng to see if the file was written.\n";
+  uint8_t BlockIsReady;
+  uint32_t DataLength;
+  CanLogEntryType NewEntry;
 
-  timedelta = HAL_GetTick() - data->CanLog.timestamp;
+  timestamp = HAL_GetTick();
+  timedelta = timestamp - data->CanLog.timestamp;
   
+  appCanLogFillDummyEntry(&NewEntry, timestamp);
+  
+  CanLogBuffer_AddEntry(&NewEntry);
+
+  CanLogBuffer_IsBlockReady(&BlockIsReady);
+
   if ( 0 != data->CanLog.openRes || timedelta<1000 )
   {    
+    /* quit */
+  }
+  else if ( 0 == BlockIsReady )
+  {
+    /* quit since block is not ready to be written */
+  }
+  else if ( 0 !=  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
+  {
+    /* quit since data could not be read */
   }
   else if (FR_OK == FatFS_SD_WriteFile(
               &(data->CanLog.writeFileDevice), 
-              TestData, 
-              sizeof(TestData)-1))
+              (const char *)Data, 
+              DataLength) )
   {
     FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
-    data->CanLog.timestamp =  HAL_GetTick();
+    data->CanLog.timestamp =  timestamp;
   }
   else
   {
-    data->CanLog.timestamp =  HAL_GetTick();
+    data->CanLog.timestamp =  timestamp;
   }
 }
 
@@ -256,7 +289,7 @@ int main(void)
 	/* While the SPI in TransmitReceive process, user can transmit data through
 	   "aTxBuffer" buffer & receive data through "aRxBuffer" */
   Spi_PwrOn();
-  if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice.file, Config.data, &Config.len) )
+  if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice, Config.data, &Config.len) )
   {
     FileHandler_ParseConfig(Config.data, Config.len, &AppConfig);
   }
@@ -334,7 +367,7 @@ int main(void)
   *            PLL_Q                          = 4
   *            PLL_R                          = 2
   *            VDD(V)                         = 3.3
-  *            Flash Latency(WS)              = 4
+  *    run        Flash Latency(WS)              = 4
   * @param  None
   * @retval None
   */
