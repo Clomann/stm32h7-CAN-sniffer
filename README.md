@@ -126,8 +126,8 @@ flowchart TD
       SPI1_CLK --- |CLK| SPI4_CLK
       SPI1_MOSI --- |MOSI| SPI4_MOSI
 
-      CAN1_Tx --- |CAN H| CANTRANC_Tx
-      CAN1_Rx --- |CAN H| CANTRANC_Rx
+      CAN1_Tx --- |Tx| CANTRANC_Tx
+      CAN1_Rx --- |Rx| CANTRANC_Rx
 
       SPI1_MISO --- |MISO| SPI4_MISO
 
