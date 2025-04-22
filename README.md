@@ -1,4 +1,21 @@
-[[_TOC_]]
+- [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
+  * [Software architecture](#software-architecture)
+    + [System overview](#system-overview)
+    + [Building block view](#building-block-view)
+    + [FatFS and SD card driver](#fatfs-and-sd-card-driver)
+  * [Hardware setup](#hardware-setup)
+  * [Pin usage](#pin-usage)
+  * [Funtional reuquirements](#funtional-reuquirements)
+    + [General](#general)
+    + [CAN](#can)
+    + [Data Logging Requirements](#data-logging-requirements)
+    + [Server Requirements](#server-requirements)
+    + [Storage and File Management Requirements](#storage-and-file-management-requirements)
+  * [Hardware Constraints](#hardware-constraints)
+  * [Wishlist](#wishlist)
+  * [Design decisions](#design-decisions)
+  * [Clocks](#clocks)
+  * [HTTP](#http)
 
 STM32H7 CAN sniffer
 ====================
