@@ -297,17 +297,19 @@ static uint8_t m_CreateJSonString(AppConfigType *cfg, char *json, uint32_t maxLe
 
 static uint8_t m_StoreConfig(FatFsDeviceType *dev, AppConfigType *cfg)
 {
+    FRESULT res;
+
     uint32_t ConfigLength;
     char json_buffer[SETTINGS_HANDLER_JSON_BUFFER_SIZE];
 
     m_CreateJSonString(cfg, json_buffer, sizeof(json_buffer), &ConfigLength);
     
-    FatFS_SD_WriteFile(dev, json_buffer, ConfigLength);
+    res = FatFS_SD_WriteFile(dev, json_buffer, ConfigLength);
     FatFS_SD_CloseFile(dev);
 
     cfg->updated = 0U;
     
-    return 0U;
+    return res;
 }
 
 uint8_t SettingsHandler_Poll(FatFsDeviceType *dev, AppConfigType *cfg)
