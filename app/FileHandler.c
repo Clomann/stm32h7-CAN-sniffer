@@ -56,10 +56,10 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
     uint32_t FileSize = 0U;
 
     FileSize = f_size(&dev->file);
-    f_lseek(&dev->file, FileSize);  // Move file pointer to the end
-    f_write(&dev->file, content, len, &BytesWritten);
+    res = f_lseek(&dev->file, FileSize);  // Move file pointer to the end
+    res = f_write(&dev->file, content, len, &BytesWritten);
 
-    if ( len == BytesWritten )
+    if ( 0 == res && len == BytesWritten )
         res = FR_OK;
     else
         res = FR_DISK_ERR;
