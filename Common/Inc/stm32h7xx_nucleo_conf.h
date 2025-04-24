@@ -56,7 +56,6 @@
 
 #define BUS_SPI1_BAUDRATE                   18000000
 
-#define TEST_SPI_PLL2 1
 /**
   * @}
   */
