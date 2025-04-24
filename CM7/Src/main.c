@@ -442,9 +442,9 @@ int main(void)
    RCC_OscInitStruct.PLL.PLLM = 4;
    RCC_OscInitStruct.PLL.PLLN = 400;
    RCC_OscInitStruct.PLL.PLLFRACN = 0;
-   RCC_OscInitStruct.PLL.PLLP = 2;
+   RCC_OscInitStruct.PLL.PLLP = 2; /* PLL1P: drives SYSCLK */
    RCC_OscInitStruct.PLL.PLLR = 2;
-   RCC_OscInitStruct.PLL.PLLQ = 2;
+   RCC_OscInitStruct.PLL.PLLQ = 2; /* PLL1Q: drives FDCAN */
  
    RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
    RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
@@ -454,15 +454,16 @@ int main(void)
      Error_Handler();
    }
  
- #if TEST_SPI_PLL2
+ #if TEST_SPI_PLL2 || 1
    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+   PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
    PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1 | RCC_PERIPHCLK_SPI4;
    PeriphClkInitStruct.PLL2.PLL2M = 2;
    PeriphClkInitStruct.PLL2.PLL2N = 96;
    PeriphClkInitStruct.PLL2.PLL2FRACN = 1;
-   PeriphClkInitStruct.PLL2.PLL2P = 20;
-   PeriphClkInitStruct.PLL2.PLL2Q = 20;
+   PeriphClkInitStruct.PLL2.PLL2P = 20; /* PLL2P: drives SPI1 */
+   PeriphClkInitStruct.PLL2.PLL2Q = 20; /* PLL2P: drives SPI4 */
    PeriphClkInitStruct.PLL2.PLL2R = 2;
  
    PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
