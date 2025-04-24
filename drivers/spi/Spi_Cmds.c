@@ -84,11 +84,7 @@ HAL_StatusTypeDef SPI_Init()
 	/* Set the SPI1 parameters */
 	SpiHandle1.Instance               = SPI1;
 	SpiHandle1.Init.Mode              = SPI_MODE_MASTER;
-#if TEST_SPI_PLL2
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
-#else
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-#endif
+	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
 	SpiHandle1.Init.Direction         = SPI_DIRECTION_2LINES;
 	SpiHandle1.Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
 	SpiHandle1.Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
@@ -287,11 +283,7 @@ uint8_t Spi_goHighSpeed()
 	/* Set the SPI1 parameters */
 	SpiHandle1.Instance               = SPI1;
 	SpiHandle1.Init.Mode              = SPI_MODE_MASTER;
-#if TEST_SPI_PLL2
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16; // <-----
-#else
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-#endif
+	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
 	SpiHandle1.Init.Direction         = SPI_DIRECTION_2LINES;
 	SpiHandle1.Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
 	SpiHandle1.Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
