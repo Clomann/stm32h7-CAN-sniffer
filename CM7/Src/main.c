@@ -239,7 +239,6 @@ int main(void)
   /* Configure the system clock to 400 MHz */
   SystemClock_Config();
 
-#if TEST_SPI_PLL2
   /* When system initialization is finished, Cortex-M7 will release Cortex-M4  by means of
      HSEM notification */
 
@@ -261,7 +260,7 @@ int main(void)
     if (0 == __HAL_RCC_GET_FLAG(RCC_FLAG_HSIRDY)) {
         Error_Handler();
     }
-#endif
+
 
   /*HW semaphore Clock enable*/
   __HAL_RCC_HSEM_CLK_ENABLE();
