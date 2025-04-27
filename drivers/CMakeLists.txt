@@ -7,6 +7,7 @@ set(DRIVERS_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommHandle/CommHandle.c 
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommManager/CommManager.c 
     ${CMAKE_CURRENT_LIST_DIR}/fdcan/fdcan.c
+    ${CMAKE_CURRENT_LIST_DIR}/fdcan/fdcan_utils.c
 )
 
 # Include directories

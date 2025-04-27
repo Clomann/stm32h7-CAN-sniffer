@@ -9,7 +9,7 @@
 
 typedef struct {
 	CommInterface interface;
-	FDCAN_Config config;            // Store the configuration for this instance
+	FdcanConfigType config;            // Store the configuration for this instance
 	void (*interrupt_callback)(void); // Interrupt callback for this instance
 	int channel;                    // Channel for this instance
 } FDCAN_Driver;
@@ -18,7 +18,7 @@ FDCAN_HandleTypeDef hfdcan;
 FDCAN_RxHeaderTypeDef RxHeader;
 
 FDCAN_Driver fdcan_drivers[MAX_INSTANCES];
-FDCAN_Config fdcan_configs[DRIVER_CFGn];
+FdcanConfigType fdcan_configs[DRIVER_CFGn];
 
 /* Private function prototypes -----------------------------------------------*/
 void FDCANx_IRQHandler(void);
@@ -32,7 +32,7 @@ comm_status_t fdcan_init_tx_header(const void *, FDCAN_TxHeaderTypeDef *, uint32
 comm_status_t FDCAN_CreateDriver(CommDriver *pDriver, driver_cfg_t config, RingBuffer *pRxBuffer)
 {
 	comm_status_t RetVal;
-	FDCAN_Config newConfig;
+	FdcanConfigType newConfig;
 	FDCAN_FilterTypeDef pFilterConfig;
 
 	RetVal = COMM_ERROR;
@@ -50,7 +50,7 @@ comm_status_t FDCAN_CreateDriver(CommDriver *pDriver, driver_cfg_t config, RingB
 		case DRIVER_CFG1:
 		case DRIVER_CFG2:
 			get_fdcan_config(&hfdcan, &pFilterConfig, config);
-			memcpy(&fdcan_configs[config], &newConfig, sizeof(FDCAN_Config));
+			memcpy(&fdcan_configs[config], &newConfig, sizeof(FdcanConfigType));
 			pDriver->config = &(fdcan_configs[config]);
 			pDriver->initialized = 1;
 			RetVal = COMM_SUCCESS;
@@ -81,10 +81,18 @@ FDCAN_Driver* create_driver(uint8_t instance) {
     return driver;
 }
 
-comm_status_t FDCAN_Init(void)
+comm_status_t FDCAN_Init(FdcanDeviceType *dev, FdcanConfigType *cfg, uint8_t *rxBuf, uint32_t rxLen, uint8_t *txBuf, uint32_t txLen)
 {
 	FDCAN_FilterTypeDef sFilterConfig;
 	comm_status_t RetVal;
+
+    (void) dev;
+    (void) cfg;
+    (void) rxBuf;
+    (void) rxLen;
+    (void) txBuf;
+    (void) txLen;
+
 
 	RetVal = COMM_SUCCESS;
 
@@ -513,10 +521,10 @@ comm_status_t get_fdcan_config(
 			pHfdcan->Init.AutoRetransmission = ENABLE;
 			pHfdcan->Init.TransmitPause = DISABLE;
 			pHfdcan->Init.ProtocolException = ENABLE;
-			pHfdcan->Init.NominalPrescaler = 0x8; /* tq = NominalPrescaler x (1/fdcan_ker_ck) */
+			pHfdcan->Init.NominalPrescaler = 0x4; /* tq = NominalPrescaler x (1/fdcan_ker_ck) */
 			pHfdcan->Init.NominalSyncJumpWidth = 0x01;
-			pHfdcan->Init.NominalTimeSeg1 = 0xE; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
-			pHfdcan->Init.NominalTimeSeg2 = 0x5;
+			pHfdcan->Init.NominalTimeSeg1 = 34U; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
+			pHfdcan->Init.NominalTimeSeg2 = 5U;
 			pHfdcan->Init.MessageRAMOffset = 0;
 			pHfdcan->Init.StdFiltersNbr = 1;
 			pHfdcan->Init.ExtFiltersNbr = 0;
