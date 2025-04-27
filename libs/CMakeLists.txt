@@ -54,6 +54,7 @@ set(LIBS_SRCS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/timeouts.c 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/udp.c
 
+    ${STM32_HAL_PATH}/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.c
     ${STM32_HAL_PATH}/Drivers/BSP/Components/lan8742/lan8742.c
 
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c
