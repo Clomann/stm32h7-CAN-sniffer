@@ -33,6 +33,7 @@
 #include "HttpAbs.h"
 #include "CanLogBuffer.h"
 #include "SettingsHandler.h"
+#include "CanAbs.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -204,6 +205,7 @@ int main(void)
 {
   static FatFsDeviceType ConfigReadFileDevice;
   int32_t timeout;
+  uint32_t MsgCount;
   uint32_t spiClockSource;
   HAL_StatusTypeDef HalStatus;
   struct Config { 
@@ -338,8 +340,22 @@ int main(void)
   
   appConfigHandlerInit(&AppCtrlData);
 
+  if ( 0 != CanAbs_Init() ) 
+  {
+      Error_Handler();
+  }
+
   while (run)
   {
+    if ( 0 != CanAbs_Send())
+    {
+        Error_Handler();
+    }
+
+    CanAbs_Receive(&MsgCount);
+
+    (void) MsgCount;
+
     http_poll();
 
     appCanLogHandlerPoll(&AppCtrlData);
