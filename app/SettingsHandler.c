@@ -11,45 +11,60 @@ static AppConfigType * AppSettings;
 
 void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {
-    uint32_t i=0;
-    uint8_t tmp[254];
+    uint32_t i = 0;
+    uint32_t NewMode = 0;
+    uint32_t NewBaudrate = 0;
+    char * param = NULL;
+    char * value = NULL;
+
     if (iIndex==1)
     {
       /* Check cgi parameter */
-      for (i=0; i<(uint32_t)iNumParams; i++)
+      for (i = 0; i<(uint32_t)iNumParams; i++)
       {
-        memcpy(tmp, pcParam, 254);
-        /* check parameter "led" */
-        if (strcmp(pcParam[i] , "baudrate")==0)
+        param = pcParam[i];
+        value = pcValue[i];
+
+        /* check parameter "baudrate" */
+        if (strcmp(param , "baudrate") == 0)
         {
-          /* Switch LED1 ON if 1 */
-          if(strcmp(pcValue[i], "250000") ==0)
-          {
-            AppSettings->baudrate = 250000;
-            AppSettings->updated = 1U;
-          }
-          /* Switch LED2 ON if 2 */
-          else if(strcmp(pcValue[i], "500000") ==0)
-          {
-            AppSettings->baudrate = 500000;
-            AppSettings->updated = 1U;
-          }
+            NewBaudrate = AppSettings->baudrate;
+
+            if(strcmp(value, "250000") == 0)
+            {
+                NewBaudrate = 250000;
+            }
+            else if(strcmp(value, "500000") == 0)
+            {
+                NewBaudrate = 500000;
+            }
+
+            if (NewBaudrate != AppSettings->baudrate)
+            {
+                AppSettings->updated = 1U;
+            }
+
+            AppSettings->baudrate = NewBaudrate;
         }
-        else if (strcmp(pcParam[i] , "mode")==0)
+        else if (strcmp(param , "mode")==0)
         {
-          /* Switch LED1 ON if 1 */
-          if(strcmp(pcValue[i], "1") ==0)
-          {
-            AppSettings->mode = 1;
-            AppSettings->updated = 1U;
-          }
-          /* Switch LED2 ON if 2 */
-          else if(strcmp(pcValue[i], "2") ==0)
-          {
-            AppSettings->mode = 2;
-            AppSettings->updated = 1U;
-          }
-  
+            NewMode = AppSettings->mode;
+                
+            if(strcmp(value, "1") ==0)
+            {
+                NewMode = 1;
+            }
+            else if(strcmp(value, "2") ==0)
+            {
+                NewMode = 2;
+            }
+
+            if (NewMode != AppSettings->mode)
+            {
+                AppSettings->updated = 1U;
+            }
+
+            AppSettings->mode = NewMode;
         }
       }
     }
@@ -67,7 +82,7 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
         } else if (AppSettings->baudrate == 500000) {
             snprintf(pcInsert, iInsertLen, "500 kbit/s");
         } else {
-            *pcInsert = '\0';
+            snprintf(pcInsert, iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);
     case 1: // "mode"
@@ -76,7 +91,7 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
         } else if (AppSettings->mode == 2) {
             snprintf(pcInsert, iInsertLen, "listen only");
         } else {
-            *pcInsert = '\0';
+            snprintf(pcInsert, iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);        
     default:
@@ -252,7 +267,7 @@ int FatFS_SD_LoadConfig(FatFsDeviceType *dev, char *data, uint32_t *len)
     fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
 
     if (fr == FR_OK)
-        fr = f_open(&dev->file, "conf.txt", FA_READ);	/* Create a file */
+        fr = f_open(&dev->file, "conf.txt", FA_READ | FA_OPEN_EXISTING);	/* Create a file */
 
     if (fr == FR_OK) {
         FileSize = f_size(&dev->file);
@@ -305,7 +320,8 @@ static uint8_t m_StoreConfig(FatFsDeviceType *dev, AppConfigType *cfg)
     m_CreateJSonString(cfg, json_buffer, sizeof(json_buffer), &ConfigLength);
     
     res = FatFS_SD_WriteFile(dev, json_buffer, ConfigLength);
-    FatFS_SD_CloseFile(dev);
+    if (FR_OK == res )
+        FatFS_SD_Flush(dev);
 
     cfg->updated = 0U;
     

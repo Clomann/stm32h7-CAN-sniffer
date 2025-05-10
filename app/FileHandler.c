@@ -51,13 +51,14 @@ FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
 
 FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint32_t len)
 {
-    FRESULT res;
-    UINT BytesWritten;
-    uint32_t FileSize = 0U;
-
-    FileSize = f_size(&dev->file);
-    res = f_lseek(&dev->file, FileSize);  // Move file pointer to the end
-    res = f_write(&dev->file, content, len, &BytesWritten);
+    FRESULT res = FR_OK;
+    UINT BytesWritten = 0U;
+    
+    if (FR_OK == f_lseek(&dev->file, 0U))
+    {
+        /* write to the start of the file */
+        res = f_write(&dev->file, content, len, &BytesWritten);
+    }
 
     if ( 0 == res && len == BytesWritten )
         res = FR_OK;
