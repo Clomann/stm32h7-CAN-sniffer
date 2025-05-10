@@ -64,8 +64,6 @@ set(sources_SRCS                    # Modified
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
-    ${PROJ_PATH}/STM32CubeIDE/CM7/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.c
-
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
@@ -101,6 +99,7 @@ set(symbols_SYMB                    # Modified
     "CORE_CM7"
     "NO_SYS=1"
     "USE_STM32H7XX_NUCLEO_144_MB1363"
+    "FDCAN_MODE=FDCAN_MODE_NORMAL"
 )
 
 # Executable files
