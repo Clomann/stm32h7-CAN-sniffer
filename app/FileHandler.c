@@ -53,8 +53,18 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
 {
     FRESULT res = FR_OK;
     UINT BytesWritten = 0U;
-    
-    if (FR_OK == f_lseek(&dev->file, 0U))
+    uint32_t FileSize = 0U;
+
+    if ((dev->file.flag & FA_CREATE_ALWAYS) == 0)  // Only seek if we did NOT truncate the file
+    {
+        FileSize = f_size(&dev->file);
+    }
+    else
+    {
+        FileSize = 0U;
+    }
+
+    if (FR_OK == f_lseek(&dev->file, FileSize))
     {
         /* write to the start of the file */
         res = f_write(&dev->file, content, len, &BytesWritten);
