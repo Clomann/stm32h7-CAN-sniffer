@@ -1,7 +1,7 @@
 set(DRIVERS_BASE ${CMAKE_CURRENT_LIST_DIR})
 
 # Sources
-set(DRIVERS_SRCS
+list(APPEND sources_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/spi/Spi_Cmds.c
     ${CMAKE_CURRENT_LIST_DIR}/CanAbs/CanAbs.c 
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommHandle/CommHandle.c 
@@ -11,7 +11,7 @@ set(DRIVERS_SRCS
 )
 
 # Include directories
-set(DRIVERS_INCS
+list(APPEND include_path_DIRS
     ${CMAKE_CURRENT_LIST_DIR}/
     ${CMAKE_CURRENT_LIST_DIR}/spi
     ${CMAKE_CURRENT_LIST_DIR}/CanAbs
@@ -19,3 +19,7 @@ set(DRIVERS_INCS
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommManager
     ${CMAKE_CURRENT_LIST_DIR}/fdcan
 )
+
+# Send the final list to the parent scope
+set(sources_SRCS "${sources_SRCS}" PARENT_SCOPE)
+set(include_path_DIRS "${include_path_DIRS}" PARENT_SCOPE)

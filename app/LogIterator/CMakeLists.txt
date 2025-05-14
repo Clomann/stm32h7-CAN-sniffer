@@ -1,12 +1,11 @@
 # Sources
 list(APPEND sources_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/fatfs_sd/DiskIoFacade.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/fatfs_sd/MmcAdapter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/LogIterator.c
 )
 
 # Append new include directories
 list(APPEND include_path_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/fatfs_sd
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Send the final list to the parent scope
