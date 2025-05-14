@@ -1,9 +1,13 @@
 # Sources
-set(MIDDLEWARE_SRCS
-    ${PROJ_PATH}/middleware/Sd/Sd.c
+list(APPEND sources_SRCS
+    ${CMAKE_CURRENT_LIST_DIR}/Sd/Sd.c
 )
 
 # Include directories
-set(MIDDLEWARE_INCS
-    ${PROJ_PATH}/middleware/Sd
+list(APPEND include_path_DIRS
+    ${CMAKE_CURRENT_LIST_DIR}/Sd
 )
+
+# Send the final list to the parent scope
+set(sources_SRCS "${sources_SRCS}" PARENT_SCOPE)
+set(include_path_DIRS "${include_path_DIRS}" PARENT_SCOPE)

@@ -1,5 +1,5 @@
 # Sources
-set(LIBS_SRCS
+list(APPEND sources_SRCS
     ${PROJ_PATH}/libs/ff15a/source/diskio.c
     ${PROJ_PATH}/libs/ff15a/source/ff.c
     ${PROJ_PATH}/libs/ff15a/source/ffsystem.c
@@ -192,7 +192,7 @@ set(LIBS_SRCS
 )
 
 # Include directories
-set(LIBS_INCS
+list(APPEND include_path_DIRS
     ${STM32_HAL_PATH}//Drivers/BSP/Components/lan8742
 
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Inc
@@ -216,3 +216,7 @@ set(LIBS_INCS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/apps
     ${STM32_HAL_PATH}Middlewares/Third_Party/LwIP/src/apps/http/
 )
+
+# Send the final list to the parent scope
+set(sources_SRCS "${sources_SRCS}" PARENT_SCOPE)
+set(include_path_DIRS "${include_path_DIRS}" PARENT_SCOPE)

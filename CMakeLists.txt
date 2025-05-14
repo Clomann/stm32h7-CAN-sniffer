@@ -48,12 +48,6 @@ set(CPU_PARAMETERS
 set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld) # Modified
 set(EXECUTABLE                      ${CMAKE_PROJECT_NAME})
 
-include(${PROJ_PATH}/adapters/CMakeLists.txt)
-include(${PROJ_PATH}/app/CMakeLists.txt)
-include(${PROJ_PATH}/drivers/CMakeLists.txt)
-include(${PROJ_PATH}/middleware/CMakeLists.txt)
-include(${PROJ_PATH}/libs/CMakeLists.txt)
-
 #
 # List of source files to compile
 #
@@ -67,12 +61,6 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
-
-    ${ADAPTERS_SRCS}
-    ${APP_SRCS}
-    ${DRIVERS_SRCS}
-    ${MIDDLEWARE_SRCS}
-    ${LIBS_SRCS}
 )
 
 #
@@ -82,13 +70,13 @@ set(include_path_DIRS               # Modified
     ${PROJ_PATH}/CM7/Inc
 
     ${PROJ_PATH}/Common/Inc
-
-    ${ADAPTERS_INCS}
-    ${APP_INCS}
-    ${DRIVERS_INCS}
-    ${MIDDLEWARE_INCS}
-    ${LIBS_INCS}
 )
+
+add_subdirectory(adapters)
+add_subdirectory(app)
+add_subdirectory(drivers)
+add_subdirectory(libs)
+add_subdirectory(middleware)
 
 #
 # Symbols definition
@@ -99,7 +87,7 @@ set(symbols_SYMB                    # Modified
     "CORE_CM7"
     "NO_SYS=1"
     "USE_STM32H7XX_NUCLEO_144_MB1363"
-    "FDCAN_MODE=FDCAN_MODE_NORMAL"
+    "FDCAN_MODE=FDCAN_MODE_EXTERNAL_LOOPBACK"
 )
 
 # Executable files

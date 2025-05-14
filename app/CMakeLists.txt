@@ -1,20 +1,25 @@
 # Sources
-set(APP_SRCS
-    ${PROJ_PATH}/app/FileHandler.c
-    ${PROJ_PATH}/app/HttpAbs.c
-    ${PROJ_PATH}/app/CanLogBuffer.c
-    ${PROJ_PATH}/app/SettingsHandler.c
-    ${PROJ_PATH}/app/http/src/app_ethernet.c
-    ${PROJ_PATH}/app/http/src/ethernetif.c
-    ${PROJ_PATH}/app/http/src/fs_custom.c
-    ${PROJ_PATH}/app/http/src/httpd_cgi_ssi.c
-    ${PROJ_PATH}/app/http/src/lwip.c
-    ${PROJ_PATH}/app/http/src/tcp_echoserver.c
+list(APPEND sources_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/FileHandler.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/HttpAbs.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/CanLogBuffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/SettingsHandler.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/app_ethernet.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/ethernetif.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/fs_custom.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/httpd_cgi_ssi.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/lwip.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/tcp_echoserver.c
 )
 
 # Include directories
-set(APP_INCS
-    ${PROJ_PATH}/app
-    ${PROJ_PATH}/app/fs
-    ${PROJ_PATH}/app/http/inc
+list(APPEND include_path_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/fs
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/inc
 )
+
+
+# Send the final list to the parent scope
+set(sources_SRCS "${sources_SRCS}" PARENT_SCOPE)
+set(include_path_DIRS "${include_path_DIRS}" PARENT_SCOPE)
