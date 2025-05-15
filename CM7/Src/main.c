@@ -28,6 +28,7 @@
 //#include "Spi_Cmds.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #include "FileHandler.h"
 #include "HttpAbs.h"
@@ -47,14 +48,17 @@
 
 typedef struct {
   struct {
-    const char * filename;
+   char * filename;
+    uint32_t fnamemaxlen;
     uint32_t count;
     uint32_t timestamp;
     uint8_t openRes;
+    int32_t fileIndex;
     FatFsDeviceType writeFileDevice;
   } CanLog;
   struct {
-    const char * filename;
+    char * filename;
+    uint32_t fnamemaxlen;
     uint32_t count;
     uint32_t timestamp;
     uint8_t openRes;
@@ -73,12 +77,13 @@ typedef struct {
 
 uint8_t run;
 static AppConfigType AppConfig;
-static const char CanLogFileName[] = "can.log";
-static const char ConfigFileName[] = "conf.txt";
+static char CanLogFileName[255] = "/logs/CAN.LOG";
+static char ConfigFileName[255] = "CONF.TXT";
 
 static AppControlDataType AppCtrlData = { 
   .CanLog = {
     .filename = CanLogFileName,
+    .fnamemaxlen = sizeof(CanLogFileName),
     .count = 0,
     .timestamp = 0,
     .openRes = 1,
@@ -86,6 +91,7 @@ static AppControlDataType AppCtrlData = {
   },
   .Config = {
     .filename = ConfigFileName,
+    .fnamemaxlen = sizeof(ConfigFileName),
     .count = 0,
     .timestamp = 0,
     .openRes = 1,
@@ -120,20 +126,130 @@ static void appConfigHandlerInit(AppControlDataType *data)
   }
 }
 
-static void appCanLogHandlerInit(AppControlDataType *data)
+static int find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix)
 {
-  CanLogBuffer_Init();
+    FatFS_FileIterator it;
+    FILINFO *fno;
+    int highest = -1;
 
-  if ( RES_OK == data->mountRes)
-  {
+    if ( FatFS_SD_FileIterator_Open(&it, dirPath, prefix) != FR_OK)
+        return -1;
+
+    while ( FatFS_SD_FileIterator_Next(&it, &fno) == FR_OK) {
+        const char *suffix = fno->fname + strlen(prefix);
+        char *endptr;
+        long val = strtol(suffix, &endptr, 10);
+
+        if (*endptr == '\0' && val >= 0 && val <= maxSuffix && val > highest) {
+            highest = (int)val;
+        }
+    }
+
+    FatFS_SD_FileIterator_Close(&it);
+    return highest;
+}
+
+static unsigned int appCanLogOpenMostRecentFile(AppControlDataType *data)
+{
+    #define MAX_LOG_INDEX       (1024U)
+
+    int lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);       
+    data->CanLog.fileIndex = lastUsed;
+
+    // Build candidate filename
+    snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)lastUsed);
+
     data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
                                     &(data->CanLog.writeFileDevice), 
                                     data->CanLog.filename);
-  }
-  else 
-  {
-    data->CanLog.openRes = 1U;
-  }
+    
+    return 0U;
+}
+
+static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
+{
+    #define MAX_LOG_FILE_SIZE   (32U * 1024U )
+
+    FRESULT FileSizeRes;
+    uint32_t FileSize;
+
+    FileSizeRes = FatFS_SD_GetBufferedFileSize(&(data->CanLog.writeFileDevice), &FileSize);
+
+    if (FileSizeRes == FR_OK && FileSize >= MAX_LOG_FILE_SIZE)
+    {
+        // File exists and is full, advance to next one
+        if (0 == FatFS_SD_CloseFile(
+            &(data->CanLog.writeFileDevice)))
+        {
+            data->CanLog.fileIndex = (data->CanLog.fileIndex + 1) % (MAX_LOG_INDEX + 1);
+            snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)data->CanLog.fileIndex);
+    
+            data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
+                &(data->CanLog.writeFileDevice), 
+                data->CanLog.filename);
+    
+            if (0 != data->CanLog.openRes)
+            {
+                Error_Handler();
+                data->CanLog.fileIndex++;
+            }
+            FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
+        }
+        else
+        {            
+            Error_Handler();
+        }
+    }
+    
+    return 0U;
+}
+
+static void appCanLogHandlerInit(AppControlDataType *data)
+{
+    CanLogBuffer_Init();
+
+    FILINFO info;
+    FRESULT res;
+    FIL file;
+    char filename[128];
+    
+    res = f_stat("/logs", &info);
+
+    if ( (res == FR_OK) && (info.fattrib & AM_DIR)) 
+    {
+
+    }
+    else if (res == FR_NO_FILE)
+    {
+        // Directory does not exist — create it
+        res = f_mkdir("/logs");
+        if (res != FR_OK) {
+            Error_Handler();
+        }
+    }
+    else if ( (res == FR_OK) && (!(info.fattrib & AM_DIR))) 
+    {
+        Error_Handler();
+    }
+
+    if ( RES_OK == data->mountRes)
+    {
+        appCanLogOpenMostRecentFile(data);
+    }
+    else 
+    {
+        data->CanLog.openRes = 1U;
+    }
+}
+
+static void appCanLogFillEntry(CanLogEntryType *entry, FDCAN_ClassicFrame *frame, int32_t timestamp)
+{
+    memset(entry, 0x0, sizeof(CanLogEntryType));
+    entry->timestamp_us.lsb = timestamp & 0xFFFF;
+    entry->timestamp_us.msb = (timestamp >> 16) & 0xFF;
+    entry->dlc = frame->dlc;
+    memcpy( (uint8_t *)&entry->can_id, (uint8_t *)frame->id, sizeof(entry->can_id) );
+    memcpy( entry->data, frame->data, sizeof(entry->data) );
 }
 
 static void appCanLogFillDummyEntry(CanLogEntryType *dummy, uint32_t timestamp)
@@ -147,45 +263,56 @@ static void appCanLogFillDummyEntry(CanLogEntryType *dummy, uint32_t timestamp)
 
 static void appCanLogHandlerPoll(AppControlDataType *data)
 {
-  uint32_t timestamp;
-  uint32_t timedelta;
-  uint8_t BlockIsReady;
-  uint32_t DataLength;
-  CanLogEntryType NewEntry;
+    uint32_t timestamp;
+    uint32_t timedelta;
+    uint8_t BlockIsReady;
+    uint32_t DataLength;
+    CanLogEntryType NewEntry;
+    FDCAN_ClassicFrame NewFrame;
+    static int counter = 0U;
 
-  timestamp = HAL_GetTick();
-  timedelta = timestamp - data->CanLog.timestamp;
-  
-  appCanLogFillDummyEntry(&NewEntry, timestamp);
-  
-  CanLogBuffer_AddEntry(&NewEntry);
+    appCanLogCheckNewFileOpen(data);
 
-  CanLogBuffer_IsBlockReady(&BlockIsReady);
+    while (0 == CanAbs_Receive(&NewFrame))
+    {
+        timestamp = HAL_GetTick();
+        timedelta = timestamp - data->CanLog.timestamp;
+        (void) timedelta;
 
-  if ( 0 != data->CanLog.openRes || timedelta<1000 )
-  {    
-    /* quit */
-  }
-  else if ( 0 == BlockIsReady )
-  {
-    /* quit since block is not ready to be written */
-  }
-  else if ( 0 !=  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
-  {
-    /* quit since data could not be read */
-  }
-  else if (FR_OK == FatFS_SD_WriteFile(
-              &(data->CanLog.writeFileDevice), 
-              (const char *)Data, 
-              DataLength) )
-  {
-    FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
-    data->CanLog.timestamp =  timestamp;
-  }
-  else
-  {
-    data->CanLog.timestamp =  timestamp;
-  }
+        appCanLogFillEntry(&NewEntry, &NewFrame, timestamp);
+
+        CanLogBuffer_AddEntry(&NewEntry);
+
+        CanLogBuffer_IsBlockReady(&BlockIsReady);
+
+        if ( 0 != data->CanLog.openRes )
+        {    
+            /* quit */
+            Error_Handler();
+        }
+        else if ( 0 == BlockIsReady )
+        {
+            /* quit since block is not ready to be written */
+        }
+        else if ( 0 !=  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
+        {
+            /* quit since data could not be read */
+        }
+        else if (FR_OK == FatFS_SD_WriteFile(
+                &(data->CanLog.writeFileDevice), 
+                (const char *)Data, 
+                DataLength) )
+        {
+            FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
+            data->CanLog.timestamp =  timestamp;
+        }
+        else
+        {
+            data->CanLog.timestamp =  timestamp;
+        }
+
+        counter++;
+    }
 }
 
 static void appCanLogHandlerDeInit(AppControlDataType * data)
@@ -203,9 +330,11 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   */
 int main(void)
 {
+  static uint32_t timestamp_prev = 0U;
+  uint32_t timestamp = 0U;
+  uint32_t time_delta = 0U;
   static FatFsDeviceType ConfigReadFileDevice;
   int32_t timeout;
-  uint32_t MsgCount;
   uint32_t spiClockSource;
   HAL_StatusTypeDef HalStatus;
   struct Config { 
@@ -347,14 +476,22 @@ int main(void)
 
   while (run)
   {
-    if ( 0 != CanAbs_Send())
+    timestamp = HAL_GetTick() * HAL_GetTickFreq();
+    time_delta = timestamp - timestamp_prev;
+
+    if ( time_delta < 10 )
+    {
+
+    }
+    else if ( 0 != CanAbs_Send())
     {
         Error_Handler();
+        timestamp_prev = timestamp;
     }
-
-    CanAbs_Receive(&MsgCount);
-
-    (void) MsgCount;
+    else
+    {
+        timestamp_prev = timestamp;
+    }
 
     http_poll();
 
@@ -362,7 +499,7 @@ int main(void)
 
     if (0 == AppCtrlData.Config.openRes)
     {
-      SettingsHandler_Poll(&AppCtrlData.Config.writeFileDevice, &AppConfig);
+      SettingsHandler_Poll(&(AppCtrlData.Config.writeFileDevice), &AppConfig);
     }
   }
 

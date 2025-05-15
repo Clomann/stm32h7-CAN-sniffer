@@ -5,7 +5,7 @@
 
 int CanAbs_Init(void);
 int CanAbs_Send(void);
-int CanAbs_Receive(uint32_t *count);
+int CanAbs_Receive(FDCAN_ClassicFrame *frame);
 
 unsigned int fdcan_setup(void);
 comm_status_t fdcan_create_message_1(FDCAN_Message*, uint8_t*, uint32_t);
