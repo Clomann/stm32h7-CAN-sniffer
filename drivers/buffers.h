@@ -20,7 +20,7 @@ typedef struct {
 	bool isFull;
 } RingBuffer;
 
-static void ring_buffer_put(RingBuffer *pBuffer, void *pElement)
+static inline void ring_buffer_put(RingBuffer *pBuffer, void *pElement)
 {
 	uint32_t SwBufferIndex;
 
@@ -37,7 +37,7 @@ static void ring_buffer_put(RingBuffer *pBuffer, void *pElement)
 	pBuffer->elementCount++;
 }
 
-static unsigned int ring_buffer_pop(RingBuffer *pBuffer, void *pElement)
+static inline unsigned int ring_buffer_pop(RingBuffer *pBuffer, void *pElement)
 {
 	uint32_t SwBufferIndex;
 

@@ -54,18 +54,9 @@ int CanAbs_Init()
     return res;
 }
 
-int CanAbs_Receive(uint32_t *count)
+int CanAbs_Receive(FDCAN_ClassicFrame *frame)
 {
-    uint8_t Data[8];
-    FDCAN_ClassicFrame Frame;
-
-
-    while (0 == ring_buffer_pop(fdcan_driver.RxFrameBuffer, (void*)&Frame))
-    {
-    	memcpy(Data, &Frame.data[0], sizeof(Data));
-    }
-
-    return 0;
+    return ring_buffer_pop(fdcan_driver.RxFrameBuffer, (void*)frame);
 }
 
 int CanAbs_Send()

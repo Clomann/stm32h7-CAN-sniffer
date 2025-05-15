@@ -34,16 +34,18 @@ static FatFsDeviceType CanLogReadFileDevice;
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
-    const char CanLogFilename[] = "can.log";
+    char CanLogFilename[64] = "can.log";
     uint32_t FileSize = 0U;
 
-    if (strcmp(name, "/can_trace") == 0) {
+    /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
+    if (strncmp(name, "/logs/CAN.LOG", 13) == 0)
+    {
         reqState.index = 0;
         reqState.stage = 0;
         reqState.callcount = 0;
         strncpy((char *)reqState.name, name, sizeof(reqState.name));
 
-        if ( 0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, CanLogFilename) )
+        if ( 0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, name) )
         {
             return 0;
         }
@@ -83,42 +85,34 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
         return FS_READ_EOF;
     }
 
-    if (strcmp(state->name, "/can_trace") == 0)
+    volatile uint32_t FileIndex = state->callcount * CHUNK_SIZE;
+    
+    if (FileIndex >= CanLogReadFileDevice.readTargetSize)
     {
-        volatile uint32_t FileIndex = state->callcount * CHUNK_SIZE;
-        
-        if (FileIndex >= CanLogReadFileDevice.readTargetSize)
-        {
-            state->callcount = 0;
-            return FS_READ_EOF;
-        }
-
-        if (CanLogReadFileDevice.readTargetSize > FileIndex + CHUNK_SIZE)
-        {
-            len = CHUNK_SIZE;
-        }
-        else
-        {
-            len = CanLogReadFileDevice.readTargetSize - FileIndex ;   
-        }
-
-        FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
-
-        state->callcount++;
+        state->callcount = 0;
+        return FS_READ_EOF;
     }
+
+    if (CanLogReadFileDevice.readTargetSize > FileIndex + CHUNK_SIZE)
+    {
+        len = CHUNK_SIZE;
+    }
+    else
+    {
+        len = CanLogReadFileDevice.readTargetSize - FileIndex ;   
+    }
+
+    FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
+
+    state->callcount++;
+    
     
     return len; // triggers send
 }
 
 void fs_close_custom(struct fs_file *file)
 {
-    CustomHandlerState *state = (CustomHandlerState *)file->pextension;
-
-    if (strcmp(state->name, "/can_trace") == 0)
-    {
-        FatFS_SD_CloseFile(&CanLogReadFileDevice);
-    }
-        
+    FatFS_SD_CloseFile(&CanLogReadFileDevice);
     file->pextension = NULL; // optional cleanup
 }
 
