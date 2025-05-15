@@ -1,6 +1,5 @@
 #include "FileHandler.h"
 
-
 static FATFS FatFs;		/* FatFs work area needed for each volume */
 
 FRESULT FatFS_SD_Mount()
@@ -17,7 +16,8 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
 {  
   FRESULT fr;
 
-  fr = f_open(&dev->file, name, FA_OPEN_APPEND | FA_WRITE );	/* Create a file */
+  dev->fflags = FA_OPEN_APPEND | FA_WRITE;
+  fr = f_open(&dev->file, name, dev->fflags);
 
   return fr;
 }
@@ -26,7 +26,8 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
 {  
   FRESULT fr;
 
-  fr = f_open(&dev->file, name, FA_CREATE_ALWAYS | FA_WRITE );	/* Create a file */
+  dev->fflags = FA_CREATE_ALWAYS | FA_WRITE;
+  fr = f_open(&dev->file, name, dev->fflags);
 
   return fr;
 }
@@ -35,7 +36,8 @@ FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name)
 {  
   FRESULT fr;
 
-  fr = f_open(&dev->file, name, FA_READ );	/* Create a file */
+  dev->fflags = FA_READ;
+  fr = f_open(&dev->file, name, dev->fflags);	/* Create a file */
 
   return fr;
 }
@@ -55,7 +57,7 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
     UINT BytesWritten = 0U;
     uint32_t FileSize = 0U;
 
-    if ((dev->file.flag & FA_CREATE_ALWAYS) == 0)  // Only seek if we did NOT truncate the file
+    if ((dev->fflags & FA_CREATE_ALWAYS) == 0)  // Only seek if we did NOT truncate the file
     {
         FileSize = f_size(&dev->file);
     }
@@ -103,4 +105,47 @@ FRESULT FatFS_SD_GetFileSize(FatFsDeviceType *dev, uint32_t *size)
 
     *size = f_size(&dev->file);
     return res;							/* Close the file */
+}
+
+FRESULT FatFS_SD_GetBufferedFileSize(FatFsDeviceType *dev, uint32_t *size)
+{
+    FRESULT res;
+
+    res = FR_OK;
+
+    *size = f_tell(&dev->file);
+    return res;							/* Close the file */
+}
+
+FRESULT FatFS_SD_FileIterator_Open(FatFS_FileIterator *it, const char *dirPath, const char *prefix)
+{
+    it->prefix = prefix;
+    it->prefixLen = strlen(prefix);
+    return f_opendir(&it->dir, dirPath);
+}
+
+FRESULT FatFS_SD_FileIterator_Next(FatFS_FileIterator *it, FILINFO **outInfo)
+{
+    FRESULT res;
+
+    while (1) {
+        res = f_readdir(&it->dir, &it->fno);
+        if (res != FR_OK)
+            return res; // end of dir or error
+
+        if (it->fno.fname[0] == 0)
+            return FR_NO_FILE;  // Indicate end of directory
+
+        if (!(it->fno.fattrib & AM_DIR) &&
+            strncmp(it->fno.fname, it->prefix, it->prefixLen) == 0)
+        {
+            *outInfo = &it->fno;
+            return FR_OK;
+        }
+    }
+}
+
+FRESULT FatFS_SD_FileIterator_Close(FatFS_FileIterator *it)
+{
+    return f_closedir(&it->dir);
 }
