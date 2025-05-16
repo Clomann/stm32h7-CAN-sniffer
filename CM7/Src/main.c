@@ -35,6 +35,7 @@
 #include "CanLogBuffer.h"
 #include "SettingsHandler.h"
 #include "CanAbs.h"
+#include "fs_custom.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -53,7 +54,9 @@ typedef struct {
     uint32_t count;
     uint32_t timestamp;
     uint8_t openRes;
-    int32_t fileIndex;
+    uint32_t fileHeadIndex;
+    uint32_t fileTailIndex;
+    bool fileIndexWrapped;
     FatFsDeviceType writeFileDevice;
   } CanLog;
   struct {
@@ -109,6 +112,27 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
+#define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
+#define MAX_LOG_FILE_SIZE   (8U * 1024U )
+#define MAX_LOG_INDEX       (16U)
+
+uint8_t FsCustom_GetCanLogHeadIndex(uint32_t *index)
+{
+    *index = AppCtrlData.CanLog.fileHeadIndex;
+    return 0U;
+}
+
+uint8_t FsCustom_GetCanLogTailIndex(uint32_t *index)
+{
+    *index = AppCtrlData.CanLog.fileTailIndex;
+    return 0U;
+}
+
+uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
+{
+    *capacity = MAX_LOG_INDEX;
+    return 0U;
+}
 
 static void appConfigHandlerInit(AppControlDataType *data)
 {
@@ -151,10 +175,14 @@ static int find_highest_suffix(const char *dirPath, const char *prefix, int maxS
 
 static unsigned int appCanLogOpenMostRecentFile(AppControlDataType *data)
 {
-    #define MAX_LOG_INDEX       (1024U)
+    int lastUsed;
+#if PERSIST_CAN_LOG_FILE_HEAD_TAIL
+    lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);     
+#else  
+    data->CanLog.fileHeadIndex = lastUsed;
+#endif
 
-    int lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);       
-    data->CanLog.fileIndex = lastUsed;
+    data->CanLog.fileHeadIndex = 0U;
 
     // Build candidate filename
     snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)lastUsed);
@@ -168,8 +196,6 @@ static unsigned int appCanLogOpenMostRecentFile(AppControlDataType *data)
 
 static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
 {
-    #define MAX_LOG_FILE_SIZE   (32U * 1024U )
-
     FRESULT FileSizeRes;
     uint32_t FileSize;
 
@@ -181,9 +207,22 @@ static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
         if (0 == FatFS_SD_CloseFile(
             &(data->CanLog.writeFileDevice)))
         {
-            data->CanLog.fileIndex = (data->CanLog.fileIndex + 1) % (MAX_LOG_INDEX + 1);
-            snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)data->CanLog.fileIndex);
+            if (data->CanLog.fileHeadIndex >= MAX_LOG_INDEX)
+            {
+                data->CanLog.fileIndexWrapped = 1;
+            }
+            
+            data->CanLog.fileHeadIndex = (data->CanLog.fileHeadIndex + 1) % (MAX_LOG_INDEX + 1);
+
+            if (1 == data->CanLog.fileIndexWrapped)
+            {
+                data->CanLog.fileTailIndex = (data->CanLog.fileHeadIndex + 1) % (MAX_LOG_INDEX + 1);
+            }
+            
+            snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)data->CanLog.fileHeadIndex);
     
+            (void) f_unlink(data->CanLog.filename);
+
             data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
                 &(data->CanLog.writeFileDevice), 
                 data->CanLog.filename);
@@ -191,7 +230,6 @@ static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
             if (0 != data->CanLog.openRes)
             {
                 Error_Handler();
-                data->CanLog.fileIndex++;
             }
             FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
         }
@@ -206,13 +244,17 @@ static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
 
 static void appCanLogHandlerInit(AppControlDataType *data)
 {
-    CanLogBuffer_Init();
-
     FILINFO info;
     FRESULT res;
     FIL file;
     char filename[128];
-    
+
+    data->CanLog.fileHeadIndex = 0;
+    data->CanLog.fileTailIndex = 0;
+    data->CanLog.fileIndexWrapped = 0;
+
+    CanLogBuffer_Init();
+
     res = f_stat("/logs", &info);
 
     if ( (res == FR_OK) && (info.fattrib & AM_DIR)) 
@@ -329,6 +371,7 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   * @retval None
   */
 int main(void)
+
 {
   static uint32_t timestamp_prev = 0U;
   uint32_t timestamp = 0U;
