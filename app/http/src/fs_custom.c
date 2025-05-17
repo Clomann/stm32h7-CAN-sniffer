@@ -35,11 +35,11 @@ static FatFsDeviceType CanLogReadFileDevice;
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
-    char CanLogFilename[64] = "can.log";
+    char CanLogFilename[64] = "/logs/CAN.LOG";
     uint32_t FileSize = 0U;
 
     /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
-    if (strncmp(name, "/logs/CAN.LOG", 13) == 0)
+    if (strncmp(name, CanLogFilename, 13) == 0)
     {
         reqState.index = 0;
         reqState.stage = 0;
@@ -89,7 +89,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
         }
 
         int n = snprintf(meta,sizeof meta,
-            "{\"head\":%u,\"tail\":%u,\"capacity\":%u,\"latest\":\"CAN.LOG%u\"}",
+            "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}",
             HeadIndex, TailIndex, Capacity,
             (TailIndex + TailIndex - 1) % Capacity);
     

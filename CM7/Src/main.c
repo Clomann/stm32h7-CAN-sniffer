@@ -176,13 +176,14 @@ static int find_highest_suffix(const char *dirPath, const char *prefix, int maxS
 static unsigned int appCanLogOpenMostRecentFile(AppControlDataType *data)
 {
     int lastUsed;
-#if PERSIST_CAN_LOG_FILE_HEAD_TAIL
+
     lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);     
-#else  
-    data->CanLog.fileHeadIndex = lastUsed;
+
+#if 0U == PERSIST_CAN_LOG_FILE_HEAD_TAIL
+    lastUsed = 0U;
 #endif
 
-    data->CanLog.fileHeadIndex = 0U;
+    data->CanLog.fileHeadIndex = lastUsed;
 
     // Build candidate filename
     snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)lastUsed);
@@ -242,12 +243,10 @@ static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
     return 0U;
 }
 
-static void appCanLogHandlerInit(AppControlDataType *data)
+static FRESULT appCanLogHandlerInit(AppControlDataType *data)
 {
     FILINFO info;
     FRESULT res;
-    FIL file;
-    char filename[128];
 
     data->CanLog.fileHeadIndex = 0;
     data->CanLog.fileTailIndex = 0;
@@ -282,6 +281,8 @@ static void appCanLogHandlerInit(AppControlDataType *data)
     {
         data->CanLog.openRes = 1U;
     }
+
+    return res;
 }
 
 static void appCanLogFillEntry(CanLogEntryType *entry, FDCAN_ClassicFrame *frame, int32_t timestamp)
@@ -292,15 +293,6 @@ static void appCanLogFillEntry(CanLogEntryType *entry, FDCAN_ClassicFrame *frame
     entry->dlc = frame->dlc;
     memcpy( (uint8_t *)&entry->can_id, (uint8_t *)frame->id, sizeof(entry->can_id) );
     memcpy( entry->data, frame->data, sizeof(entry->data) );
-}
-
-static void appCanLogFillDummyEntry(CanLogEntryType *dummy, uint32_t timestamp)
-{
-  dummy->timestamp_us.lsb = timestamp & 0xFFFF;
-  dummy->timestamp_us.msb = (timestamp >> 16) & 0xFF;
-  dummy->dlc = 0x11;
-  memset( &dummy->can_id, 0x22, sizeof(dummy->can_id) );
-  memset( dummy->data, 0x33, sizeof(dummy->data) );
 }
 
 static void appCanLogHandlerPoll(AppControlDataType *data)
