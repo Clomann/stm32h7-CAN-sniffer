@@ -83,6 +83,9 @@ SECTIONS
   .rodata :
   {
     . = ALIGN(4);
+    __start_comm_factory = .;
+    KEEP(*(.comm_factory))
+    __stop_comm_factory = .;
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);

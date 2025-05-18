@@ -6,29 +6,17 @@
  */
 
 #include "CommManager.h"
-#include "fdcan.h"
+#include "CommFactory.h"
 
-comm_status_t comm_manager_init(CommDriver *pDriver, driver_protocol_t protocol, driver_cfg_t config, RingBuffer *pRxBuffer)
+comm_status_t comm_manager_init(
+    CommDriver *drv,
+    driver_protocol_t proto,
+    driver_cfg_t cfg,
+    RingBuffer *rx)
 {
-	comm_status_t RetVal;
+    const CommFactoryEntry *e = CommFactory_Find(proto);
+    if (!e)                     /* unknown protocol */
+    return COMM_ERROR;
 
-	RetVal = COMM_SUCCESS;
-
-	switch (protocol)
-	{
-		case DRIVER_FDCAN:
-			FDCAN_CreateDriver(pDriver, config, pRxBuffer);
-			break;
-		case DRIVER_CAN:
-		case DRIVER_USART:
-		case DRIVER_SPI:
-		case DRIVER_I2C:
-		case DRIVER_ETHERNET:
-		default:
-			RetVal = COMM_ERROR;
-	}
-
-	return RetVal;
+    return e->create(drv, cfg, rx);
 }
-
-

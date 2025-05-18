@@ -63,6 +63,8 @@ comm_status_t FDCAN_CreateDriver(CommDriver *pDriver, driver_cfg_t config, RingB
 	return RetVal;
 }
 
+COMM_REGISTER_DRIVER(DRIVER_FDCAN, FDCAN_CreateDriver);
+
 FDCAN_Driver* create_driver(uint8_t instance) {
     if (instance < 1 || instance > MAX_INSTANCES) {
         return NULL;  // Error: Invalid channel
