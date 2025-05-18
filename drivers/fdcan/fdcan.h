@@ -10,8 +10,9 @@
 
 #include "stm32h7xx.h"
 #include "stm32h7xx_hal_fdcan.h"
-#include "CommManager.h"
 #include "fdcan_cfg.h"
+#include "CommManager.h"
+#include "CommFactory.h"
 
 #ifndef FDCAN_MODE
 #define FDCAN_MODE FDCAN_MODE_NORMAL 
@@ -57,7 +58,7 @@ typedef struct {
 
 extern const CommInterface FDCAN_Interface;
 
-comm_status_t FDCAN_CreateDriver(CommDriver *, driver_cfg_t, RingBuffer *);
+comm_status_t COMM_FACTORY_USED_ATTR FDCAN_CreateDriver(CommDriver *, driver_cfg_t, RingBuffer *);
 comm_status_t FDCAN_Init(FdcanDeviceType *dev, FdcanConfigType *cfg, uint8_t *rxBuf, uint32_t rxLen, uint8_t *txBuf, uint32_t txLen);
 comm_status_t FDCAN_Send(const void*);
 comm_status_t FDCAN_Read(void*, uint8_t, uint32_t);

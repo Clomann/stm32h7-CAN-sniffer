@@ -5,8 +5,7 @@
  *      Author: Clemens
  */
 
-#ifndef CM7_DRIVERS_COMM_COMMMANAGER_H_
-#define CM7_DRIVERS_COMM_COMMMANAGER_H_
+#pragma once
 
 #include <string.h>
 
@@ -29,4 +28,5 @@ typedef struct CommDriver {
 
 comm_status_t comm_manager_init(CommDriver *, driver_protocol_t, driver_cfg_t, RingBuffer *pRxBuffer);
 
-#endif /* CM7_DRIVERS_COMM_COMMMANAGER_H_ */
+/* Shim functions that eed to be oimplemented by the caller */
+comm_status_t CommManager_Fdcan_Init(CommDriver *pDriver, driver_cfg_t config, RingBuffer *pRxBuffer);
