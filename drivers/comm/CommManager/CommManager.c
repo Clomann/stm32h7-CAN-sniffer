@@ -6,7 +6,7 @@
  */
 
 #include "CommManager.h"
-#include "fdcan.h"
+#include "CommFactory.h"
 
 comm_status_t CommManager_Init(
     CommDriver *drv,
@@ -24,5 +24,3 @@ comm_status_t CommManager_Init(
 
     return e->create(drv, cfg, cfg_size, tx, rx);
 }
-
-
