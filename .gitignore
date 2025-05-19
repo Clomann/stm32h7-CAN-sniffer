@@ -8,3 +8,5 @@ _bin/
 _deps/
 tests/_deps
 tests/build/
+
+cmake_install.cmake

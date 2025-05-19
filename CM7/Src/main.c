@@ -134,6 +134,11 @@ uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
     return 0U;
 }
 
+void FDCAN_ErrorHandler()
+{
+    Error_Handler();
+}
+
 static void appConfigHandlerInit(AppControlDataType *data)
 {
   SettingsHandler_Init(&AppConfig);
@@ -363,7 +368,6 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   * @retval None
   */
 int main(void)
-
 {
   static uint32_t timestamp_prev = 0U;
   uint32_t timestamp = 0U;

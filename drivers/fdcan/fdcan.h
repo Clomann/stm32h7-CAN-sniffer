@@ -10,8 +10,8 @@
 
 #include "stm32h7xx.h"
 #include "stm32h7xx_hal_fdcan.h"
-#include "CommManager.h"
 #include "fdcan_cfg.h"
+#include "CommFactory.h"
 
 #ifndef FDCAN_MODE
 #define FDCAN_MODE FDCAN_MODE_NORMAL 
@@ -29,11 +29,11 @@ typedef struct {
 } FdcanBitTimingType;
 
 typedef struct {
-    driver_cfg_t config;
+    CommDriverConfigType config;
     // Other FDCAN-specific fields
 } FDCANHandle;
 
-typedef struct {
+typedef struct FdcanConfigType {
     FdcanBitTimingType * bittiming;
     int bitrate;            // CAN bitrate (e.g., 500 kbps)
     int mode;               // CAN mode (normal, loopback, etc.)
@@ -57,9 +57,24 @@ typedef struct {
 
 extern const CommInterface FDCAN_Interface;
 
-comm_status_t FDCAN_CreateDriver(CommDriver *, driver_cfg_t, RingBuffer *);
-comm_status_t FDCAN_Init(FdcanDeviceType *dev, FdcanConfigType *cfg, uint8_t *rxBuf, uint32_t rxLen, uint8_t *txBuf, uint32_t txLen);
-comm_status_t FDCAN_Send(const void*);
-comm_status_t FDCAN_Read(void*, uint8_t, uint32_t);
+comm_status_t FDCAN_CreateDriver(
+    CommDriver *pDriver, 
+    const void *cfg, 
+    size_t cfg_size,
+    RingBuffer *tx, 
+    RingBuffer *rx) COMM_FACTORY_USED_ATTR;
+
+comm_status_t FDCAN_Init(
+    CommDriver *dev);
+
+comm_status_t FDCAN_Send(
+    const void*);
+
+comm_status_t FDCAN_Read(
+    void*, 
+    uint8_t, uint32_t);
+
+/* shims needed to be implemented by the caller */
+void FDCAN_ErrorHandler(void);
 
 #endif /* COMM_FDCAN_H_ */
