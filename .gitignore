@@ -10,3 +10,4 @@ tests/_deps
 tests/build/
 
 cmake_install.cmake
+CMakeFiles/*
