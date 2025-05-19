@@ -145,9 +145,12 @@ static void appConfigHandlerInit(AppControlDataType *data)
 
   if ( RES_OK == data->mountRes)
   {
-    data->Config.openRes = FatFS_SD_OpenFileForOverWrite(
+    data->Config.openRes = FatFS_SD_OpenFileForWrite(
                               &(data->Config.writeFileDevice),
                               data->Config.filename);
+
+    /* enforce f_seek to zero via custom flags to not clear content later */
+    data->Config.writeFileDevice.fflags = FA_CREATE_ALWAYS | FA_WRITE;
   }
   else 
   {
