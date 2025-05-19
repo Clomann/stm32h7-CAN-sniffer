@@ -25,14 +25,14 @@ typedef enum {
 	DRIVER_I2C,
 	DRIVER_ETHERNET,
 	DRIVER_BLUETOOTH
-} driver_protocol_t;
+} CommProtocolType;
 
 typedef enum {
 	DRIVER_CFG0,
 	DRIVER_CFG1,
 	DRIVER_CFG2,
 	DRIVER_CFGn
-} driver_cfg_t;
+} CommConfigType;
 
 typedef enum {
     DRIVER_MSGDIRECTION_RX,
@@ -40,7 +40,7 @@ typedef enum {
 } driver_msgdir_t;
 
 typedef struct {
-	driver_protocol_t protocol;
+	CommProtocolType protocol;
 	driver_msgdir_t dir;
     uint32_t length;
     uint8_t* payload;

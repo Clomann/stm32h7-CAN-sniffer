@@ -22,7 +22,53 @@ STM32H7 CAN sniffer
 
 This is a multi-protocol learning project. It implements a device that logs CAN traffic and stores the data onto a SD card. The device can be configured and the logged data can be accessed via a web interface.
 
+## How To Use
+
+The project consists of the source code written to run on a NUCLE 144 STM32H745ZI discovery board. It uses GPIO to interface to:
+- SD card
+- CAN tranceiver
+- the on board ETH interface
+
+It is build using cmake and make based on the gcc toolcain. You can run 
+
+```sh
+cmake --preset "Debug" -B ./build/
+```
+to build the make project using cmake and then 
+
+```sh
+make -C build -j4
+```
+
+to build the application.
+
+[!NOTE]: Use a high quality SD card because many cheap once have issues with SPI. Thus, the quality of the SD card influences the reliablity accesing it through SPI. The system was tested with a Kingston Industrial graded card.
+
 ## Software architecture
+### Introduction and goals
+The main of this project is to offer practical challanges to gain experience in:
+- applying software architecture concepts in an embedded environment
+- developing hardware drivers and there abstractions
+- using and integrating thrid party libraries
+- practicing tool chain management (cmake, vs code, gcc) 
+- leaning about industry relevant protocols (SPI, I2C, Ethernet, etc.)
+
+The application itself shall provide a basic software piece offering:
+- functions for data management and persisting
+- connectivity
+- user interaction
+- extendable and modularized HW interface to easily add protocols in the future
+
+Therefore, a central goal is to make the core application reusable and portable in a way, to also use it with other uCs of the family.
+
+### Quality goals
+
+| Goal | Motivation and description |
+|-|-|
+| Transferability | The app shall be modularized and open to extension so that the code can be resued in other projects. A clean interface between main app and HW abstraction is neede. |
+| Reliability | Data aquisition shall be reliable also at high throughput |
+| Maintainability | It shall be easy to add funcitons in the main app, but also to change driver implementations without affecting other parts of the code base. | 
+
 ### System overview
 
 ```mermaid

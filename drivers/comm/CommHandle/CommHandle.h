@@ -10,17 +10,21 @@
 
 #include <stdlib.h>
 #include "CommTypes.h"
+#include "buffers.h"
 
-typedef struct CommHandle CommHandle;
+typedef struct CommDriver CommDriver;
 
-typedef comm_status_t (*Comm_Init)(void);
-typedef comm_status_t (*Comm_Deinit)(CommHandle *handle);
+/*! Opaque init funciton that needs to be implemented by each driver.
+ * \param[in] cfg_size Allows the dirver sanity-check the config.
+ */
+typedef comm_status_t (*Comm_Init)(CommDriver *drv);
+typedef comm_status_t (*Comm_Deinit)(CommDriver *handle);
 typedef comm_status_t (*Comm_Send)(const void *msg);
 typedef comm_status_t (*Comm_Read)(void *data, uint8_t length, uint32_t RxFifo0ITs);
-typedef comm_status_t (*Comm_Control)(CommHandle *handle, int command, void *argument);
-typedef comm_status_t (*Comm_RegisterCallback)(CommHandle *handle, void (*callback)(void *), void *context);
-typedef comm_status_t (*Comm_EnableInterrupt)(CommHandle *handle);
-typedef comm_status_t (*Comm_DisableInterrupt)(CommHandle *handle);
+typedef comm_status_t (*Comm_Control)(CommDriver *handle, int command, void *argument);
+typedef comm_status_t (*Comm_RegisterCallback)(CommDriver *handle, void (*callback)(void *), void *context);
+typedef comm_status_t (*Comm_EnableInterrupt)(CommDriver *handle);
+typedef comm_status_t (*Comm_DisableInterrupt)(CommDriver *handle);
 
 typedef struct {
     Comm_Init init;

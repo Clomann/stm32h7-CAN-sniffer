@@ -3,7 +3,14 @@
         "main.h": "c",
         "diskiofacade.h": "c",
         "filehandler.h": "c",
-        "canlogbuffer.h": "c"
+        "canlogbuffer.h": "c",
+        "commmanager.h": "c",
+        "commfactory.h": "c",
+        "fdcan.h": "c",
+        "canabs.h": "c",
+        "fs_custom.h": "c",
+        "commtypes.h": "c",
+        "commmessages.h": "c"
     },
     "cortex-debug.openocdPath": "/usr/local/bin/openocd",
     "cortex-debug.gdbPath": "/opt/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb", 

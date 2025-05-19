@@ -5,28 +5,41 @@
  *      Author: Clemens
  */
 
-#ifndef CM7_DRIVERS_COMM_COMMMANAGER_H_
-#define CM7_DRIVERS_COMM_COMMMANAGER_H_
+#pragma once
 
 #include <string.h>
 
 #include "CommTypes.h"
 #include "CommHandle.h"
 #include "CommMessages.h"
-#include "buffers.h"
 
 typedef comm_status_t (*RegisterMessageFunction)(void* message, void* protocolSpecific, uint32_t *msgId);
 
 typedef struct CommDriver {
 	CommInterface *interface;
 	void *config;
-	driver_protocol_t protocol;
+	CommProtocolType protocol;
 	uint8_t configNbr;
 	uint8_t initialized;
 	RingBuffer *RxFrameBuffer;
 	RingBuffer *TxFrameBuffer;
 } CommDriver;
 
-comm_status_t comm_manager_init(CommDriver *, driver_protocol_t, driver_cfg_t, RingBuffer *pRxBuffer);
+/* config type forward declarations: 
+    need to be completed by the respective drivers 
+*/
+typedef struct FdcanConfigType FdcanConfigType;
 
-#endif /* CM7_DRIVERS_COMM_COMMMANAGER_H_ */
+typedef struct CommDriverConfigType {
+    CommConfigType config;
+    union {
+        FdcanConfigType *fdcan;
+    };
+} CommDriverConfigType;
+
+comm_status_t CommManager_Init(
+    CommDriver *drv,
+    const void *cfg,
+    size_t cfg_size,
+    RingBuffer *tx,
+    RingBuffer *rx);

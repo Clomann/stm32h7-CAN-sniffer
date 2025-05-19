@@ -17,41 +17,54 @@ typedef struct {
 FDCAN_HandleTypeDef hfdcan;
 FDCAN_RxHeaderTypeDef RxHeader;
 
-FDCAN_Driver fdcan_drivers[MAX_INSTANCES];
 FdcanConfigType fdcan_configs[DRIVER_CFGn];
 
+CommDriverConfigType Can1Cfg;
+
 /* Private function prototypes -----------------------------------------------*/
-void FDCANx_IRQHandler(void);
 comm_status_t get_fdcan_config(
 		FDCAN_HandleTypeDef *,
 		FDCAN_FilterTypeDef *,
-		driver_cfg_t);
+		CommConfigType);
 
 comm_status_t fdcan_init_tx_header(const void *, FDCAN_TxHeaderTypeDef *, uint32_t);
 
-comm_status_t FDCAN_CreateDriver(CommDriver *pDriver, driver_cfg_t config, RingBuffer *pRxBuffer)
+comm_status_t FDCAN_CreateDriver(
+    CommDriver *pDriver, 
+    const void *cfg, 
+    size_t cfg_size,
+    RingBuffer *tx, 
+    RingBuffer *rx)
 {
 	comm_status_t RetVal;
-	FdcanConfigType newConfig;
+	CommDriverConfigType *DriverConfig;
+    FdcanConfigType newConfig;
 	FDCAN_FilterTypeDef pFilterConfig;
 
 	RetVal = COMM_ERROR;
+    DriverConfig = (CommDriverConfigType *)cfg;
+
+    if (sizeof(DriverConfig) != cfg_size)
+    {
+        FDCAN_ErrorHandler();
+    }
 
 	pDriver->interface->init = FDCAN_Init;
 	pDriver->interface->send = FDCAN_Send;
 	pDriver->interface->read = FDCAN_Read;
-	pDriver->configNbr = config;
+	pDriver->configNbr = DriverConfig->config;
 	pDriver->protocol = DRIVER_FDCAN;
-	pDriver->RxFrameBuffer = pRxBuffer;
+	pDriver->TxFrameBuffer = tx;
+    pDriver->RxFrameBuffer = rx;
 
-	switch (config)
+	switch (pDriver->configNbr )
 	{
 		case DRIVER_CFG0:
 		case DRIVER_CFG1:
 		case DRIVER_CFG2:
-			get_fdcan_config(&hfdcan, &pFilterConfig, config);
-			memcpy(&fdcan_configs[config], &newConfig, sizeof(FdcanConfigType));
-			pDriver->config = &(fdcan_configs[config]);
+			get_fdcan_config(&hfdcan, &pFilterConfig, pDriver->configNbr );
+			memcpy(&fdcan_configs[pDriver->configNbr ], &newConfig, sizeof(FdcanConfigType));
+			pDriver->config = &(fdcan_configs[pDriver->configNbr ]);
 			pDriver->initialized = 1;
 			RetVal = COMM_SUCCESS;
 			break;
@@ -63,82 +76,61 @@ comm_status_t FDCAN_CreateDriver(CommDriver *pDriver, driver_cfg_t config, RingB
 	return RetVal;
 }
 
-FDCAN_Driver* create_driver(uint8_t instance) {
-    if (instance < 1 || instance > MAX_INSTANCES) {
-        return NULL;  // Error: Invalid channel
-    }
+COMM_REGISTER_DRIVER(DRIVER_FDCAN, FDCAN_CreateDriver);
 
-    // Initialize the driver instance for this channel
-    FDCAN_Driver *driver = &fdcan_drivers[instance - 1];
-    driver->channel = instance;
-
-    // Set up the function pointers in the interface
-//    driver->interface.init = FDCAN_Init;
-//    driver->interface.read = void*;
-//    driver->interface.write = void*;
-//    driver->interface.register_interrupt_callback = void*;
-
-    return driver;
-}
-
-comm_status_t FDCAN_Init(FdcanDeviceType *dev, FdcanConfigType *cfg, uint8_t *rxBuf, uint32_t rxLen, uint8_t *txBuf, uint32_t txLen)
+comm_status_t FDCAN_Init(
+    CommDriver *dev)
 {
 	FDCAN_FilterTypeDef sFilterConfig;
 	comm_status_t RetVal;
 
     (void) dev;
-    (void) cfg;
-    (void) rxBuf;
-    (void) rxLen;
-    (void) txBuf;
-    (void) txLen;
-
 
 	RetVal = COMM_SUCCESS;
 
-	// TODO make init function consistent with driver creation
-	get_fdcan_config(&hfdcan, &sFilterConfig, DRIVER_CFG2);
-	  if (HAL_FDCAN_Init(&hfdcan) != HAL_OK)
-	  {
-	    /* Initialization Error */
-		  RetVal = COMM_ERROR;
-	  }
+    // TODO make init function consistent with driver creation
+    get_fdcan_config(&hfdcan, &sFilterConfig, DRIVER_CFG2);
+    if (HAL_FDCAN_Init(&hfdcan) != HAL_OK)
+    {
+        /* Initialization Error */
+        RetVal = COMM_ERROR;
+    }
 
-	  if (HAL_FDCAN_ConfigTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_PRESC_1) != HAL_OK)
-	  {
-		/* Initialization Error */
-		  RetVal = COMM_ERROR;
-	  }
+    if (HAL_FDCAN_ConfigTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_PRESC_1) != HAL_OK)
+    {
+        /* Initialization Error */
+        RetVal = COMM_ERROR;
+    }
 
-	  if (HAL_FDCAN_EnableTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_INTERNAL) != HAL_OK)
-	  {
-		/* Initialization Error */
-		  RetVal = COMM_ERROR;
-	  }
+    if (HAL_FDCAN_EnableTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_INTERNAL) != HAL_OK)
+    {
+        /* Initialization Error */
+        RetVal = COMM_ERROR;
+    }
 
-	  /* Configure Rx filter */
-	  if (HAL_FDCAN_ConfigFilter(&hfdcan, &sFilterConfig) != HAL_OK)
-	  {
-	    /* Filter configuration Error */
-		  RetVal = COMM_ERROR;
-	  }
+    /* Configure Rx filter */
+    if (HAL_FDCAN_ConfigFilter(&hfdcan, &sFilterConfig) != HAL_OK)
+    {
+        /* Filter configuration Error */
+        RetVal = COMM_ERROR;
+    }
 
-	  /* Start the FDCAN module */
-	  if (HAL_FDCAN_Start(&hfdcan) != HAL_OK)
-	  {
-	    /* Start Error */
-	    RetVal = COMM_ERROR;
-	  }
+    /* Start the FDCAN module */
+    if (HAL_FDCAN_Start(&hfdcan) != HAL_OK)
+    {
+        /* Start Error */
+        RetVal = COMM_ERROR;
+    }
 
-	  if (HAL_FDCAN_ActivateNotification(&hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-	  {
-	    /* Notification Error */
-		  RetVal = COMM_ERROR;
-	  }
+    if (HAL_FDCAN_ActivateNotification(&hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+    {
+        /* Notification Error */
+        RetVal = COMM_ERROR;
+    }
 
-	  /* Prepare Tx Header */
+    /* Prepare Tx Header */
 
-	  return RetVal;
+    return RetVal;
 }
 
 comm_status_t FDCAN_Send(const void *pMsg)
@@ -406,7 +398,7 @@ comm_status_t fdcan_init_tx_header(const void * pMsg, FDCAN_TxHeaderTypeDef *pTx
 comm_status_t get_fdcan_config(
 		FDCAN_HandleTypeDef *pHfdcan,
 		FDCAN_FilterTypeDef *pFilterConfig,
-		driver_cfg_t config)
+		CommConfigType config)
 {
 	comm_status_t RetVal;
 	RetVal = COMM_ERROR;

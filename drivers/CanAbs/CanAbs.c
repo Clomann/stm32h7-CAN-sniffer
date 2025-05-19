@@ -10,26 +10,6 @@ FDCAN_Message Msg2;
 FDCAN_Message Msg3;
 FDCAN_Message Msg4;
 
-CommDriver fdcan_driver;
-FDCAN_ClassicFrame fdcan_rx_frame_buffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
-FDCAN_ClassicFrame fdcan_tx_frame_buffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
-
-RingBuffer fdcan_RxRingBuffer = {
-    .startAddress = &fdcan_rx_frame_buffer[0],
-    .head = 0,
-    .tail = 0,
-    .bufferLength = sizeof(fdcan_rx_frame_buffer) / sizeof(fdcan_rx_frame_buffer[0]),
-    .elementSize = sizeof(fdcan_rx_frame_buffer[0]),
-    .isFull = false};
-
-RingBuffer fdcan_TxRingBuffer = {
-    .startAddress = &fdcan_tx_frame_buffer[0],
-    .head = 0,
-    .tail = 0,
-    .bufferLength = sizeof(fdcan_tx_frame_buffer) / sizeof(fdcan_tx_frame_buffer[0]),
-    .elementSize = sizeof(fdcan_tx_frame_buffer[0]),
-    .isFull = false};
-
 // FDCAN_HandleTypeDef hfdcan;
 // FDCAN_RxHeaderTypeDef RxHeader;
 // FDCAN_TxHeaderTypeDef TxHeader;
@@ -37,11 +17,39 @@ uint8_t RxData[8];
 uint8_t TxData[8];
 uint8_t TxData2[8];
 
+static CommDriver Fdcan1Driver;
+static CommDriverConfigType Fdcan1Config;
+static FDCAN_ClassicFrame fdcan_rx_frame_buffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrame fdcan_tx_frame_buffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
+static RingBuffer Fdcan1RxRingBuffer = {
+    .startAddress = &fdcan_rx_frame_buffer[0],
+    .head = 0,
+    .tail = 0,
+    .bufferLength = sizeof(fdcan_rx_frame_buffer) / sizeof(fdcan_rx_frame_buffer[0]),
+    .elementSize = sizeof(fdcan_rx_frame_buffer[0]),
+    .isFull = false};
+
+static RingBuffer Fdcan1TxRingBuffer = {
+    .startAddress = &fdcan_tx_frame_buffer[0],
+    .head = 0,
+    .tail = 0,
+    .bufferLength = sizeof(fdcan_tx_frame_buffer) / sizeof(fdcan_tx_frame_buffer[0]),
+    .elementSize = sizeof(fdcan_tx_frame_buffer[0]),
+    .isFull = false};
+
 int CanAbs_Init()
 {
-    unsigned int res;
+    unsigned int res = COMM_SUCCESS;
 
-    res = fdcan_setup();
+    Fdcan1Driver.protocol = DRIVER_FDCAN;
+    Fdcan1Config.config = DRIVER_CFG2;
+
+    (void)CommManager_Init(&Fdcan1Driver, &Fdcan1Config, sizeof(CommDriverConfigType), &Fdcan1TxRingBuffer, &Fdcan1RxRingBuffer);
+
+	if (Fdcan1Driver.interface->init(&Fdcan1Driver) != COMM_SUCCESS)
+	{
+	  res = 1;
+	}
 
     if (0 == res)
     {
@@ -56,45 +64,30 @@ int CanAbs_Init()
 
 int CanAbs_Receive(FDCAN_ClassicFrame *frame)
 {
-    return ring_buffer_pop(fdcan_driver.RxFrameBuffer, (void*)frame);
+    return ring_buffer_pop(Fdcan1Driver.RxFrameBuffer, (void*)frame);
 }
 
 int CanAbs_Send()
 {
     int res = 0;
 
-    if (fdcan_driver.interface->send(&Msg2) != COMM_SUCCESS)
+    if (Fdcan1Driver.interface->send(&Msg2) != COMM_SUCCESS)
     {
         /* Transmission request Error */
         res = 1;
     }
 
-    if (fdcan_driver.interface->send(&Msg3) != COMM_SUCCESS)
+    if (Fdcan1Driver.interface->send(&Msg3) != COMM_SUCCESS)
     {
         /* Transmission request Error */
         res = 2;
     }
 
-    if (fdcan_driver.interface->send(&Msg4) != COMM_SUCCESS)
+    if (Fdcan1Driver.interface->send(&Msg4) != COMM_SUCCESS)
     {
         /* Transmission request Error */
         res = 3;
     }
-
-    return res;
-}
-
-
-unsigned int fdcan_setup()
-{
-    unsigned int res = 0;
-
-	(void)comm_manager_init(&fdcan_driver, DRIVER_FDCAN, DRIVER_CFG2, &fdcan_RxRingBuffer);
-
-	if (fdcan_driver.interface->init() != COMM_SUCCESS)
-	{
-	  res = 1;
-	}
 
     return res;
 }
@@ -187,10 +180,10 @@ comm_status_t fdcan_create_message_4(FDCAN_Message *pMsg, uint8_t *pData, uint32
  {
      FDCAN_ClassicFrame NewFrame;
  
-     if (fdcan_driver.interface->read((void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+     if (Fdcan1Driver.interface->read((void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
      {
  
-         ring_buffer_put(fdcan_driver.RxFrameBuffer, (void*)&NewFrame);
+         ring_buffer_put(Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
      }
  
  }
