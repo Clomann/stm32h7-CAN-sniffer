@@ -36,6 +36,7 @@
 #include "SettingsHandler.h"
 #include "CanAbs.h"
 #include "fs_custom.h"
+#include "timer.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -105,6 +106,9 @@ static AppControlDataType AppCtrlData = {
 
 uint8_t Data[BLOCK_SIZE] = {0};
 
+/* Prescaler declaration */
+uint32_t uwPrescalerValue = 0;
+
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
 static void SystemClock_Config(void);
@@ -135,6 +139,11 @@ uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
 }
 
 void FDCAN_ErrorHandler()
+{
+    Error_Handler();
+}
+
+void TIM_ErrorHandler()
 {
     Error_Handler();
 }
@@ -299,7 +308,7 @@ static void appCanLogFillEntry(CanLogEntryType *entry, FDCAN_ClassicFrame *frame
     entry->timestamp_us.lsb = timestamp & 0xFFFF;
     entry->timestamp_us.msb = (timestamp >> 16) & 0xFF;
     entry->dlc = frame->dlc;
-    memcpy( (uint8_t *)&entry->can_id, (uint8_t *)frame->id, sizeof(entry->can_id) );
+    memcpy( (uint8_t *)&entry->can_id, (uint8_t *)&frame->id, sizeof(entry->can_id) );
     memcpy( entry->data, frame->data, sizeof(entry->data) );
 }
 
@@ -321,7 +330,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
         timedelta = timestamp - data->CanLog.timestamp;
         (void) timedelta;
 
-        appCanLogFillEntry(&NewEntry, &NewFrame, timestamp);
+        appCanLogFillEntry(&NewEntry, &NewFrame, NewFrame.timestamp);
 
         CanLogBuffer_AddEntry(&NewEntry);
 
@@ -372,62 +381,62 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   */
 int main(void)
 {
-  static uint32_t timestamp_prev = 0U;
-  uint32_t timestamp = 0U;
-  uint32_t time_delta = 0U;
-  static FatFsDeviceType ConfigReadFileDevice;
-  int32_t timeout;
-  uint32_t spiClockSource;
-  HAL_StatusTypeDef HalStatus;
-  struct Config { 
-    char data[1024U];
-    uint32_t len;
-  } Config = {0U};
+    static uint32_t timestamp_prev = 0U;
+    uint32_t timestamp = 0U;
+    uint32_t time_delta = 0U;
+    static FatFsDeviceType ConfigReadFileDevice;
+    int32_t timeout;
+    uint32_t spiClockSource;
+    HAL_StatusTypeDef HalStatus;
+    struct Config { 
+        char data[1024U];
+        uint32_t len;
+    } Config = {0U};
 
-  /* Configure the MPU attributes */
-  MPU_Config();
+    /* Configure the MPU attributes */
+    MPU_Config();
 
-  /* Enable the CPU Cache */
-  CPU_CACHE_Enable();
+    /* Enable the CPU Cache */
+    CPU_CACHE_Enable();
 
-  /* Wait until CPU2 boots and enters in stop mode or timeout*/
-  timeout = 0xFFFF;
-  while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0));
-  if ( timeout < 0 )
-  {
-    Error_Handler();
-  }
+    /* Wait until CPU2 boots and enters in stop mode or timeout*/
+    timeout = 0xFFFF;
+    while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0));
+    if ( timeout < 0 )
+    {
+        Error_Handler();
+    }
 
-  /* STM32H7xx HAL library initialization:
-       - Systick timer is configured by default as source of time base, but user
-         can eventually implement his proper time base source (a general purpose
-         timer for example or other time source), keeping in mind that Time base
-         duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and
-         handled in milliseconds basis.
-       - Set NVIC Group Priority to 4
-       - Low Level Initialization
-     */
-  HAL_Init();
+    /* STM32H7xx HAL library initialization:
+        - Systick timer is configured by default as source of time base, but user
+            can eventually implement his proper time base source (a general purpose
+            timer for example or other time source), keeping in mind that Time base
+            duration should be kept 1ms since PPP_TIMEOUT_VALUEs are defined and
+            handled in milliseconds basis.
+        - Set NVIC Group Priority to 4
+        - Low Level Initialization
+        */
+    HAL_Init();
 
-  /* Configure the system clock to 400 MHz */
-  SystemClock_Config();
+    /* Configure the system clock to 400 MHz */
+    SystemClock_Config();
 
-  /* When system initialization is finished, Cortex-M7 will release Cortex-M4  by means of
-     HSEM notification */
+    /* When system initialization is finished, Cortex-M7 will release Cortex-M4  by means of
+        HSEM notification */
 
-  // Wait for PLL2 to lock
-  while (!__HAL_RCC_GET_FLAG(RCC_FLAG_PLL2RDY)) {
-      // Optional: Timeout handling can be implemented here
-  }
+    // Wait for PLL2 to lock
+    while (!__HAL_RCC_GET_FLAG(RCC_FLAG_PLL2RDY)) {
+        // Optional: Timeout handling can be implemented here
+    }
 
-  // Check SPI1 clock source
+    // Check SPI1 clock source
     if (__HAL_RCC_GET_SPI1_SOURCE() != RCC_SPI1CLKSOURCE_PLL2) {
-  	  Error_Handler();
+        Error_Handler();
     }
 
     if (__HAL_RCC_GET_SPI4_SOURCE() != RCC_SPI1CLKSOURCE_PLL2) {
-	  Error_Handler();
-	}
+        Error_Handler();
+    }
 
     // Verify that HSI is enabled
     if (0 == __HAL_RCC_GET_FLAG(RCC_FLAG_HSIRDY)) {
@@ -435,155 +444,162 @@ int main(void)
     }
 
 
-  /*HW semaphore Clock enable*/
-  __HAL_RCC_HSEM_CLK_ENABLE();
+    /*HW semaphore Clock enable*/
+    __HAL_RCC_HSEM_CLK_ENABLE();
 
-  /*Take HSEM */
-  HAL_HSEM_FastTake(HSEM_ID_0);
-  /*Release HSEM in order to notify the CPU2(CM4)*/
-  HAL_HSEM_Release(HSEM_ID_0,0);
+    /*Take HSEM */
+    HAL_HSEM_FastTake(HSEM_ID_0);
+    /*Release HSEM in order to notify the CPU2(CM4)*/
+    HAL_HSEM_Release(HSEM_ID_0,0);
 
-  /* wait until CPU2 wakes up from stop mode */
-  timeout = 0xFFFF;
-  while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0));
-  if ( timeout < 0 )
-  {
-    Error_Handler();
-  }
-
-  /* Configure LED1, LED2 and LED3 */
-  BSP_LED_Init(LED1);
-  BSP_LED_Init(LED2);
-  BSP_LED_Init(LED3);
-
-   /*##-1- Configure the SPI peripheral #######################################*/
-
-  HalStatus = SPI_Init();
-
-  if(HalStatus != HAL_OK)
-  {
-    /* Initialization Error */
-    Error_Handler();
-  }
-
-  spiClockSource = __HAL_RCC_GET_SPI1_SOURCE();
-  (void)spiClockSource;
-
-  /* Infinite loop */
-  while (1)
-  {
-	//aTxBuffer[0] = counter++;
-//	SCB_CleanDCache_by_Addr ((uint32_t *)aTxBuffer, BUFFERSIZE);
-#if WAIT_FOR_USER_BUTTON
-	/* Configure User push-button button */
-	BSP_PB_Init(BUTTON_USER,BUTTON_MODE_GPIO);
-	/* Wait for User push-button press before starting the Communication */
-	while (BSP_PB_GetState(BUTTON_USER) != GPIO_PIN_SET)
-	{
-	  BSP_LED_Toggle(LED1);
-	  HAL_Delay(100);
-	}
-	BSP_LED_Off(LED1);
-#endif
-
-
-
-  /* USER CODE END 5 */
-
-	/*##-2- Start the Full Duplex Communication process ########################*/
-	/* While the SPI in TransmitReceive process, user can transmit data through
-	   "aTxBuffer" buffer & receive data through "aRxBuffer" */
-  Spi_PwrOn();
-  if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice, Config.data, &Config.len) )
-  {
-    SettingsHandler_ParseConfig(Config.data, Config.len, &AppConfig);
-    SettingsHandler_Init(&AppConfig);
-  }
-
-  http_init();
-
-  run = 1U;
-  
-  if (0 != AppCtrlData.mountRes)
-    AppCtrlData.mountRes = FatFS_SD_Mount();
-
-  appCanLogHandlerInit(&AppCtrlData);
-  
-  appConfigHandlerInit(&AppCtrlData);
-
-  if ( 0 != CanAbs_Init() ) 
-  {
-      Error_Handler();
-  }
-
-  while (run)
-  {
-    timestamp = HAL_GetTick() * HAL_GetTickFreq();
-    time_delta = timestamp - timestamp_prev;
-
-    if ( time_delta < 10 )
-    {
-
-    }
-    else if ( 0 != CanAbs_Send())
+    /* wait until CPU2 wakes up from stop mode */
+    timeout = 0xFFFF;
+    while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0));
+    if ( timeout < 0 )
     {
         Error_Handler();
-        timestamp_prev = timestamp;
     }
-    else
+
+    /* Configure LED1, LED2 and LED3 */
+    BSP_LED_Init(LED1);
+    BSP_LED_Init(LED2);
+    BSP_LED_Init(LED3);
+
+    /*##-1- Configure the SPI peripheral #######################################*/
+
+    HalStatus = SPI_Init();
+
+    if(HalStatus != HAL_OK)
     {
-        timestamp_prev = timestamp;
+        /* Initialization Error */
+        Error_Handler();
     }
 
-    http_poll();
+    spiClockSource = __HAL_RCC_GET_SPI1_SOURCE();
+    (void)spiClockSource;
 
-    appCanLogHandlerPoll(&AppCtrlData);
-
-    if (0 == AppCtrlData.Config.openRes)
+    /* Infinite loop */
+    while (1)
     {
-      SettingsHandler_Poll(&(AppCtrlData.Config.writeFileDevice), &AppConfig);
+        //aTxBuffer[0] = counter++;
+        //	SCB_CleanDCache_by_Addr ((uint32_t *)aTxBuffer, BUFFERSIZE);
+        #if WAIT_FOR_USER_BUTTON
+        /* Configure User push-button button */
+        BSP_PB_Init(BUTTON_USER,BUTTON_MODE_GPIO);
+        /* Wait for User push-button press before starting the Communication */
+        while (BSP_PB_GetState(BUTTON_USER) != GPIO_PIN_SET)
+        {
+            BSP_LED_Toggle(LED1);
+            HAL_Delay(100);
+        }
+        BSP_LED_Off(LED1);
+        #endif
+
+
+
+        /* USER CODE END 5 */
+
+        /*##-2- Start the Full Duplex Communication process ########################*/
+        /* While the SPI in TransmitReceive process, user can transmit data through
+            "aTxBuffer" buffer & receive data through "aRxBuffer" */
+        Spi_PwrOn();
+        if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice, Config.data, &Config.len) )
+        {
+            SettingsHandler_ParseConfig(Config.data, Config.len, &AppConfig);
+            SettingsHandler_Init(&AppConfig);
+        }
+
+        http_init();
+
+        run = 1U;
+
+        if (0 != AppCtrlData.mountRes)
+        AppCtrlData.mountRes = FatFS_SD_Mount();
+
+        appCanLogHandlerInit(&AppCtrlData);
+
+        appConfigHandlerInit(&AppCtrlData);
+
+        /* Compute the prescaler value to have TIMx counter clock equal to 10000 Hz */
+        uwPrescalerValue = (uint32_t)(SystemCoreClock / (2*10000)) - 1;
+        if (0 != TIMx_Init(uwPrescalerValue) )
+        {
+            Error_Handler();
+        }
+
+        if ( 0 != CanAbs_Init() ) 
+        {
+            Error_Handler();
+        }
+
+        while (run)
+        {
+            timestamp = HAL_GetTick() * HAL_GetTickFreq();
+            time_delta = timestamp - timestamp_prev;
+
+            if ( time_delta < 10 )
+            {
+
+            }
+            else if ( 0 != CanAbs_Send())
+            {
+                Error_Handler();
+                timestamp_prev = timestamp;
+            }
+            else
+            {
+                timestamp_prev = timestamp;
+            }
+
+            http_poll();
+
+            appCanLogHandlerPoll(&AppCtrlData);
+
+            if (0 == AppCtrlData.Config.openRes)
+            {
+                SettingsHandler_Poll(&(AppCtrlData.Config.writeFileDevice), &AppConfig);
+            }
+        }
+
+        appCanLogHandlerDeInit(&AppCtrlData);
+
+        if (0 == AppCtrlData.mountRes)
+        FatFS_SD_Unmount();
+
+        Spi_PwrOff();
+
+
+        /*##-3- Wait for the end of the transfer ###################################*/
+        /*  Before starting a new communication transfer, you must wait the callback call
+            to get the transfer complete confirmation or an error detection.
+            For simplicity reasons, this example is just waiting till the end of the
+            transfer, but application may perform other tasks while transfer operation
+            is ongoing. */
+
+        //	/* Invalidate cache prior to access by CPU */
+        //	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, BUFFERSIZE);
+        //
+        //	switch(wTransferState)
+        //	{
+        //	  case TRANSFER_COMPLETE :
+        //	/*##-4- Compare the sent and received
+        //	 *  buffers ##############################*/
+        //		if(Buffercmp((uint8_t*)aTxBuffer, (uint8_t*)aRxBuffer, BUFFERSIZE))
+        //		{
+        //		  /* Processing Error */
+        //		  //Error_Handler();
+        //		  BSP_LED_On(LED3);
+        //		}
+        //		else
+        //		{
+        //			BSP_LED_Off(LED3);
+        //		}
+        //		break;
+        //	  default :
+        //		Error_Handler();
+        //		break;
+        //	}
     }
-  }
-
-  appCanLogHandlerDeInit(&AppCtrlData);
-
-  if (0 == AppCtrlData.mountRes)
-    FatFS_SD_Unmount();
-
-  Spi_PwrOff();
-  
-
-	/*##-3- Wait for the end of the transfer ###################################*/
-	/*  Before starting a new communication transfer, you must wait the callback call
-		to get the transfer complete confirmation or an error detection.
-		For simplicity reasons, this example is just waiting till the end of the
-		transfer, but application may perform other tasks while transfer operation
-		is ongoing. */
-
-//	/* Invalidate cache prior to access by CPU */
-//	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, BUFFERSIZE);
-//
-//	switch(wTransferState)
-//	{
-//	  case TRANSFER_COMPLETE :
-//	/*##-4- Compare the sent and received
-//	 *  buffers ##############################*/
-//		if(Buffercmp((uint8_t*)aTxBuffer, (uint8_t*)aRxBuffer, BUFFERSIZE))
-//		{
-//		  /* Processing Error */
-//		  //Error_Handler();
-//		  BSP_LED_On(LED3);
-//		}
-//		else
-//		{
-//			BSP_LED_Off(LED3);
-//		}
-//		break;
-//	  default :
-//		Error_Handler();
-//		break;
-//	}
-  }
 }
 
 
@@ -732,60 +748,60 @@ void Error_Handler(void)
   */
 static void MPU_Config(void)
 {
-  MPU_Region_InitTypeDef MPU_InitStruct;
+    MPU_Region_InitTypeDef MPU_InitStruct;
 
-  /* Disable the MPU */
-  HAL_MPU_Disable();
+    /* Disable the MPU */
+    HAL_MPU_Disable();
 
-  /* Configure the MPU as Strongly ordered for not defined regions */
-  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.BaseAddress = 0x00;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;
-  MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-  MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.SubRegionDisable = 0x87;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+    /* Configure the MPU as Strongly ordered for not defined regions */
+    MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+    MPU_InitStruct.BaseAddress = 0x00;
+    MPU_InitStruct.Size = MPU_REGION_SIZE_4GB;
+    MPU_InitStruct.AccessPermission = MPU_REGION_NO_ACCESS;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+    MPU_InitStruct.Number = MPU_REGION_NUMBER0;
+    MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+    MPU_InitStruct.SubRegionDisable = 0x87;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
 
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
 
-  /* Configure the MPU attributes as Device not cacheable
+    /* Configure the MPU attributes as Device not cacheable
      for ETH DMA descriptors */
-     MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-     MPU_InitStruct.BaseAddress = 0x30000000;
-     MPU_InitStruct.Size = MPU_REGION_SIZE_1KB;
-     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-     MPU_InitStruct.IsBufferable = MPU_ACCESS_BUFFERABLE;
-     MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-     MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
-     MPU_InitStruct.Number = MPU_REGION_NUMBER1;
-     MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-     MPU_InitStruct.SubRegionDisable = 0x00;
-     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-   
-     HAL_MPU_ConfigRegion(&MPU_InitStruct);
-   
-     /* Configure the MPU attributes as Normal Non Cacheable
-        for LwIP RAM heap which contains the Tx buffers */
-     MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-     MPU_InitStruct.BaseAddress = 0x30004000;
-     MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
-     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-     MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-     MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-     MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-     MPU_InitStruct.Number = MPU_REGION_NUMBER2;
-     MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
-     MPU_InitStruct.SubRegionDisable = 0x00;
-     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-   
-     HAL_MPU_ConfigRegion(&MPU_InitStruct);
+    MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+    MPU_InitStruct.BaseAddress = 0x30000000;
+    MPU_InitStruct.Size = MPU_REGION_SIZE_1KB;
+    MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_BUFFERABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+    MPU_InitStruct.Number = MPU_REGION_NUMBER1;
+    MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+    MPU_InitStruct.SubRegionDisable = 0x00;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
 
-  /* Enable the MPU */
-  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+    /* Configure the MPU attributes as Normal Non Cacheable
+    for LwIP RAM heap which contains the Tx buffers */
+    MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+    MPU_InitStruct.BaseAddress = 0x30004000;
+    MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
+    MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+    MPU_InitStruct.Number = MPU_REGION_NUMBER2;
+    MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
+    MPU_InitStruct.SubRegionDisable = 0x00;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+    /* Enable the MPU */
+    HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 
 #ifdef  USE_FULL_ASSERT
@@ -820,6 +836,12 @@ static void CPU_CACHE_Enable(void)
 
   /* Enable D-Cache */
   SCB_EnableDCache();
+}
+
+void TIM_InterruptCallback()
+{
+    static uint32_t CNT = 0;
+    CNT++;
 }
 
 /**
