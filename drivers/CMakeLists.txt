@@ -10,6 +10,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/fdcan/fdcan.c
     ${CMAKE_CURRENT_LIST_DIR}/fdcan/fdcan_utils.c
     ${CMAKE_CURRENT_LIST_DIR}/timer/timer.c
+    ${CMAKE_CURRENT_LIST_DIR}/gpio/gpio.c
 )
 
 # Include directories
@@ -21,6 +22,7 @@ list(APPEND include_path_DIRS
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommManager
     ${CMAKE_CURRENT_LIST_DIR}/fdcan
     ${CMAKE_CURRENT_LIST_DIR}/timer
+    ${CMAKE_CURRENT_LIST_DIR}/gpio
 )
 
 # Send the final list to the parent scope
