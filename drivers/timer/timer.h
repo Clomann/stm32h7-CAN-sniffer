@@ -15,7 +15,7 @@
 #define TIMx_IRQHandler                TIM3_IRQHandler
 
 
-uint8_t TIMx_Init(uint32_t prescaler);
+uint8_t TIMx_Init(uint32_t freq);
 void TIMx_IRQHandler(void);
 
 /* Shims needed to be implemented by caller */

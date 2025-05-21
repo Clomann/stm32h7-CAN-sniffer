@@ -545,3 +545,13 @@ comm_status_t get_fdcan_config(
 
 	return RetVal;
 }
+
+comm_status_t FDCAN_SampleTimestampCounterValue(uint16_t *timestamp)
+{
+    comm_status_t res = 0;
+    uint32_t time;
+
+    (void) FDCAN_GetTimestamp(&time);
+
+    return res;
+}

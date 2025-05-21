@@ -76,5 +76,6 @@ comm_status_t FDCAN_Read(
 
 /* shims needed to be implemented by the caller */
 void FDCAN_ErrorHandler(void);
+comm_status_t FDCAN_GetTimestamp(uint32_t *timestamp);
 
 #endif /* COMM_FDCAN_H_ */

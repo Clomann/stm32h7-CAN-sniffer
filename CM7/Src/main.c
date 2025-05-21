@@ -37,6 +37,7 @@
 #include "CanAbs.h"
 #include "fs_custom.h"
 #include "timer.h"
+#include "gpio.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -392,6 +393,7 @@ int main(void)
         char data[1024U];
         uint32_t len;
     } Config = {0U};
+    volatile uint32_t FdcanClock;
 
     /* Configure the MPU attributes */
     MPU_Config();
@@ -520,9 +522,12 @@ int main(void)
 
         appConfigHandlerInit(&AppCtrlData);
 
-        /* Compute the prescaler value to have TIMx counter clock equal to 10000 Hz */
-        uwPrescalerValue = (uint32_t)(SystemCoreClock / (2*10000)) - 1;
-        if (0 != TIMx_Init(uwPrescalerValue) )
+        GPIO_Dbg_Init();
+        
+        FdcanClock = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_FDCAN);
+        /* Compute the prescaler value to have TIMx counter clock equal double the FDCAN timestamp counter */
+        uwPrescalerValue = (uint32_t)(SystemCoreClock / (2U*FdcanClock));
+        if (0 != TIMx_Init(1000000U) )
         {
             Error_Handler();
         }
@@ -601,8 +606,6 @@ int main(void)
         //	}
     }
 }
-
-
 
 /**
   * @brief  System Clock Configuration
@@ -838,10 +841,19 @@ static void CPU_CACHE_Enable(void)
   SCB_EnableDCache();
 }
 
+
+static uint32_t Time;
+
 void TIM_InterruptCallback()
 {
     static uint32_t CNT = 0;
     CNT++;
+    GPIO_Dbg_Toggle();
+}
+
+comm_status_t FDCAN_GetTimestamp(uint32_t *timestamp)
+{
+
 }
 
 /**
