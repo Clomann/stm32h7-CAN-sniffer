@@ -50,7 +50,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t id;
-	uint16_t timestamp;
+	uint32_t timestamp;
 	uint16_t dlc;
 	uint8_t data[8];
 } FDCAN_ClassicFrame;

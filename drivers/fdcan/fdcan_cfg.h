@@ -16,6 +16,9 @@
 #define FDCANx_FORCE_RESET()   __HAL_RCC_FDCAN_FORCE_RESET()
 #define FDCANx_RELEASE_RESET() __HAL_RCC_FDCAN_RELEASE_RESET()
 
+/*!< timestamp resolution in micro seconds */
+#define FDCANx_TIMESTAMP_RESOLUTION     (1U)
+
 /* Definition for FDCANx Pins */
 #define FDCANx_TX_PIN       GPIO_PIN_9
 #define FDCANx_TX_GPIO_PORT GPIOB

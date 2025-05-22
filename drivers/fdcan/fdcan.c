@@ -20,6 +20,7 @@ FDCAN_RxHeaderTypeDef RxHeader;
 FdcanConfigType fdcan_configs[DRIVER_CFGn];
 
 CommDriverConfigType Can1Cfg;
+static volatile uint32_t FdcanMostRecentInterrupTimestamp = 0U;
 
 /* Private function prototypes -----------------------------------------------*/
 comm_status_t get_fdcan_config(
@@ -28,6 +29,9 @@ comm_status_t get_fdcan_config(
 		CommConfigType);
 
 comm_status_t fdcan_init_tx_header(const void *, FDCAN_TxHeaderTypeDef *, uint32_t);
+
+comm_status_t SampleTime(
+    uint32_t *timestamp);
 
 comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 
@@ -90,11 +94,15 @@ comm_status_t FDCAN_Init(
 
     // TODO make init function consistent with driver creation
     get_fdcan_config(&hfdcan, &sFilterConfig, DRIVER_CFG2);
+
     if (HAL_FDCAN_Init(&hfdcan) != HAL_OK)
     {
         /* Initialization Error */
         RetVal = COMM_ERROR;
     }
+
+    HAL_FDCAN_ConfigTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_PRESC_1);
+    HAL_FDCAN_EnableTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_EXTERNAL);
 
     if (HAL_FDCAN_ConfigTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_PRESC_1) != HAL_OK)
     {
@@ -223,7 +231,7 @@ comm_status_t FDCAN_Read(void *pFrame, uint8_t length, uint32_t RxFifo0ITs)
 
 
     pNewFrame->id = RxHeader.Identifier;
-    pNewFrame->timestamp = RxHeader.RxTimestamp;
+    pNewFrame->timestamp = FdcanMostRecentInterrupTimestamp; // RxHeader.RxTimestamp;
 
     memcpy(pNewFrame->data, &Data, pNewFrame->dlc);
 
@@ -256,9 +264,15 @@ comm_status_t FDCAN_RegisterRxMessage(Message *pMsg)
 {
 }*/
 
+void FDCAN_GetMostRecentInterruptTimestamp(uint32_t *timestamp)
+{
+    *timestamp = FdcanMostRecentInterrupTimestamp;
+}
+
 void FDCANx_IRQHandler(void)
 {
-  HAL_FDCAN_IRQHandler(&hfdcan);
+    SampleTime(&FdcanMostRecentInterrupTimestamp);
+    HAL_FDCAN_IRQHandler(&hfdcan);
 }
 
 /**
@@ -546,12 +560,14 @@ comm_status_t get_fdcan_config(
 	return RetVal;
 }
 
-comm_status_t FDCAN_SampleTimestampCounterValue(uint16_t *timestamp)
+comm_status_t SampleTime(uint32_t *timestamp)
 {
     comm_status_t res = 0;
-    uint32_t time;
+    uint64_t time;
 
     (void) FDCAN_GetTimestamp(&time);
+
+    memcpy((uint8_t*)timestamp, (uint8_t*)&time, sizeof(*timestamp));
 
     return res;
 }

@@ -74,8 +74,12 @@ comm_status_t FDCAN_Read(
     void*, 
     uint8_t, uint32_t);
 
+void FDCAN_GetMostRecentInterruptTimestamp(
+    uint32_t *timestamp);
+
 /* shims needed to be implemented by the caller */
 void FDCAN_ErrorHandler(void);
-comm_status_t FDCAN_GetTimestamp(uint32_t *timestamp);
+comm_status_t FDCAN_GetTimestamp(
+    uint64_t *timestamp);
 
 #endif /* COMM_FDCAN_H_ */

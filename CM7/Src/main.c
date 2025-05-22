@@ -527,7 +527,7 @@ int main(void)
         FdcanClock = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_FDCAN);
         /* Compute the prescaler value to have TIMx counter clock equal double the FDCAN timestamp counter */
         uwPrescalerValue = (uint32_t)(SystemCoreClock / (2U*FdcanClock));
-        if (0 != TIMx_Init(1U) )
+        if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
         {
             Error_Handler();
         }
@@ -841,22 +841,36 @@ static void CPU_CACHE_Enable(void)
   SCB_EnableDCache();
 }
 
-
-static uint32_t Time;
+/*!< Time in micro seconds */
+static volatile uint64_t Time;
 
 void TIM_InterruptCallback()
 {
-    static uint32_t CNT = 0;
-    CNT++;
+    static uint64_t Arr;
     GPIO_Dbg_Toggle();
+    TIM_GetArrValue((uint16_t*)&Arr);
+    Time += Arr * TIMx_TIME_RESOLUTION;
 }
 
-comm_status_t FDCAN_GetTimestamp(uint32_t *timestamp)
+/**
+ * 
+ * \param[out] timestamp in micro seconds.
+ */
+comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
 {
     comm_status_t res;
+    uint64_t time_snapshot1, time_snapshot2;
+    uint16_t cnt;
 
-    res = 0;
-    (void) res;
+    res = COMM_SUCCESS;
+
+    do {
+        time_snapshot1 = Time;
+        TIM_GetCounterValue(&cnt);
+        time_snapshot2 = Time;
+    } while (time_snapshot1 != time_snapshot2);
+
+    *timestamp = time_snapshot1 + (uint64_t)(cnt * TIMx_TIME_RESOLUTION);
 
     return res;
 }

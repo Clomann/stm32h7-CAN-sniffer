@@ -21,6 +21,8 @@
  */
 uint8_t TIMx_Init(uint32_t resolution);
 void TIMx_IRQHandler(void);
+void TIM_GetCounterValue(uint16_t *cnt);
+void TIM_GetArrValue(uint16_t *arr);
 
 /* Shims needed to be implemented by caller */
 void TIM_InterruptCallback(void);
