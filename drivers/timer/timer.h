@@ -14,8 +14,12 @@
 #define TIMx_IRQn                      TIM3_IRQn
 #define TIMx_IRQHandler                TIM3_IRQHandler
 
-
-uint8_t TIMx_Init(uint32_t freq);
+/**
+ * Initialize timer with a provided resolution.
+ * 
+ * \param[in] Timer resolution in micro seconds per tick.
+ */
+uint8_t TIMx_Init(uint32_t resolution);
 void TIMx_IRQHandler(void);
 
 /* Shims needed to be implemented by caller */

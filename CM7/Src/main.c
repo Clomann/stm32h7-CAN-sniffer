@@ -527,7 +527,7 @@ int main(void)
         FdcanClock = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_FDCAN);
         /* Compute the prescaler value to have TIMx counter clock equal double the FDCAN timestamp counter */
         uwPrescalerValue = (uint32_t)(SystemCoreClock / (2U*FdcanClock));
-        if (0 != TIMx_Init(1000000U) )
+        if (0 != TIMx_Init(1U) )
         {
             Error_Handler();
         }
@@ -853,7 +853,12 @@ void TIM_InterruptCallback()
 
 comm_status_t FDCAN_GetTimestamp(uint32_t *timestamp)
 {
+    comm_status_t res;
 
+    res = 0;
+    (void) res;
+
+    return res;
 }
 
 /**
