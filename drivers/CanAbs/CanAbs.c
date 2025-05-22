@@ -1,5 +1,6 @@
 #include "CanAbs.h"
 #include "buffers.h"
+#include "fdcan.h"
 
 #define SW_RX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
 #define SW_TX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
@@ -182,8 +183,8 @@ comm_status_t fdcan_create_message_4(FDCAN_Message *pMsg, uint8_t *pData, uint32
  
      if (Fdcan1Driver.interface->read((void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
      {
- 
-         ring_buffer_put(Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
+        FDCAN_GetMostRecentInterruptTimestamp(&NewFrame.timestamp);
+        ring_buffer_put(Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
      }
  
  }

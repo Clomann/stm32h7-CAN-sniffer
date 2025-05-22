@@ -191,12 +191,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     TIM_InterruptCallback();
 }
 
- /**
-  * @brief  This function handles TIM interrupt request.
-  * @param  None
-  * @retval None
-  */
- void TIMx_IRQHandler(void)
- {
-   HAL_TIM_IRQHandler(&TimHandle);
- }
+/**
+ * @brief  This function handles TIM interrupt request.
+ * @param  None
+ * @retval None
+ */
+void TIMx_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&TimHandle);
+}
+
+void TIM_GetCounterValue(uint16_t *cnt)
+{
+    *cnt = __HAL_TIM_GetCounter(&TimHandle);
+}
+
+void TIM_GetArrValue(uint16_t *arr)
+{
+    *arr = __HAL_TIM_GetAutoreload(&TimHandle);
+}
