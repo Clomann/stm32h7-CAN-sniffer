@@ -41,34 +41,52 @@ uint32_t GetTimerInputClock(TIM_TypeDef *htim)
     return timer_clk;
 }
 
-uint8_t ComputePrescalerAndARR(uint32_t timer_clk, uint32_t target_freq, uint32_t max_arr,
-    uint32_t *prescaler_out, uint32_t *arr_out)
+/**
+ * @brief Compute the prescaler and ARR to achieve a target frequency.
+ * 
+ * @param timer_clk       Clock frequency of the timer in Hz.
+ * @param target_freq_mHz Target frequency in milli-Hertz (e.g., 15243 = 15.243 Hz).
+ * @param max_arr         Maximum value for ARR (typically 0xFFFF for 16-bit timers).
+ * @param prescaler_out   Pointer to store the computed prescaler value.
+ * @param arr_out         Pointer to store the computed ARR value.
+ * 
+ * @return uint8_t        0 if successful, 1 if no suitable values were found.
+ */
+uint8_t ComputePrescalerAndARR(
+    uint32_t timer_clk, 
+    uint64_t target_freq, 
+    uint32_t max_arr,
+    uint32_t *prescaler_out, 
+    uint32_t *arr_out)
 {
     uint8_t res;
     uint32_t prescaler = 0;
     uint32_t arr = 0;
-    uint64_t total_counts = 0U;
+    volatile uint64_t total_counts = 0U;
 
     res = 1;
 
-    // Upper bound on product (PSC+1)*(ARR+1)
-    total_counts = (uint64_t)timer_clk / target_freq;
-    (volatile) total_counts;
+    if (target_freq == 0)
+        return res;  // Avoid division by zero
 
+    // Upper bound on product (PSC+1)*(ARR+1)
+    total_counts = ((uint64_t)timer_clk * 1000ULL) / target_freq;
 
     for (arr = max_arr; arr > 0; --arr)
     {
         uint64_t divisor = (uint64_t)arr + 1;
-        if (total_counts < divisor)
+        
+        if (total_counts % divisor != 0)
             continue;
     
         prescaler = (uint32_t)((total_counts / divisor) - 1);
     
-        if (((uint64_t)(prescaler + 1)) * divisor <= total_counts)
-        {
-            res = 0;
-            break;
-        }
+        if ( ((uint64_t)prescaler + 1U) == 0 || ((uint64_t)prescaler + 1U) > 0x10000)
+            continue;
+
+        if (prescaler_out) *prescaler_out = prescaler;
+        if (arr_out) *arr_out = arr;
+        return 0;  // Exact match found
     }
 
     if (arr_out) *arr_out = arr;
@@ -77,16 +95,35 @@ uint8_t ComputePrescalerAndARR(uint32_t timer_clk, uint32_t target_freq, uint32_
     return res;
 }
 
-uint8_t TIMx_Init(uint32_t freq)
+uint8_t TIMx_Init(uint32_t resolution)
 {
+    #define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL)  // = 10_000_000_000
+
     uint8_t res = 0;
     uint32_t InputClock;
     uint32_t MaxArr;
     uint32_t Arr;
     uint32_t Prescaler;
+    volatile uint64_t freq;
+    volatile uint64_t freq_int;
 
     InputClock = GetTimerInputClock(TIMx);
     MaxArr = GetTimerMaxARR(TIMx);
+
+    Arr = MaxArr;
+    while (Arr > 0)
+    {
+        // find lowest frequency that yields the desired resolution
+        freq_int = BASE_CONSTANT / (resolution * (Arr + 1));
+        if (BASE_CONSTANT == freq_int * resolution * (Arr + 1)) {
+            freq = freq_int;
+            break;
+        }
+        else
+        {
+            Arr--;
+        }
+    }
 
     res = ComputePrescalerAndARR(
             InputClock, 
