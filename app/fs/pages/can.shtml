@@ -1,0 +1,118 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+    <title>STM32H7 CAN sniffer</title>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+    <meta content="MSHTML 6.00.2800.1561" name="GENERATOR">
+    <style ="font-weight: normal; font-family: Verdana;"></style>
+</head>
+<body>
+    <h4>
+        <big style="font-weight: bold;">
+            <strong style="color: rgb(0, 0, 0);">
+                <span style="font-style: italic;">STM32H7 CAN sniffer</span>
+            </strong>
+        </big>
+    </h4>
+    <table style="width: 961px; height: 30px;" border="0" cellpadding="2" cellspacing="2">
+        <tbody>
+            <tr>
+                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
+                    <a href="/index.html">
+                        <span style="color: rgb(0, 0, 0);">Home
+                        page</span>
+                    </a>
+                </td>
+                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
+                    <a href="/can.shtml">
+                        <span style="color: rgb(0, 0, 0);">CAN setup
+                        </span>
+                    </a>
+                </td>
+                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
+                    <a href="/can_trace.shtml">
+                        <span style="color: rgb(0, 0, 0);">CAN trace
+                        </span>
+                    </a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    <small>
+        <span style="font-family: Verdana;">Here you can change the CAN channel configuration. 
+            Change the settings and click "Save" to persist the changes.
+            You have to re-initilaize the CAN moudule manually (e. g. restart the device).
+        </span>
+    </small>
+    <small>
+        <span style="font-family: Verdana;">STM32H743I</span>
+    </small>
+    <small>
+        <span style="font-family: Verdana;">-EVAL board that you get the
+        desired
+        LEDs
+        are putted on/off. </span>
+        <br style="font-family: Verdana;">
+    </small>
+    <br>
+    <br>
+    <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
+        <tbody>
+            <tr>
+                <td class="tabtitle" style="height: 15px; background-color: rgb(255, 255, 255);">
+                        <strong>CAN sniffer CAN configuration setup</strong>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    <form method="get" action="/can.cgi">
+        <table style="color: #000000; width: 961px; height: 38px; width: 50%;" border="0" cellspacing="0" cellpadding="3">
+            <tbody>
+                <tr>
+                    <th style="width: 33.333333%; text-align: left;">Setting</th>
+                    <th style="width: 33.333333%; text-align: left;">Current value</th>
+                    <th style="width: 33.333333%; text-align: left;">New value</th>
+                </tr>
+                <tr>
+                    <td style="width: 33.333333%;">Baudrate</td>
+                    <td style="width: 33.333333%;"><!--#baudrate--></td>
+                    <td style="width: 33.333333%;"><select name="baudrate">
+                        <option value="0">-</option>
+                        <option value="250000">250 kbit/s</option>
+                        <option value="500000">500 kbit/s</option>
+                    </select></td>
+                </tr>
+                <tr>
+                    <td style="width: 33.333333%;">Operating mode</td>
+                    <td style="width: 33.333333%;"><!--#mode--></td>
+                    <td style="width: 33.333333%;">
+                        <select name="mode">
+                            <option value="0">-</option>
+                            <option value="1">normal</option>
+                            <option value="2">listen only</option>
+                        </select>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <br>
+        <br>
+        <big style="font-weight: bold;">
+            <input value="Save" type="submit">
+        </big>
+    </form>
+    <h3>
+        <font size="-1">
+            <span style="color: black;"></span>
+        </font>
+    </h3>
+    <h3 style="font-weight: normal; font-family: Verdana;">
+        <font size="-1">
+            <br>
+        </font>
+    </h3>
+</body>
+</html>

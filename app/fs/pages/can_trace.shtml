@@ -1,0 +1,246 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+    <title>STM32H7 CAN sniffer</title>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+    <meta content="MSHTML 6.00.2800.1561" name="GENERATOR">
+    <style ="font-weight: normal; font-family: Verdana;"></style>
+    
+</head>
+<body>
+    <h4>
+        <big style="font-weight: bold;">
+            <strong style="color: rgb(0, 0, 0);">
+                <span style="font-style: italic;">STM32H7 CAN sniffer</span>
+            </strong>
+        </big>
+    </h4>
+    <table style="width: 961px; height: 30px;" border="0" cellpadding="2" cellspacing="2">
+        <tbody>
+            <tr>
+                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
+                    <a href="/index.html">
+                        <span style="color: rgb(0, 0, 0);">Home
+                        page</span>
+                    </a>
+                </td>
+                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
+                    <a href="/can.shtml">
+                        <span style="color: rgb(0, 0, 0);">CAN setup
+                        </span>
+                    </a>
+                </td>
+                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
+                    <a href="/can_trace.shtml">
+                        <span style="color: rgb(0, 0, 0);">CAN trace
+                        </span>
+                    </a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    The sniffer stores the CAN log on the SD card and you can retrieve it here:
+    <br/>
+    <br/>
+    <button id="btn">Download CAN log</button>
+    <pre id="log"></pre>
+    <br>
+    Select a file you downloaded to parse it's HEX content and display it here in a table:
+    <br/>
+    <br/>
+    <input type="file" id="logfile" accept=".bin" />
+    <table id="logTable" style="display:none">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Timestamp [us]</th>
+          <th>CAN ID</th>
+          <th>DLC</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script type="text/javascript">
+    (function () {
+        const btn  = document.getElementById('btn');
+        const log  = document.getElementById('log');
+        const print = txt => log.textContent += txt + '\n';
+        const fetchBin = async url => {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(url + ' : HTTP ' + r.status);
+            return new Uint8Array(await r.arrayBuffer());
+        };
+
+        async function loadMeta () {
+            const r = await fetch('/logs/meta');
+            if (!r.ok) throw new Error('no /logs/meta');
+            return await r.json();        // {head newest, tail oldest, capacity}
+        }
+
+        btn.onclick = async () => {
+            btn.disabled = true;
+            log.textContent = '';
+
+            try {
+                const {head, tail, capacity} = await loadMeta();
+                print(`* head(newest)=${head}  tail(oldest)=${tail}  capacity=${capacity}`);
+
+                const idxList = [];
+                for (let i = tail; i !== head; i = (i + 1) % capacity)
+                    idxList.push(i);
+
+                const totalFiles = idxList.length;
+                let total = 0;
+                const parts = [];
+
+                for (let done = 0; done < totalFiles; done++) {
+                    const i = idxList[done];
+                    const url = `/logs/CAN.LOG${i}`;
+
+                    try {
+                        const data = await fetchBin(url);
+                        parts.push(data);
+                        total += data.length;
+                    } catch (e) {
+                        print(`! Error reading ${url}: ${e.message}`);
+                    }
+
+                    const progress = Math.round(((done + 1) / totalFiles) * 20);
+                    const bar = '[' + '='.repeat(progress) + ' '.repeat(20 - progress) + ']';
+                    log.textContent = bar + '\n';
+                }
+
+                const joined = new Uint8Array(total);
+                let off = 0;
+                for (const p of parts) { joined.set(p, off); off += p.length; }
+
+                const blob = new Blob([joined], {type:'application/octet-stream'});
+                const href = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = href; a.download = 'CAN-TRACE.BIN'; a.click();
+                setTimeout(()=>URL.revokeObjectURL(href), 1000);
+
+                print('* finished - file ready');
+            } catch (e) {
+                print('! ' + e.message);
+            }
+
+            btn.disabled = false;
+        };
+    })();
+
+
+    function parseCanLog(arrayBuffer) {
+      const view = new DataView(arrayBuffer);
+      const entries = [];
+      let offset = 0;
+
+      while (offset + 8 <= arrayBuffer.byteLength) {
+        // --- Parse block header ---
+        const version = view.getUint8(offset);
+        const headerSize = view.getUint8(offset + 1);
+        const blockSize = view.getUint16(offset + 2, true);
+        const blockFill = view.getUint16(offset + 4, true);
+
+        // Safety checks
+        if (blockSize === 0 || blockFill > blockSize || offset + blockSize > arrayBuffer.byteLength) {
+          console.warn("Invalid or incomplete block header at offset", offset);
+          break;
+        }
+
+        let recordOffset = offset + headerSize;
+        const endOfValidData = offset + blockFill;
+
+        while (recordOffset + 4 <= endOfValidData) {
+          const type = view.getUint8(recordOffset);
+          const header_len = view.getUint8(recordOffset + 1);
+          const total_len = view.getUint16(recordOffset + 2, true);
+
+          if (recordOffset + total_len > endOfValidData) break;
+
+          const timestamp = view.getBigUint64(recordOffset + 4, true);
+          const can_id = view.getUint32(recordOffset + 12, true);
+          const dlc = view.getUint8(recordOffset + 16);
+          const flags = view.getUint8(recordOffset + 17);
+          const bus_id = view.getUint8(recordOffset + 18);
+          const timestampSeconds = Number(timestamp) / 1_000_000;
+
+          const data = [];
+          if (type === 1) { // CANLOG_CLASSIC_TYPE
+            for (let i = 0; i < 8; i++) {
+              data.push(view.getUint8(recordOffset + 19 + i).toString(16).padStart(2, '0'));
+            }
+
+            entries.push({
+              type: "Classic",
+              timestamp: timestampSeconds.toFixed(6),
+              can_id,
+              dlc,
+              flags,
+              bus_id,
+              data
+            });
+
+          } else if (type === 2) { // CANLOG_FD_TYPE
+            for (let i = 0; i < 64; i++) {
+              data.push(view.getUint8(recordOffset + 19 + i).toString(16).padStart(2, '0'));
+            }
+
+            entries.push({
+              type: "FD",
+              timestamp: timestampSeconds.toFixed(6),
+              can_id,
+              dlc,
+              flags,
+              bus_id,
+              data
+            });
+
+          } else {
+            console.warn("Unsupported frame type at offset", recordOffset, "type =", type);
+          }
+
+          recordOffset += total_len;
+        }
+
+        offset += blockSize; // move to the next block
+      }
+
+      return entries;
+    }
+
+    function displayEntries(entries) {
+        const table = document.getElementById("logTable");
+        const tbody = table.querySelector("tbody");
+        tbody.innerHTML = "";
+        entries.forEach((entry, index) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${entry.timestamp}</td>
+            <td>0x${entry.can_id.toString(16).toUpperCase()}</td>
+            <td>${entry.dlc}</td>
+            <td>${entry.data.join(' ')}</td>
+            <td>${entry.type}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        table.style.display = "table";
+    }
+
+    document.getElementById("logfile").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const buffer = await file.arrayBuffer();
+      const entries = parseCanLog(buffer);
+      displayEntries(entries);
+    });
+    
+    </script>
+</body>
+</html>
