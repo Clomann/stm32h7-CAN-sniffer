@@ -1,17 +1,27 @@
 #include "CanLogBuffer.h"
 #include "lwrb/lwrb.h"
 
-static CanLogType CanLogBuf1;
+static uint8_t CanLogBuf1[LOG_BUFFER_SIZE];
 static lwrb_t Rb1;
 
 uint8_t CanLogBuffer_Init()
 {
-    return lwrb_init(&Rb1, CanLogBuf1.raw, sizeof(CanLogBuf1.raw));
+    return lwrb_init(&Rb1, CanLogBuf1, sizeof(CanLogBuf1));
 }
 
-uint8_t CanLogBuffer_AddEntry(const CanLogEntryType* entry)
+uint8_t CanLogBuffer_AddClassicCanEntry(const CanLogClassicCanEntryType * entry)
 {
-    if (sizeof(CanLogEntryType) == lwrb_write(&Rb1, entry, sizeof(CanLogEntryType)))
+    if (sizeof(CanLogClassicCanEntryType) == lwrb_write(&Rb1, entry, sizeof(CanLogClassicCanEntryType)))
+    {
+        return 0;
+    }
+    
+    return 1;
+}
+
+uint8_t CanLogBuffer_AddFdCanEntry(const CanLogFdcanCanEntryType * entry)
+{
+    if (sizeof(CanLogFdcanCanEntryType) == lwrb_write(&Rb1, entry, sizeof(CanLogFdcanCanEntryType)))
     {
         return 0;
     }
@@ -35,34 +45,75 @@ uint8_t CanLogBuffer_IsBlockReady(uint8_t *rdy)
 
 uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
 {
-    uint32_t counter;
-    const uint32_t EntryCount = (BLOCK_SIZE/ENTRY_SIZE);
-    CanLogEntryType Entry;
-    // const char TestData[] = {0,1,2,3,4,5,6,7,8,9,0xa,0xb,0xc,0xd,0xe};
-    // char Data[16];
+    uint8_t res;
+    uint16_t total_len;
+    uint8_t entry_type;
+    uint32_t offset;
+    CanLogBlockHeaderType BlockHeader;
+    CanLogEntryHeaderType EntryHeader;
+    
+    res = CANLOG_E_OK;
+    total_len = 0;
+    offset = sizeof(CanLogBlockHeaderType);
     *len = BLOCK_SIZE;
 
-    for (counter = 0U; counter < EntryCount; counter++)
+    while (CANLOG_E_OK == res)
     {
-        if ( sizeof(CanLogEntryType) != lwrb_read(&Rb1, &Entry, sizeof(CanLogEntryType)) )
+        if (lwrb_get_full(&Rb1) < sizeof(EntryHeader)) {
+            res = CANLOG_E_NOT_OK;
+            break; // Not enough data
+        }
+
+        if (lwrb_peek(&Rb1, 0, &EntryHeader, sizeof(EntryHeader)) != sizeof(EntryHeader)) {
+            res = CANLOG_E_NOT_OK;
+            break; // Error
+        }
+
+        total_len = EntryHeader.total_len;
+        entry_type = EntryHeader.type;
+
+        if (CANLOG_UNDEFINED_TYPE == entry_type)
         {
+            res = CANLOG_E_OK;
             break;
         }
-        else if ( (BLOCK_SIZE - counter * sizeof(CanLogEntryType)) >= sizeof(CanLogEntryType))
-        {
-            // utohex_custom(TestData, Data, sizeof(TestData)-1);
-            memcpy(&data[counter * sizeof(CanLogEntryType)], &Entry, sizeof(CanLogEntryType));
+
+        if ((offset + total_len) > BLOCK_SIZE) {
+            res = CANLOG_E_OK;
+            break; // Output block full
         }
-        else
-        {
+
+        if (lwrb_get_full(&Rb1) < total_len) {
+            res = CANLOG_E_NOT_OK;
             break;
         }
+
+        if (lwrb_read(&Rb1, &data[offset], total_len) != total_len) {
+            res = CANLOG_E_NOT_OK;
+            break;
+        }
+
+        offset += total_len;
     }
     
-    return 0U;
-}
+    if (offset != sizeof(BlockHeader))
+    {
+        if (offset < BLOCK_SIZE) {
+            memset(&data[offset], 0xFF, BLOCK_SIZE - offset);
+        }
+    
+        BlockHeader.block_fill = offset;
+        BlockHeader.block_size = BLOCK_SIZE;
+        BlockHeader.header_size = sizeof(CanLogBlockHeaderType);
+        BlockHeader.version = CANLOG_VERSION;
+        memset(BlockHeader.reserved, 0xFF, sizeof(BlockHeader.reserved));
 
-uint32_t get_timestamp_us(const CanLogEntryType* entry)
-{
-    return ((uint32_t)entry->timestamp_us.msb << 16) | entry->timestamp_us.lsb;
+        memcpy(data, &BlockHeader, BlockHeader.header_size);
+    }
+    else
+    {
+        res = CANLOG_E_NOT_OK;
+    }
+    
+    return res;
 }
