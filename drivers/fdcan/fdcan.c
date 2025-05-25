@@ -271,7 +271,7 @@ void FDCAN_GetMostRecentInterruptTimestamp(uint32_t *timestamp)
 
 void FDCANx_IRQHandler(void)
 {
-    SampleTime(&FdcanMostRecentInterrupTimestamp);
+    SampleTime((uint32_t *)&FdcanMostRecentInterrupTimestamp);
     HAL_FDCAN_IRQHandler(&hfdcan);
 }
 

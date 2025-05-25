@@ -303,11 +303,15 @@ static FRESULT appCanLogHandlerInit(AppControlDataType *data)
     return res;
 }
 
-static void appCanLogFillEntry(CanLogEntryType *entry, FDCAN_ClassicFrame *frame, int32_t timestamp)
+static void appCanLogFillEntry(CanLogClassicCanEntryType *entry, FDCAN_ClassicFrame *frame, uint64_t timestamp)
 {
-    memset(entry, 0x0, sizeof(CanLogEntryType));
-    entry->timestamp_us.lsb = timestamp & 0xFFFF;
-    entry->timestamp_us.msb = (timestamp >> 16) & 0xFF;
+    memset(entry, 0x0, sizeof(CanLogClassicCanEntryType));
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type = CANLOG_CLASSIC_TYPE;
+    entry->header.total_len = sizeof(CanLogClassicCanEntryType);
+
+    entry->timestamp = timestamp;
     entry->dlc = frame->dlc;
     memcpy( (uint8_t *)&entry->can_id, (uint8_t *)&frame->id, sizeof(entry->can_id) );
     memcpy( entry->data, frame->data, sizeof(entry->data) );
@@ -319,7 +323,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     uint32_t timedelta;
     uint8_t BlockIsReady;
     uint32_t DataLength;
-    CanLogEntryType NewEntry;
+    CanLogClassicCanEntryType NewEntry;
     FDCAN_ClassicFrame NewFrame;
     static int counter = 0U;
 
@@ -333,7 +337,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
 
         appCanLogFillEntry(&NewEntry, &NewFrame, NewFrame.timestamp);
 
-        CanLogBuffer_AddEntry(&NewEntry);
+        CanLogBuffer_AddClassicCanEntry(&NewEntry);
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
 
@@ -346,7 +350,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
         {
             /* quit since block is not ready to be written */
         }
-        else if ( 0 !=  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
+        else if ( CANLOG_E_OK !=  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
         {
             /* quit since data could not be read */
         }
