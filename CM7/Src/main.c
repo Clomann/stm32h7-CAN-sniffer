@@ -70,6 +70,7 @@ typedef struct {
     FatFsDeviceType writeFileDevice;
   } Config;
   uint8_t mountRes;
+  bool runCanTracer;
 } AppControlDataType;
 
 /* Private define ------------------------------------------------------------*/
@@ -103,6 +104,7 @@ static AppControlDataType AppCtrlData = {
     .writeFileDevice.readTargetSize = 0U,
   },
   .mountRes = 1,
+  .runCanTracer = 0,
 };
 
 uint8_t Data[BLOCK_SIZE] = {0};
@@ -877,6 +879,37 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
     *timestamp = time_snapshot1 + (uint64_t)(cnt * TIMx_TIME_RESOLUTION);
 
     return res;
+}
+
+
+void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+    uint32_t i = 0;
+    char * param = NULL;
+    char * value = NULL;
+
+    if (iIndex==0)
+    {
+        /* Check cgi parameter */
+        for (i = 0; i<(uint32_t)iNumParams; i++)
+        {
+            param = pcParam[i];
+            value = pcValue[i];
+
+            /* check parameter "baudrate" */
+            if (strcmp(param , "action") == 0)
+            {
+                if(strcmp(value, "Stop") == 0)
+                {
+                    AppCtrlData.runCanTracer = 0;
+                }
+                else if(strcmp(value, "Start") == 0)
+                {
+                    AppCtrlData.runCanTracer = 1;
+                }
+            }
+        }
+    }
 }
 
 /**
