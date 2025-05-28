@@ -21,3 +21,6 @@ int SettingsHandler_ParseConfig(char *buff, uint32_t len, AppConfigType *cfg);
 int FatFS_SD_LoadConfig(FatFsDeviceType *dev, char *data, uint32_t *len);
 uint8_t SettingsHandler_Init(AppConfigType *cfg);
 uint8_t SettingsHandler_Poll(FatFsDeviceType *dev, AppConfigType *cfg);
+
+/* Shim functions needed to be implemented by the caller */
+void SettingsHandler_ApplyRequestCallback();

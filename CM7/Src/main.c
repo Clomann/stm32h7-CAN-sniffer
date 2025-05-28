@@ -71,6 +71,7 @@ typedef struct {
   } Config;
   uint8_t mountRes;
   bool runCanTracer;
+  bool applyConfig;
 } AppControlDataType;
 
 /* Private define ------------------------------------------------------------*/
@@ -117,6 +118,7 @@ static void MPU_Config(void);
 static void SystemClock_Config(void);
 // static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
 static void CPU_CACHE_Enable(void);
+void appCanCtrlSetBaudrate(uint32_t baudrate);
 
 /* Private functions ---------------------------------------------------------*/
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
@@ -141,6 +143,16 @@ uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
     return 0U;
 }
 
+uint8_t FsCustom_IsTracerRunning(uint8_t *running)
+{
+    uint8_t res;
+
+    res = 0;
+    *running = AppCtrlData.runCanTracer;
+
+    return res;
+}
+
 void FDCAN_ErrorHandler()
 {
     Error_Handler();
@@ -149,6 +161,11 @@ void FDCAN_ErrorHandler()
 void TIM_ErrorHandler()
 {
     Error_Handler();
+}
+
+void SettingsHandler_ApplyRequestCallback()
+{
+    AppCtrlData.applyConfig = 1;
 }
 
 static void appConfigHandlerInit(AppControlDataType *data)
@@ -381,6 +398,11 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   }
 }
 
+int appInit()
+{
+    AppCtrlData.runCanTracer = 1;
+}
+
 /**
   * @brief  Main program
   * @param  None
@@ -503,7 +525,7 @@ int main(void)
         BSP_LED_Off(LED1);
         #endif
 
-
+        appInit();
 
         /* USER CODE END 5 */
 
@@ -570,6 +592,20 @@ int main(void)
             {
                 SettingsHandler_Poll(&(AppCtrlData.Config.writeFileDevice), &AppConfig);
             }
+
+            if (1 != AppCtrlData.applyConfig)
+            {
+            }
+            else if (1 == AppCtrlData.runCanTracer)
+            {
+                appCanCtrlSetBaudrate(AppConfig.baudrate);
+                AppCtrlData.applyConfig = 0;
+            }
+            else
+            {
+                AppCtrlData.applyConfig = 0;
+            }
+            
         }
 
         appCanLogHandlerDeInit(&AppCtrlData);
@@ -881,6 +917,10 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
     return res;
 }
 
+void appCanCtrlSetBaudrate(uint32_t baudrate)
+{
+
+}
 
 void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {

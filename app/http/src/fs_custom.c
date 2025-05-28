@@ -87,11 +87,30 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             HeadIndex = TailIndex;
         }
-
+        
         int n = snprintf(meta,sizeof meta,
             "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}",
             HeadIndex, TailIndex, Capacity,
             (TailIndex + TailIndex - 1) % Capacity);
+    
+        file->data           = meta;
+        file->len            = n;
+        file->index          = 0;
+        file->is_custom_file = 0;       /* httpd sends static buffer     */
+        return 1;
+    }
+    else if (strcmp(name, "/logger/status") == 0) {
+        static char meta[32];
+        uint8_t IsTracerRunning = 1;
+
+        if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
+        {
+            IsTracerRunning =  1;
+        }
+
+        int n = snprintf(meta,sizeof meta,
+            "{ \"active\": %s }",
+            IsTracerRunning ? "true" : "false");
     
         file->data           = meta;
         file->len            = n;
