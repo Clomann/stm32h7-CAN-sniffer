@@ -47,7 +47,7 @@ void httpd_ssi_init(void);
 void httpd_cgi_init(void);
 
 /* Html request for "/leds.cgi" will start LEDS_CGI_Handler */
-const tCGI LEDS_CGI={"/cancontrol.cgi", app_control_cgi_handler};
+const tCGI CAN_CTL_CGI={"/cancontrol.cgi", app_control_cgi_handler};
 const tCGI CAN_CFG_CGI={"/can.cgi", CAN_config_CGI_Handler};
 
 /* Cgi call table, only one CGI used */
@@ -74,8 +74,6 @@ const char * CAN_config_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
   */
 const char * app_control_cgi_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {
-  uint32_t i=0;
-
   appCtrlCgiHandler(iIndex, iNumParams, pcParam, pcValue);
 
   /* uri to send after cgi call*/
@@ -94,7 +92,7 @@ void http_server_init(void)
   http_set_ssi_handler(Handler, (char const **)TAGS, 4);
 
   /* configure CGI handlers */
-  CGI_TAB[0] = LEDS_CGI;
+  CGI_TAB[0] = CAN_CTL_CGI;
   CGI_TAB[1] = CAN_CFG_CGI;
   http_set_cgi_handlers(CGI_TAB, 2);
 }

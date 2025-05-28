@@ -66,6 +66,16 @@ void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcV
 
             AppSettings->mode = NewMode;
         }
+        else if (strcmp(param , "action") == 0)
+        {
+            if(strcmp(value, "apply") ==0)
+            {
+                SettingsHandler_ApplyRequestCallback();
+            }
+            else if(strcmp(value, "save") ==0)
+            {
+            }
+        }
       }
     }
 }
