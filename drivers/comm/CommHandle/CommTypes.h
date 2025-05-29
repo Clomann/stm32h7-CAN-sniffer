@@ -14,7 +14,8 @@
 typedef enum {
     COMM_SUCCESS,
     COMM_ERROR,
-    COMM_TIMEOUT
+    COMM_TIMEOUT,
+    COMM_INVALID_PARAMETER
 } comm_status_t;
 
 typedef enum {
@@ -33,6 +34,13 @@ typedef enum {
 	DRIVER_CFG2,
 	DRIVER_CFGn
 } CommConfigType;
+
+typedef enum {
+    DRIVER_STATE_UNINITIALIZED = 0,
+    DRIVER_STATE_INITIALIZED,
+    DRIVER_STATE_STOPPED,
+    DRIVER_STATE_STARTED
+} CommDriverStatesType;
 
 typedef enum {
     DRIVER_MSGDIRECTION_RX,

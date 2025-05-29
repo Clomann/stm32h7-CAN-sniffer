@@ -18,6 +18,18 @@
 #endif 
 #define MAX_INSTANCES 1
 
+typedef enum {
+    CANABS_IOCTL_CMD_SET_BAUDRATE,
+    CANABS_IOCTL_CMD_SET_FILTERMASK,
+    CANABS_IOCTL_CMD_START,
+    CANABS_IOCTL_CMD_STOP
+} FdcanIoctlCmdType;
+
+#define FDCAN_BAUDRATE_250000      250000U
+#define FDCAN_BAUDRATE_500000      500000U
+#define FDCAN_BAUDRATE_1000000     1000000U
+typedef uint32_t FdcanBaudrateType;
+
 #define FDCAN_STATUS_OK     0U
 typedef uint8_t FdcanStatusType;
 
@@ -67,6 +79,9 @@ comm_status_t FDCAN_CreateDriver(
 comm_status_t FDCAN_Init(
     CommDriver *dev);
 
+comm_status_t FDCAN_DeInit(
+    CommDriver *dev);
+    
 comm_status_t FDCAN_Send(
     const void*);
 

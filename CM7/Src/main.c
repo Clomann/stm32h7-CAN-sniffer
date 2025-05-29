@@ -110,9 +110,6 @@ static AppControlDataType AppCtrlData = {
 
 uint8_t Data[BLOCK_SIZE] = {0};
 
-/* Prescaler declaration */
-uint32_t uwPrescalerValue = 0;
-
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
 static void SystemClock_Config(void);
@@ -344,7 +341,34 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     uint32_t DataLength;
     CanLogClassicCanEntryType NewEntry;
     FDCAN_ClassicFrame NewFrame;
-    static int counter = 0U;
+    static volatile bool RunTracerOld = 0;
+
+    if (RunTracerOld == AppCtrlData.runCanTracer)
+    {
+
+    }
+    else if (AppCtrlData.runCanTracer)
+    {
+        if (COMM_SUCCESS != CanAbs_Start())
+        {
+            AppCtrlData.runCanTracer = 1;
+        }
+        else
+        {
+            RunTracerOld = AppCtrlData.runCanTracer;
+        }
+    }
+    else
+    {
+        if (COMM_SUCCESS != CanAbs_Stop())
+        {
+            AppCtrlData.runCanTracer = 1;
+        }
+        else
+        {
+            RunTracerOld = AppCtrlData.runCanTracer;
+        }
+    }
 
     appCanLogCheckNewFileOpen(data);
 
@@ -385,8 +409,6 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
         {
             data->CanLog.timestamp =  timestamp;
         }
-
-        counter++;
     }
 }
 
@@ -400,7 +422,7 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
 
 int appInit()
 {
-    AppCtrlData.runCanTracer = 1;
+    return 0;
 }
 
 /**
@@ -421,7 +443,6 @@ int main(void)
         char data[1024U];
         uint32_t len;
     } Config = {0U};
-    volatile uint32_t FdcanClock;
 
     /* Configure the MPU attributes */
     MPU_Config();
@@ -552,9 +573,6 @@ int main(void)
 
         GPIO_Dbg_Init();
         
-        FdcanClock = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_FDCAN);
-        /* Compute the prescaler value to have TIMx counter clock equal double the FDCAN timestamp counter */
-        uwPrescalerValue = (uint32_t)(SystemCoreClock / (2U*FdcanClock));
         if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
         {
             Error_Handler();
@@ -593,10 +611,10 @@ int main(void)
                 SettingsHandler_Poll(&(AppCtrlData.Config.writeFileDevice), &AppConfig);
             }
 
-            if (1 != AppCtrlData.applyConfig)
+            if (0 == AppCtrlData.applyConfig)
             {
             }
-            else if (1 == AppCtrlData.runCanTracer)
+            else if (0 == AppCtrlData.runCanTracer)
             {
                 appCanCtrlSetBaudrate(AppConfig.baudrate);
                 AppCtrlData.applyConfig = 0;
@@ -919,7 +937,10 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
 
 void appCanCtrlSetBaudrate(uint32_t baudrate)
 {
-
+    if (COMM_SUCCESS == CanAbs_SetBaudrate(baudrate))
+    {
+        Error_Handler();
+    }
 }
 
 void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
