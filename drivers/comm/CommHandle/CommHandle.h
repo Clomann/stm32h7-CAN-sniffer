@@ -31,7 +31,7 @@ typedef struct {
     Comm_Deinit deinit;
     Comm_Send send;
     Comm_Read read;
-    Comm_Control control;
+    Comm_Control ioctl;
     Comm_RegisterCallback register_callback;
     Comm_EnableInterrupt enable_interrupt;
     Comm_DisableInterrupt disable_interrupt;

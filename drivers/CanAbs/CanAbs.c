@@ -93,6 +93,23 @@ int CanAbs_Send()
     return res;
 }
 
+comm_status_t CanAbs_Start()
+{
+    uint32_t val = 1;
+    return Fdcan1Driver.interface->ioctl(&Fdcan1Driver, CANABS_IOCTL_CMD_START, &val);
+}
+
+comm_status_t CanAbs_Stop()
+{
+    uint32_t val = 1;
+    return Fdcan1Driver.interface->ioctl(&Fdcan1Driver, CANABS_IOCTL_CMD_STOP, &val);
+}
+
+comm_status_t CanAbs_SetBaudrate(uint32_t baudrate)
+{
+    return Fdcan1Driver.interface->ioctl(&Fdcan1Driver, CANABS_IOCTL_CMD_SET_BAUDRATE, &baudrate);
+}
+
 comm_status_t fdcan_create_message_1(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
 {
 

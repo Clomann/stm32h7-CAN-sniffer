@@ -6,6 +6,7 @@
  */
 
 #include "fdcan.h"
+#include "fdcan_utils.h"
 
 typedef struct {
 	CommInterface interface;
@@ -23,6 +24,11 @@ CommDriverConfigType Can1Cfg;
 static volatile uint32_t FdcanMostRecentInterrupTimestamp = 0U;
 
 /* Private function prototypes -----------------------------------------------*/
+comm_status_t FDCAN_Ioctl(
+    CommDriver *handle, 
+    int cmd, 
+    void *argument);
+
 comm_status_t get_fdcan_config(
 		FDCAN_HandleTypeDef *,
 		FDCAN_FilterTypeDef *,
@@ -56,6 +62,7 @@ comm_status_t FDCAN_CreateDriver(
 	pDriver->interface->init = FDCAN_Init;
 	pDriver->interface->send = FDCAN_Send;
 	pDriver->interface->read = FDCAN_Read;
+    pDriver->interface->ioctl = FDCAN_Ioctl;
 	pDriver->configNbr = DriverConfig->config;
 	pDriver->protocol = DRIVER_FDCAN;
 	pDriver->TxFrameBuffer = tx;
@@ -69,7 +76,7 @@ comm_status_t FDCAN_CreateDriver(
 			get_fdcan_config(&hfdcan, &pFilterConfig, pDriver->configNbr );
 			memcpy(&fdcan_configs[pDriver->configNbr ], &newConfig, sizeof(FdcanConfigType));
 			pDriver->config = &(fdcan_configs[pDriver->configNbr ]);
-			pDriver->initialized = 1;
+			pDriver->state = DRIVER_STATE_INITIALIZED;
 			RetVal = COMM_SUCCESS;
 			break;
 		default:
@@ -101,16 +108,13 @@ comm_status_t FDCAN_Init(
         RetVal = COMM_ERROR;
     }
 
-    HAL_FDCAN_ConfigTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_PRESC_1);
-    HAL_FDCAN_EnableTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_EXTERNAL);
-
     if (HAL_FDCAN_ConfigTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_PRESC_1) != HAL_OK)
     {
         /* Initialization Error */
         RetVal = COMM_ERROR;
     }
 
-    if (HAL_FDCAN_EnableTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_INTERNAL) != HAL_OK)
+    if (HAL_FDCAN_EnableTimestampCounter(&hfdcan, FDCAN_TIMESTAMP_EXTERNAL) != HAL_OK)
     {
         /* Initialization Error */
         RetVal = COMM_ERROR;
@@ -124,11 +128,11 @@ comm_status_t FDCAN_Init(
     }
 
     /* Start the FDCAN module */
-    if (HAL_FDCAN_Start(&hfdcan) != HAL_OK)
-    {
-        /* Start Error */
-        RetVal = COMM_ERROR;
-    }
+    // if (HAL_FDCAN_Start(&hfdcan) != HAL_OK)
+    // {
+    //     /* Start Error */
+    //     RetVal = COMM_ERROR;
+    // }
 
     if (HAL_FDCAN_ActivateNotification(&hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
     {
@@ -137,6 +141,43 @@ comm_status_t FDCAN_Init(
     }
 
     /* Prepare Tx Header */
+
+    return RetVal;
+}
+
+comm_status_t FDCAN_DeInit(
+    CommDriver *dev)
+{
+	comm_status_t RetVal;
+
+    (void) dev;
+
+	RetVal = COMM_SUCCESS;
+
+    if (HAL_FDCAN_DeactivateNotification(&hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != HAL_OK)
+    {
+        /* Notification Error */
+        RetVal = COMM_ERROR;
+    }
+
+    /* Stop the FDCAN module */
+    if (HAL_FDCAN_Stop(&hfdcan) != HAL_OK)
+    {
+        /* Start Error */
+        RetVal = COMM_ERROR;
+    }
+
+    if (HAL_FDCAN_DisableTimestampCounter(&hfdcan) != HAL_OK)
+    {
+        /* Initialization Error */
+        RetVal = COMM_ERROR;
+    }
+
+    if (HAL_FDCAN_DeInit(&hfdcan) != HAL_OK)
+    {
+        /* Initialization Error */
+        RetVal = COMM_ERROR;
+    }
 
     return RetVal;
 }
@@ -273,6 +314,108 @@ void FDCANx_IRQHandler(void)
 {
     SampleTime((uint32_t *)&FdcanMostRecentInterrupTimestamp);
     HAL_FDCAN_IRQHandler(&hfdcan);
+}
+
+/* IOCTL/ driver specific functions */
+
+static comm_status_t FDCAN_SetBaudrate(uint32_t baudrate)
+{
+    comm_status_t res = 0;
+    uint32_t FdcanClock = 0;
+    uint8_t timings[4];
+    bool IsDataPhase = false;
+    uint16_t Prescaler;
+    uint8_t Seg1;        
+    uint8_t Seg2;        
+    uint8_t Sjw;  
+    FDCAN_FilterTypeDef sFilterConfig;      
+
+    FdcanClock = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_FDCAN);
+
+    res = COMM_SUCCESS;
+    switch (baudrate)
+    {
+        case FDCAN_BAUDRATE_250000:
+        case FDCAN_BAUDRATE_500000:
+        case FDCAN_BAUDRATE_1000000:
+            break;
+        default:
+            res = COMM_INVALID_PARAMETER;
+            break;
+    }
+
+    memset(timings, 0x00, sizeof(timings));
+
+    if (COMM_SUCCESS != res)
+    {
+    }
+    else if (0 == CANFD_CalculateBitTimingRegister(FdcanClock, baudrate, IsDataPhase, timings))
+    {
+        res = COMM_SUCCESS;
+    }
+    else
+    {
+        res = COMM_ERROR;
+    }
+
+    if (COMM_SUCCESS == res)
+    {
+        Prescaler  = CANFD_GetPrescaler(timings, IsDataPhase);
+        Seg1       = CANFD_GetSeg1(timings, IsDataPhase);
+        Seg2       = CANFD_GetSeg2(timings, IsDataPhase);
+        Sjw        = CANFD_GetSJW(timings, IsDataPhase);
+
+        hfdcan.Init.NominalPrescaler = Prescaler; 
+        hfdcan.Init.NominalSyncJumpWidth = Sjw;
+        hfdcan.Init.NominalTimeSeg1 = Seg1; 
+        hfdcan.Init.NominalTimeSeg2 = Seg2;
+
+        if (HAL_FDCAN_Init(&hfdcan) != HAL_OK)
+        {
+            /* Initialization Error */
+            res = COMM_ERROR;
+        }
+    }
+
+    return res;
+}
+
+comm_status_t FDCAN_Ioctl(
+    CommDriver *handle, 
+    int cmd, 
+    void *argument)
+{
+    comm_status_t res = 0;
+
+    switch (cmd)
+    {
+        case CANABS_IOCTL_CMD_SET_BAUDRATE:
+            {
+                FdcanBaudrateType baudrate = *((FdcanBaudrateType *)argument);
+                res = FDCAN_SetBaudrate(baudrate);
+            }
+            break;
+        case CANABS_IOCTL_CMD_START:
+            if (HAL_FDCAN_Start(&hfdcan) != HAL_OK)
+            {
+                /* Start Error */
+                res = COMM_ERROR;
+            }
+            break;
+        case CANABS_IOCTL_CMD_STOP:
+            if (HAL_FDCAN_Stop(&hfdcan) != HAL_OK)
+            {
+                /* Start Error */
+                res = COMM_ERROR;
+            }
+            break;
+        case CANABS_IOCTL_CMD_SET_FILTERMASK:
+        default:
+            res = 1;
+            break;
+    }    
+
+    return res;
 }
 
 /**

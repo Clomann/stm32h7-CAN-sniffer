@@ -7,6 +7,10 @@ int CanAbs_Init(void);
 int CanAbs_Send(void);
 int CanAbs_Receive(FDCAN_ClassicFrame *frame);
 
+comm_status_t CanAbs_Start(void);
+comm_status_t CanAbs_Stop(void);
+comm_status_t CanAbs_SetBaudrate(uint32_t baudrate);
+
 comm_status_t fdcan_create_message_1(FDCAN_Message*, uint8_t*, uint32_t);
 comm_status_t fdcan_create_message_2(FDCAN_Message*, uint8_t*, uint32_t);
 comm_status_t fdcan_create_message_3(FDCAN_Message*, uint8_t*, uint32_t);
