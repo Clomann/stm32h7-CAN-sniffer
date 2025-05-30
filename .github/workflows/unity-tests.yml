@@ -1,0 +1,23 @@
+name: CMake Unity Tests
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y cmake gcc make
+
+    - name: Configure with CMake
+      run: cmake -S tests -B build
+
+    - name: Build tests
+      run: cmake --build build
+
+    - name: Run tests with CTest
+      run: ctest --test-dir build --output-on-failure
