@@ -3,17 +3,81 @@
 #include <stdio.h>
 
 #include "SettingsHandler.h"
+#include "http_cgi_ssi.h"
+#include "httpd_post.h"
 #include "core_json.h"
+
 
 #define SETTINGS_HANDLER_JSON_BUFFER_SIZE 256U
 
 static AppConfigType * AppSettings;
 
+static void consume_param_values(char *param, char *value)
+{
+    uint32_t NewMode = 0;
+    uint32_t NewBaudrate = 0;
+    
+    /* check parameter "baudrate" */
+    if (strcmp(param , "baudrate") == 0)
+    {
+        NewBaudrate = AppSettings->baudrate;
+
+        if(strcmp(value, "250000") == 0)
+        {
+            NewBaudrate = 250000;
+        }
+        else if(strcmp(value, "500000") == 0)
+        {
+            NewBaudrate = 500000;
+        }
+
+        if (NewBaudrate != AppSettings->baudrate)
+        {
+            AppSettings->updated = 1U;
+        }
+
+        AppSettings->baudrate = NewBaudrate;
+    }
+    else if (strcmp(param , "mode")==0)
+    {
+        NewMode = AppSettings->mode;
+            
+        if(strcmp(value, "1") ==0)
+        {
+            NewMode = 1;
+        }
+        else if(strcmp(value, "2") ==0)
+        {
+            NewMode = 2;
+        }
+
+        if (NewMode != AppSettings->mode)
+        {
+            AppSettings->updated = 1U;
+        }
+
+        AppSettings->mode = NewMode;
+    }
+    else if (strcmp(param , "action") == 0)
+    {
+        if(strcmp(value, "apply") ==0)
+        {
+            SettingsHandler_ApplyRequestCallback();
+        }
+        else if(strcmp(value, "save") ==0)
+        {
+        }
+    }
+}
+
+void httpd_post_cb(char *key, char *val)
+{
+    consume_param_values(key, val);
+}
+
 void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
 {
     uint32_t i = 0;
-    uint32_t NewMode = 0;
-    uint32_t NewBaudrate = 0;
     char * param = NULL;
     char * value = NULL;
 
@@ -25,57 +89,7 @@ void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcV
         param = pcParam[i];
         value = pcValue[i];
 
-        /* check parameter "baudrate" */
-        if (strcmp(param , "baudrate") == 0)
-        {
-            NewBaudrate = AppSettings->baudrate;
-
-            if(strcmp(value, "250000") == 0)
-            {
-                NewBaudrate = 250000;
-            }
-            else if(strcmp(value, "500000") == 0)
-            {
-                NewBaudrate = 500000;
-            }
-
-            if (NewBaudrate != AppSettings->baudrate)
-            {
-                AppSettings->updated = 1U;
-            }
-
-            AppSettings->baudrate = NewBaudrate;
-        }
-        else if (strcmp(param , "mode")==0)
-        {
-            NewMode = AppSettings->mode;
-                
-            if(strcmp(value, "1") ==0)
-            {
-                NewMode = 1;
-            }
-            else if(strcmp(value, "2") ==0)
-            {
-                NewMode = 2;
-            }
-
-            if (NewMode != AppSettings->mode)
-            {
-                AppSettings->updated = 1U;
-            }
-
-            AppSettings->mode = NewMode;
-        }
-        else if (strcmp(param , "action") == 0)
-        {
-            if(strcmp(value, "apply") ==0)
-            {
-                SettingsHandler_ApplyRequestCallback();
-            }
-            else if(strcmp(value, "save") ==0)
-            {
-            }
-        }
+        consume_param_values(param, value);        
       }
     }
 }

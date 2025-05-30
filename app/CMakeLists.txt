@@ -8,6 +8,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/ethernetif.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/fs_custom.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/httpd_cgi_ssi.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/httpd_post.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/lwip.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/tcp_echoserver.c
 )

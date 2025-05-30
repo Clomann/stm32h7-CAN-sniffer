@@ -17,6 +17,13 @@ struct fs_custom_data {
 #endif
 };
 
+static const char redirect_reply[] =
+    "HTTP/1.1 303 See Other\r\n"
+    "Location: /can.shtml\r\n"
+    "Connection: close\r\n"
+    "Content-Length: 0\r\n"
+    "\r\n";
+
 #if LWIP_HTTPD_CUSTOM_FILES
 
 #if LWIP_HTTPD_DYNAMIC_FILE_READ != 1
@@ -116,6 +123,19 @@ int fs_open_custom(struct fs_file *file, const char *name)
         file->len            = n;
         file->index          = 0;
         file->is_custom_file = 0;       /* httpd sends static buffer     */
+        return 1;
+    }
+    else if (strcmp(name, "/postredir") == 0) {
+        file->data   = redirect_reply;
+        file->len    = sizeof(redirect_reply) - 1;
+        file->flags	= FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
+        file->index  = 0;
+        #if LWIP_HTTPD_DYNAMIC_HEADERS
+            // file->http_header_included = 1;
+        #endif
+        #if LWIP_HTTPD_CUSTOM_FILES
+            file->is_custom_file       = 1;
+        #endif
         return 1;
     }
 

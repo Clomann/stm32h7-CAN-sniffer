@@ -327,8 +327,7 @@ static comm_status_t FDCAN_SetBaudrate(uint32_t baudrate)
     uint16_t Prescaler;
     uint8_t Seg1;        
     uint8_t Seg2;        
-    uint8_t Sjw;  
-    FDCAN_FilterTypeDef sFilterConfig;      
+    uint8_t Sjw;      
 
     FdcanClock = HAL_RCCEx_GetPeriphCLKFreq(RCC_PERIPHCLK_FDCAN);
 
