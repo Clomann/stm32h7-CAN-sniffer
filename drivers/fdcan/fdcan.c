@@ -348,7 +348,7 @@ static comm_status_t FDCAN_SetBaudrate(uint32_t baudrate)
     if (COMM_SUCCESS != res)
     {
     }
-    else if (0 == CANFD_CalculateBitTimingRegister(FdcanClock, baudrate, IsDataPhase, timings))
+    else if (0 == CANFD_CalculateBitTimingRegister(FdcanClock, baudrate, 7500, IsDataPhase, timings))
     {
         res = COMM_SUCCESS;
     }

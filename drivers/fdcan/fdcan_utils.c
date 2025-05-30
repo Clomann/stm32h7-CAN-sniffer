@@ -71,15 +71,23 @@ uint8_t CANFD_GetSJW(const uint8_t reg_value[4], bool is_data_phase)
 
 /* ============================= */
 
-uint8_t CANFD_CalculateBitTimingRegister(uint32_t clock_hz, uint32_t bitrate, bool is_data_phase, uint8_t reg_value_out[4])
+uint8_t CANFD_CalculateBitTimingRegister(uint32_t clock_hz, uint32_t bitrate, uint32_t sample_point, bool is_data_phase, uint8_t reg_value_out[4])
 {
+    uint32_t MaxTq;
     #define SAMPLE_POINT_FACTOR 10000
-    uint32_t sample_point = 8750; /*<! sample point in percent factored by 100 for higher precision */
+
     if (!reg_value_out || clock_hz == 0 || bitrate == 0) {
         return false;
     }
 
-    for (uint8_t tq_num = 49; tq_num >= 8; tq_num--) {
+    MaxTq = clock_hz / bitrate;
+    
+    if (MaxTq > 512U)
+    {
+        MaxTq = 512U;
+    }
+
+    for (uint8_t tq_num = MaxTq; tq_num >= 8; tq_num--) {
         uint32_t total_tq_freq = bitrate * tq_num;
         uint32_t prescaler = clock_hz / total_tq_freq;
 
@@ -96,7 +104,7 @@ uint8_t CANFD_CalculateBitTimingRegister(uint32_t clock_hz, uint32_t bitrate, bo
             continue;
         }
 
-        uint8_t seg1 = (tq_num * sample_point) / SAMPLE_POINT_FACTOR;
+        uint8_t seg1 = (tq_num * sample_point) / SAMPLE_POINT_FACTOR - 1;
         uint8_t seg2 = tq_num - seg1 - 1;
         uint8_t sjw = 1; // <<< FORCE SJW = 1 always
 
