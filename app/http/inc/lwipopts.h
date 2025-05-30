@@ -130,12 +130,19 @@
 #define LWIP_TCP 1
 
 #define HTTPD_USE_CUSTOM_FSDATA 1
-#define LWIP_HTTPD_CUSTOM_FILES 1 /* enable custom POST handlers */
+#define LWIP_HTTPD_CUSTOM_FILES 1 /* enable custom GET handlers */
 #define LWIP_HTTPD_DYNAMIC_FILE_READ 1
 #define LWIP_HTTPD_DYNAMIC_HEADERS 1
 #define LWIP_HTTPD_FILE_STATE 0
 
 #define LWIP_HTTPD_SSI_INCLUDE_TAG 1
+
+#define LWIP_HTTPD_SUPPORT_POST 1 /* enable custom POST handlers */
+#define HTTPD_USE_MEM_POOL  1U
+#define MEMP_NUM_PARALLEL_HTTPD_CONNS 8U
+#define MEMP_NUM_PARALLEL_HTTPD_SSI_CONNS 8U
+#define LWIP_HTTPD_POST_MANUAL_WND  0U
+
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
 /* ETH_CODE: first 2 macros solve errno issue with GCC 10 and ST LwIP

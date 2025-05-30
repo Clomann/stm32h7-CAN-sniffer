@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#include "http_cgi_ssi.h"
 #include "FileHandler.h"
 
 typedef struct {

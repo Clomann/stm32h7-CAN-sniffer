@@ -5,7 +5,12 @@
 
     <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
     <meta content="MSHTML 6.00.2800.1561" name="GENERATOR">
-    <style ="font-weight: normal; font-family: Verdana;"></style>
+    <style>
+        body {
+            font-family: Verdana;
+            font-weight: normal;
+        }
+    </style>    
 </head>
 <body>
     <h4>
@@ -49,14 +54,28 @@
     <small>
         <span style="font-family: Verdana;">STM32H743I</span>
     </small>
-    <small>
-        <span style="font-family: Verdana;">-EVAL board that you get the
-        desired
-        LEDs
-        are putted on/off. </span>
-        <br style="font-family: Verdana;">
-    </small>
     <br>
+    <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
+        <tbody>
+            <tr>
+                <td class="tabtitle" style="height: 15px; background-color: rgb(255, 255, 255);">
+                        <strong>CAN sniffer control</strong>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <br>
+    Here you can start and stop the CAN sniffer activity.
+    <br>
+    <br>
+    <form method="get" action="/cancontrol.cgi">
+        <big style="font-weight: bold;">
+            <input type="submit" name="action" value="Start" id="start-button">
+            <input type="submit" name="action" value="Stop" id="stop-button">
+        </big>
+    </form>
+
     <br>
     <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
         <tbody>
@@ -68,7 +87,13 @@
         </tbody>
     </table>
     <br>
-    <form method="get" action="/can.cgi">
+    Here you can change the CAN sniffer configuration. 
+    To apply the current values you have to stop and the 
+    CAN sniffer before clicking on "Apply". Clicking "Save" persists
+    the configuration on the SD card and read on a device restart.
+    <br>
+    <br>
+    <form method="get" action="/can.cgi" id="ctrl-form">
         <table style="color: #000000; width: 961px; height: 38px; width: 50%;" border="0" cellspacing="0" cellpadding="3">
             <tbody>
                 <tr>
@@ -79,7 +104,8 @@
                 <tr>
                     <td style="width: 33.333333%;">Baudrate</td>
                     <td style="width: 33.333333%;"><!--#baudrate--></td>
-                    <td style="width: 33.333333%;"><select name="baudrate">
+                    <td style="width: 33.333333%;">
+                        <select name="baudrate" id="baudrate-select">
                         <option value="0">-</option>
                         <option value="250000">250 kbit/s</option>
                         <option value="500000">500 kbit/s</option>
@@ -89,7 +115,7 @@
                     <td style="width: 33.333333%;">Operating mode</td>
                     <td style="width: 33.333333%;"><!--#mode--></td>
                     <td style="width: 33.333333%;">
-                        <select name="mode">
+                        <select name="mode" id="mode-select">
                             <option value="0">-</option>
                             <option value="1">normal</option>
                             <option value="2">listen only</option>
@@ -100,10 +126,23 @@
         </table>
         <br>
         <br>
-        <big style="font-weight: bold;">
-            <input value="Save" type="submit">
-        </big>
     </form>
+    <!-- APPLY FORM (via JS, adds `action=apply`) -->
+    <form method="POST" action="/can.cgi" id="apply-form">
+        <input type="hidden" name="baudrate" id="apply-baudrate">
+        <input type="hidden" name="mode" id="apply-mode">
+        <input type="hidden" name="action" value="apply">
+        <button type="submit" id="apply-button">Apply</button>
+    </form>
+    
+    <!-- SAVE FORM (via JS, adds `action=save`) -->
+    <form method="POST" action="/can.cgi" id="save-form">
+        <input type="hidden" name="baudrate" id="save-baudrate">
+        <input type="hidden" name="mode" id="save-mode">
+        <input type="hidden" name="action" value="save">
+        <button type="submit" id="save-button">Save</button>
+    </form>
+  
     <h3>
         <font size="-1">
             <span style="color: black;"></span>
@@ -114,5 +153,76 @@
             <br>
         </font>
     </h3>
+    <!-- ------------- JavaScript ---------------- -->
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+    
+        /* ---------- configuration ---------- */
+        const STATUS_URL   = "/logger/status";   // ← your CGI/REST endpoint
+        const POLL_MS      = 1000;                    // how often to refresh (ms)
+        const btnApply     = document.getElementById("apply-button");
+        const btnStart     = document.getElementById("start-button");
+        const btnStop      = document.getElementById("stop-button");
+        /* ----------------------------------- */
+    
+        /* -------- sniffer-state polling -------- */
+        async function pollSnifferState () {
+            try {
+                const resp = await fetch(STATUS_URL, {cache: "no-store"});
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const {active} = await resp.json();   // {active: true|false}
+    
+                if (active) {
+                    btnApply.disabled = true;
+                    btnApply.title    = "Stop the sniffer first.";
+                    btnStart.disabled = true;
+                    btnStart.title    = "Stop the sniffer first.";
+                    btnStop.disabled = false;
+                    btnStop.title    = "";
+                } else {
+                    btnApply.disabled = false;
+                    btnApply.title    = "";
+                    btnStart.disabled = false;
+                    btnStart.title    = "";
+                    btnStop.disabled = true;
+                    btnStop.title    = "Start the sniffer first.";
+                }
+            } catch (e) {
+                console.error("Status poll failed:", e);
+                btnApply.disabled = true;
+                btnApply.title    = "Sniffer status unknown.";
+            }
+        }
+        pollSnifferState();
+        setInterval(pollSnifferState, POLL_MS);
+        /* --------------------------------------- */
+    
+        /* -------- form helpers  ---------------- */
+        const selBaud = document.getElementById("baudrate-select");
+        const selMode = document.getElementById("mode-select");
+    
+        function updateHiddenFields() {
+            const baud = selBaud.value;
+            const mode = selMode.value;
+            [ ...document.querySelectorAll("#apply-baudrate,#save-baudrate") ]
+                .forEach(i => i.value = baud);
+            [ ...document.querySelectorAll("#apply-mode,#save-mode") ]
+                .forEach(i => i.value = mode);
+        }
+    
+        document.getElementById("apply-form")
+                .addEventListener("submit", updateHiddenFields);
+    
+        document.getElementById("save-form")
+                .addEventListener("submit", updateHiddenFields);
+
+        document.getElementById("ctrl-form")
+            .addEventListener("submit", async (e) => {
+        // let the browser submit as normal, then…
+        setTimeout(pollSnifferState, 200);  // refresh quickly
+});
+    });
+    </script>        
+    
 </body>
 </html>

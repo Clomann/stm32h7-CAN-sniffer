@@ -38,6 +38,7 @@
 #include "fs_custom.h"
 #include "timer.h"
 #include "gpio.h"
+#include "httpd_post.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{

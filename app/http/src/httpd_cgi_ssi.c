@@ -18,7 +18,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-// #include "lwip/debug.h"
 #include "lwip/tcp.h"
 #include "lwip/apps/httpd.h"
 #include "http_cgi_ssi.h"
@@ -51,7 +50,11 @@ const tCGI CAN_CTL_CGI={"/cancontrol.cgi", app_control_cgi_handler};
 const tCGI CAN_CFG_CGI={"/can.cgi", CAN_config_CGI_Handler};
 
 /* Cgi call table, only one CGI used */
-tCGI CGI_TAB[1];
+tCGI CGI_TAB[] =
+{
+    CAN_CTL_CGI,
+    CAN_CFG_CGI
+};
 
 /**
   * @brief  ADC_Handler : SSI handler for ADC page
@@ -85,6 +88,8 @@ const char * app_control_cgi_handler(int iIndex, int iNumParams, char *pcParam[]
   */
 void http_server_init(void)
 {
+  uint8_t HandlerCount;
+
   /* Httpd Init */
   httpd_init();
 
@@ -92,7 +97,6 @@ void http_server_init(void)
   http_set_ssi_handler(Handler, (char const **)TAGS, 4);
 
   /* configure CGI handlers */
-  CGI_TAB[0] = CAN_CTL_CGI;
-  CGI_TAB[1] = CAN_CFG_CGI;
-  http_set_cgi_handlers(CGI_TAB, 2);
+  HandlerCount = sizeof(CGI_TAB)/sizeof(tCGI);
+  http_set_cgi_handlers(CGI_TAB, HandlerCount);
 }
