@@ -109,6 +109,7 @@
                         <option value="0">-</option>
                         <option value="250000">250 kbit/s</option>
                         <option value="500000">500 kbit/s</option>
+                        <option value="1000000">1 Mbit/s</option>
                     </select></td>
                 </tr>
                 <tr>
