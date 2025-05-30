@@ -30,6 +30,10 @@ static void consume_param_values(char *param, char *value)
         {
             NewBaudrate = 500000;
         }
+        else if(strcmp(value, "1000000") == 0)
+        {
+            NewBaudrate = 1000000;
+        }
 
         if (NewBaudrate != AppSettings->baudrate)
         {
@@ -105,6 +109,8 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
             snprintf(pcInsert, iInsertLen, "250 kbit/s");
         } else if (AppSettings->baudrate == 500000) {
             snprintf(pcInsert, iInsertLen, "500 kbit/s");
+        } else if (AppSettings->baudrate == 1000000) {
+            snprintf(pcInsert, iInsertLen, "1 Mbit/s");
         } else {
             snprintf(pcInsert, iInsertLen, "n/a");
         }
