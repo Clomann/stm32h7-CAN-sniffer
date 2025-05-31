@@ -87,7 +87,7 @@ set(symbols_SYMB                    # Modified
     "CORE_CM7"
     "NO_SYS=1"
     "USE_STM32H7XX_NUCLEO_144_MB1363"
-    "FDCAN_MODE=FDCAN_MODE_EXTERNAL_LOOPBACK"
+    "FDCAN_MODE=FDCAN_MODE_NORMAL"
 )
 
 # Executable files
