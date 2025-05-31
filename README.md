@@ -1,28 +1,37 @@
-- [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
-  * [Software architecture](#software-architecture)
-    + [System overview](#system-overview)
-    + [Building block view](#building-block-view)
-    + [FatFS and SD card driver](#fatfs-and-sd-card-driver)
-  * [Hardware setup](#hardware-setup)
-  * [Pin usage](#pin-usage)
-  * [Funtional reuquirements](#funtional-reuquirements)
-    + [General](#general)
-    + [CAN](#can)
-    + [Data Logging Requirements](#data-logging-requirements)
-    + [Server Requirements](#server-requirements)
-    + [Storage and File Management Requirements](#storage-and-file-management-requirements)
-  * [Hardware Constraints](#hardware-constraints)
-  * [Wishlist](#wishlist)
-  * [Design decisions](#design-decisions)
-  * [Clocks](#clocks)
-  * [HTTP](#http)
-
-STM32H7 CAN sniffer
+# STM32H7 CAN sniffer
 ====================
 
 This is a multi-protocol learning project. It implements a device that logs CAN traffic and stores the data onto a SD card. The device can be configured and the logged data can be accessed via a web interface.
 
-## How To Use
+# Content
+
+<!-- TOC -->
+
+- [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
+- [Content](#content)
+- [How To Use](#how-to-use)
+- [Software architecture](#software-architecture)
+    - [Introduction and goals](#introduction-and-goals)
+    - [Quality goals](#quality-goals)
+    - [System overview](#system-overview)
+    - [Building block view](#building-block-view)
+- [Hardware setupp](#hardware-setupp)
+- [Pin usage](#pin-usage)
+- [Funtional requirements](#funtional-requirements)
+    - [General](#general)
+    - [CAN](#can)
+    - [Data Logging Requirements](#data-logging-requirements)
+    - [Server Requirements](#server-requirements)
+    - [Storage and File Management Requirements](#storage-and-file-management-requirements)
+- [Hardware Constraints](#hardware-constraints)
+- [Wishlist](#wishlist)
+- [Design decisions](#design-decisions)
+- [Third party libraries](#third-party-libraries)
+    - [FatFS and SD card driver](#fatfs-and-sd-card-driver)
+
+<!-- /TOC -->
+
+# How To Use
 
 The project consists of the source code written to run on a NUCLE 144 STM32H745ZI discovery board. It uses GPIO to interface to:
 - SD card
@@ -42,10 +51,11 @@ make -C build -j4
 
 to build the application.
 
-[!NOTE]: Use a high quality SD card because many cheap once have issues with SPI. Thus, the quality of the SD card influences the reliablity accesing it through SPI. The system was tested with a Kingston Industrial graded card.
+ [!NOTE]]: Use a high quality SD card because many cheap once have issues with SPI. Thus, the quality of the SD card influences the reliablity accesing it through SPI. The system was tested with a Kingston Industrial graded card.
 
-## Software architecture
-### Introduction and goals
+# Software architecture
+
+## Introduction and goals
 The main of this project is to offer practical challanges to gain experience in:
 - applying software architecture concepts in an embedded environment
 - developing hardware drivers and there abstractions
@@ -61,7 +71,7 @@ The application itself shall provide a basic software piece offering:
 
 Therefore, a central goal is to make the core application reusable and portable in a way, to also use it with other uCs of the family.
 
-### Quality goals
+## Quality goals
 
 | Goal | Motivation and description |
 |-|-|
@@ -69,7 +79,7 @@ Therefore, a central goal is to make the core application reusable and portable 
 | Reliability | Data aquisition shall be reliable also at high throughput |
 | Maintainability | It shall be easy to add funcitons in the main app, but also to change driver implementations without affecting other parts of the code base. | 
 
-### System overview
+## System overview
 
 ```mermaid
 block-beta
@@ -84,7 +94,7 @@ block-beta
 
 ``` 
 
-### Building block view
+## Building block view
 
  The following figure shows the layers of the CAn sniffer software.
 
@@ -129,62 +139,106 @@ block-beta
 
 For better performance and higher availability the serving of requests via ethernet shall be executed on another core to not interfere with the CAN trace logging when large files are loaded for user downloads.
 
-### FatFS and SD card driver
- http://elm-chan.org/fsw/ff/
-
- ## Hardware setup
+# Hardware setupp
 
 This section gives a brief overview of the hardware setup. The hardware setup is based on a NUCLEO-H745ZI-Q development board.
 
-## Pin usage
-Following diagram showes which pins are connected to the external components:
+# Pin usage
+Following diagram shows which pins are connected to the external components:
 
 ```mermaid
 flowchart TD
-      subgraph STM32H7 [STM32H7]
-            subgraph SPI1 [SPI1 - Master]
-                  SPI1_SS["SS (PA4)<br>CN7.D13"]
-                  SPI1_CLK["CLK (PA5)<br>CN7.D13"]
-                  SPI1_MISO["MISO (PA6)<br>CN7.D12"]
-                  SPI1_MOSI["MOSI (PB5)<br>CN7.D11"]
-            end
+    subgraph STM32H7 [STM32H7]
+        subgraph ETH [ETH MAC]
+            MAC_MDC["MDC<br>(PC1)"]
+            MAC_REF_CLK["REF_CLK<br>(PA1)"]
+            MAC_MDIO["MDIO<br>(PA2)"]
+            MAC_CRS_DV["CRS_DV<br>(PA7)"]
+            MAC_RXD0["RXD0<br>(PC4)"]
+            MAC_RXD1["RXD1<br>(PC5)"]
+            MAC_TXD1["TXD1<br>(PB13)"]
+            MAC_TX_EN["TX_EN<br>(PG11)"]
+            MAC_TXD0["TXD0<br>(PG13)"]
+        end
+        
+        subgraph SPI1 [SPI1 - Master]
+                SPI1_SS["SS (PA4)<br>CN7.D13"]
+                SPI1_CLK["CLK (PA5)<br>CN7.D13"]
+                SPI1_MISO["MISO (PA6)<br>CN7.D12"]
+                SPI1_MOSI["MOSI (PB5)<br>CN7.D11"]
+        end
 
-            subgraph CAN1 [CAN 1]
-                  CAN1_Tx["Tx (H13)<br>"]
-                  CAN1_Rx["Rx (H14)<br>"]
-            end
-      end
+        subgraph CAN1 [CAN 1]
+                CAN1_Tx["Tx (B9)<br>"]
+                CAN1_Rx["Rx (B8)<br>"]
+        end
 
-      subgraph SDCARD [SD card]
-            SPI4_SS["SS (PE11)"]
-            SPI4_CLK["CLK (PE12)<br>CN10.D39"]
-            SPI4_MISO["MISO (PE13)<br>CN10.D3"]
-            SPI4_MOSI["MOSI (PE14)<br>CN10.D4"]
-      end
+        subgraph CAN2 [CAN 2]
+                CAN2_Tx["Tx (B13)<br>"]
+                CAN2_Rx["Rx (B12)<br>"]
+        end
+    end
 
-      subgraph CAN [CAN Tranceiver]
-            CANTRANC_Tx["CAN Tx"]
-            CANTRANC_Rx["CAN Rx"]
-      end
+    subgraph PHY["ETH - PHY (on board)"]
+        PHY_MDC
+        PHY_REF_CLK
+        PHY_MDIO
+        PHY_CRS_DV
+        PHY_RXD0
+        PHY_RXD1
+        PHY_TXD1
+        PHY_TX_EN
+        PHY_TXD0
+    end
 
-      %% Connections with directions
-      SPI1_SS --- |SS| SPI4_SS
-      SPI1_CLK --- |CLK| SPI4_CLK
-      SPI1_MOSI --- |MOSI| SPI4_MOSI
+    subgraph SDCARD [SD card]
+        SPI4_SS["SS (PE11)"]
+        SPI4_CLK["CLK (PE12)<br>CN10.D39"]
+        SPI4_MISO["MISO (PE13)<br>CN10.D3"]
+        SPI4_MOSI["MOSI (PE14)<br>CN10.D4"]
+    end
 
-      CAN1_Tx --- |Tx| CANTRANC_Tx
-      CAN1_Rx --- |Rx| CANTRANC_Rx
+    subgraph CAN1TRCV [CAN 1 Tranceiver]
+        CAN1TRANC_Tx["CAN Tx"]
+        CAN1TRANC_Rx["CAN Rx"]
+    end
 
-      SPI1_MISO --- |MISO| SPI4_MISO
+    subgraph CAN2TRCV [CAN 2 Tranceiver]
+        CAN2TRANC_Tx["CAN Tx"]
+        CAN2TRANC_Rx["CAN Rx"]
+    end
+
+    %% Connections with directions
+    MAC_MDC     --- PHY_MDC
+    MAC_REF_CLK --- PHY_REF_CLK
+    MAC_MDIO    --- PHY_MDIO
+    MAC_CRS_DV  --- PHY_CRS_DV
+    MAC_RXD0    --- PHY_RXD0
+    MAC_RXD1    --- PHY_RXD1
+    MAC_TXD1    --- PHY_TXD1
+    MAC_TX_EN   --- PHY_TX_EN
+    MAC_TXD0    --- PHY_TXD0
+
+    SPI1_SS --- |SS| SPI4_SS
+    SPI1_CLK --- |CLK| SPI4_CLK
+    SPI1_MOSI --- |MOSI| SPI4_MOSI
+
+    CAN1_Tx --- |Tx| CAN1TRANC_Tx
+    CAN1_Rx --- |Rx| CAN1TRANC_Rx
+
+    CAN2_Tx --- |Tx| CAN2TRANC_Tx
+    CAN2_Rx --- |Rx| CAN2TRANC_Rx
+
+    SPI1_MISO --- |MISO| SPI4_MISO
 
 ```
 
 
-## Funtional reuquirements
+# Funtional requirements
 
-This section states the most important funcitonal requirements for the CAN sniffer.
+This section states the most important functional requirements for the CAN sniffer.
 
-### General
+## General
 The CAN sniffer shall implement following functions:
 - Support for classic CAN
 - Store all received CAN frames to a SD card
@@ -194,7 +248,7 @@ The CAN sniffer shall implement following functions:
 
 The CAN sniffer shall be able to capture all CAN frames at 100 % bus load reliably and store them persistently without losing any frames.
 
-### CAN
+## CAN
 The CAN sniffer shall have following CAN specific functions:
 - The system shall support standard (11-bit) and extended (29-bit) CAN identifiers.
 - The system shall support baudrates of up to 1 Mbit/s
@@ -203,14 +257,14 @@ The CAN sniffer shall have following CAN specific functions:
 - The system shall log bus load statistics.
 - The system shall support ISO-TP (ISO 15765-2) reassembly for multi-frame messages.
 
-### Data Logging Requirements
+## Data Logging Requirements
 - The system shall log messages to an SD card formatted with FAT32.
 - The system shall store CAN messages in a timestamped log format.
 - The system shall allow log retrieval via a network or direct SD card access.
 - The system shall support automatic log file rotation to prevent SD card overflow.
 - The system shall include metadata (e. g. timestamp, frame type) for each message.
 
-### Server Requirements
+## Server Requirements
 - The system shall host a web interface accessible over Wi-Fi or LAN.
 - The web interface shall allow live message monitoring.
 - The web interface shall provide options to configure the message filters based on CAN IDs.
@@ -218,31 +272,26 @@ The CAN sniffer shall have following CAN specific functions:
 - The system shall support remote log file download.
 - optional: The system shall support firmware updates via the web interface.
 
-### Storage and File Management Requirements
+## Storage and File Management Requirements
 - The system shall implement buffered writes to the SD card to minimize wear.
 - The system shall create a new log file at the start of each session.
 - The system shall allow oldest logs to be deleted automatically if storage is full.
 
-## Hardware Constraints
+# Hardware Constraints
 - The system shall operate with an STM32H7 microcontroller.
 - The system shall support an SPI-connected SD card.
 - The system shall support a low-power mode when logging is not active.
 - The system shall indicate operational status via LED indicators.
 
-## Wishlist
-- the web interface shall support cliennt side CAN log parsing to offload the 
+# Wishlist
+- the web interface shall support client side CAN log parsing to offload the 
 formatting from the server
 
-## Design decisions
+# Design decisions
 
+To be found in [design decisions](./doc/design_decisions.md).
 
-## Clocks
-HSE is used as the input clock due to it's better accuracy (https://community.st.com/t5/stm32-mcus-products/hse-versus-hsi-on-nucleo-boards/td-p/473783)
+# Third party libraries
 
-## HTTP
-To reduce development time the LwIP library. ST provides functional examples usign LwIP which help to get up to speed.
-
-To reduce implementation overhead and debugging complexity no multi-threading is used.
-
-To reduce space the logger and the http server shall access the same file.
-For that, the file system must support concurrent read/write operations.
+## FatFS and SD card driver
+ http://elm-chan.org/fsw/ff/

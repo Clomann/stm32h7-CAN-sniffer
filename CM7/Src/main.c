@@ -350,7 +350,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     }
     else if (AppCtrlData.runCanTracer)
     {
-        if (COMM_SUCCESS != CanAbs_Start())
+        if (COMM_SUCCESS != CanAbs_Start_Can1())
         {
             AppCtrlData.runCanTracer = 1;
         }
@@ -361,7 +361,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     }
     else
     {
-        if (COMM_SUCCESS != CanAbs_Stop())
+        if (COMM_SUCCESS != CanAbs_Stop_Can1())
         {
             AppCtrlData.runCanTracer = 1;
         }
@@ -373,7 +373,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
 
     appCanLogCheckNewFileOpen(data);
 
-    while (0 == CanAbs_Receive(&NewFrame))
+    while (0 == CanAbs_Receive_Can1(&NewFrame))
     {
         timestamp = HAL_GetTick();
         timedelta = timestamp - data->CanLog.timestamp;
@@ -579,7 +579,7 @@ int main(void)
             Error_Handler();
         }
 
-        if ( 0 != CanAbs_Init() ) 
+        if ( 0 != CanAbs_Init_Can1() ) 
         {
             Error_Handler();
         }
@@ -593,7 +593,7 @@ int main(void)
             {
 
             }
-            else if ( 0 != CanAbs_Send())
+            else if ( 0 != CanAbs_Send_Can1())
             {
                 Error_Handler();
                 timestamp_prev = timestamp;
@@ -938,7 +938,7 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
 
 void appCanCtrlSetBaudrate(uint32_t baudrate)
 {
-    if (COMM_SUCCESS == CanAbs_SetBaudrate(baudrate))
+    if (COMM_SUCCESS == CanAbs_SetBaudrate_Can1(baudrate))
     {
         Error_Handler();
     }

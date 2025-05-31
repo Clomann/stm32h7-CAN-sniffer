@@ -1,53 +1,56 @@
 #include "CanAbs.h"
+#include "CanAbs_Cfg.h"
 #include "buffers.h"
 #include "fdcan.h"
 
-#define SW_RX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
-#define SW_TX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
-
-uint32_t Msg1Id = 0x0;
-FDCAN_Message Msg1;
-FDCAN_Message Msg2;
-FDCAN_Message Msg3;
-FDCAN_Message Msg4;
-
-// FDCAN_HandleTypeDef hfdcan;
-// FDCAN_RxHeaderTypeDef RxHeader;
-// FDCAN_TxHeaderTypeDef TxHeader;
-uint8_t RxData[8];
-uint8_t TxData[8];
-uint8_t TxData2[8];
+static FDCAN_Message Msg1;
+static FDCAN_Message Msg2;
+static FDCAN_Message Msg3;
+static FDCAN_Message Msg4;
 
 static CommDriver Fdcan1Driver;
 static CommDriverConfigType Fdcan1Config;
-static FDCAN_ClassicFrame fdcan_rx_frame_buffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
-static FDCAN_ClassicFrame fdcan_tx_frame_buffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrame Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrame Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan1RxRingBuffer = {
-    .startAddress = &fdcan_rx_frame_buffer[0],
+    .startAddress = &Fdcan1RxFrameBuffer[0],
     .head = 0,
     .tail = 0,
-    .bufferLength = sizeof(fdcan_rx_frame_buffer) / sizeof(fdcan_rx_frame_buffer[0]),
-    .elementSize = sizeof(fdcan_rx_frame_buffer[0]),
-    .isFull = false};
+    .bufferLength = sizeof(Fdcan1RxFrameBuffer) / sizeof(Fdcan1RxFrameBuffer[0]),
+    .elementSize = sizeof(Fdcan1RxFrameBuffer[0]),
+    .isFull = false
+};
 
 static RingBuffer Fdcan1TxRingBuffer = {
-    .startAddress = &fdcan_tx_frame_buffer[0],
+    .startAddress = &Fdcan1TxFrameBuffer[0],
     .head = 0,
     .tail = 0,
-    .bufferLength = sizeof(fdcan_tx_frame_buffer) / sizeof(fdcan_tx_frame_buffer[0]),
-    .elementSize = sizeof(fdcan_tx_frame_buffer[0]),
-    .isFull = false};
+    .bufferLength = sizeof(Fdcan1TxFrameBuffer) / sizeof(Fdcan1TxFrameBuffer[0]),
+    .elementSize = sizeof(Fdcan1TxFrameBuffer[0]),
+    .isFull = false
+};
 
-int CanAbs_Init()
+/* Private functions */
+
+/**
+ * Little helper function to make ioctl function call a bit prettier.
+ */
+static inline int can_ioctl(struct CommDriver *dev, int cmd, void *arg) {
+    return dev->interface->ioctl(dev, cmd, arg);
+}
+
+int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, RingBuffer *tx, RingBuffer *rx)
 {
+    uint8_t TxData[8];
+    uint8_t TxData2[8];
     unsigned int res = COMM_SUCCESS;
 
-    Fdcan1Driver.protocol = DRIVER_FDCAN;
-    Fdcan1Config.config = DRIVER_CFG2;
+    dev->protocol = DRIVER_FDCAN;
+    cfg->config = DRIVER_CFG2;
 
-    (void)CommManager_Init(&Fdcan1Driver, &Fdcan1Config, sizeof(CommDriverConfigType), &Fdcan1TxRingBuffer, &Fdcan1RxRingBuffer);
+    (void)CommManager_Init(dev, cfg, sizeof(CommDriverConfigType), tx, rx);
 
-	if (Fdcan1Driver.interface->init(&Fdcan1Driver) != COMM_SUCCESS)
+	if (dev->interface->init(dev) != COMM_SUCCESS)
 	{
 	  res = 1;
 	}
@@ -63,51 +66,56 @@ int CanAbs_Init()
     return res;
 }
 
-int CanAbs_Receive(FDCAN_ClassicFrame *frame)
+int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrame *frame)
 {
-    return ring_buffer_pop(Fdcan1Driver.RxFrameBuffer, (void*)frame);
+    return ring_buffer_pop(dev->RxFrameBuffer, (void*)frame);
 }
 
-int CanAbs_Send()
+int CanAbs_Send(CommDriver *dev)
 {
     int res = 0;
 
-    if (Fdcan1Driver.interface->send(&Msg2) != COMM_SUCCESS)
+    if (dev->interface->send(dev, &Msg2) != COMM_SUCCESS)
     {
         /* Transmission request Error */
         res = 1;
     }
 
-    if (Fdcan1Driver.interface->send(&Msg3) != COMM_SUCCESS)
+    if (dev->interface->send(dev, &Msg3) != COMM_SUCCESS)
     {
         /* Transmission request Error */
         res = 2;
     }
 
-    if (Fdcan1Driver.interface->send(&Msg4) != COMM_SUCCESS)
+    if (dev->interface->send(dev, &Msg4) != COMM_SUCCESS)
     {
         /* Transmission request Error */
         res = 3;
     }
 
+    if (0 != res)
+    {
+        FDCAN_ErrorHandler();
+    }
+
     return res;
 }
 
-comm_status_t CanAbs_Start()
+comm_status_t CanAbs_Start(CommDriver *dev)
 {
     uint32_t val = 1;
-    return Fdcan1Driver.interface->ioctl(&Fdcan1Driver, CANABS_IOCTL_CMD_START, &val);
+    return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_START, &val);
 }
 
-comm_status_t CanAbs_Stop()
+comm_status_t CanAbs_Stop(CommDriver *dev)
 {
     uint32_t val = 1;
-    return Fdcan1Driver.interface->ioctl(&Fdcan1Driver, CANABS_IOCTL_CMD_STOP, &val);
+    return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_STOP, &val);
 }
 
-comm_status_t CanAbs_SetBaudrate(uint32_t baudrate)
+comm_status_t CanAbs_SetBaudrate(CommDriver *dev, uint32_t baudrate)
 {
-    return Fdcan1Driver.interface->ioctl(&Fdcan1Driver, CANABS_IOCTL_CMD_SET_BAUDRATE, &baudrate);
+    return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_BAUDRATE, &baudrate);
 }
 
 comm_status_t fdcan_create_message_1(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
@@ -194,14 +202,45 @@ comm_status_t fdcan_create_message_4(FDCAN_Message *pMsg, uint8_t *pData, uint32
   *                     This parameter can be any combination of @arg FDCAN_Rx_Fifo0_Interrupts.
   * @retval None
   */
- void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
- {
-     FDCAN_ClassicFrame NewFrame;
- 
-     if (Fdcan1Driver.interface->read((void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
-     {
-        FDCAN_GetMostRecentInterruptTimestamp(&NewFrame.timestamp);
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+    FDCAN_ClassicFrame NewFrame;
+
+    if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+    {
+        FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver, &NewFrame.timestamp);
         ring_buffer_put(Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
-     }
- 
- }
+    }
+}
+
+/* Public functions */
+
+comm_status_t CanAbs_Init_Can1()
+{
+    return CanAbs_Init(&Fdcan1Driver, &Fdcan1Config, &Fdcan1TxRingBuffer, &Fdcan1RxRingBuffer);
+}
+
+comm_status_t CanAbs_Send_Can1()
+{
+    return CanAbs_Send(&Fdcan1Driver);
+}
+
+comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrame *frame)
+{
+    return CanAbs_Receive(&Fdcan1Driver, frame);
+}
+
+comm_status_t CanAbs_Start_Can1()
+{
+    return CanAbs_Start(&Fdcan1Driver);
+}
+
+comm_status_t CanAbs_Stop_Can1()
+{
+    return CanAbs_Stop(&Fdcan1Driver);
+}
+
+comm_status_t CanAbs_SetBaudrate_Can1(uint32_t baudrate)
+{
+    return CanAbs_SetBaudrate(&Fdcan1Driver, baudrate);
+}

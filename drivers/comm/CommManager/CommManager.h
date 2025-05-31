@@ -19,6 +19,7 @@ typedef comm_status_t (*RegisterMessageFunction)(void* message, void* protocolSp
 typedef struct CommDriver {
 	CommInterface *interface;
 	void *config;
+    void *instance;
 	CommProtocolType protocol;
 	uint8_t configNbr;
 	CommDriverStatesType state;

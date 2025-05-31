@@ -14,9 +14,11 @@
 #include "CommFactory.h"
 
 #ifndef FDCAN_MODE
-#define FDCAN_MODE FDCAN_MODE_NORMAL 
+#error "FDCAN_MODE is not defined! You can select: e.g. FDCAN_MODE_NORMAL)" 
 #endif 
-#define MAX_INSTANCES 1
+
+#define SW_RX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
+#define SW_TX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
 
 typedef enum {
     CANABS_IOCTL_CMD_SET_BAUDRATE,
@@ -83,13 +85,17 @@ comm_status_t FDCAN_DeInit(
     CommDriver *dev);
     
 comm_status_t FDCAN_Send(
+    CommDriver *dev,
     const void*);
 
 comm_status_t FDCAN_Read(
+    CommDriver *dev,
     void*, 
-    uint8_t, uint32_t);
+    uint8_t, 
+    uint32_t);
 
 void FDCAN_GetMostRecentInterruptTimestamp(
+    CommDriver *dev,
     uint32_t *timestamp);
 
 /* shims needed to be implemented by the caller */
