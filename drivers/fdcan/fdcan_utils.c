@@ -71,9 +71,18 @@ uint8_t CANFD_GetSJW(const uint8_t reg_value[4], bool is_data_phase)
 
 /* ============================= */
 
-uint8_t CANFD_CalculateBitTimingRegister(uint32_t clock_hz, uint32_t bitrate, uint32_t sample_point, bool is_data_phase, uint8_t reg_value_out[4])
+uint8_t CANFD_CalculateBitTimingRegister(
+    uint32_t clock_hz, 
+    uint32_t bitrate, 
+    uint32_t sample_point, 
+    uint32_t sjw, 
+    bool is_data_phase,
+    uint8_t reg_value_out[4]
+)
 {
     uint32_t MaxTq;
+    uint32_t Sjw;
+    const uint32_t SyncSeg = 1;
     #define SAMPLE_POINT_FACTOR 10000
 
     if (!reg_value_out || clock_hz == 0 || bitrate == 0) {
@@ -104,23 +113,31 @@ uint8_t CANFD_CalculateBitTimingRegister(uint32_t clock_hz, uint32_t bitrate, ui
             continue;
         }
 
-        uint8_t seg1 = (tq_num * sample_point) / SAMPLE_POINT_FACTOR - 1;
+        uint8_t seg1 = (tq_num * sample_point) / SAMPLE_POINT_FACTOR - SyncSeg;
         uint8_t seg2 = tq_num - seg1 - 1;
-        uint8_t sjw = 1; // <<< FORCE SJW = 1 always
 
         if (seg1 > 0 && seg2 > 0) {
             uint32_t reg_value = 0;
+            
+            if (sjw > seg2)
+            {
+                Sjw = seg2;
+            }
+            else
+            {
+                Sjw = sjw;
+            }
 
             if (is_data_phase) {
                 reg_value =
                     ((prescaler - 1) << FDCAN_DBTP_DBRP_Pos) |
-                    ((sjw - 1) << FDCAN_DBTP_DSJW_Pos) |
+                    ((Sjw - 1) << FDCAN_DBTP_DSJW_Pos) |
                     ((seg1 - 1) << FDCAN_DBTP_DTSEG1_Pos) |
                     ((seg2 - 1) << FDCAN_DBTP_DTSEG2_Pos);
             } else {
                 reg_value =
                     ((prescaler - 1) << FDCAN_NBTP_NBRP_Pos) |
-                    ((sjw - 1) << FDCAN_NBTP_NSJW_Pos) |
+                    ((Sjw - 1) << FDCAN_NBTP_NSJW_Pos) |
                     ((seg1 - 1) << FDCAN_NBTP_NTSEG1_Pos) |
                     ((seg2 - 1) << FDCAN_NBTP_NTSEG2_Pos);
             }

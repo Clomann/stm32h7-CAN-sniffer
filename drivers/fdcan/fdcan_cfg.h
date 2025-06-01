@@ -6,7 +6,11 @@
  */
 
 
-#define FDCAN_MAX_INSTANCES 2U
+#define FDCAN_MAX_INSTANCES     2U
+
+#define FDCAN_MESSAGE_RAM_SIZE      0x2800U /* check stm32h7xx_hal_fdcan.c */
+#define FDCAN_RAM_RX_SIZE           (FDCAN_MESSAGE_RAM_SIZE - 4UL)
+#define FDCAN_RAM_RX_SECTION_SIZE   (FDCAN_RAM_RX_SIZE / FDCAN_MAX_INSTANCES/ 4UL) /*!< RAM available for each driver to store rx frames */
 
 /* User can use this section to tailor FDCANx instance used and associated
    resources */
@@ -20,45 +24,45 @@
 /* FDCAN 1 ========================================= */
 #define FDCAN_1             FDCAN1
 
-#define FDCAN1_RX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
-#define FDCAN1_TX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
+#define FDCAN_1_RX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
+#define FDCAN_1_TX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
 
 /*!< timestamp resolution in micro seconds */
-#define FDCAN1_TIMESTAMP_RESOLUTION     (1U)
+#define FDCAN_1_TIMESTAMP_RESOLUTION     (1U)
 
 /* Definition for FDCAN1 Pins */
-#define FDCAN1_TX_PIN       GPIO_PIN_9
-#define FDCAN1_TX_GPIO_PORT GPIOB
-#define FDCAN1_TX_AF        GPIO_AF9_FDCAN1
-#define FDCAN1_RX_PIN       GPIO_PIN_8
-#define FDCAN1_RX_GPIO_PORT GPIOB
-#define FDCAN1_RX_AF        GPIO_AF9_FDCAN1
+#define FDCAN_1_TX_PIN       GPIO_PIN_9
+#define FDCAN_1_TX_GPIO_PORT GPIOB
+#define FDCAN_1_TX_AF        GPIO_AF9_FDCAN1
+#define FDCAN_1_RX_PIN       GPIO_PIN_8
+#define FDCAN_1_RX_GPIO_PORT GPIOB
+#define FDCAN_1_RX_AF        GPIO_AF9_FDCAN1
 
 /* Definition for FDCAN1's NVIC IRQ and IRQ Handlers */
-#define FDCAN1_IRQn       FDCAN1_IT0_IRQn
+#define FDCAN_1_IRQn       FDCAN1_IT0_IRQn
 #define FDCAN_1_IRQHandler FDCAN1_IT0_IRQHandler
 
-#define FDCAN1_MAX_MSG_COUNT 10u
+#define FDCAN_1_MAX_MSG_COUNT 10u
 
 /* FDCAN 2 ========================================= */
 #define FDCAN_2             FDCAN2
 
-#define FDCAN2_RX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
-#define FDCAN2_TX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
+#define FDCAN_2_RX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
+#define FDCAN_2_TX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
 
 /*!< timestamp resolution in micro seconds */
-#define FDCAN2_TIMESTAMP_RESOLUTION     (1U)
+#define FDCAN_2_TIMESTAMP_RESOLUTION     (1U)
 
 /* Definition for FDCAN2 Pins */
-#define FDCAN2_TX_PIN       GPIO_PIN_6
-#define FDCAN2_TX_GPIO_PORT GPIOB
-#define FDCAN2_TX_AF        GPIO_AF9_FDCAN2
-#define FDCAN2_RX_PIN       GPIO_PIN_12
-#define FDCAN2_RX_GPIO_PORT GPIOB
-#define FDCAN2_RX_AF        GPIO_AF9_FDCAN2
+#define FDCAN_2_TX_PIN       GPIO_PIN_6
+#define FDCAN_2_TX_GPIO_PORT GPIOB
+#define FDCAN_2_TX_AF        GPIO_AF9_FDCAN2
+#define FDCAN_2_RX_PIN       GPIO_PIN_12
+#define FDCAN_2_RX_GPIO_PORT GPIOB
+#define FDCAN_2_RX_AF        GPIO_AF9_FDCAN2
 
 /* Definition for FDCAN2's NVIC IRQ and IRQ Handlers */
-#define FDCAN2_IRQn       FDCAN2_IT0_IRQn
+#define FDCAN_2_IRQn       FDCAN2_IT0_IRQn
 #define FDCAN_2_IRQHandler FDCAN2_IT0_IRQHandler
 
-#define FDCAN2_MAX_MSG_COUNT 10u
+#define FDCAN_2_MAX_MSG_COUNT 10u

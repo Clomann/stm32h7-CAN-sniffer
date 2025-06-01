@@ -21,7 +21,7 @@ typedef struct CommDriver {
 	void *config;
     void *instance;
 	CommProtocolType protocol;
-	uint8_t configNbr;
+	uint8_t devNbr;
 	CommDriverStatesType state;
 	RingBuffer *RxFrameBuffer;
 	RingBuffer *TxFrameBuffer;

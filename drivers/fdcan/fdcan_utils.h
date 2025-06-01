@@ -19,5 +19,6 @@ uint8_t CANFD_CalculateBitTimingRegister(
     uint32_t clock_hz, 
     uint32_t bitrate, 
     uint32_t sample_point, 
+    uint32_t sjw,
     bool is_data_phase, 
     uint8_t reg_value_out[4]);

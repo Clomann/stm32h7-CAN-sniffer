@@ -15,7 +15,8 @@ typedef enum {
     COMM_SUCCESS,
     COMM_ERROR,
     COMM_TIMEOUT,
-    COMM_INVALID_PARAMETER
+    COMM_INVALID_PARAMETER,
+    COMM_INVALID_STATE
 } comm_status_t;
 
 typedef enum {
