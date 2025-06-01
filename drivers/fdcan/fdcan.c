@@ -26,8 +26,6 @@ static FdcanInstanceType fdcan_hfdcan[FDCAN_MAX_INSTANCES] = {
     }
 };
 
-FdcanConfigType fdcan_configs[DRIVER_CFGn];
-
 CommDriverConfigType Can1Cfg;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -74,8 +72,7 @@ comm_status_t fdcan_get_handle(FDCAN_GlobalTypeDef *fdcan, FdcanInstanceType **h
 
 comm_status_t get_fdcan_config(
         FdcanInstanceType *,
-		FDCAN_FilterTypeDef *,
-		CommConfigType);
+		FDCAN_FilterTypeDef *);
 
 comm_status_t fdcan_init_tx_header(
     const void *, 
@@ -111,33 +108,32 @@ comm_status_t FDCAN_CreateDriver(
         RetVal = COMM_ERROR;
         FDCAN_ErrorHandler();
     }
-    instance->fdcan = FDCAN_1;
+
+    if (0 == pDriver->devNbr)
+    {
+        instance->fdcan = FDCAN_1;
+    }
+    else if (1 == pDriver->devNbr)
+    {
+        instance->fdcan = FDCAN_2;
+    }
+    else
+    {
+        FDCAN_ErrorHandler();
+    }
     pDriver->instance = (void *) instance;
 
 	pDriver->interface->init = FDCAN_Init;
 	pDriver->interface->send = FDCAN_Send;
 	pDriver->interface->read = FDCAN_Read;
     pDriver->interface->ioctl = FDCAN_Ioctl;
-	pDriver->configNbr = DriverConfig->config;
+	pDriver->state = DRIVER_STATE_UNINITIALIZED;
 	pDriver->protocol = DRIVER_FDCAN;
 	pDriver->TxFrameBuffer = tx;
     pDriver->RxFrameBuffer = rx;
 
-	switch (pDriver->configNbr )
-	{
-		case DRIVER_CFG0:
-		case DRIVER_CFG1:
-		case DRIVER_CFG2:
-			get_fdcan_config(pDriver->instance, &pFilterConfig, pDriver->configNbr );
-			memcpy(&fdcan_configs[pDriver->configNbr ], &newConfig, sizeof(FdcanConfigType));
-			pDriver->config = &(fdcan_configs[pDriver->configNbr ]);
-			pDriver->state = DRIVER_STATE_INITIALIZED;
-			RetVal = COMM_SUCCESS;
-			break;
-		default:
-			RetVal = COMM_ERROR;
-			return RetVal;
-	}
+    pDriver->state = DRIVER_STATE_INITIALIZED;
+    RetVal = COMM_SUCCESS;
 
 	return RetVal;
 }
@@ -155,12 +151,17 @@ comm_status_t FDCAN_Init(
     instance = (FdcanInstanceType *) dev->instance;
 
     // TODO make init function consistent with driver creation
-    get_fdcan_config(instance, &sFilterConfig, DRIVER_CFG2);
+    get_fdcan_config(instance, &sFilterConfig);
 
     if (HAL_FDCAN_Init(&instance->hfdcan) != HAL_OK)
     {
         /* Initialization Error */
         RetVal = COMM_ERROR;
+    }
+
+    if (0 != instance->hfdcan.ErrorCode)
+    {
+        FDCAN_ErrorHandler();
     }
 
     if (HAL_FDCAN_ConfigTimestampCounter(&instance->hfdcan, FDCAN_TIMESTAMP_PRESC_1) != HAL_OK)
@@ -169,10 +170,20 @@ comm_status_t FDCAN_Init(
         RetVal = COMM_ERROR;
     }
 
+    if (0 != instance->hfdcan.ErrorCode)
+    {
+        FDCAN_ErrorHandler();
+    }
+
     if (HAL_FDCAN_EnableTimestampCounter(&instance->hfdcan, FDCAN_TIMESTAMP_EXTERNAL) != HAL_OK)
     {
         /* Initialization Error */
         RetVal = COMM_ERROR;
+    }
+
+    if (0 != instance->hfdcan.ErrorCode)
+    {
+        FDCAN_ErrorHandler();
     }
 
     /* Configure Rx filter */
@@ -180,6 +191,11 @@ comm_status_t FDCAN_Init(
     {
         /* Filter configuration Error */
         RetVal = COMM_ERROR;
+    }
+
+    if (0 != instance->hfdcan.ErrorCode)
+    {
+        FDCAN_ErrorHandler();
     }
 
     /* Start the FDCAN module */
@@ -195,8 +211,17 @@ comm_status_t FDCAN_Init(
         RetVal = COMM_ERROR;
     }
 
+    if (0 != instance->hfdcan.ErrorCode)
+    {
+        FDCAN_ErrorHandler();
+    }
+
     /* Prepare Tx Header */
 
+    if (0 == RetVal)
+    {
+        dev->state = DRIVER_STATE_INITIALIZED;
+    }
     return RetVal;
 }
 
@@ -247,9 +272,13 @@ comm_status_t FDCAN_Send(
 	FDCAN_TxHeaderTypeDef TxHeader;
     FdcanInstanceType * instance;
 
+    if (DRIVER_STATE_STARTED != dev->state)
+    {
+        return COMM_INVALID_STATE;
+    }
+
     RetVal = COMM_SUCCESS;
     instance = (FdcanInstanceType *) dev->instance;
-
     pMsgCpy = (FDCAN_Message*)pMsg;
     pData = (uint8_t*)(pMsgCpy->msgBase.payload);
 	
@@ -432,7 +461,7 @@ static comm_status_t FDCAN_SetBaudrate(
     if (COMM_SUCCESS != res)
     {
     }
-    else if (0 == CANFD_CalculateBitTimingRegister(FdcanClock, baudrate, 7500, IsDataPhase, timings))
+    else if (0 == CANFD_CalculateBitTimingRegister(FdcanClock, baudrate, 7500, 1, IsDataPhase, timings))
     {
         res = COMM_SUCCESS;
     }
@@ -482,10 +511,20 @@ comm_status_t FDCAN_Ioctl(
             }
             break;
         case CANABS_IOCTL_CMD_START:
-            if (HAL_FDCAN_Start(&instance->hfdcan) != HAL_OK)
+            if (0 != instance->hfdcan.ErrorCode)
+            {
+                res = COMM_ERROR;
+                FDCAN_ErrorHandler();
+            }
+            else if (HAL_FDCAN_Start(&instance->hfdcan) != HAL_OK)
             {
                 /* Start Error */
                 res = COMM_ERROR;
+                FDCAN_ErrorHandler();
+            }
+            else
+            {
+                dev->state = DRIVER_STATE_STARTED;
             }
             break;
         case CANABS_IOCTL_CMD_STOP:
@@ -493,6 +532,11 @@ comm_status_t FDCAN_Ioctl(
             {
                 /* Start Error */
                 res = COMM_ERROR;
+                FDCAN_ErrorHandler();
+            }
+            else 
+            {
+                dev->state = DRIVER_STATE_STOPPED;
             }
             break;
         case CANABS_IOCTL_CMD_SET_FILTERMASK:
@@ -512,13 +556,13 @@ HAL_StatusTypeDef FDCAN_GpioClck(FDCAN_GlobalTypeDef *fdcan)
 
     if (FDCAN_1 == fdcan)
     {
-        FDCAN1_TX_GPIO_CLK_ENABLE();
-        FDCAN1_RX_GPIO_CLK_ENABLE();
+        FDCAN_1_TX_GPIO_CLK_ENABLE();
+        FDCAN_1_RX_GPIO_CLK_ENABLE();
     }
     else if (FDCAN_2 == fdcan)
     {
-        FDCAN2_TX_GPIO_CLK_ENABLE();
-        FDCAN2_RX_GPIO_CLK_ENABLE();
+        FDCAN_2_TX_GPIO_CLK_ENABLE();
+        FDCAN_2_RX_GPIO_CLK_ENABLE();
     }
     else
     {
@@ -542,25 +586,25 @@ HAL_StatusTypeDef FDCAN_InitGpio(FDCAN_GlobalTypeDef *fdcan)
 
     if (FDCAN_1 == fdcan)
     {
-        GPIO_InitStruct.Pin       = FDCAN1_TX_PIN;
-        GPIO_InitStruct.Alternate = FDCAN1_TX_AF;
-        (void) HAL_GPIO_Init(FDCAN1_TX_GPIO_PORT, &GPIO_InitStruct);
+        GPIO_InitStruct.Pin       = FDCAN_1_TX_PIN;
+        GPIO_InitStruct.Alternate = FDCAN_1_TX_AF;
+        (void) HAL_GPIO_Init(FDCAN_1_TX_GPIO_PORT, &GPIO_InitStruct);
     
         /* FDCANx RX GPIO pin configuration  */
-        GPIO_InitStruct.Pin       = FDCAN1_RX_PIN;
-        GPIO_InitStruct.Alternate = FDCAN1_RX_AF;
-        (void) HAL_GPIO_Init(FDCAN1_RX_GPIO_PORT, &GPIO_InitStruct);
+        GPIO_InitStruct.Pin       = FDCAN_1_RX_PIN;
+        GPIO_InitStruct.Alternate = FDCAN_1_RX_AF;
+        (void) HAL_GPIO_Init(FDCAN_1_RX_GPIO_PORT, &GPIO_InitStruct);
     }
     else if (FDCAN_2 == fdcan)
     {
-        GPIO_InitStruct.Pin       = FDCAN2_TX_PIN;
-        GPIO_InitStruct.Alternate = FDCAN2_TX_AF;
-        (void) HAL_GPIO_Init(FDCAN2_TX_GPIO_PORT, &GPIO_InitStruct);
+        GPIO_InitStruct.Pin       = FDCAN_2_TX_PIN;
+        GPIO_InitStruct.Alternate = FDCAN_2_TX_AF;
+        (void) HAL_GPIO_Init(FDCAN_2_TX_GPIO_PORT, &GPIO_InitStruct);
     
         /* FDCANx RX GPIO pin configuration  */
-        GPIO_InitStruct.Pin       = FDCAN2_RX_PIN;
-        GPIO_InitStruct.Alternate = FDCAN2_RX_AF;
-        (void) HAL_GPIO_Init(FDCAN2_RX_GPIO_PORT, &GPIO_InitStruct);
+        GPIO_InitStruct.Pin       = FDCAN_2_RX_PIN;
+        GPIO_InitStruct.Alternate = FDCAN_2_RX_AF;
+        (void) HAL_GPIO_Init(FDCAN_2_RX_GPIO_PORT, &GPIO_InitStruct);
     }
     else
     {
@@ -578,13 +622,13 @@ HAL_StatusTypeDef FDCAN_Nvic(FDCAN_GlobalTypeDef *fdcan)
 
     if (FDCAN_1 == fdcan)
     {
-        HAL_NVIC_SetPriority(FDCAN1_IRQn, 0, 1);
-        HAL_NVIC_EnableIRQ(FDCAN1_IRQn);
+        HAL_NVIC_SetPriority(FDCAN_1_IRQn, 0, 1);
+        HAL_NVIC_EnableIRQ(FDCAN_1_IRQn);
     }
     else if (FDCAN_2 == fdcan)
     {
-        HAL_NVIC_SetPriority(FDCAN2_IRQn, 0, 1);
-        HAL_NVIC_EnableIRQ(FDCAN2_IRQn);
+        HAL_NVIC_SetPriority(FDCAN_2_IRQn, 0, 1);
+        HAL_NVIC_EnableIRQ(FDCAN_2_IRQn);
     }
     else
     {
@@ -606,7 +650,7 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* hfdcan)
 
     /*##-1- Enable peripherals and GPIO Clocks #################################*/
     /* Enable GPIO TX/RX clock */
-    (void) FDCAN_GpioClck(FDCAN_1);
+    (void) FDCAN_GpioClck(hfdcan->Instance);
 
     /* Select PLL1Q as source of FDCANx clock */
     RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
@@ -618,11 +662,11 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* hfdcan)
 
     /*##-2- Configure peripheral GPIO ##########################################*/
     /* FDCANx TX GPIO pin configuration  */
-    (void) FDCAN_InitGpio(FDCAN_1);
+    (void) FDCAN_InitGpio(hfdcan->Instance);
 
     /*##-3- Configure the NVIC #################################################*/
     /* NVIC for FDCANx */
-    (void) FDCAN_Nvic(FDCAN_1);
+    (void) FDCAN_Nvic(hfdcan->Instance);
 }
 
 /**
@@ -633,22 +677,32 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* hfdcan)
   */
 void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* hfdcan)
 {
-  /*##-1- Reset peripherals ##################################################*/
-  FDCANx_FORCE_RESET();
-  FDCANx_RELEASE_RESET();
+    /*##-1- Reset peripherals ##################################################*/
+    FDCANx_FORCE_RESET();
+    FDCANx_RELEASE_RESET();
 
-  /*##-2- Disable peripherals and GPIO Clocks ################################*/
-  /* Configure FDCANx Tx as alternate function  */
-  HAL_GPIO_DeInit(FDCAN1_TX_GPIO_PORT, FDCAN1_TX_PIN);
-  HAL_GPIO_DeInit(FDCAN2_TX_GPIO_PORT, FDCAN2_TX_PIN);
+    /*##-2- Disable peripherals and GPIO Clocks ################################*/
+    if (FDCAN_1 == hfdcan->Instance)
+    {
+        /* Configure FDCANx Tx as alternate function  */
+        HAL_GPIO_DeInit(FDCAN_1_TX_GPIO_PORT, FDCAN_1_TX_PIN);
 
-  /* Configure FDCANx Rx as alternate function  */
-  HAL_GPIO_DeInit(FDCAN1_RX_GPIO_PORT, FDCAN1_RX_PIN);
-  HAL_GPIO_DeInit(FDCAN2_RX_GPIO_PORT, FDCAN2_RX_PIN);
+        /* Configure FDCANx Rx as alternate function  */
+        HAL_GPIO_DeInit(FDCAN_1_RX_GPIO_PORT, FDCAN_1_RX_PIN);
 
-  /*##-3- Disable the NVIC for FDCANx ########################################*/
-  HAL_NVIC_DisableIRQ(FDCAN1_IRQn);
-  HAL_NVIC_DisableIRQ(FDCAN2_IRQn);
+        /*##-3- Disable the NVIC for FDCANx ########################################*/
+        HAL_NVIC_DisableIRQ(FDCAN_1_IRQn);
+    }
+    else if (FDCAN_2 == hfdcan->Instance)
+    {
+        HAL_GPIO_DeInit(FDCAN_2_TX_GPIO_PORT, FDCAN_2_TX_PIN);
+        HAL_GPIO_DeInit(FDCAN_2_RX_GPIO_PORT, FDCAN_2_RX_PIN);
+        HAL_NVIC_DisableIRQ(FDCAN_2_IRQn);
+    }
+    else
+    {
+        FDCAN_ErrorHandler();
+    }
 }
 
 comm_status_t fdcan_init_tx_header(const void * pMsg, FDCAN_TxHeaderTypeDef *pTxHeader, uint32_t frameLength)
@@ -717,153 +771,79 @@ comm_status_t fdcan_init_tx_header(const void * pMsg, FDCAN_TxHeaderTypeDef *pTx
 	return RetVal;
 }
 
+comm_status_t ram_usage(FDCAN_GlobalTypeDef *fdcan, uint32_t *size)
+{
+    comm_status_t res;
+
+    res = COMM_SUCCESS;
+
+    if (FDCAN1 == fdcan)
+    {
+        *size = 1U * (FDCAN_RAM_RX_SECTION_SIZE);
+    }
+    else if (FDCAN2 == fdcan)
+    {
+        *size = 0U * (FDCAN_RAM_RX_SECTION_SIZE);
+    }
+    else
+    {
+        res = COMM_ERROR;
+    }
+
+    return res;
+}
+
 comm_status_t get_fdcan_config(
         FdcanInstanceType * instance,
-		FDCAN_FilterTypeDef *pFilterConfig,
-		CommConfigType config)
+		FDCAN_FilterTypeDef *pFilterConfig)
 {
 	comm_status_t RetVal;
 	RetVal = COMM_ERROR;
 
-	switch (config)
-	{
-		case DRIVER_CFG0:
-			/*	Bit time configuration:
-				fdcan_ker_ck               = 40 MHz
-				Time_quantum (tq)          = 25 ns
-				Synchronization_segment    = 1 tq
-				Propagation_segment        = 23 tq
-				Phase_segment_1            = 8 tq
-				Phase_segment_2            = 8 tq
-				Synchronization_Jump_width = 8 tq
-				Bit_length                 = 40 tq = 1 �s
-				Bit_rate                   = 1 MBit/s
-			*/
-            instance->hfdcan.Instance = instance->fdcan;
-			instance->hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-			instance->hfdcan.Init.Mode = FDCAN_MODE;
-			instance->hfdcan.Init.AutoRetransmission = ENABLE;
-			instance->hfdcan.Init.TransmitPause = DISABLE;
-			instance->hfdcan.Init.ProtocolException = ENABLE;
-			instance->hfdcan.Init.NominalPrescaler = 0x1; /* tq = NominalPrescaler x (1/fdcan_ker_ck) */
-			instance->hfdcan.Init.NominalSyncJumpWidth = 0x8;
-			instance->hfdcan.Init.NominalTimeSeg1 = 0x1F; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
-			instance->hfdcan.Init.NominalTimeSeg2 = 0x8;
-			instance->hfdcan.Init.MessageRAMOffset = 0;
-			instance->hfdcan.Init.StdFiltersNbr = 1;
-			instance->hfdcan.Init.ExtFiltersNbr = 0;
-			instance->hfdcan.Init.RxFifo0ElmtsNbr = 1;
-			instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
-			instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
-			instance->hfdcan.Init.RxBuffersNbr = 0;
-			instance->hfdcan.Init.TxEventsNbr = 0;
-			instance->hfdcan.Init.TxBuffersNbr = 0;
-			instance->hfdcan.Init.TxFifoQueueElmtsNbr = 1;
-			instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
-			instance->hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
+    /*	Bit time configuration:
+        fdcan_ker_ck               = 40 MHz
+        Time_quantum (tq)          = 200 ns
+        Synchronization_segment    = 1 tq
+        Propagation_segment        =  tq
+        Phase_segment_1            =  tq
+        Phase_segment_2            =  tq
+        Synchronization_Jump_width =  tq
+        Bit_length                 = 20 tq = 1 �s
+        Bit_rate                   = 250 k Bit/s
 
-			pFilterConfig->IdType = FDCAN_STANDARD_ID;
-			pFilterConfig->FilterIndex = 0;
-			pFilterConfig->FilterType = FDCAN_FILTER_RANGE;
-			pFilterConfig->FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-			pFilterConfig->FilterID1 = 0x0;
-			pFilterConfig->FilterID2 = 0x7FF;
+        sample point at 75 %
+    */
+    instance->hfdcan.Instance = instance->fdcan;
+    instance->hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+    instance->hfdcan.Init.Mode = FDCAN_MODE;
+    instance->hfdcan.Init.AutoRetransmission = ENABLE;
+    instance->hfdcan.Init.TransmitPause = DISABLE;
+    instance->hfdcan.Init.ProtocolException = ENABLE;
+    instance->hfdcan.Init.NominalPrescaler = 0x4; /* tq = NominalPrescaler x (1/fdcan_ker_ck) */
+    instance->hfdcan.Init.NominalSyncJumpWidth = 0x01;
+    instance->hfdcan.Init.NominalTimeSeg1 = 34U; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
+    instance->hfdcan.Init.NominalTimeSeg2 = 5U;
+    ram_usage(instance->fdcan, &instance->hfdcan.Init.MessageRAMOffset);
+    instance->hfdcan.Init.StdFiltersNbr = 1;
+    instance->hfdcan.Init.ExtFiltersNbr = 0;
+    instance->hfdcan.Init.RxFifo0ElmtsNbr = 0;
+    instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
+    instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
+    instance->hfdcan.Init.RxBuffersNbr = 0;
+    instance->hfdcan.Init.TxEventsNbr = 0;
+    instance->hfdcan.Init.TxBuffersNbr = 0;
+    instance->hfdcan.Init.TxFifoQueueElmtsNbr = 4;
+    instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+    instance->hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
 
-			RetVal = COMM_SUCCESS;
-			break;
-		case DRIVER_CFG1:
-			/*	Bit time configuration:
-				fdcan_ker_ck               = 40 MHz
-				Time_quantum (tq)          = 100 ns
-				Synchronization_segment    = 1 tq
-				Propagation_segment        =  tq
-				Phase_segment_1            =  tq
-				Phase_segment_2            =  tq
-				Synchronization_Jump_width = 8 tq
-				Bit_length                 = 10 tq
-				Bit_rate                   = 1 MBit/s
-			*/
-			instance->hfdcan.Instance = instance->fdcan;
-			instance->hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-			instance->hfdcan.Init.Mode = FDCAN_MODE;
-			instance->hfdcan.Init.AutoRetransmission = ENABLE;
-			instance->hfdcan.Init.TransmitPause = DISABLE;
-			instance->hfdcan.Init.ProtocolException = ENABLE;
-			instance->hfdcan.Init.NominalPrescaler = 0x4; /* tq = NominalPrescaler x (1/fdcan_ker_ck) */
-			instance->hfdcan.Init.NominalSyncJumpWidth = 0x8;
-			instance->hfdcan.Init.NominalTimeSeg1 = 0x8; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
-			instance->hfdcan.Init.NominalTimeSeg2 = 0x1;
-			instance->hfdcan.Init.MessageRAMOffset = 0;
-			instance->hfdcan.Init.StdFiltersNbr = 1;
-			instance->hfdcan.Init.ExtFiltersNbr = 0;
-			instance->hfdcan.Init.RxFifo0ElmtsNbr = 1;
-			instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
-			instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
-			instance->hfdcan.Init.RxBuffersNbr = 0;
-			instance->hfdcan.Init.TxEventsNbr = 0;
-			instance->hfdcan.Init.TxBuffersNbr = 0;
-			instance->hfdcan.Init.TxFifoQueueElmtsNbr = 1;
-			instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
-			instance->hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
+    pFilterConfig->IdType = FDCAN_STANDARD_ID;
+    pFilterConfig->FilterIndex = 0;
+    pFilterConfig->FilterType = FDCAN_FILTER_MASK;
+    pFilterConfig->FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+    pFilterConfig->FilterID1 = 0x321;
+    pFilterConfig->FilterID2 = 0x7FF;
 
-			pFilterConfig->IdType = FDCAN_STANDARD_ID;
-			pFilterConfig->FilterIndex = 0;
-			pFilterConfig->FilterType = FDCAN_FILTER_MASK;
-			pFilterConfig->FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-			pFilterConfig->FilterID1 = 0x321;
-			pFilterConfig->FilterID2 = 0x7FF;
-
-			RetVal = COMM_SUCCESS;
-			break;
-		case DRIVER_CFG2:
-			/*	Bit time configuration:
-				fdcan_ker_ck               = 40 MHz
-				Time_quantum (tq)          = 200 ns
-				Synchronization_segment    = 1 tq
-				Propagation_segment        =  tq
-				Phase_segment_1            =  tq
-				Phase_segment_2            =  tq
-				Synchronization_Jump_width =  tq
-				Bit_length                 = 20 tq = 1 �s
-				Bit_rate                   = 250 k Bit/s
-
-				sample point at 75 %
-			*/
-			instance->hfdcan.Instance = instance->fdcan;
-			instance->hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-			instance->hfdcan.Init.Mode = FDCAN_MODE;
-			instance->hfdcan.Init.AutoRetransmission = ENABLE;
-			instance->hfdcan.Init.TransmitPause = DISABLE;
-			instance->hfdcan.Init.ProtocolException = ENABLE;
-			instance->hfdcan.Init.NominalPrescaler = 0x4; /* tq = NominalPrescaler x (1/fdcan_ker_ck) */
-			instance->hfdcan.Init.NominalSyncJumpWidth = 0x01;
-			instance->hfdcan.Init.NominalTimeSeg1 = 34U; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
-			instance->hfdcan.Init.NominalTimeSeg2 = 5U;
-			instance->hfdcan.Init.MessageRAMOffset = 0;
-			instance->hfdcan.Init.StdFiltersNbr = 1;
-			instance->hfdcan.Init.ExtFiltersNbr = 0;
-			instance->hfdcan.Init.RxFifo0ElmtsNbr = 1;
-			instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
-			instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
-			instance->hfdcan.Init.RxBuffersNbr = 0;
-			instance->hfdcan.Init.TxEventsNbr = 0;
-			instance->hfdcan.Init.TxBuffersNbr = 0;
-			instance->hfdcan.Init.TxFifoQueueElmtsNbr = 16;
-			instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
-			instance->hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
-
-			pFilterConfig->IdType = FDCAN_STANDARD_ID;
-			pFilterConfig->FilterIndex = 0;
-			pFilterConfig->FilterType = FDCAN_FILTER_MASK;
-			pFilterConfig->FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-			pFilterConfig->FilterID1 = 0x321;
-			pFilterConfig->FilterID2 = 0x7FF;
-
-			RetVal = COMM_SUCCESS;
-			break;
-		default:
-			break;
-	}
+    RetVal = COMM_SUCCESS;
 
 	return RetVal;
 }
