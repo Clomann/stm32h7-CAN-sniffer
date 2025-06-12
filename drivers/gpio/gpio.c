@@ -29,6 +29,24 @@ int32_t GPIO_Dbg_Init()
 
    return ret;
  }
+
+ int32_t GPIO_Mco1_Init()
+{
+    int32_t ret = BSP_ERROR_NONE;
+    GPIO_InitTypeDef  gpio_init_structure;
+
+    MCO1_GPIO_CLK_ENABLE();
+    
+    /*Configure GPIO pin : PA8 */
+    gpio_init_structure.Pin = MCO1_PIN;
+    gpio_init_structure.Mode = GPIO_MODE_AF_PP;
+    gpio_init_structure.Pull = GPIO_NOPULL;
+    gpio_init_structure.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    gpio_init_structure.Alternate = GPIO_AF0_MCO;
+    HAL_GPIO_Init(MCO1_GPIO_PORT, &gpio_init_structure);
+
+   return ret;
+ }
  
 /**
  * @brief  DeInit LEDs.

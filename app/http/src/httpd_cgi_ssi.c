@@ -26,16 +26,14 @@
 #include <string.h>
 #include <stdlib.h>
 
-tSSIHandler ADC_Page_SSI_Handler;
-uint32_t ADC_not_configured=1;
+char const* CFG_TAGCHAR[] = {
+    "baudrate1",  // index=0
+    "mode1",  // index=1
+    "baudrate2",  // index=2
+    "mode2",  // index=3
+  };
 
-/* we will use character "t" as tag for CGI */
-char const* TAGCHAR[] = {
-  "baudrate",  // index=0
-  "mode",  // index=1
-};
-
-char const** TAGS = (char const**)&TAGCHAR;
+char const** TAGS = (char const**)&CFG_TAGCHAR;
 
 u16_t Handler(int iIndex, char *pcInsert, int iInsertLen);
 

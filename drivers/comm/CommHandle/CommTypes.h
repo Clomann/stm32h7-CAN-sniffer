@@ -37,6 +37,12 @@ typedef enum {
 } CommConfigType;
 
 typedef enum {
+	COMM_DEVICE_NUMBER_1 = 1U,
+	COMM_DEVICE_NUMBER_2,
+	COMM_DEVICE_NUMBERn,
+} CommDeviceNumberType;
+
+typedef enum {
     DRIVER_STATE_UNINITIALIZED = 0,
     DRIVER_STATE_INITIALIZED,
     DRIVER_STATE_STOPPED,

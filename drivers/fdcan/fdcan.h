@@ -13,8 +13,8 @@
 #include "fdcan_cfg.h"
 #include "CommFactory.h"
 
-#ifndef FDCAN_MODE
-#error "FDCAN_MODE is not defined! You can select: e.g. FDCAN_MODE_NORMAL)" 
+#ifndef FDCAN_MODE_DEFAULT
+#error "FDCAN_MODE_DEFAULT is not defined! You can select: e.g. FDCAN_MODE_NORMAL)" 
 #endif 
 
 #define SW_RX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
@@ -24,13 +24,18 @@ typedef enum {
     CANABS_IOCTL_CMD_SET_BAUDRATE,
     CANABS_IOCTL_CMD_SET_FILTERMASK,
     CANABS_IOCTL_CMD_START,
-    CANABS_IOCTL_CMD_STOP
+    CANABS_IOCTL_CMD_STOP,
+    CANABS_IOCTL_CMD_SET_MODE,
 } FdcanIoctlCmdType;
 
 #define FDCAN_BAUDRATE_250000      250000U
 #define FDCAN_BAUDRATE_500000      500000U
 #define FDCAN_BAUDRATE_1000000     1000000U
 typedef uint32_t FdcanBaudrateType;
+
+#define FDCAN_MODE_1      1U /*<! normal */
+#define FDCAN_MODE_2      2U /*<! listen only */
+typedef uint32_t FdcanModeType;
 
 #define FDCAN_STATUS_OK     0U
 typedef uint8_t FdcanStatusType;

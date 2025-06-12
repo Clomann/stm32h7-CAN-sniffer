@@ -9,10 +9,11 @@ static FDCAN_Message Msg4;
 
 /* CAN 1 */
 
-static CommDriver Fdcan1Driver = {
-    .devNbr = 0
+static CommDriver Fdcan1Driver;
+static CommDriverConfigType Fdcan1Config = {
+    .config = DRIVER_CFG2,
+    .devNbr = COMM_DEVICE_NUMBER_1
 };
-static CommDriverConfigType Fdcan1Config;
 static FDCAN_ClassicFrame Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
 static FDCAN_ClassicFrame Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan1RxRingBuffer = {
@@ -35,10 +36,11 @@ static RingBuffer Fdcan1TxRingBuffer = {
 
 /* CAN 2 */
 
-static CommDriver Fdcan2Driver = {
-    .devNbr = 1
+static CommDriver Fdcan2Driver;
+static CommDriverConfigType Fdcan2Config = {
+    .config = DRIVER_CFG2,
+    .devNbr = COMM_DEVICE_NUMBER_2
 };
-static CommDriverConfigType Fdcan2Config;
 static FDCAN_ClassicFrame Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
 static FDCAN_ClassicFrame Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan2RxRingBuffer = {
@@ -75,9 +77,8 @@ int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, RingBuffer *tx, Ring
     unsigned int res = COMM_SUCCESS;
 
     dev->protocol = DRIVER_FDCAN;
-    cfg->config = DRIVER_CFG2;
 
-    (void)CommManager_Init(dev, cfg, sizeof(CommDriverConfigType), tx, rx);
+    (void)CommManager_Init(dev, (const void *)cfg, sizeof(CommDriverConfigType), tx, rx);
 
 	if (dev->interface->init(dev) != COMM_SUCCESS)
 	{
@@ -145,6 +146,11 @@ comm_status_t CanAbs_Stop(CommDriver *dev)
 comm_status_t CanAbs_SetBaudrate(CommDriver *dev, uint32_t baudrate)
 {
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_BAUDRATE, &baudrate);
+}
+
+comm_status_t CanAbs_SetMode(CommDriver *dev, uint32_t baudrate)
+{
+    return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_MODE, &baudrate);
 }
 
 comm_status_t fdcan_create_message_1(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
@@ -295,6 +301,11 @@ comm_status_t CanAbs_SetBaudrate_Can1(uint32_t baudrate)
     return CanAbs_SetBaudrate(&Fdcan1Driver, baudrate);
 }
 
+comm_status_t CanAbs_SetMode_Can1(uint32_t mode)
+{
+    return CanAbs_SetMode(&Fdcan1Driver, mode);
+}
+
 /* CAN 2 */
 
 comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
@@ -334,4 +345,9 @@ comm_status_t CanAbs_Stop_Can2()
 comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate)
 {
     return CanAbs_SetBaudrate(&Fdcan2Driver, baudrate);
+}
+
+comm_status_t CanAbs_SetMode_Can2(uint32_t mode)
+{
+    return CanAbs_SetMode(&Fdcan2Driver, mode);
 }

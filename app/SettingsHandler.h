@@ -6,13 +6,18 @@
 #include "FileHandler.h"
 
 typedef struct {
-    /*!< indicates that settings were updated and 
-       are ready to be stored */
-    uint8_t updated; 
     /*!< Baudrate in bit/s (e.g. 250000 for 250 kbit/s) */
     uint32_t baudrate;
     /*!< CAN operatig mode (1: normal, 2: listen only) */
     uint8_t mode; 
+} AppFcdanConfigType;
+
+typedef struct {
+    /*!< indicates that settings were updated and 
+       are ready to be stored */
+    uint8_t updated; 
+    AppFcdanConfigType can1;
+    AppFcdanConfigType can2;
     uint8_t ip[4U];
 } AppConfigType;
 
