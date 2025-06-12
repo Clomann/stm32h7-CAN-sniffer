@@ -116,7 +116,8 @@ static void MPU_Config(void);
 static void SystemClock_Config(void);
 // static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
 static void CPU_CACHE_Enable(void);
-void appCanCtrlSetBaudrate(uint32_t baudrate);
+void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2);
+void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2);
 
 /* Private functions ---------------------------------------------------------*/
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
@@ -348,11 +349,15 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     {
 
     }
-    else if (AppCtrlData.runCanTracer)
+    else if (true == AppCtrlData.runCanTracer)
     {
-        if (COMM_SUCCESS != CanAbs_Start_Can2())
+        if (COMM_SUCCESS != CanAbs_Start_Can1())
         {
-            AppCtrlData.runCanTracer = 1;
+            AppCtrlData.runCanTracer = false;
+        }
+        else if (COMM_SUCCESS != CanAbs_Start_Can2())
+        {
+            AppCtrlData.runCanTracer = false;
         }
         else
         {
@@ -361,9 +366,13 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     }
     else
     {
-        if (COMM_SUCCESS != CanAbs_Stop_Can2())
+        if (COMM_SUCCESS != CanAbs_Stop_Can1())
         {
-            AppCtrlData.runCanTracer = 1;
+            AppCtrlData.runCanTracer = false;
+        }
+        else if (COMM_SUCCESS != CanAbs_Stop_Can2())
+        {
+            AppCtrlData.runCanTracer = false;
         }
         else
         {
@@ -373,7 +382,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
 
     appCanLogCheckNewFileOpen(data);
 
-    while (0 == CanAbs_Receive_Can2(&NewFrame))
+    while (0 == CanAbs_Receive_Can1(&NewFrame))
     {
         timestamp = HAL_GetTick();
         timedelta = timestamp - data->CanLog.timestamp;
@@ -472,6 +481,7 @@ int main(void)
 
     /* Configure the system clock to 400 MHz */
     SystemClock_Config();
+    HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_PLL1QCLK, RCC_MCODIV_8);
 
     /* When system initialization is finished, Cortex-M7 will release Cortex-M4  by means of
         HSEM notification */
@@ -573,18 +583,19 @@ int main(void)
         appConfigHandlerInit(&AppCtrlData);
 
         GPIO_Dbg_Init();
+        GPIO_Mco1_Init();
         
         if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
         {
             Error_Handler();
         }
 
-        if ( 0 != CanAbs_Init_Can1(AppConfig.baudrate) ) 
+        if ( 0 != CanAbs_Init_Can1(AppConfig.can1.baudrate) ) 
         {
             Error_Handler();
         }
 
-        if ( 0 != CanAbs_Init_Can2(AppConfig.baudrate) ) 
+        if ( 0 != CanAbs_Init_Can2(AppConfig.can2.baudrate) ) 
         {
             Error_Handler();
         }
@@ -602,7 +613,7 @@ int main(void)
             {
                 
             }
-            else if ( 0 != CanAbs_Send_Can2())
+            else if ( 0 != CanAbs_Send_Can1())
             {
                 Error_Handler();
                 timestamp_prev = timestamp;
@@ -626,7 +637,8 @@ int main(void)
             }
             else if (0 == AppCtrlData.runCanTracer)
             {
-                appCanCtrlSetBaudrate(AppConfig.baudrate);
+                appCanCtrlSetBaudrate(AppConfig.can1.baudrate, AppConfig.can2.baudrate);
+                appCanCtrlSetMode(AppConfig.can1.mode, AppConfig.can2.mode);
                 AppCtrlData.applyConfig = 0;
             }
             else
@@ -716,8 +728,7 @@ int main(void)
  
    /* Enable HSE Oscillator and activate PLL with HSE as source */
    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
-   RCC_OscInitStruct.HSIState = RCC_HSI_OFF;
+   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
    RCC_OscInitStruct.CSIState = RCC_CSI_OFF;
    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
@@ -945,9 +956,29 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
     return res;
 }
 
-void appCanCtrlSetBaudrate(uint32_t baudrate)
+void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2)
 {
-    if (COMM_SUCCESS == CanAbs_SetBaudrate_Can2(baudrate))
+    
+    if (COMM_SUCCESS == CanAbs_SetBaudrate_Can1(baudrate1))
+    {
+        Error_Handler();
+    }
+
+    if (COMM_SUCCESS == CanAbs_SetBaudrate_Can2(baudrate2))
+    {
+        Error_Handler();
+    }
+}
+
+void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2)
+{
+    
+    if (COMM_SUCCESS == CanAbs_SetMode_Can1(mode1))
+    {
+        Error_Handler();
+    }
+
+    if (COMM_SUCCESS == CanAbs_SetMode_Can2(mode2))
     {
         Error_Handler();
     }

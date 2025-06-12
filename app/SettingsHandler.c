@@ -2,10 +2,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+
 #include "SettingsHandler.h"
 #include "http_cgi_ssi.h"
 #include "httpd_post.h"
 #include "core_json.h"
+#include "fdcan.h"
 
 
 #define SETTINGS_HANDLER_JSON_BUFFER_SIZE 256U
@@ -14,13 +16,31 @@ static AppConfigType * AppSettings;
 
 static void consume_param_values(char *param, char *value)
 {
-    uint32_t NewMode = 0;
-    uint32_t NewBaudrate = 0;
+    AppFcdanConfigType *pCanConfig;
+    const char Baudrate[] = "baudrate";
+    const char Mode[] = "mode";
     
     /* check parameter "baudrate" */
-    if (strcmp(param , "baudrate") == 0)
+    if (strncmp(param, Baudrate, sizeof(Baudrate)-1) == 0)
     {
-        NewBaudrate = AppSettings->baudrate;
+        uint32_t NewBaudrate = 0;
+        uint32_t OldBaudrate = 0;
+
+        if (strcmp(param , "baudrate1") == 0)
+        {
+            pCanConfig = &AppSettings->can1;
+            
+        }
+        else if (strcmp(param , "baudrate2") == 0)
+        {
+            pCanConfig = &AppSettings->can2;
+        }
+        else
+        {
+            return;
+        }
+
+        OldBaudrate = pCanConfig->baudrate;
 
         if(strcmp(value, "250000") == 0)
         {
@@ -34,33 +54,58 @@ static void consume_param_values(char *param, char *value)
         {
             NewBaudrate = 1000000;
         }
+        else
+        {
+            NewBaudrate = OldBaudrate;
+        }
 
-        if (NewBaudrate != AppSettings->baudrate)
+        if (NewBaudrate != OldBaudrate)
         {
             AppSettings->updated = 1U;
         }
 
-        AppSettings->baudrate = NewBaudrate;
+        pCanConfig->baudrate = NewBaudrate;
     }
-    else if (strcmp(param , "mode")==0)
+    else if (strncmp(param, Mode, sizeof(Mode)-1)==0)
     {
-        NewMode = AppSettings->mode;
+        uint32_t NewMode = 0;
+        uint32_t OldMode = 0;
+
+        if (strcmp(param , "mode1") == 0)
+        {
+            pCanConfig = &AppSettings->can1;
+            
+        }
+        else if (strcmp(param , "mode2") == 0)
+        {
+            pCanConfig = &AppSettings->can2;
+        }
+        else
+        {
+            return;
+        }
+
+        OldMode = pCanConfig->mode;
             
         if(strcmp(value, "1") ==0)
         {
-            NewMode = 1;
+            NewMode = FDCAN_MODE_1;
         }
         else if(strcmp(value, "2") ==0)
         {
-            NewMode = 2;
+            NewMode = FDCAN_MODE_2;
+        }
+        else
+        {
+            NewMode = OldMode;
         }
 
-        if (NewMode != AppSettings->mode)
+        if (NewMode != OldMode)
         {
             AppSettings->updated = 1U;
         }
 
-        AppSettings->mode = NewMode;
+        pCanConfig->mode = NewMode;
     }
     else if (strcmp(param , "action") == 0)
     {
@@ -104,26 +149,50 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
   //   iIndex=1 => "opt500"
   //   storedBaudRate is the previously selected baud
   switch (iIndex) {
-    case 0: // "baudrate"
-        if (AppSettings->baudrate == 250000) {
+    case 0: // "baudrate1"
+        if (AppSettings->can1.baudrate == 250000) {
             snprintf(pcInsert, iInsertLen, "250 kbit/s");
-        } else if (AppSettings->baudrate == 500000) {
+        } else if (AppSettings->can1.baudrate == 500000) {
             snprintf(pcInsert, iInsertLen, "500 kbit/s");
-        } else if (AppSettings->baudrate == 1000000) {
+        } else if (AppSettings->can1.baudrate == 1000000) {
             snprintf(pcInsert, iInsertLen, "1 Mbit/s");
         } else {
             snprintf(pcInsert, iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);
-    case 1: // "mode"
-        if (AppSettings->mode == 1) {
+    case 1: // "mode1"
+        if (AppSettings->can1.mode == 1) {
             snprintf(pcInsert, iInsertLen, "normal");
-        } else if (AppSettings->mode == 2) {
+        } else if (AppSettings->can1.mode == 2) {
             snprintf(pcInsert, iInsertLen, "listen only");
+        } else if (AppSettings->can1.mode == 3) {
+            snprintf(pcInsert, iInsertLen, "off");
         } else {
             snprintf(pcInsert, iInsertLen, "n/a");
         }
-        return (uint16_t)strlen(pcInsert);        
+        return (uint16_t)strlen(pcInsert);    
+    case 2: // "baudrate2"
+        if (AppSettings->can2.baudrate == 250000) {
+            snprintf(pcInsert, iInsertLen, "250 kbit/s");
+        } else if (AppSettings->can2.baudrate == 500000) {
+            snprintf(pcInsert, iInsertLen, "500 kbit/s");
+        } else if (AppSettings->can2.baudrate == 1000000) {
+            snprintf(pcInsert, iInsertLen, "1 Mbit/s");
+        } else {
+            snprintf(pcInsert, iInsertLen, "n/a");
+        }
+        return (uint16_t)strlen(pcInsert);
+    case 3: // "mode2"
+        if (AppSettings->can2.mode == 1) {
+            snprintf(pcInsert, iInsertLen, "normal");
+        } else if (AppSettings->can2.mode == 2) {
+            snprintf(pcInsert, iInsertLen, "listen only");
+        } else if (AppSettings->can2.mode == 2) {
+            snprintf(pcInsert, iInsertLen, "off");
+        } else {
+            snprintf(pcInsert, iInsertLen, "n/a");
+        }
+        return (uint16_t)strlen(pcInsert);      
     default:
         break;
   }
@@ -241,8 +310,12 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
     const size_t queryKeyLength1 = sizeof( queryKey1 ) - 1;
     const char queryKey2[] = "CAN1.Mode";
     const size_t queryKeyLength2 = sizeof( queryKey2 ) - 1;
-    const char queryKey3[] = "HTTP.IP";
+    const char queryKey3[] = "CAN2.Baudrate";
     const size_t queryKeyLength3 = sizeof( queryKey3 ) - 1;
+    const char queryKey4[] = "CAN2.Mode";
+    const size_t queryKeyLength4 = sizeof( queryKey4 ) - 1;
+    const char queryKey5[] = "HTTP.IP";
+    const size_t queryKeyLength5 = sizeof( queryKey5 ) - 1;
 
     char TmpBuf[64];
 
@@ -264,7 +337,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if ( 0U == m_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
-                cfg->baudrate = Baudrate;
+                cfg->can1.baudrate = Baudrate;
         }
         
         result = FileHandler_GetValue( buffer, bufferLength, queryKey2, queryKeyLength2, &value, &valueLength );
@@ -273,10 +346,28 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == m_ConvertToInteger(TmpBuf, &Mode, 10U))
-                cfg->mode = Mode;
+                cfg->can1.mode = Mode;
         }
 
-        result = FileHandler_GetValue( buffer, bufferLength, queryKey3, queryKeyLength3, &value, &valueLength );
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey3, queryKeyLength3, &value, &valueLength);
+        if( JSONSuccess ==  result )
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if ( 0U == m_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
+                cfg->can2.baudrate = Baudrate;
+        }
+        
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey4, queryKeyLength4, &value, &valueLength );
+        if( JSONSuccess == result ) 
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if (0U == m_ConvertToInteger(TmpBuf, &Mode, 10U))
+                cfg->can2.mode = Mode;
+        }
+
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey5, queryKeyLength5, &value, &valueLength );
         if( JSONSuccess == result ) 
         {
             if (0U == IpStringToIntArray(value, valueLength, IP))
@@ -325,12 +416,18 @@ static uint8_t m_CreateJSonString(AppConfigType *cfg, char *json, uint32_t maxLe
     "        \"Baudrate\":%ld,\n"
     "        \"Mode\":%d\n"
     "    },\n"
+    "    \"CAN2\":{\n"
+    "        \"Baudrate\":%ld,\n"
+    "        \"Mode\":%d\n"
+    "    },\n"
     "    \"HTTP\":{\n"
     "        \"IP\":\"%d.%d.%d.%d\"\n"
     "    }\n"
     "}\n",
-    cfg->baudrate,
-    cfg->mode,
+    cfg->can1.baudrate,
+    cfg->can1.mode,
+    cfg->can2.baudrate,
+    cfg->can2.mode,
     cfg->ip[0U],
     cfg->ip[1U],
     cfg->ip[2U],

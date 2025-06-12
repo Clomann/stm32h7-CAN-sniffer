@@ -8,6 +8,9 @@
 #include "fdcan.h"
 #include "fdcan_utils.h"
 
+#define FDCAN_1_NBR        COMM_DEVICE_NUMBER_1
+#define FDCAN_2_NBR        COMM_DEVICE_NUMBER_2
+
 typedef struct {
     FDCAN_GlobalTypeDef *fdcan;
     FDCAN_HandleTypeDef hfdcan;
@@ -90,13 +93,10 @@ comm_status_t FDCAN_CreateDriver(
     RingBuffer *rx)
 {
 	comm_status_t RetVal;
-	CommDriverConfigType *DriverConfig;
-    FdcanConfigType newConfig;
-	FDCAN_FilterTypeDef pFilterConfig;
     FdcanInstanceType * instance;
 
 	RetVal = COMM_ERROR;
-    DriverConfig = (CommDriverConfigType *)cfg;
+    pDriver->config = (CommDriverConfigType *)cfg;
 
     if (sizeof(CommDriverConfigType) != cfg_size)
     {
@@ -109,18 +109,26 @@ comm_status_t FDCAN_CreateDriver(
         FDCAN_ErrorHandler();
     }
 
-    if (0 == pDriver->devNbr)
+    switch (pDriver->config->devNbr)
     {
+    case COMM_DEVICE_NUMBER_1:
         instance->fdcan = FDCAN_1;
-    }
-    else if (1 == pDriver->devNbr)
-    {
+        RetVal = COMM_SUCCESS;
+        break;
+    case COMM_DEVICE_NUMBER_2:
         instance->fdcan = FDCAN_2;
+        RetVal = COMM_SUCCESS;
+        break;
+    default:
+        RetVal = COMM_ERROR;
+        break;
     }
-    else
+
+    if (COMM_SUCCESS != RetVal)
     {
         FDCAN_ErrorHandler();
     }
+    
     pDriver->instance = (void *) instance;
 
 	pDriver->interface->init = FDCAN_Init;
@@ -492,6 +500,42 @@ static comm_status_t FDCAN_SetBaudrate(
     return res;
 }
 
+static comm_status_t FDCAN_SetMode(
+    CommDriver *dev,
+    uint32_t mode)
+{
+    comm_status_t res = 0;
+    FdcanInstanceType * instance;
+    
+    instance = (FdcanInstanceType *)dev->instance;
+
+    switch (mode)
+    {
+        case FDCAN_MODE_1:
+            instance->hfdcan.Init.Mode = FDCAN_MODE_NORMAL; 
+            res = COMM_SUCCESS;
+            break;
+        case FDCAN_MODE_2:
+            instance->hfdcan.Init.Mode = FDCAN_MODE_BUS_MONITORING; 
+            res = COMM_SUCCESS;
+            break;
+        default:
+            res = COMM_INVALID_PARAMETER;
+            break;
+    }
+
+    if (COMM_SUCCESS == res)
+    {
+        if (HAL_FDCAN_Init(&instance->hfdcan) != HAL_OK)
+        {
+            /* Initialization Error */
+            res = COMM_ERROR;
+        }
+    }
+
+    return res;
+}
+
 comm_status_t FDCAN_Ioctl(
     CommDriver *dev, 
     int cmd, 
@@ -511,7 +555,11 @@ comm_status_t FDCAN_Ioctl(
             }
             break;
         case CANABS_IOCTL_CMD_START:
-            if (0 != instance->hfdcan.ErrorCode)
+            if (DRIVER_STATE_STARTED == dev->state)
+            {
+                /* nothing to do */
+            }
+            else if (0 != instance->hfdcan.ErrorCode)
             {
                 res = COMM_ERROR;
                 FDCAN_ErrorHandler();
@@ -528,7 +576,11 @@ comm_status_t FDCAN_Ioctl(
             }
             break;
         case CANABS_IOCTL_CMD_STOP:
-            if (HAL_FDCAN_Stop(&instance->hfdcan) != HAL_OK)
+            if (DRIVER_STATE_STARTED != dev->state)
+            {
+                /* nothing to do */
+            }
+            else if (HAL_FDCAN_Stop(&instance->hfdcan) != HAL_OK)
             {
                 /* Start Error */
                 res = COMM_ERROR;
@@ -538,6 +590,13 @@ comm_status_t FDCAN_Ioctl(
             {
                 dev->state = DRIVER_STATE_STOPPED;
             }
+            break;
+        case CANABS_IOCTL_CMD_SET_MODE:
+            {
+                FdcanModeType mode = *((FdcanModeType *)argument);
+                res = FDCAN_SetMode(dev, mode);
+            }
+            break;
             break;
         case CANABS_IOCTL_CMD_SET_FILTERMASK:
         default:
@@ -779,11 +838,11 @@ comm_status_t ram_usage(FDCAN_GlobalTypeDef *fdcan, uint32_t *size)
 
     if (FDCAN1 == fdcan)
     {
-        *size = 1U * (FDCAN_RAM_RX_SECTION_SIZE);
+        *size = 0U * (FDCAN_RAM_RX_SECTION_SIZE);
     }
     else if (FDCAN2 == fdcan)
     {
-        *size = 0U * (FDCAN_RAM_RX_SECTION_SIZE);
+        *size = 1U * (FDCAN_RAM_RX_SECTION_SIZE);
     }
     else
     {
@@ -815,7 +874,7 @@ comm_status_t get_fdcan_config(
     */
     instance->hfdcan.Instance = instance->fdcan;
     instance->hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-    instance->hfdcan.Init.Mode = FDCAN_MODE;
+    instance->hfdcan.Init.Mode = FDCAN_MODE_DEFAULT;
     instance->hfdcan.Init.AutoRetransmission = ENABLE;
     instance->hfdcan.Init.TransmitPause = DISABLE;
     instance->hfdcan.Init.ProtocolException = ENABLE;
@@ -826,7 +885,7 @@ comm_status_t get_fdcan_config(
     ram_usage(instance->fdcan, &instance->hfdcan.Init.MessageRAMOffset);
     instance->hfdcan.Init.StdFiltersNbr = 1;
     instance->hfdcan.Init.ExtFiltersNbr = 0;
-    instance->hfdcan.Init.RxFifo0ElmtsNbr = 0;
+    instance->hfdcan.Init.RxFifo0ElmtsNbr = 1;
     instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
     instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
     instance->hfdcan.Init.RxBuffersNbr = 0;
