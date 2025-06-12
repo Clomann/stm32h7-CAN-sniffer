@@ -17,21 +17,21 @@ static AppConfigType * AppSettings;
 static void consume_param_values(char *param, char *value)
 {
     AppFcdanConfigType *pCanConfig;
-    const char Baudrate[] = "baudrate";
+    const char Baudrate[] = "baud";
     const char Mode[] = "mode";
     
-    /* check parameter "baudrate" */
+    /* check parameter "baud" */
     if (strncmp(param, Baudrate, sizeof(Baudrate)-1) == 0)
     {
         uint32_t NewBaudrate = 0;
         uint32_t OldBaudrate = 0;
 
-        if (strcmp(param , "baudrate1") == 0)
+        if (strcmp(param , "baud1") == 0)
         {
             pCanConfig = &AppSettings->can1;
             
         }
-        else if (strcmp(param , "baudrate2") == 0)
+        else if (strcmp(param , "baud2") == 0)
         {
             pCanConfig = &AppSettings->can2;
         }
@@ -95,6 +95,10 @@ static void consume_param_values(char *param, char *value)
         {
             NewMode = FDCAN_MODE_2;
         }
+        else if(strcmp(value, "3") ==0)
+        {
+            NewMode = FDCAN_MODE_3;
+        }
         else
         {
             NewMode = OldMode;
@@ -149,7 +153,7 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
   //   iIndex=1 => "opt500"
   //   storedBaudRate is the previously selected baud
   switch (iIndex) {
-    case 0: // "baudrate1"
+    case 0: // "naud1"
         if (AppSettings->can1.baudrate == 250000) {
             snprintf(pcInsert, iInsertLen, "250 kbit/s");
         } else if (AppSettings->can1.baudrate == 500000) {
@@ -171,7 +175,7 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
             snprintf(pcInsert, iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);    
-    case 2: // "baudrate2"
+    case 2: // "baud2"
         if (AppSettings->can2.baudrate == 250000) {
             snprintf(pcInsert, iInsertLen, "250 kbit/s");
         } else if (AppSettings->can2.baudrate == 500000) {
@@ -187,7 +191,7 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
             snprintf(pcInsert, iInsertLen, "normal");
         } else if (AppSettings->can2.mode == 2) {
             snprintf(pcInsert, iInsertLen, "listen only");
-        } else if (AppSettings->can2.mode == 2) {
+        } else if (AppSettings->can2.mode == 3) {
             snprintf(pcInsert, iInsertLen, "off");
         } else {
             snprintf(pcInsert, iInsertLen, "n/a");

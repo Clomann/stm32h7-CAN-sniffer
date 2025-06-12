@@ -26,11 +26,14 @@
 #include <string.h>
 #include <stdlib.h>
 
+/**
+ * \note If LWIP_HTTPD_MAX_TAG_NAME_LEN is not set explicitly, it will default to 8!
+ */
 char const* CFG_TAGCHAR[] = {
-    "baudrate1",  // index=0
-    "mode1",  // index=1
-    "baudrate2",  // index=2
-    "mode2",  // index=3
+    "baud1",  // index=0
+    "mode1",
+    "baud2",  // index=0
+    "mode2",
   };
 
 char const** TAGS = (char const**)&CFG_TAGCHAR;

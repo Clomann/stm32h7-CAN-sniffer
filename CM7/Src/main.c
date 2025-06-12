@@ -337,6 +337,8 @@ static void appCanLogFillEntry(CanLogClassicCanEntryType *entry, FDCAN_ClassicFr
 
 static void appCanLogHandlerPoll(AppControlDataType *data)
 {
+    comm_status_t res = COMM_SUCCESS;
+    bool IsOffState;
     uint32_t timestamp;
     uint32_t timedelta;
     uint8_t BlockIsReady;
@@ -351,17 +353,37 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     }
     else if (true == AppCtrlData.runCanTracer)
     {
-        if (COMM_SUCCESS != CanAbs_Start_Can1())
+        CanAbs_IsStateOff_Can1(&IsOffState);
+
+        if (true == IsOffState)
         {
-            AppCtrlData.runCanTracer = false;
+            /* nothing to do */
+        }
+        else if (COMM_SUCCESS != CanAbs_Start_Can1())
+        {
+            res = COMM_ERROR;
+            Error_Handler();
+        }
+
+        CanAbs_IsStateOff_Can2(&IsOffState);
+
+        if (true == IsOffState)
+        {
+            /* nothing to do */
         }
         else if (COMM_SUCCESS != CanAbs_Start_Can2())
         {
-            AppCtrlData.runCanTracer = false;
+            res = COMM_ERROR;
+            Error_Handler();
+        }
+
+        if (COMM_SUCCESS == res)
+        {
+            RunTracerOld = AppCtrlData.runCanTracer;
         }
         else
         {
-            RunTracerOld = AppCtrlData.runCanTracer;
+            AppCtrlData.runCanTracer = false;
         }
     }
     else
@@ -972,7 +994,6 @@ void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2)
 
 void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2)
 {
-    
     if (COMM_SUCCESS == CanAbs_SetMode_Can1(mode1))
     {
         Error_Handler();
