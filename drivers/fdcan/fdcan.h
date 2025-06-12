@@ -35,6 +35,7 @@ typedef uint32_t FdcanBaudrateType;
 
 #define FDCAN_MODE_1      1U /*<! normal */
 #define FDCAN_MODE_2      2U /*<! listen only */
+#define FDCAN_MODE_3      3U /*<! off */
 typedef uint32_t FdcanModeType;
 
 #define FDCAN_STATUS_OK     0U

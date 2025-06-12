@@ -306,6 +306,12 @@ comm_status_t CanAbs_SetMode_Can1(uint32_t mode)
     return CanAbs_SetMode(&Fdcan1Driver, mode);
 }
 
+comm_status_t CanAbs_IsStateOff_Can1(bool * isOff)
+{
+    *isOff = Fdcan1Driver.state == DRIVER_STATE_OFF;
+    return COMM_SUCCESS;
+}
+
 /* CAN 2 */
 
 comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
@@ -350,4 +356,10 @@ comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate)
 comm_status_t CanAbs_SetMode_Can2(uint32_t mode)
 {
     return CanAbs_SetMode(&Fdcan2Driver, mode);
+}
+
+comm_status_t CanAbs_IsStateOff_Can2(bool * isOff)
+{
+    *isOff = Fdcan1Driver.state == DRIVER_STATE_OFF;
+    return COMM_SUCCESS;
 }
