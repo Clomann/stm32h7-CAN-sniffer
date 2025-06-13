@@ -113,68 +113,15 @@ comm_status_t CanAbs_SetMode(CommDriver *dev, uint32_t mode)
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_MODE, &mode);
 }
 
-comm_status_t fdcan_create_message_1(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
+comm_status_t CanAbs_CreateMessage_Standard(
+    FDCAN_Message *pMsg, 
+    uint32_t id, 
+    uint8_t *pData, 
+    uint32_t length)
 {
 
 	{
-		pMsg->can_id = 0x321U;
-		pMsg->isExtendedId = 0U;
-		pMsg->frame_type = 0U;
-		pMsg->msgMarker = 0U;
-
-		pMsg->msgBase.dir = DRIVER_MSGDIRECTION_TX;
-		pMsg->msgBase.isMmultiframe = 0;
-		pMsg->msgBase.length = length;
-		pMsg->msgBase.payload = pData;
-		pMsg->msgBase.protocol = DRIVER_FDCAN;
-	}
-
-	return COMM_SUCCESS;
-}
-
-comm_status_t fdcan_create_message_2(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
-{
-
-	{
-		pMsg->can_id = 0x322U;
-		pMsg->isExtendedId = 0U;
-		pMsg->frame_type = 0U;
-		pMsg->msgMarker = 0U;
-
-		pMsg->msgBase.dir = DRIVER_MSGDIRECTION_TX;
-		pMsg->msgBase.isMmultiframe = 0;
-		pMsg->msgBase.length = length;
-		pMsg->msgBase.payload = pData;
-		pMsg->msgBase.protocol = DRIVER_FDCAN;
-	}
-
-	return COMM_SUCCESS;
-}
-
-comm_status_t fdcan_create_message_3(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
-{
-
-	{
-		pMsg->can_id = 0x323U;
-		pMsg->isExtendedId = 0U;
-		pMsg->frame_type = 0U;
-		pMsg->msgMarker = 0U;
-
-		pMsg->msgBase.dir = DRIVER_MSGDIRECTION_TX;
-		pMsg->msgBase.isMmultiframe = 0;
-		pMsg->msgBase.length = length;
-		pMsg->msgBase.payload = pData;
-		pMsg->msgBase.protocol = DRIVER_FDCAN;
-	}
-
-	return COMM_SUCCESS;
-}
-
-comm_status_t fdcan_create_message_4(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
-{
-
-	{
-		pMsg->can_id = 0x324U;
+		pMsg->can_id = id;
 		pMsg->isExtendedId = 0U;
 		pMsg->frame_type = 0U;
 		pMsg->msgMarker = 0U;

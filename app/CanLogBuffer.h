@@ -30,6 +30,7 @@ typedef struct {
     CanLogEntryHeaderType header;
     uint64_t timestamp; /*!< timestamp in us */
     uint32_t can_id;
+    uint8_t channel;
     uint8_t dlc;
     uint8_t flags;     // IDE/RTR
     uint8_t bus_id;
@@ -40,6 +41,7 @@ typedef struct {
     CanLogEntryHeaderType header;
     uint64_t timestamp; /*!< timestamp in us */
     uint32_t can_id;
+    uint8_t channel;
     uint8_t  dlc;
     uint8_t  flags;     // IDE, BRS, ESI, etc.
     uint8_t  bus_id;

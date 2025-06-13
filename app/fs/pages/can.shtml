@@ -102,10 +102,10 @@
                     <th style="width: 33.333333%; text-align: left;">New value</th>
                 </tr>
                 <tr>
-                    <td style="width: 33.333333%;">Baudrate</td>
-                    <td style="width: 33.333333%;"><!--#baudrate--></td>
+                    <td style="width: 33.333333%;">CAN1: Baudrate</td>
+                    <td style="width: 33.333333%;"><!--#baud1--></td>
                     <td style="width: 33.333333%;">
-                        <select name="baudrate" id="baudrate-select">
+                        <select name="baudrate1" id="baudrate1-select">
                         <option value="0">-</option>
                         <option value="250000">250 kbit/s</option>
                         <option value="500000">500 kbit/s</option>
@@ -113,10 +113,32 @@
                     </select></td>
                 </tr>
                 <tr>
-                    <td style="width: 33.333333%;">Operating mode</td>
-                    <td style="width: 33.333333%;"><!--#mode--></td>
+                    <td style="width: 33.333333%;">CAN1: Operating mode</td>
+                    <td style="width: 33.333333%;"><!--#mode1--></td>
                     <td style="width: 33.333333%;">
-                        <select name="mode" id="mode-select">
+                        <select name="mode1" id="mode1-select">
+                            <option value="0">-</option>
+                            <option value="1">normal</option>
+                            <option value="2">listen only</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="width: 33.333333%;">CAN2: Baudrate</td>
+                    <td style="width: 33.333333%;"><!--#baud2--></td>
+                    <td style="width: 33.333333%;">
+                        <select name="baudrate2" id="baudrate2-select">
+                        <option value="0">-</option>
+                        <option value="250000">250 kbit/s</option>
+                        <option value="500000">500 kbit/s</option>
+                        <option value="1000000">1 Mbit/s</option>
+                    </select></td>
+                </tr>
+                <tr>
+                    <td style="width: 33.333333%;">CAN2: Operating mode</td>
+                    <td style="width: 33.333333%;"><!--#mode2--></td>
+                    <td style="width: 33.333333%;">
+                        <select name="mode2" id="mode2-select">
                             <option value="0">-</option>
                             <option value="1">normal</option>
                             <option value="2">listen only</option>
@@ -130,16 +152,20 @@
     </form>
     <!-- APPLY FORM (via JS, adds `action=apply`) -->
     <form method="POST" action="/can.cgi" id="apply-form">
-        <input type="hidden" name="baudrate" id="apply-baudrate">
-        <input type="hidden" name="mode" id="apply-mode">
+        <input type="hidden" name="baud1" id="apply-baudrate1">
+        <input type="hidden" name="mode1" id="apply-mode1">
+        <input type="hidden" name="baud2" id="apply-baudrate2">
+        <input type="hidden" name="mode2" id="apply-mode2">
         <input type="hidden" name="action" value="apply">
         <button type="submit" id="apply-button">Apply</button>
     </form>
     
     <!-- SAVE FORM (via JS, adds `action=save`) -->
     <form method="POST" action="/can.cgi" id="save-form">
-        <input type="hidden" name="baudrate" id="save-baudrate">
-        <input type="hidden" name="mode" id="save-mode">
+        <input type="hidden" name="baud1" id="save-baudrate1">
+        <input type="hidden" name="mode1" id="save-mode1">
+        <input type="hidden" name="baud2" id="save-baudrate2">
+        <input type="hidden" name="mode2" id="save-mode2">
         <input type="hidden" name="action" value="save">
         <button type="submit" id="save-button">Save</button>
     </form>
@@ -199,16 +225,24 @@
         /* --------------------------------------- */
     
         /* -------- form helpers  ---------------- */
-        const selBaud = document.getElementById("baudrate-select");
-        const selMode = document.getElementById("mode-select");
+        const selBaud1 = document.getElementById("baudrate1-select");
+        const selMode1 = document.getElementById("mode1-select");
+        const selBaud2 = document.getElementById("baudrate2-select");
+        const selMode2 = document.getElementById("mode2-select");
     
         function updateHiddenFields() {
-            const baud = selBaud.value;
-            const mode = selMode.value;
-            [ ...document.querySelectorAll("#apply-baudrate,#save-baudrate") ]
-                .forEach(i => i.value = baud);
-            [ ...document.querySelectorAll("#apply-mode,#save-mode") ]
-                .forEach(i => i.value = mode);
+            const baud1 = selBaud1.value;
+            const mode1 = selMode1.value;
+            const baud2 = selBaud2.value;
+            const mode2 = selMode2.value;
+            [ ...document.querySelectorAll("#apply-baudrate1,#save-baudrate1") ]
+                .forEach(i => i.value = baud1);
+            [ ...document.querySelectorAll("#apply-mode1,#save-mode1") ]
+                .forEach(i => i.value = mode1);
+                [ ...document.querySelectorAll("#apply-baudrate2,#save-baudrate2") ]
+                .forEach(i => i.value = baud2);
+            [ ...document.querySelectorAll("#apply-mode2,#save-mode2") ]
+                .forEach(i => i.value = mode2);
         }
     
         document.getElementById("apply-form")
@@ -219,9 +253,9 @@
 
         document.getElementById("ctrl-form")
             .addEventListener("submit", async (e) => {
-        // let the browser submit as normal, then…
-        setTimeout(pollSnifferState, 200);  // refresh quickly
-});
+            // let the browser submit as normal, then…
+            setTimeout(pollSnifferState, 200);  // refresh quickly
+        });
     });
     </script>        
     

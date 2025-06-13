@@ -21,7 +21,13 @@ comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate);
 comm_status_t CanAbs_SetMode_Can2(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can2(bool * isOff);
 
-comm_status_t fdcan_create_message_1(FDCAN_Message*, uint8_t*, uint32_t);
-comm_status_t fdcan_create_message_2(FDCAN_Message*, uint8_t*, uint32_t);
-comm_status_t fdcan_create_message_3(FDCAN_Message*, uint8_t*, uint32_t);
-comm_status_t fdcan_create_message_4(FDCAN_Message*, uint8_t*, uint32_t);
+/**
+  * @brief  Create a Tx CAN message with standard ID.
+  * @param  msg: pointer to an FDCAN_Message structure that is the message
+  *              to be craeted.
+  */
+comm_status_t CanAbs_CreateMessage_Standard(
+    FDCAN_Message *msg, 
+    uint32_t id, 
+    uint8_t *data, 
+    uint32_t length);
