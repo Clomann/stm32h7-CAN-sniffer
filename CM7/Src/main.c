@@ -83,6 +83,11 @@ typedef struct {
 #define USE_HAL_SPI_REGISTER_CALLBACKS = 1U;
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
 
+static FDCAN_Message Can1TestMsg1;
+static FDCAN_Message Can1TestMsg2;
+static FDCAN_Message Can2TestMsg1;
+static FDCAN_Message Can2TestMsg2;
+
 uint8_t run;
 static AppConfigType AppConfig;
 static char CanLogFileName[255] = "/logs/CAN.LOG";
@@ -118,6 +123,7 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2);
 void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2);
+
 
 /* Private functions ---------------------------------------------------------*/
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
@@ -340,7 +346,6 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     comm_status_t res = COMM_SUCCESS;
     bool IsOffState;
     uint32_t timestamp;
-    uint32_t timedelta;
     uint8_t BlockIsReady;
     uint32_t DataLength;
     CanLogClassicCanEntryType NewEntry;
@@ -407,8 +412,43 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     while (0 == CanAbs_Receive_Can1(&NewFrame))
     {
         timestamp = HAL_GetTick();
-        timedelta = timestamp - data->CanLog.timestamp;
-        (void) timedelta;
+
+        appCanLogFillEntry(&NewEntry, &NewFrame, NewFrame.timestamp);
+
+        CanLogBuffer_AddClassicCanEntry(&NewEntry);
+
+        CanLogBuffer_IsBlockReady(&BlockIsReady);
+
+        if ( 0 != data->CanLog.openRes )
+        {    
+            /* quit */
+            Error_Handler();
+        }
+        else if ( 0 == BlockIsReady )
+        {
+            /* quit since block is not ready to be written */
+        }
+        else if ( CANLOG_E_OK !=  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
+        {
+            /* quit since data could not be read */
+        }
+        else if (FR_OK == FatFS_SD_WriteFile(
+                &(data->CanLog.writeFileDevice), 
+                (const char *)Data, 
+                DataLength) )
+        {
+            FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
+            data->CanLog.timestamp =  timestamp;
+        }
+        else
+        {
+            data->CanLog.timestamp =  timestamp;
+        }
+    }
+
+    while (0 == CanAbs_Receive_Can2(&NewFrame))
+    {
+        timestamp = HAL_GetTick();
 
         appCanLogFillEntry(&NewEntry, &NewFrame, NewFrame.timestamp);
 
@@ -450,6 +490,61 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
   { 
     FatFS_SD_CloseFile(&(data->CanLog.writeFileDevice));
   }
+}
+
+static void appFdcanInit()
+{
+    uint8_t TxData[8];
+    uint8_t TxData2[8];
+    
+    /* Initialize FDCAN timestamp external timer */
+    if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
+    {
+        Error_Handler();
+    }
+
+    if ( 0 == CanAbs_Init_Can1(AppConfig.can1.baudrate) ) 
+    {
+        fdcan_create_message_1(&Can1TestMsg1, &TxData[0], sizeof(TxData) / sizeof(*TxData));
+        fdcan_create_message_2(&Can1TestMsg2, &TxData[0], sizeof(TxData) / sizeof(*TxData));
+    }
+    else
+    {
+        Error_Handler();
+    }
+
+    if ( 0 == CanAbs_Init_Can2(AppConfig.can2.baudrate) ) 
+    {
+        fdcan_create_message_3(&Can2TestMsg1, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
+        fdcan_create_message_4(&Can2TestMsg2, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
+    }
+    else
+    {
+        Error_Handler();
+    }
+}
+
+static void appFdcanPoll()
+{
+    if ( 0 != CanAbs_Send_Can1(&Can1TestMsg1))
+    {
+        Error_Handler();
+    }
+
+    if ( 0 != CanAbs_Send_Can1(&Can1TestMsg2))
+    {
+        Error_Handler();
+    }
+
+    if ( 0 != CanAbs_Send_Can2(&Can2TestMsg1))
+    {
+        Error_Handler();
+    }
+
+    if ( 0 != CanAbs_Send_Can2(&Can2TestMsg2))
+    {
+        Error_Handler();
+    }
 }
 
 int appInit()
@@ -607,20 +702,7 @@ int main(void)
         GPIO_Dbg_Init();
         GPIO_Mco1_Init();
         
-        if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
-        {
-            Error_Handler();
-        }
-
-        if ( 0 != CanAbs_Init_Can1(AppConfig.can1.baudrate) ) 
-        {
-            Error_Handler();
-        }
-
-        if ( 0 != CanAbs_Init_Can2(AppConfig.can2.baudrate) ) 
-        {
-            Error_Handler();
-        }
+        appFdcanInit();
 
         while (run)
         {
@@ -635,13 +717,9 @@ int main(void)
             {
                 
             }
-            else if ( 0 != CanAbs_Send_Can1())
-            {
-                Error_Handler();
-                timestamp_prev = timestamp;
-            }
             else
             {
+                appFdcanPoll();
                 timestamp_prev = timestamp;
             }
 

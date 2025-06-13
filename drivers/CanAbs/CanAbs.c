@@ -2,11 +2,6 @@
 #include "buffers.h"
 #include "fdcan.h"
 
-static FDCAN_Message Msg1;
-static FDCAN_Message Msg2;
-static FDCAN_Message Msg3;
-static FDCAN_Message Msg4;
-
 /* CAN 1 */
 
 static CommDriver Fdcan1Driver;
@@ -72,8 +67,6 @@ static inline int can_ioctl(struct CommDriver *dev, int cmd, void *arg) {
 
 int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, RingBuffer *tx, RingBuffer *rx)
 {
-    uint8_t TxData[8];
-    uint8_t TxData2[8];
     unsigned int res = COMM_SUCCESS;
 
     dev->protocol = DRIVER_FDCAN;
@@ -85,14 +78,6 @@ int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, RingBuffer *tx, Ring
 	  res = 1;
 	}
 
-    if (0 == res)
-    {
-        fdcan_create_message_1(&Msg1, &TxData[0], sizeof(TxData) / sizeof(*TxData));
-        fdcan_create_message_2(&Msg2, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
-        fdcan_create_message_3(&Msg3, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
-        fdcan_create_message_4(&Msg4, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
-    }
-
     return res;
 }
 
@@ -101,34 +86,9 @@ int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrame *frame)
     return ring_buffer_pop(dev->RxFrameBuffer, (void*)frame);
 }
 
-int CanAbs_Send(CommDriver *dev)
+comm_status_t CanAbs_Send(CommDriver *dev, FDCAN_Message *msg)
 {
-    int res = 0;
-    
-    if (dev->interface->send(dev, &Msg2) != COMM_SUCCESS)
-    {
-        /* Transmission request Error */
-        res = 1;
-    }
-
-    if (dev->interface->send(dev, &Msg3) != COMM_SUCCESS)
-    {
-        /* Transmission request Error */
-        res = 2;
-    }
-
-    if (dev->interface->send(dev, &Msg4) != COMM_SUCCESS)
-    {
-        /* Transmission request Error */
-        res = 3;
-    }
-
-    if (0 != res)
-    {
-        FDCAN_ErrorHandler();
-    }
-
-    return res;
+    return dev->interface->send(dev, msg);
 }
 
 comm_status_t CanAbs_Start(CommDriver *dev)
@@ -148,9 +108,9 @@ comm_status_t CanAbs_SetBaudrate(CommDriver *dev, uint32_t baudrate)
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_BAUDRATE, &baudrate);
 }
 
-comm_status_t CanAbs_SetMode(CommDriver *dev, uint32_t baudrate)
+comm_status_t CanAbs_SetMode(CommDriver *dev, uint32_t mode)
 {
-    return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_MODE, &baudrate);
+    return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_MODE, &mode);
 }
 
 comm_status_t fdcan_create_message_1(FDCAN_Message *pMsg, uint8_t *pData, uint32_t length)
@@ -276,9 +236,9 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
     return res;
 }
 
-comm_status_t CanAbs_Send_Can1()
+comm_status_t CanAbs_Send_Can1(FDCAN_Message *msg)
 {
-    return CanAbs_Send(&Fdcan1Driver);
+    return CanAbs_Send(&Fdcan1Driver, msg);
 }
 
 comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrame *frame)
@@ -328,9 +288,9 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
     return res;
 }
 
-comm_status_t CanAbs_Send_Can2()
+comm_status_t CanAbs_Send_Can2(FDCAN_Message *msg)
 {
-    return CanAbs_Send(&Fdcan2Driver);
+    return CanAbs_Send(&Fdcan2Driver, msg);
 }
 
 comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrame *frame)

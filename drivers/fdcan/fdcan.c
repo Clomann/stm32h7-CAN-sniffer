@@ -588,13 +588,18 @@ comm_status_t FDCAN_Ioctl(
             }
             else 
             {
-                dev->state = DRIVER_STATE_OFF;
+                dev->state = DRIVER_STATE_STOPPED;
             }
             break;
         case CANABS_IOCTL_CMD_SET_MODE:
             {
                 FdcanModeType mode = *((FdcanModeType *)argument);
                 res = FDCAN_SetMode(dev, mode);
+
+                if (COMM_SUCCESS == res && mode == FDCAN_MODE_3)
+                {
+                    dev->state = DRIVER_STATE_OFF;
+                }
             }
             break;
             break;
