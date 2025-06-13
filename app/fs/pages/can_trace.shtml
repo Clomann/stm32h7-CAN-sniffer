@@ -57,6 +57,7 @@
           <th>#</th>
           <th>Timestamp [us]</th>
           <th>CAN ID</th>
+          <th>Channel</th>
           <th>DLC</th>
           <th>Data</th>
         </tr>
@@ -164,21 +165,23 @@
 
           const timestamp = view.getBigUint64(recordOffset + 4, true);
           const can_id = view.getUint32(recordOffset + 12, true);
-          const dlc = view.getUint8(recordOffset + 16);
-          const flags = view.getUint8(recordOffset + 17);
-          const bus_id = view.getUint8(recordOffset + 18);
+          const channel = view.getUint8(recordOffset + 16);
+          const dlc = view.getUint8(recordOffset + 17);
+          const flags = view.getUint8(recordOffset + 18);
+          const bus_id = view.getUint8(recordOffset + 19);
           const timestampSeconds = Number(timestamp) / 1_000_000;
 
           const data = [];
           if (type === 1) { // CANLOG_CLASSIC_TYPE
             for (let i = 0; i < 8; i++) {
-              data.push(view.getUint8(recordOffset + 19 + i).toString(16).padStart(2, '0'));
+              data.push(view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0'));
             }
 
             entries.push({
               type: "Classic",
               timestamp: timestampSeconds.toFixed(6),
               can_id,
+              channel,
               dlc,
               flags,
               bus_id,
@@ -187,13 +190,14 @@
 
           } else if (type === 2) { // CANLOG_FD_TYPE
             for (let i = 0; i < 64; i++) {
-              data.push(view.getUint8(recordOffset + 19 + i).toString(16).padStart(2, '0'));
+              data.push(view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0'));
             }
 
             entries.push({
               type: "FD",
               timestamp: timestampSeconds.toFixed(6),
               can_id,
+              channel,
               dlc,
               flags,
               bus_id,
@@ -223,6 +227,7 @@
             <td>${index + 1}</td>
             <td>${entry.timestamp}</td>
             <td>0x${entry.can_id.toString(16).toUpperCase()}</td>
+            <td>${entry.channel}</td>
             <td>${entry.dlc}</td>
             <td>${entry.data.join(' ')}</td>
             <td>${entry.type}</td>

@@ -327,15 +327,15 @@ static FRESULT appCanLogHandlerInit(AppControlDataType *data)
     return res;
 }
 
-static void appCanLogFillEntry(CanLogClassicCanEntryType *entry, FDCAN_ClassicFrame *frame, uint64_t timestamp)
+static void appCanLogFillEntry(CanLogClassicCanEntryType *entry, FDCAN_ClassicFrame *frame, uint64_t *timestamp, uint8_t channel)
 {
     memset(entry, 0x0, sizeof(CanLogClassicCanEntryType));
 
     entry->header.header_len = sizeof(entry->header);
     entry->header.type = CANLOG_CLASSIC_TYPE;
     entry->header.total_len = sizeof(CanLogClassicCanEntryType);
-
-    entry->timestamp = timestamp;
+    entry->timestamp = *timestamp;
+    entry->channel = channel;
     entry->dlc = frame->dlc;
     memcpy( (uint8_t *)&entry->can_id, (uint8_t *)&frame->id, sizeof(entry->can_id) );
     memcpy( entry->data, frame->data, sizeof(entry->data) );
@@ -413,7 +413,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     {
         timestamp = HAL_GetTick();
 
-        appCanLogFillEntry(&NewEntry, &NewFrame, NewFrame.timestamp);
+        appCanLogFillEntry(&NewEntry, &NewFrame, (uint64_t*)&NewFrame.timestamp, 1);
 
         CanLogBuffer_AddClassicCanEntry(&NewEntry);
 
@@ -450,7 +450,7 @@ static void appCanLogHandlerPoll(AppControlDataType *data)
     {
         timestamp = HAL_GetTick();
 
-        appCanLogFillEntry(&NewEntry, &NewFrame, NewFrame.timestamp);
+        appCanLogFillEntry(&NewEntry, &NewFrame, (uint64_t*)&NewFrame.timestamp, 2);
 
         CanLogBuffer_AddClassicCanEntry(&NewEntry);
 
@@ -494,9 +494,12 @@ static void appCanLogHandlerDeInit(AppControlDataType * data)
 
 static void appFdcanInit()
 {
-    uint8_t TxData[8];
-    uint8_t TxData2[8];
+    static uint8_t TxData[8];
+    static uint8_t TxData2[8];
     
+    memset(TxData, 0xFF, sizeof(TxData));
+    memset(TxData2, 0xFF, sizeof(TxData2));
+
     /* Initialize FDCAN timestamp external timer */
     if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
     {
@@ -505,8 +508,8 @@ static void appFdcanInit()
 
     if ( 0 == CanAbs_Init_Can1(AppConfig.can1.baudrate) ) 
     {
-        fdcan_create_message_1(&Can1TestMsg1, &TxData[0], sizeof(TxData) / sizeof(*TxData));
-        fdcan_create_message_2(&Can1TestMsg2, &TxData[0], sizeof(TxData) / sizeof(*TxData));
+        CanAbs_CreateMessage_Standard(&Can1TestMsg1, 0x321, &TxData[0], sizeof(TxData) / sizeof(*TxData));
+        CanAbs_CreateMessage_Standard(&Can1TestMsg2, 0x322, &TxData[0], sizeof(TxData) / sizeof(*TxData));
     }
     else
     {
@@ -515,8 +518,8 @@ static void appFdcanInit()
 
     if ( 0 == CanAbs_Init_Can2(AppConfig.can2.baudrate) ) 
     {
-        fdcan_create_message_3(&Can2TestMsg1, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
-        fdcan_create_message_4(&Can2TestMsg2, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
+        CanAbs_CreateMessage_Standard(&Can2TestMsg1, 0x323, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
+        CanAbs_CreateMessage_Standard(&Can2TestMsg2, 0x324, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
     }
     else
     {
