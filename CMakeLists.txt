@@ -20,16 +20,6 @@ message("Build type: "              ${CMAKE_BUILD_TYPE})
 project(SPI_FullDuplex_ComDMA_CM7)          # Modified
 enable_language(C CXX ASM)
 
-# thrid party libs
-include(FetchContent)
-
-FetchContent_Declare(
-  lwrb
-  GIT_REPOSITORY https://github.com/MaJerle/lwrb.git
-  GIT_TAG        main  # or a specific tag/commit
-)
-
-FetchContent_MakeAvailable(lwrb)
 
 #
 # Core MCU flags, CPU, instruction set and FPU setup
@@ -43,6 +33,41 @@ set(CPU_PARAMETERS
     -mfpu=fpv5-d16                  # Modified
     -mfloat-abi=hard                # Modified
 )
+
+# push flags to all targets
+add_compile_options(${CPU_PARAMETERS})
+add_link_options(${CPU_PARAMETERS})
+
+# thrid party libs
+
+# Low weight ring buffer (lwrb) fetch
+include(FetchContent)
+
+FetchContent_Declare(
+    lwrb
+    GIT_REPOSITORY https://github.com/MaJerle/lwrb.git
+    GIT_TAG        main
+)
+
+FetchContent_MakeAvailable(lwrb)
+
+# FreeRTOS LTS fetch
+add_library(freertos_config INTERFACE)
+target_include_directories(freertos_config INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/middleware/freertos)
+
+FetchContent_Declare(
+    freertos_kernel
+    GIT_REPOSITORY https://github.com/FreeRTOS/FreeRTOS-LTS.git
+    GIT_TAG        202406-LTS
+    SOURCE_SUBDIR  FreeRTOS/FreeRTOS-Kernel
+    GIT_SUBMODULES "FreeRTOS/FreeRTOS-Kernel"               
+)
+
+set(FREERTOS_PORT GCC_ARM_CM7 CACHE STRING "" FORCE)
+set(FREERTOS_HEAP 4            CACHE STRING "" FORCE) 
+
+FetchContent_MakeAvailable(freertos_kernel)
 
 # Set linker script
 set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld) # Modified
@@ -87,13 +112,17 @@ set(symbols_SYMB                    # Modified
     "CORE_CM7"
     "NO_SYS=1"
     "USE_STM32H7XX_NUCLEO_144_MB1363"
-    "FDCAN_MODE=FDCAN_MODE_NORMAL"
+    "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
 )
 
 # Executable files
 add_executable(${EXECUTABLE} ${sources_SRCS})
 
-target_link_libraries(${EXECUTABLE} PRIVATE lwrb)
+target_link_libraries(${EXECUTABLE} 
+    PRIVATE 
+        lwrb 
+        freertos_kernel
+        freertos_config)
 
 # Include paths
 target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})

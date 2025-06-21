@@ -6,6 +6,7 @@ list(APPEND sources_SRCS
 # Include directories
 list(APPEND include_path_DIRS
     ${CMAKE_CURRENT_LIST_DIR}/Sd
+    ${CMAKE_CURRENT_LIST_DIR}/freertos
 )
 
 # Send the final list to the parent scope
