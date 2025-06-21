@@ -193,7 +193,7 @@ list(APPEND sources_SRCS
 
 # Include directories
 list(APPEND include_path_DIRS
-    ${STM32_HAL_PATH}//Drivers/BSP/Components/lan8742
+    ${STM32_HAL_PATH}/Drivers/BSP/Components/lan8742
 
     ${STM32_HAL_PATH}/Drivers/STM32H7xx_HAL_Driver/Inc
     ${STM32_HAL_PATH}/Drivers/CMSIS/Device/ST/STM32H7xx/Include
