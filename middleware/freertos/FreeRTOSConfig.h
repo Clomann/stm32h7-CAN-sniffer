@@ -55,7 +55,7 @@ void vGenerateCore2Interrupt( void * xUpdatedMessageBuffer );
 #define configCPU_CLOCK_HZ                      ( SystemCoreClock )
 #define configTICK_RATE_HZ                      ( ( TickType_t ) 1000 )
 #define configMAX_PRIORITIES                    ( 7 )
-#define configMINIMAL_STACK_SIZE                ( ( uint16_t ) 128 )
+#define configMINIMAL_STACK_SIZE                ( ( uint16_t ) 512 )
 #define configTOTAL_HEAP_SIZE                   ( ( size_t ) ( 20 * 1024 ) )
 #define configMAX_TASK_NAME_LEN                 ( 16 )
 #define configUSE_TRACE_FACILITY                1

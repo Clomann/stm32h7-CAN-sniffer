@@ -17,7 +17,6 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
 #include "stm32h7xx_it.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
@@ -110,6 +109,8 @@ void UsageFault_Handler(void)
   }
 }
 
+#if !defined(vPortSVCHandler) && (vPortSVCHandler != SVC_Handler)
+
 /**
   * @brief  This function handles SVCall exception.
   * @param  None
@@ -118,6 +119,8 @@ void UsageFault_Handler(void)
 void SVC_Handler(void)
 {
 }
+
+#endif
 
 /**
   * @brief  This function handles Debug Monitor exception.
@@ -128,6 +131,8 @@ void DebugMon_Handler(void)
 {
 }
 
+#if !defined(xPortPendSVHandler) && (xPortPendSVHandler != PendSV_Handler)
+
 /**
   * @brief  This function handles PendSVC exception.
   * @param  None
@@ -136,6 +141,10 @@ void DebugMon_Handler(void)
 void PendSV_Handler(void)
 {
 }
+
+#endif
+
+#if !defined(xPortSysTickHandler) && (xPortSysTickHandler != SysTick_Handler)
 
 /**
   * @brief  This function handles SysTick Handler.
@@ -146,6 +155,8 @@ void SysTick_Handler(void)
 {
   HAL_IncTick();
 }
+
+#endif
 
 /******************************************************************************/
 /*                 STM32H7xx Peripherals Interrupt Handlers                   */

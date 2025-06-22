@@ -24,6 +24,7 @@
 extern "C" {
 #endif
 
+#include "main.h"
 #include "SpiCfg.h"
 
 /* Includes ------------------------------------------------------------------*/
@@ -37,10 +38,16 @@ void HardFault_Handler(void);
 void MemManage_Handler(void);
 void BusFault_Handler(void);
 void UsageFault_Handler(void);
-void SVC_Handler(void);
 void DebugMon_Handler(void);
+#if !defined(vPortSVCHandler) && (vPortSVCHandler != SVC_Handler)
+void SVC_Handler(void);
+#endif
+#if !defined(xPortPendSVHandler) && (xPortPendSVHandler != PendSV_Handler)
 void PendSV_Handler(void);
+#endif
+#if !defined(xPortSysTickHandler) && (xPortSysTickHandler != SysTick_Handler)
 void SysTick_Handler(void);
+#endif
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
 

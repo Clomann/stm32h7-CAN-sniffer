@@ -80,8 +80,11 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/main.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
+    ${PROJ_PATH}/CM7/Src/Core0Task0.c
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
+
+    ${PROJ_PATH}/middleware/freertos/freertos_interface.c
 
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
@@ -95,6 +98,8 @@ set(include_path_DIRS               # Modified
     ${PROJ_PATH}/CM7/Inc
 
     ${PROJ_PATH}/Common/Inc
+
+    ${PROJ_PATH}/middleware/freertos
 )
 
 add_subdirectory(adapters)
