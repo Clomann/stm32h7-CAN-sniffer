@@ -36,9 +36,6 @@
 
 /* Exported functions ------------------------------------------------------- */
 
-#define WAIT_FOR_USER_BUTTON	(0U)
-#define TIMx_TIME_RESOLUTION    (1U)
-
 void Error_Handler(void);
 void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
 
