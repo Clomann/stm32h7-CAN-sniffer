@@ -522,6 +522,9 @@ static void Core0Task0Main( void * parameters )
         uint32_t len;
     } Config = {0U};
     
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xCycleTime = pdMS_TO_TICKS(5);
+
     /* Unused parameters. */
     ( void ) parameters;
 
@@ -615,6 +618,7 @@ static void Core0Task0Main( void * parameters )
                 AppCtrlData.applyConfig = 0;
             }
             
+            vTaskDelayUntil(&xLastWakeTime, xCycleTime);
         }
 
         appCanLogHandlerDeInit(&AppCtrlData);
@@ -629,10 +633,10 @@ static void Core0Task0Main( void * parameters )
 void Core0Task0Init()
 {
     ( void ) xTaskCreateStatic( Core0Task0Main,
-                                "example",
+                                "Core0Task0Main",
                                 configMINIMAL_STACK_SIZE,
                                 NULL,
-                                configMAX_PRIORITIES - 1U,
+                                configMAX_PRIORITIES - 2U,
                                 &( Core0Task0MainStack[ 0 ] ),
                                 &( Core0Task0MainTCB ) );
 }
@@ -651,7 +655,6 @@ void TIM_InterruptCallback()
 void TIM_HAL_InterruptCallback()
 {
     HAL_IncTick();
-    GPIO_Dbg_Toggle();
 }
 
 /**

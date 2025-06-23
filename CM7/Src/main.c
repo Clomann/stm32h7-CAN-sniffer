@@ -28,6 +28,7 @@
 //#include "Spi_Cmds.h"
 
 #include "Core0Task0.h"
+#include "Core0Task1.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -140,6 +141,7 @@ int main(void)
     /*##-1- Configure the SPI peripheral #######################################*/
 
     Core0Task0Init();
+    Core0Task1Init();
 
     vTaskStartScheduler();
 
