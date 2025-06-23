@@ -1,6 +1,9 @@
 #include "timer.h"
 
+#define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL)  // = 10_000_000_000
+
 TIM_HandleTypeDef TimHandle;
+TIM_HandleTypeDef TimHalHandle; /* timer used to feed HAL tick */
 
 uint32_t GetTimerMaxARR(TIM_TypeDef *htim)
 {
@@ -97,8 +100,6 @@ uint8_t ComputePrescalerAndARR(
 
 uint8_t TIMx_Init(uint32_t resolution)
 {
-    #define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL)  // = 10_000_000_000
-
     uint8_t res = 0;
     uint32_t InputClock;
     uint32_t MaxArr;
@@ -167,19 +168,30 @@ uint8_t TIMx_Init(uint32_t resolution)
   * @param htim: TIM handle pointer
   * @retval None
   */
- void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
- {
-   /*##-1- Enable peripheral clock #################################*/
-   /* TIMx Peripheral clock enable */
-   TIMx_CLK_ENABLE();
-   
-   /*##-2- Configure the NVIC for TIMx ########################################*/
-   /* Set the TIMx priority */
-   HAL_NVIC_SetPriority(TIMx_IRQn, 3, 0);
- 
-   /* Enable the TIMx global Interrupt */
-   HAL_NVIC_EnableIRQ(TIMx_IRQn);
- }
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
+{
+    /*##-1- Enable peripheral clock #################################*/
+    if (TIMx == htim->Instance)
+    {
+        /* TIMx Peripheral clock enable */
+        TIMx_CLK_ENABLE();
+
+        /*##-2- Configure the NVIC for TIMx ########################################*/
+        /* Set the TIMx priority */
+        HAL_NVIC_SetPriority(TIMx_IRQn, 3, 0);
+
+        /* Enable the TIMx global Interrupt */
+        HAL_NVIC_EnableIRQ(TIMx_IRQn);
+    }
+    else if (TIM_HAL == htim->Instance)
+    {
+        TIM_HAL_CLK_ENABLE();
+
+        HAL_NVIC_SetPriority(TIM_HAL_IRQn, 3, 1);
+
+        HAL_NVIC_EnableIRQ(TIM_HAL_IRQn);
+    }
+}
 
 /**
   * @brief  Period elapsed callback in non blocking mode
@@ -188,7 +200,14 @@ uint8_t TIMx_Init(uint32_t resolution)
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    TIM_InterruptCallback();
+    if (TIMx == htim->Instance)
+    {
+        TIM_InterruptCallback();
+    }
+    else if (TIM_HAL == htim->Instance)
+    {
+        TIM_HAL_InterruptCallback();
+    }
 }
 
 /**
@@ -209,4 +228,55 @@ void TIM_GetCounterValue(uint16_t *cnt)
 void TIM_GetArrValue(uint16_t *arr)
 {
     *arr = __HAL_TIM_GetAutoreload(&TimHandle);
+}
+
+uint8_t TIM_HAL_Init(uint32_t freq)
+{
+    uint8_t res = 0;
+    uint32_t InputClock;
+    uint32_t MaxArr;
+    uint32_t Arr;
+    uint32_t Prescaler;
+
+    InputClock = GetTimerInputClock(TIM_HAL);
+    MaxArr = GetTimerMaxARR(TIM_HAL);
+
+    res = ComputePrescalerAndARR(
+            InputClock, 
+            freq,
+            MaxArr,
+            &Prescaler, 
+            &Arr);
+
+    if (0 != res) return res;
+
+    /* Set TIM instance */
+    TimHalHandle.Instance = TIM_HAL;
+
+    TimHalHandle.Init.Period            = Arr;
+    TimHalHandle.Init.Prescaler         = Prescaler;
+    TimHalHandle.Init.ClockDivision     = 0;
+    TimHalHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
+    TimHalHandle.Init.RepetitionCounter = 0;
+
+    if (HAL_TIM_Base_Init(&TimHalHandle) != HAL_OK)
+    {
+        /* Initialization Error */
+        res = 1;
+    }
+
+    /*##-2- Start the TIM Base generation in interrupt mode ####################*/
+    /* Start Channel1 */
+    if (HAL_TIM_Base_Start_IT(&TimHalHandle) != HAL_OK)
+    {
+        /* Starting Error */
+        res = 2;
+    }
+
+    return res;
+}
+
+void TIM_HAL_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&TimHalHandle);
 }
