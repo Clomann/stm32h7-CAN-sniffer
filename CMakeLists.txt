@@ -81,6 +81,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
     ${PROJ_PATH}/CM7/Src/Core0Task0.c
+    ${PROJ_PATH}/CM7/Src/Core0Task1.c
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
@@ -145,6 +146,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -Werror=implicit-function-declaration
     # Full debug configuration
     -Og -g3 -ggdb
+    -fstack-usage
 )
 
 # Linker options
