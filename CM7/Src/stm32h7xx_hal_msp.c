@@ -153,6 +153,8 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
     /* Associate the initialized DMA handle to the the SPI handle */
     __HAL_LINKDMA(hspi, hdmarx, hdma_rx);
 
+    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4); // demanded by FreeRTOS
+
     /*##-4- Configure the NVIC for DMA #########################################*/
     /* NVIC configuration for DMA transfer complete interrupt (SPI1_TX) */
     HAL_NVIC_SetPriority(SPI1_DMA_TX_IRQn, 1, 1);
@@ -166,6 +168,8 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
     /* NVIC configuration for SPI transfer complete interrupt (SPI1) */
     HAL_NVIC_SetPriority(SPI1_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(SPI1_IRQn);
+
+
   }
 }
 

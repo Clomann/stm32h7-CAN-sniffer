@@ -31,3 +31,11 @@ comm_status_t CanAbs_CreateMessage_Standard(
     uint32_t id, 
     uint8_t *data, 
     uint32_t length);
+
+/**
+  * @brief  Called by the driver on every rx frame.
+  * @note This function runs in the ISR context. 
+  */
+void CanAbs_RxNotificationCallback(
+    void
+);

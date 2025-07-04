@@ -1,0 +1,14 @@
+#include "FreeRTOSConfig.h"
+#include "stm32h745xx.h"
+
+#define DEFERRED_IRQn UART5_IRQn
+#define DEFERRED_IRQHandler UART5_IRQHandler
+#define DEFERRED_IRQ_PRIO   6
+
+#define CORE0_TASK0_PRIO (configMAX_PRIORITIES - 1U)
+#define CORE0_TASK1_PRIO (configMAX_PRIORITIES - 2U)
+#define CORE0_TASK2_PRIO (configMAX_PRIORITIES - 3U)
+
+#define CORE0_TASK0_STACK_SIZE (4U * configMINIMAL_STACK_SIZE)
+#define CORE0_TASK1_STACK_SIZE (4U * configMINIMAL_STACK_SIZE)
+#define CORE0_TASK2_STACK_SIZE (configMINIMAL_STACK_SIZE)

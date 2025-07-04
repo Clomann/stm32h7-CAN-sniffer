@@ -1,8 +1,9 @@
 #include "Core0Task1.h"
+#include "Core0TasksCfg.h"
 #include "gpio.h"
 
-static StaticTask_t Core0Task0MainTCB;
-static StackType_t Core0Task0MainStack[ configMINIMAL_STACK_SIZE ];
+static StaticTask_t Core0Task1MainTCB;
+static StackType_t Core0Task1MainStack[ configMINIMAL_STACK_SIZE ];
 
 static void Core0Task1Main( void * parameters )
 {
@@ -22,7 +23,7 @@ void Core0Task1Init()
                                 "Core0Task1Main",
                                 configMINIMAL_STACK_SIZE,
                                 NULL,
-                                configMAX_PRIORITIES - 1U,
-                                &( Core0Task0MainStack[ 0 ] ),
-                                &( Core0Task0MainTCB ) );
+                                CORE0_TASK2_PRIO,
+                                &( Core0Task1MainStack[ 0 ] ),
+                                &( Core0Task1MainTCB ) );
 }

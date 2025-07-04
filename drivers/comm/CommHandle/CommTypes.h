@@ -69,6 +69,7 @@ typedef struct {
 	uint32_t timestamp;
 	uint16_t dlc;
 	uint8_t data[8];
+    uint8_t channel;
 } FDCAN_ClassicFrame;
 
 #endif /* CM7_DRIVERS_COMM_COMMTYPES_H_ */

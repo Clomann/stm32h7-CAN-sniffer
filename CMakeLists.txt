@@ -86,6 +86,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
     ${PROJ_PATH}/middleware/freertos/freertos_interface.c
+    ${PROJ_PATH}/ports/fdcan_msg_port.c
 
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
@@ -101,6 +102,7 @@ set(include_path_DIRS               # Modified
     ${PROJ_PATH}/Common/Inc
 
     ${PROJ_PATH}/middleware/freertos
+    ${PROJ_PATH}/ports
 )
 
 add_subdirectory(adapters)
@@ -147,6 +149,8 @@ target_compile_options(${EXECUTABLE} PRIVATE
     # Full debug configuration
     -Og -g3 -ggdb
     -fstack-usage
+    -ffunction-sections
+    -fdata-sections
 )
 
 # Linker options
@@ -165,6 +169,7 @@ target_link_options(${EXECUTABLE} PRIVATE
     -Wl,--print-memory-usage
     -Wl,--warn-unresolved-symbols
     -Wl,--trace
+    -Wl,--gc-sections,--print-gc-sections
 )
 
 
