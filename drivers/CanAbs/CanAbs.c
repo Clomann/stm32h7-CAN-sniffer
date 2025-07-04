@@ -136,6 +136,11 @@ comm_status_t CanAbs_CreateMessage_Standard(
 	return COMM_SUCCESS;
 }
 
+void NotifyConsumerTask(void)
+{
+    CanAbs_RxNotificationCallback();
+}
+
 /**
   * @brief  Rx FIFO 0 callback.
   * @param  hfdcan: pointer to an FDCAN_HandleTypeDef structure that contains
@@ -152,16 +157,20 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     {
         if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
         {
+            NewFrame.channel = 1;
             FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver, &NewFrame.timestamp);
             ring_buffer_put(Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
+            NotifyConsumerTask();
         }
     }
     else if (FDCAN_2 == hfdcan->Instance)
     {
         if (Fdcan2Driver.interface->read(&Fdcan2Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
         {
+            NewFrame.channel = 2;
             FDCAN_GetMostRecentInterruptTimestamp(&Fdcan2Driver, &NewFrame.timestamp);
             ring_buffer_put(Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
+            NotifyConsumerTask();
         }
     }
 }
