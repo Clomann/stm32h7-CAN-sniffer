@@ -20,6 +20,7 @@
 #include "timer.h"
 #include "gpio.h"
 #include "httpd_post.h"
+#include "spi_port_freertos.h"
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
@@ -591,8 +592,8 @@ static void Core0Task0Main( void * parameters )
     {
         Error_Handler();
     }
-
-    HalStatus = SPI_Init();
+    
+    HalStatus = spi_port_freertos_init();
 
     if(HalStatus != HAL_OK)
     {

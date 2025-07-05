@@ -22,7 +22,7 @@ uint8_t spi2_tx_buffer[SPI2_TX_BUFFER_SIZE];
 uint8_t spi2_rx_buffer[SPI2_RX_BUFFER_SIZE];
 
 /* SPI handler declaration */
-SPI_HandleTypeDef SpiHandle1;
+static SPI_HandleTypeDef *pSpiHandle1;
 
 /* transfer state */
 __IO uint32_t wTransferState = TRANSFER_WAIT;
@@ -51,7 +51,7 @@ void SPI1_DMA_TX_IRQHandler(void);
 //	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
 //#endif
 //
-//	RetVal = HAL_SPI_Receive_DMA(&SpiHandle1, pRxBuffer, RxBytes);
+//	RetVal = HAL_SPI_Receive_DMA(pSpiHandle1, pRxBuffer, RxBytes);
 //
 //	if (RetVal == HAL_BUSY)
 //	{
@@ -68,7 +68,7 @@ void SPI1_DMA_TX_IRQHandler(void);
 //	}
 //
 //	// Wait until the SPI is no longer busy
-//	while (HAL_SPI_GetState(&SpiHandle1) != HAL_SPI_STATE_READY) {}
+//	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
 //
 //#if CS_ACTIVE_HIGH
 //	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
@@ -81,32 +81,42 @@ void SPI1_DMA_TX_IRQHandler(void);
 //	return RetVal;
 //}
 
-HAL_StatusTypeDef SPI_Init()
-{
+HAL_StatusTypeDef SPI_Init(SPI_HandleTypeDef * handle)
+{   
+    HAL_StatusTypeDef res;
+
+    if (NULL == handle)
+    {
+        Spi_ErrorHandler();
+    }
+
+    pSpiHandle1 = handle;
+
 	/* Set the SPI1 parameters */
-	SpiHandle1.Instance               = SPI1;
-	SpiHandle1.Init.Mode              = SPI_MODE_MASTER;
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
-	SpiHandle1.Init.Direction         = SPI_DIRECTION_2LINES;
-	SpiHandle1.Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
-	SpiHandle1.Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
-	SpiHandle1.Init.DataSize          = SPI_DATASIZE_8BIT;
-	SpiHandle1.Init.FirstBit          = SPI_FIRSTBIT_MSB;
-	SpiHandle1.Init.TIMode            = SPI_TIMODE_DISABLE;
-	SpiHandle1.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-	SpiHandle1.Init.CRCPolynomial     = 7;
-	SpiHandle1.Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
-	SpiHandle1.Init.NSS               = SPI_NSS_SOFT;
-	SpiHandle1.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
-	SpiHandle1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
-	return HAL_SPI_Init(&SpiHandle1);
+	handle->Instance               = SPI1;
+	handle->Init.Mode              = SPI_MODE_MASTER;
+	handle->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+	handle->Init.Direction         = SPI_DIRECTION_2LINES;
+	handle->Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
+	handle->Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
+	handle->Init.DataSize          = SPI_DATASIZE_8BIT;
+	handle->Init.FirstBit          = SPI_FIRSTBIT_MSB;
+	handle->Init.TIMode            = SPI_TIMODE_DISABLE;
+	handle->Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
+	handle->Init.CRCPolynomial     = 7;
+	handle->Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
+	handle->Init.NSS               = SPI_NSS_SOFT;
+	handle->Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
+	handle->Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
+	res = HAL_SPI_Init(handle);
+    return res;
 }
 
 uint8_t Spi_Send(uint8_t * pTxBuffer, uint8_t TxBytes)
 {
 	uint8_t RetVal;
 
-	RetVal = HAL_SPI_Transmit_DMA(&SpiHandle1, pTxBuffer, TxBytes);
+	RetVal = HAL_SPI_Transmit_DMA(pSpiHandle1, pTxBuffer, TxBytes);
 
 	if (RetVal == HAL_BUSY)
 	{
@@ -123,7 +133,7 @@ uint8_t Spi_Send(uint8_t * pTxBuffer, uint8_t TxBytes)
 	}
 
 	// Wait until the SPI is no longer busy
-	while (HAL_SPI_GetState(&SpiHandle1) != HAL_SPI_STATE_READY) {}
+	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
 
 	return RetVal;
 }
@@ -134,7 +144,7 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 
 	SCB_CleanDCache_by_Addr ((uint32_t *)pTxBuffer, TxBytes);
 
-	RetVal = HAL_SPI_TransmitReceive_DMA(&SpiHandle1, pTxBuffer, aRxBuffer, TxBytes);
+	RetVal = HAL_SPI_TransmitReceive_DMA(pSpiHandle1, pTxBuffer, aRxBuffer, TxBytes);
 
 	if (RetVal == HAL_BUSY)
 	{
@@ -146,12 +156,10 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 		Error_Handler();
 	}
 
-	while (wTransferState == TRANSFER_WAIT)
-	{
-	}
+    Spi_NotifyTransferIssued(pSpiHandle1);
 
 	// Wait until the SPI is no longer busy
-	while (HAL_SPI_GetState(&SpiHandle1) != HAL_SPI_STATE_READY) {}
+	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
 
 	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, TxBytes);
 
@@ -275,7 +283,7 @@ uint8_t Spi_goHighSpeed()
 
 	RetVal = 0U;
 
-	if(HAL_SPI_Init(&SpiHandle1) != HAL_OK)
+	if(HAL_SPI_Init(pSpiHandle1) != HAL_OK)
 	{
 		/* Initialization Error */
 		Error_Handler();
@@ -283,29 +291,52 @@ uint8_t Spi_goHighSpeed()
 
 	/*##-1- Configure the SPI peripheral #######################################*/
 	/* Set the SPI1 parameters */
-	SpiHandle1.Instance               = SPI1;
-	SpiHandle1.Init.Mode              = SPI_MODE_MASTER;
-	SpiHandle1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-	SpiHandle1.Init.Direction         = SPI_DIRECTION_2LINES;
-	SpiHandle1.Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
-	SpiHandle1.Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
-	SpiHandle1.Init.DataSize          = SPI_DATASIZE_8BIT;
-	SpiHandle1.Init.FirstBit          = SPI_FIRSTBIT_MSB;
-	SpiHandle1.Init.TIMode            = SPI_TIMODE_DISABLE;
-	SpiHandle1.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-	SpiHandle1.Init.CRCPolynomial     = 7;
-	SpiHandle1.Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
-	SpiHandle1.Init.NSS               = SPI_NSS_SOFT;
-	SpiHandle1.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
-	SpiHandle1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
+	pSpiHandle1->Instance               = SPI1;
+	pSpiHandle1->Init.Mode              = SPI_MODE_MASTER;
+	pSpiHandle1->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+	pSpiHandle1->Init.Direction         = SPI_DIRECTION_2LINES;
+	pSpiHandle1->Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
+	pSpiHandle1->Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
+	pSpiHandle1->Init.DataSize          = SPI_DATASIZE_8BIT;
+	pSpiHandle1->Init.FirstBit          = SPI_FIRSTBIT_MSB;
+	pSpiHandle1->Init.TIMode            = SPI_TIMODE_DISABLE;
+	pSpiHandle1->Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
+	pSpiHandle1->Init.CRCPolynomial     = 7;
+	pSpiHandle1->Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
+	pSpiHandle1->Init.NSS               = SPI_NSS_SOFT;
+	pSpiHandle1->Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
+	pSpiHandle1->Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
 
-	if(HAL_SPI_Init(&SpiHandle1) != HAL_OK)
+	if(HAL_SPI_Init(pSpiHandle1) != HAL_OK)
 	{
 		/* Initialization Error */
 		Error_Handler();
 	}
 
 	return RetVal;
+}
+
+uint8_t  __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+{
+    uint8_t res = 0;
+	while (wTransferState == TRANSFER_WAIT)
+	{
+	}
+    return res;
+}
+
+uint8_t  __attribute__((weak)) Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+{
+    uint8_t res = 0;
+    wTransferState = TRANSFER_COMPLETE;
+    return res;
+}
+
+uint8_t  __attribute__((weak)) Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
+{
+    uint8_t res = 0;
+    wTransferState = TRANSFER_ERROR;
+    return res;
 }
 
 /**
@@ -322,7 +353,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   BSP_LED_On(LED1);
   /* Turn LED2 on: Transfer in reception process is complete */
   BSP_LED_On(LED2);
-  wTransferState = TRANSFER_COMPLETE;
+  Spi_NotifyTransferComplete(hspi);
 }
 
 
@@ -335,7 +366,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
-  wTransferState = TRANSFER_ERROR;
+  Spi_NotifyTransferError(hspi);
 }
 
 /**
