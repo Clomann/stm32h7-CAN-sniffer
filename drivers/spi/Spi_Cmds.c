@@ -38,6 +38,8 @@ ALIGN_32BYTES(uint8_t aRxBuffer[BUFFER_ALIGNED_SIZE]);
 
 
 static void Error_Handler(void);
+void SPI1_DMA_RX_IRQHandler(void);
+void SPI1_DMA_TX_IRQHandler(void);
 
 //uint8_t Spi_Receive(uint8_t * pRxBuffer, uint8_t RxBytes)
 //{
@@ -347,4 +349,34 @@ static void Error_Handler(void)
   /* Turn LED3 on */
   BSP_LED_On(LED3);
 
+}
+
+/**
+  * @brief  This function handles SPI1 interrupt request.
+  * @param  None
+  * @retval None
+  */
+void SPI1_IRQHandler(void)
+{
+  HAL_SPI_IRQHandler(pSpiHandle1);
+}
+
+/**
+  * @brief  This function handles DMA Rx interrupt request.
+  * @param  None
+  * @retval None
+  */
+void SPI1_DMA_RX_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(pSpiHandle1->hdmarx);
+}
+
+/**
+  * @brief  This function handles DMA Tx interrupt request.
+  * @param  None
+  * @retval None
+  */
+void SPI1_DMA_TX_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(pSpiHandle1->hdmatx);
 }

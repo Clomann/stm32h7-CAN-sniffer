@@ -25,7 +25,6 @@ extern "C" {
 #endif
 
 #include "main.h"
-#include "SpiCfg.h"
 
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
@@ -48,8 +47,6 @@ void PendSV_Handler(void);
 #if !defined(xPortSysTickHandler) && (xPortSysTickHandler != SysTick_Handler)
 void SysTick_Handler(void);
 #endif
-void SPI1_DMA_RX_IRQHandler(void);
-void SPI1_DMA_TX_IRQHandler(void);
 
 #ifdef __cplusplus
 }

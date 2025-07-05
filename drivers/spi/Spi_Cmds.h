@@ -62,4 +62,7 @@ uint8_t Spi_PollTillIdle(uint8_t *);
 uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
 uint8_t Spi_SendReceiveMsg(const uint8_t *, uint8_t *, uint8_t);
 
+void SPI1_DMA_RX_IRQHandler(void);
+void SPI1_DMA_TX_IRQHandler(void);
+
 #endif /* CM7_INC_SPI_CMDS_H_ */
