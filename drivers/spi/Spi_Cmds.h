@@ -53,7 +53,8 @@ static inline uint8_t Spi_CsDisable()
 	return 0;
 }
 
-HAL_StatusTypeDef SPI_Init(void);
+HAL_StatusTypeDef SPI_Init(SPI_HandleTypeDef *);
+
 //static uint8_t Spi_Receive(uint8_t *r, uint8_t);
 uint8_t Spi_readByte(uint8_t * pResponse);
 uint8_t Spi_writByte(const uint8_t *data);
@@ -61,6 +62,12 @@ uint8_t Spi_PollForResponse(uint8_t *);
 uint8_t Spi_PollTillIdle(uint8_t *);
 uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
 uint8_t Spi_SendReceiveMsg(const uint8_t *, uint8_t *, uint8_t);
+
+uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
+uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
+uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi);
+
+void Spi_ErrorHandler(void);
 
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
