@@ -8,6 +8,8 @@
 #include <task.h>
 #include <queue.h>
 
+#include "nvic_irg_config.h"
+
 #include "FileHandler.h"
 #include "HttpAbs.h"
 #include "CanLogBuffer.h"
@@ -684,7 +686,7 @@ static void Core0Task0Main( void * parameters )
 
 void Core0Task0Init()
 {
-    HAL_NVIC_SetPriority(DEFERRED_IRQn, DEFERRED_IRQ_PRIO, 0);             /* 6 ≥ configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY */
+    HAL_NVIC_SetPriority(DEFERRED_IRQn, DEFERRED_IRQ_PREEMPT_PRIO, 0);             /* 6 ≥ configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY */
     HAL_NVIC_EnableIRQ(DEFERRED_IRQn);
     
     TASK_CREATE_STATIC(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE, CORE0_TASK0_PRIO);

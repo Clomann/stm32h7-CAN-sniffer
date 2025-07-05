@@ -1,4 +1,5 @@
 #include "timer.h"
+#include "nvic_irg_config.h"
 
 #define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL)  // = 10_000_000_000
 
@@ -178,7 +179,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
 
         /*##-2- Configure the NVIC for TIMx ########################################*/
         /* Set the TIMx priority */
-        HAL_NVIC_SetPriority(TIMx_IRQn, 3, 0);
+        HAL_NVIC_SetPriority(TIMx_IRQn, TIMx_IRQ_PREEMPT_PRIO, 0);
 
         /* Enable the TIMx global Interrupt */
         HAL_NVIC_EnableIRQ(TIMx_IRQn);
@@ -187,7 +188,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
     {
         TIM_HAL_CLK_ENABLE();
 
-        HAL_NVIC_SetPriority(TIM_HAL_IRQn, 3, 1);
+        HAL_NVIC_SetPriority(TIM_HAL_IRQn, TIMx_IRQ_PREEMPT_PRIO, 1);
 
         HAL_NVIC_EnableIRQ(TIM_HAL_IRQn);
     }

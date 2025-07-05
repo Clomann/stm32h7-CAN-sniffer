@@ -20,6 +20,7 @@
 #include "main.h"
 
 #include "SpiCfg.h"
+#include "nvic_irg_config.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -157,19 +158,17 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
 
     /*##-4- Configure the NVIC for DMA #########################################*/
     /* NVIC configuration for DMA transfer complete interrupt (SPI1_TX) */
-    HAL_NVIC_SetPriority(SPI1_DMA_TX_IRQn, 1, 1);
+    HAL_NVIC_SetPriority(SPI1_DMA_TX_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 1);
     HAL_NVIC_EnableIRQ(SPI1_DMA_TX_IRQn);
 
     /* NVIC configuration for DMA transfer complete interrupt (SPI1_RX) */
-    HAL_NVIC_SetPriority(SPI1_DMA_RX_IRQn, 1, 0);
+    HAL_NVIC_SetPriority(SPI1_DMA_RX_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 0);
     HAL_NVIC_EnableIRQ(SPI1_DMA_RX_IRQn);
 
     /*##-5- Configure the NVIC for SPI #########################################*/
     /* NVIC configuration for SPI transfer complete interrupt (SPI1) */
-    HAL_NVIC_SetPriority(SPI1_IRQn, 1, 0);
+    HAL_NVIC_SetPriority(SPI1_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 0);
     HAL_NVIC_EnableIRQ(SPI1_IRQn);
-
-
   }
 }
 
