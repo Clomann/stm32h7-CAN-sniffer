@@ -32,13 +32,10 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 /* SPI handler declared in "main.c" file */
-extern SPI_HandleTypeDef SpiHandle1;
 extern ETH_HandleTypeDef heth;
 
 /* Private function prototypes -----------------------------------------------*/
 void SPI1_IRQHandler(void);
-void SPI1_DMA_RX_IRQHandler(void);
-void SPI1_DMA_TX_IRQHandler(void);
 void ETH_IRQHandler(void);
 
 
@@ -164,36 +161,6 @@ void SysTick_Handler(void)
 /*  available peripheral interrupt handler's name please refer to the startup */
 /*  file (startup_stm32h7xx.s).                                               */
 /******************************************************************************/
-
-/**
-  * @brief  This function handles SPI1 interrupt request.
-  * @param  None
-  * @retval None
-  */
-void SPI1_IRQHandler(void)
-{
-  HAL_SPI_IRQHandler(&SpiHandle1);
-}
-
-/**
-  * @brief  This function handles DMA Rx interrupt request.
-  * @param  None
-  * @retval None
-  */
-void SPI1_DMA_RX_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(SpiHandle1.hdmarx);
-}
-
-/**
-  * @brief  This function handles DMA Tx interrupt request.
-  * @param  None
-  * @retval None
-  */
-void SPI1_DMA_TX_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(SpiHandle1.hdmatx);
-}
 
 /**
   * @brief This function handles Ethernet global interrupt.
