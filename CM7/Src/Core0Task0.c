@@ -19,13 +19,8 @@
 #include "gpio.h"
 #include "httpd_post.h"
 
-static volatile StaticTask_t Core0Task0MainTCB;
-static volatile StackType_t Core0Task0MainStack[ CORE0_TASK1_STACK_SIZE ];
-
-static volatile StaticTask_t CanBridgeTaskTCB;
-static volatile StackType_t CanBridgeTaskStack[ CORE0_TASK0_STACK_SIZE ];
-
-static volatile TaskHandle_t CanBridgeTaskHdl;
+TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
+TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
 
 typedef struct {
   struct {
@@ -146,7 +141,10 @@ void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
 static void CanBridgeTask(void *arg)
 {
     FDCAN_ClassicFrame Frame;
+    static UBaseType_t MinUnusedStack;
     
+    ( void ) MinUnusedStack;
+
     ulTaskNotifyTake(pdTRUE, 0);
 
     for (;;)
@@ -166,6 +164,8 @@ static void CanBridgeTask(void *arg)
         {
             fdcan_msg_port_receive(&Frame);
         }
+
+        MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
     }
 }
 
@@ -578,9 +578,11 @@ static void Core0Task0Main( void * parameters )
         char data[1024U];
         uint32_t len;
     } Config = {0U};
+    static UBaseType_t MinUnusedStack;
 
     /* Unused parameters. */
     ( void ) parameters;
+    ( void ) MinUnusedStack;
 
     /* Initialize HAL SysTick external timer */
     if (0 != TIM_HAL_Init(TIM_HAL_TIME_FREQ) )
@@ -668,6 +670,8 @@ static void Core0Task0Main( void * parameters )
         {
             AppCtrlData.applyConfig = 0;
         }
+
+        MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
     }
 
     appCanLogHandlerDeInit(&AppCtrlData);
@@ -682,23 +686,9 @@ void Core0Task0Init()
 {
     HAL_NVIC_SetPriority(DEFERRED_IRQn, DEFERRED_IRQ_PRIO, 0);             /* 6 ≥ configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY */
     HAL_NVIC_EnableIRQ(DEFERRED_IRQn);
-
-    CanBridgeTaskHdl =  xTaskCreateStatic( CanBridgeTask,
-                                "CanBridgeTask",
-                                CORE0_TASK0_STACK_SIZE,
-                                NULL,
-                                CORE0_TASK0_PRIO,
-                                (StackType_t*)&( CanBridgeTaskStack[ 0 ] ),
-                                (StaticTask_t*)&( CanBridgeTaskTCB ) );
-
-    ( void ) xTaskCreateStatic( Core0Task0Main,
-                                "Core0Task0Main",
-                                CORE0_TASK1_STACK_SIZE,
-                                NULL,
-                                CORE0_TASK1_PRIO,
-                                (StackType_t*)&( Core0Task0MainStack[ 0 ] ),
-                                (StaticTask_t*)&( Core0Task0MainTCB ) );
-
+    
+    TASK_CREATE_STATIC(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE, CORE0_TASK0_PRIO);
+    TASK_CREATE_STATIC(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE, CORE0_TASK1_PRIO);
     
     configASSERT( CanBridgeTaskHdl != NULL );
 }

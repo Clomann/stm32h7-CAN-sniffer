@@ -2,8 +2,7 @@
 #include "Core0TasksCfg.h"
 #include "gpio.h"
 
-static StaticTask_t Core0Task1MainTCB;
-static StackType_t Core0Task1MainStack[ configMINIMAL_STACK_SIZE ];
+TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
 static void Core0Task1Main( void * parameters )
 {
@@ -19,11 +18,5 @@ static void Core0Task1Main( void * parameters )
 
 void Core0Task1Init()
 {
-    ( void ) xTaskCreateStatic( Core0Task1Main,
-                                "Core0Task1Main",
-                                configMINIMAL_STACK_SIZE,
-                                NULL,
-                                CORE0_TASK2_PRIO,
-                                &( Core0Task1MainStack[ 0 ] ),
-                                &( Core0Task1MainTCB ) );
+    TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
 }
