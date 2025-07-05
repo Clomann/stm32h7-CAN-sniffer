@@ -24,6 +24,7 @@
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_nucleo.h"
 
+#include "nvic_irg_config.h"
 #include "freertos_interface.h"
 
 /* Exported types ------------------------------------------------------------*/

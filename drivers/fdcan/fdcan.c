@@ -7,6 +7,7 @@
 
 #include "fdcan.h"
 #include "fdcan_utils.h"
+#include "nvic_irg_config.h"
 
 #define FDCAN_1_NBR        COMM_DEVICE_NUMBER_1
 #define FDCAN_2_NBR        COMM_DEVICE_NUMBER_2
@@ -686,12 +687,12 @@ HAL_StatusTypeDef FDCAN_Nvic(FDCAN_GlobalTypeDef *fdcan)
 
     if (FDCAN_1 == fdcan)
     {
-        HAL_NVIC_SetPriority(FDCAN_1_IRQn, 0, 1);
+        HAL_NVIC_SetPriority(FDCAN_1_IRQn, FDCAN_IRQ_PREEMPT_PRIO, 1);
         HAL_NVIC_EnableIRQ(FDCAN_1_IRQn);
     }
     else if (FDCAN_2 == fdcan)
     {
-        HAL_NVIC_SetPriority(FDCAN_2_IRQn, 0, 1);
+        HAL_NVIC_SetPriority(FDCAN_2_IRQn, FDCAN_IRQ_PREEMPT_PRIO, 1);
         HAL_NVIC_EnableIRQ(FDCAN_2_IRQn);
     }
     else

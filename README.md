@@ -139,6 +139,25 @@ block-beta
 
 For better performance and higher availability the serving of requests via ethernet shall be executed on another core to not interfere with the CAN trace logging when large files are loaded for user downloads.
 
+## Modules
+## Interrupts
+configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY is set to 5 per default.
+
+Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY):
+| Module | Prio |  |
+| - | - | - |
+| FDCAN | -5 |  |
+| TIM | -4 |  |
+|  | -3 |  |
+|  | -2 |  |
+|  | -1 |  |
+|  | +0 |  |
+| SPI | +1 |  |
+| ETH | +2 |  |
+| Deferred (SW) | +3 |  |
+|  | +4 |  |
+|  | +5 |  |
+
 # Hardware setupp
 
 This section gives a brief overview of the hardware setup. The hardware setup is based on a NUCLEO-H745ZI-Q development board.
