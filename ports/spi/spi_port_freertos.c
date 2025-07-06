@@ -15,13 +15,19 @@ typedef struct {
     SemaphoreHandle_t  xSem;
 } SpiSemEntry_t;
 
-static SpiSemEntry_t xSemTable[MAX_SPI_INSTANCES] = { 0 };
-static StaticSemaphore_t xSemBuffers[MAX_SPI_INSTANCES];
+static volatile TaskHandle_t* pCanBridgeTaskHdl;
+static volatile SpiSemEntry_t xSemTable[MAX_SPI_INSTANCES] = { 0 };
+static volatile StaticSemaphore_t xSemBuffers[MAX_SPI_INSTANCES];
 
-uint8_t spi_port_freertos_init(void)
+uint8_t spi_port_freertos_init(void *handle)
 {
     void *pSpiHandle1;
-
+    
+    if (NULL == handle)
+    {
+        Spi_ErrorHandler();
+    }
+    pCanBridgeTaskHdl = (TaskHandle_t*)handle;
     pSpiHandle1 = SpiAbs_GetHandle_Spi1();
     Spi_NotifyRegister((SPI_HandleTypeDef*)pSpiHandle1);
     
@@ -38,18 +44,18 @@ void Spi_NotifyRegister(void *hspi)
     {
         Spi_ErrorHandler();
     }
-    
+#if SPI_PORT_USE_SEMAPHORE
     for (int i = 0; i < MAX_SPI_INSTANCES; ++i) {
         if (xSemTable[i].hspi == NULL) {
             xSemTable[i].hspi = handle;
-            xSemTable[i].xSem =
-                xSemaphoreCreateBinaryStatic(&xSemBuffers[i]);
+            xSemTable[i].xSem = xSemaphoreCreateBinaryStatic(( StaticQueue_t *)&xSemBuffers[i]);
             configASSERT(xSemTable[i].xSem);
             return;
         }
     }
     /* Ran out of slots – stop here so the bug is obvious.               */
     configASSERT(!"MAX_SPI_INSTANCES too small");
+#endif
 }
 
 #if SPI_PORT_USE_HOOKS
@@ -66,14 +72,16 @@ static inline SemaphoreHandle_t prvGetSem(SPI_HandleTypeDef *hspi)
 /* ---------- task-side: called after the DMA transfer is started ------ */
 uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
+    BaseType_t res;
+#if SPI_PORT_USE_SEMAPHORE
     SemaphoreHandle_t xSem = prvGetSem(hspi);
     configASSERT(xSem);                        /* forgot to register?   */
-
-    /* Flush any old token (e.g. previous error path).                   */
-    (void)xSemaphoreTake(xSem, 0);
-
-    /* Block until ISR signals completion or error.                      */
-    if (xSemaphoreTake(xSem, portMAX_DELAY) != pdTRUE)
+    
+    res = xSemaphoreTake(xSem, portMAX_DELAY);
+#else
+    res = ulTaskNotifyTake( pdTRUE /*clearOnExit*/, portMAX_DELAY );
+#endif
+    if (res != pdTRUE)
         return 1;                            /* timeout (shouldn’t happen) */
 
     return 0;
@@ -83,11 +91,24 @@ uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     BaseType_t xHigherPrioTaskWoken = pdFALSE;
+    volatile uint32_t IrqPrio = NVIC_GetPriority(SPI1_IRQn);
+
+    configASSERT(__get_IPSR() != 0);
+    configASSERT( IrqPrio >= configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+        
+#if SPI_PORT_USE_SEMAPHORE
     SemaphoreHandle_t xSem = prvGetSem(hspi);
 
     if (xSem) {
         xSemaphoreGiveFromISR(xSem, &xHigherPrioTaskWoken);
     }
+    else
+    {
+        Spi_ErrorHandler();
+    }
+#else
+    vTaskNotifyGiveFromISR( *pCanBridgeTaskHdl, &xHigherPrioTaskWoken );
+#endif
     portYIELD_FROM_ISR(xHigherPrioTaskWoken);
     return 0;
 }
@@ -96,13 +117,21 @@ uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     BaseType_t xHigherPrioTaskWoken = pdFALSE;
+
+#if SPI_PORT_USE_SEMAPHORE
     SemaphoreHandle_t xSem = prvGetSem(hspi);
 
     if (xSem) {
         xSemaphoreGiveFromISR(xSem, &xHigherPrioTaskWoken);
     }
+    else
+    {
+        Spi_ErrorHandler();
+    }
+#else
+    vTaskNotifyGiveFromISR( *pCanBridgeTaskHdl, &xHigherPrioTaskWoken );
+#endif
     portYIELD_FROM_ISR(xHigherPrioTaskWoken);
     return 0;
 }
-
 #endif

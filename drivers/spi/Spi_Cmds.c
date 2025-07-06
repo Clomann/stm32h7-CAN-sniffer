@@ -41,6 +41,10 @@ static void Error_Handler(void);
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
 
+static uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
+static uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi);
+static uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
+
 //uint8_t Spi_Receive(uint8_t * pRxBuffer, uint8_t RxBytes)
 //{
 //	uint8_t RetVal;
@@ -128,9 +132,7 @@ uint8_t Spi_Send(uint8_t * pTxBuffer, uint8_t TxBytes)
 		Error_Handler();
 	}
 
-	while (wTransferState == TRANSFER_WAIT)
-	{
-	}
+    m_NotifyTransferIssued(pSpiHandle1);
 
 	// Wait until the SPI is no longer busy
 	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
@@ -156,7 +158,7 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 		Error_Handler();
 	}
 
-    Spi_NotifyTransferIssued(pSpiHandle1);
+    m_NotifyTransferIssued(pSpiHandle1);
 
 	// Wait until the SPI is no longer busy
 	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
@@ -316,27 +318,45 @@ uint8_t Spi_goHighSpeed()
 	return RetVal;
 }
 
-uint8_t  __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
+    Spi_NotifyTransferIssued(hspi);
 	while (wTransferState == TRANSFER_WAIT)
 	{
 	}
     return res;
 }
 
-uint8_t  __attribute__((weak)) Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
+    Spi_NotifyTransferComplete(hspi);
     wTransferState = TRANSFER_COMPLETE;
     return res;
 }
 
-uint8_t  __attribute__((weak)) Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
+uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
+    Spi_NotifyTransferError(hspi);
     wTransferState = TRANSFER_ERROR;
     return res;
+}
+
+uint8_t  __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+{
+    return (uint8_t) 0;
+}
+
+uint8_t  __attribute__((weak)) Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+{
+    return (uint8_t) 0;
+}
+
+uint8_t  __attribute__((weak)) Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
+{
+    return (uint8_t) 0;
 }
 
 /**
@@ -353,7 +373,8 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   BSP_LED_On(LED1);
   /* Turn LED2 on: Transfer in reception process is complete */
   BSP_LED_On(LED2);
-  Spi_NotifyTransferComplete(hspi);
+  
+  m_NotifyTransferComplete(hspi);
 }
 
 
@@ -366,7 +387,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
-  Spi_NotifyTransferError(hspi);
+  m_NotifyTransferError(hspi);
 }
 
 /**
