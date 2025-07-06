@@ -24,6 +24,7 @@
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
+TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
 typedef struct {
   struct {
@@ -86,6 +87,8 @@ static AppControlDataType AppCtrlData = {
 void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2);
 void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2);
 
+static void appFdcanPoll();
+
 /* Private functions ---------------------------------------------------------*/
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
 #define MAX_LOG_FILE_SIZE   (8U * 1024U )
@@ -139,6 +142,23 @@ void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
     ( void ) name;
     taskDISABLE_INTERRUPTS();
     __BKPT(1);                     /* hit here => stack overflow      */
+}
+
+static void CanSendTask(void *arg)
+{
+    static TickType_t xPreviousWakeTime;
+    const TickType_t xFrequency = pdMS_TO_TICKS(100);
+
+    vTaskSuspend(CanSendTaskHdl);
+
+    xPreviousWakeTime = xTaskGetTickCount();
+
+    while (1)
+    {
+        vTaskDelayUntil(&xPreviousWakeTime, xFrequency);
+        
+        appFdcanPoll();
+    }
 }
 
 static void CanBridgeTask(void *arg)
@@ -546,24 +566,30 @@ static void appFdcanInit()
     }
 }
 
-static void appFdcanPoll()
+void appFdcanPoll()
 {
-    if ( 0 != CanAbs_Send_Can1(&Can1TestMsg1))
+    volatile uint8_t res;
+    
+    res = CanAbs_Send_Can1(&Can1TestMsg1);
+    if ( 0 != res)
     {
         Error_Handler();
     }
 
-    if ( 0 != CanAbs_Send_Can1(&Can1TestMsg2))
+    res = CanAbs_Send_Can1(&Can1TestMsg2);
+    if ( 0 != res)
     {
         Error_Handler();
     }
 
-    if ( 0 != CanAbs_Send_Can2(&Can2TestMsg1))
+    res = CanAbs_Send_Can2(&Can2TestMsg1);
+    if ( 0 != res)
     {
         Error_Handler();
     }
 
-    if ( 0 != CanAbs_Send_Can2(&Can2TestMsg2))
+    res = CanAbs_Send_Can2(&Can2TestMsg2);
+    if ( 0 != res)
     {
         Error_Handler();
     }
@@ -593,7 +619,7 @@ static void Core0Task0Main( void * parameters )
         Error_Handler();
     }
     
-    HalStatus = spi_port_freertos_init();
+    HalStatus = spi_port_freertos_init((TaskHandle_t*)&Core0Task0MainHdl);
 
     if(HalStatus != HAL_OK)
     {
@@ -632,6 +658,8 @@ static void Core0Task0Main( void * parameters )
     
     appFdcanInit();
 
+    vTaskResume(CanSendTaskHdl);
+
     while (run)
     {
         timestamp = HAL_GetTick() * HAL_GetTickFreq();
@@ -647,7 +675,6 @@ static void Core0Task0Main( void * parameters )
         }
         else
         {
-            appFdcanPoll();
             timestamp_prev = timestamp;
         }
 
@@ -692,6 +719,7 @@ void Core0Task0Init()
     
     TASK_CREATE_STATIC(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE, CORE0_TASK0_PRIO);
     TASK_CREATE_STATIC(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE, CORE0_TASK1_PRIO);
+    TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
     
     configASSERT( CanBridgeTaskHdl != NULL );
 }
