@@ -141,7 +141,7 @@ int main(void)
     /*##-1- Configure the SPI peripheral #######################################*/
 
     Core0Task0Init();
-    Core0Task1Init();
+    // Core0Task1Init();
 
     vTaskStartScheduler();
 

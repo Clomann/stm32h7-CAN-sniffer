@@ -19,3 +19,6 @@ Reason:
     - deterministic (unlike runtime regisrtaion)
 
 But the linker-section registry is a good opportunity to apply and learn about the factory and opaque design patterns and a discovery mechanism similar to those used by OSs.
+
+## Frame logging
+### FreeRTOS tasks

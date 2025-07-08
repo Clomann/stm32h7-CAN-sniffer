@@ -522,8 +522,15 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
 		RetVal = 1;
 	}
 
-	if (0U != RetVal) RetVal = RES_ERROR;
-	
+	if (0U == RetVal) 
+    {
+        RetVal = Spi_goHighSpeed();
+    }
+    else
+    {
+        RetVal = RES_ERROR;
+    }
+
 	return RetVal;
 }
 

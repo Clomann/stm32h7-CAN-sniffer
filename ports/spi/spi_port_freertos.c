@@ -19,14 +19,21 @@ static volatile TaskHandle_t* pCanBridgeTaskHdl;
 static volatile SpiSemEntry_t xSemTable[MAX_SPI_INSTANCES] = { 0 };
 static volatile StaticSemaphore_t xSemBuffers[MAX_SPI_INSTANCES];
 
+static void spi_port_freertos_init_ll_mutex(void);
+
 uint8_t spi_port_freertos_init(void *handle)
 {
     void *pSpiHandle1;
-    
+
+#if SPI_PORT_USE_LOCKS
+    spi_port_freertos_init_ll_mutex();
+#endif
+
     if (NULL == handle)
     {
         Spi_ErrorHandler();
     }
+
     pCanBridgeTaskHdl = (TaskHandle_t*)handle;
     pSpiHandle1 = SpiAbs_GetHandle_Spi1();
     Spi_NotifyRegister((SPI_HandleTypeDef*)pSpiHandle1);
@@ -134,4 +141,34 @@ uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
     portYIELD_FROM_ISR(xHigherPrioTaskWoken);
     return 0;
 }
+#endif
+
+#if SPI_PORT_USE_LOCKS
+
+static SemaphoreHandle_t bus_mtx[MAX_SPI_INSTANCES];
+
+void spi_port_freertos_init_ll_mutex(void)
+{
+    for (unsigned i = 0; i < MAX_SPI_INSTANCES; ++i)
+    {
+        bus_mtx[i] = xSemaphoreCreateMutex();
+    }
+}
+
+void Spi_Lock(uint8_t bus_id)
+{
+    if (bus_id < MAX_SPI_INSTANCES)
+    {
+        xSemaphoreTake(bus_mtx[bus_id], portMAX_DELAY);
+    }
+}
+
+void Spi_Unlock(uint8_t bus_id)
+{
+    if (bus_id < MAX_SPI_INSTANCES)
+    {
+        xSemaphoreGive(bus_mtx[bus_id]);
+    }
+}
+
 #endif

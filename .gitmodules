@@ -7,3 +7,6 @@
 [submodule "libs/lwip-tcpip"]
 	path = libs/lwip-tcpip
 	url = https://github.com/lwip-tcpip/lwip.git
+[submodule "libs/STM32_HAL/STM32H7"]
+	path = libs/STM32_HAL/STM32H7
+	url = https://github.com/STMicroelectronics/STM32CubeH7.git
