@@ -62,6 +62,7 @@ uint8_t Spi_PollForResponse(uint8_t *);
 uint8_t Spi_PollTillIdle(uint8_t *);
 uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
 uint8_t Spi_SendReceiveMsg(const uint8_t *, uint8_t *, uint8_t);
+uint8_t Spi_goHighSpeed(void);
 
 uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
 uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
@@ -71,5 +72,8 @@ void Spi_ErrorHandler(void);
 
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
+
+void Spi_Lock(uint8_t id);
+void Spi_Unlock(uint8_t id);
 
 #endif /* CM7_INC_SPI_CMDS_H_ */

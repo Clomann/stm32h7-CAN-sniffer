@@ -144,6 +144,8 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 {
 	uint8_t RetVal;
 
+    Spi_Lock(0);
+    memset(aRxBuffer,0x00, TxBytes);
 	SCB_CleanDCache_by_Addr ((uint32_t *)pTxBuffer, TxBytes);
 
 	RetVal = HAL_SPI_TransmitReceive_DMA(pSpiHandle1, pTxBuffer, aRxBuffer, TxBytes);
@@ -156,16 +158,18 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 	{
 	  /* Transfer error in transmission process */
 		Error_Handler();
+        Spi_Unlock(0);
+        return HAL_ERROR;
 	}
 
     m_NotifyTransferIssued(pSpiHandle1);
 
-	// Wait until the SPI is no longer busy
-	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
-
+    
 	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, TxBytes);
-
+    
 	memcpy(pRxBuffer, aRxBuffer, TxBytes);
+    
+    Spi_Unlock(0);
 
 	return RetVal;
 }
@@ -281,18 +285,17 @@ uint8_t Spi_PollTillIdle(uint8_t * pResponse)
 
 uint8_t Spi_goHighSpeed()
 {
-	uint8_t RetVal;
+	uint8_t res;
 
-	RetVal = 0U;
+	res = 0U;
 
-	if(HAL_SPI_Init(pSpiHandle1) != HAL_OK)
+	if(HAL_SPI_DeInit(pSpiHandle1) != HAL_OK)
 	{
 		/* Initialization Error */
 		Error_Handler();
 	}
 
-	/*##-1- Configure the SPI peripheral #######################################*/
-	/* Set the SPI1 parameters */
+    /* Set the SPI1 parameters */
 	pSpiHandle1->Instance               = SPI1;
 	pSpiHandle1->Init.Mode              = SPI_MODE_MASTER;
 	pSpiHandle1->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
@@ -308,23 +311,21 @@ uint8_t Spi_goHighSpeed()
 	pSpiHandle1->Init.NSS               = SPI_NSS_SOFT;
 	pSpiHandle1->Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
 	pSpiHandle1->Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
+	res = HAL_SPI_Init(pSpiHandle1);
 
-	if(HAL_SPI_Init(pSpiHandle1) != HAL_OK)
+	if(res != HAL_OK)
 	{
 		/* Initialization Error */
 		Error_Handler();
 	}
 
-	return RetVal;
+	return res;
 }
 
 uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
     Spi_NotifyTransferIssued(hspi);
-	while (wTransferState == TRANSFER_WAIT)
-	{
-	}
     return res;
 }
 
@@ -332,7 +333,6 @@ uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
     Spi_NotifyTransferComplete(hspi);
-    wTransferState = TRANSFER_COMPLETE;
     return res;
 }
 
@@ -340,23 +340,40 @@ uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
     Spi_NotifyTransferError(hspi);
-    wTransferState = TRANSFER_ERROR;
     return res;
 }
 
 uint8_t  __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
+    while (wTransferState == TRANSFER_WAIT)
+	{
+	}
+
+    // Wait until the SPI is no longer busy
+	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
     return (uint8_t) 0;
 }
 
 uint8_t  __attribute__((weak)) Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
+    wTransferState = TRANSFER_COMPLETE;
     return (uint8_t) 0;
 }
 
 uint8_t  __attribute__((weak)) Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
+    wTransferState = TRANSFER_ERROR;
     return (uint8_t) 0;
+}
+
+__attribute__((weak)) void Spi_Lock(uint8_t id) 
+{ 
+    ;
+}
+
+__attribute__((weak)) void Spi_Unlock(uint8_t id)
+{ 
+    ;
 }
 
 /**
