@@ -16,10 +16,9 @@ enum {
   TRANSFER_ERROR
 };
 
-uint8_t spi1_tx_buffer[SPI1_TX_BUFFER_SIZE];
-uint8_t spi1_rx_buffer[SPI1_RX_BUFFER_SIZE];
-uint8_t spi2_tx_buffer[SPI2_TX_BUFFER_SIZE];
-uint8_t spi2_rx_buffer[SPI2_RX_BUFFER_SIZE];
+ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiInit[18]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiDummy1[1]) = {0xFF};
+ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiDummy4[4]) = {0xFF, 0xFF, 0xFF, 0xFF};
 
 /* SPI handler declaration */
 static SPI_HandleTypeDef *pSpiHandle1;
@@ -28,14 +27,13 @@ static SPI_HandleTypeDef *pSpiHandle1;
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 
 /* Buffer used for transmission */
-uint8_t aTxBuffer[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
+ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aTxBuffer[]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
 
 /* Buffer used for reception */
 /* Size of buffer */
 #define BUFFERSIZE              (COUNTOF(aTxBuffer) - 1)
 #define BUFFER_ALIGNED_SIZE 	(((BUFFERSIZE+31)/32)*32)
-ALIGN_32BYTES(uint8_t aRxBuffer[BUFFER_ALIGNED_SIZE]);
-
+ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxBuffer[BUFFER_ALIGNED_SIZE]);
 
 static void Error_Handler(void);
 void SPI1_DMA_RX_IRQHandler(void);
@@ -44,6 +42,15 @@ void SPI1_DMA_TX_IRQHandler(void);
 static uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
 static uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi);
 static uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
+
+static inline uint8_t is_in_dma_nocache(const void *addr, size_t len)
+{
+    uintptr_t start = (uintptr_t)addr;
+    uintptr_t end   = start + len - 1U;
+
+    return  (uint8_t)((start >= (uintptr_t)&__dma_buffers_start) &&
+            (end   <  (uintptr_t)&__dma_buffers_end));
+}
 
 //uint8_t Spi_Receive(uint8_t * pRxBuffer, uint8_t RxBytes)
 //{
@@ -145,8 +152,11 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 	uint8_t RetVal;
 
     Spi_Lock(0);
-    memset(aRxBuffer,0x00, TxBytes);
-	SCB_CleanDCache_by_Addr ((uint32_t *)pTxBuffer, TxBytes);
+    
+    if (!is_in_dma_nocache((void*)pTxBuffer, TxBytes))
+	{
+        SCB_CleanDCache_by_Addr ((uint32_t *)pTxBuffer, TxBytes);
+    }
 
 	RetVal = HAL_SPI_TransmitReceive_DMA(pSpiHandle1, pTxBuffer, aRxBuffer, TxBytes);
 
@@ -164,8 +174,10 @@ uint8_t Spi_SendReceiveMsg(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8
 
     m_NotifyTransferIssued(pSpiHandle1);
 
-    
-	SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, TxBytes);
+    if (!is_in_dma_nocache((void*)aRxBuffer, TxBytes))
+	{
+        SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, TxBytes);
+    }
     
 	memcpy(pRxBuffer, aRxBuffer, TxBytes);
     

@@ -82,6 +82,7 @@ set(sources_SRCS                    # Modified
     ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
     ${PROJ_PATH}/CM7/Src/Core0Task0.c
     ${PROJ_PATH}/CM7/Src/Core0Task1.c
+    ${PROJ_PATH}/CM7/Src/utils_mpu.c
 
     ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 

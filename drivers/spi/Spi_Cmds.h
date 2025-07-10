@@ -17,9 +17,12 @@
 
 #define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
 
-static const uint8_t aTxSpiInit[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-static const uint8_t aTxSpiDummy1[] = {0xFF};
-static  const uint8_t aTxSpiDummy4[] = {0xFF, 0xFF, 0xFF, 0xFF};
+extern uint8_t __dma_buffers_start; /* see linker script */
+extern uint8_t __dma_buffers_end; /* see linker script */
+
+extern const uint8_t aTxSpiInit[18];
+extern const uint8_t aTxSpiDummy1[1];
+extern const uint8_t aTxSpiDummy4[4];
 
 static inline uint8_t Spi_PwrOn()
 {

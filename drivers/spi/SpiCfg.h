@@ -55,9 +55,5 @@
 #define SPI1_IRQHandler                  SPI1_IRQHandler
 
 #define CS_ACTIVE_HIGH 0
-#define SPI1_TX_BUFFER_SIZE 128
-#define SPI1_RX_BUFFER_SIZE 128
-#define SPI2_TX_BUFFER_SIZE 256
-#define SPI2_RX_BUFFER_SIZE 256
 
 #endif /* CM7_INC_SPICFG_H_ */
