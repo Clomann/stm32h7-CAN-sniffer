@@ -129,7 +129,10 @@ SECTIONS
     _sdata = .;        /* create a global symbol at data start */
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
-
+    . = ALIGN(32);
+    __dma_ro_start = .;
+    KEEP(*(.dma_buffer.ro))
+    __dma_ro_end = .;
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
   } >RAM_D1 AT> FLASH
@@ -162,8 +165,16 @@ SECTIONS
     . = ALIGN(8);
   } >RAM_D1
 
+  .dma_buffer (NOLOAD) : ALIGN(32) {
+    __dma_buffers_start__ = .;
+    *(.dma_buffer)
+    __dma_buffers_end__   = .;
+  } >RAM_D1
+
   .lwip_sec (NOLOAD): {
     . = ABSOLUTE(0x30000000);
+    __lwip_sec_start__ = .;
+
     *(.RxDecripSection) 
     
     . = ABSOLUTE(0x30000200);
@@ -171,7 +182,15 @@ SECTIONS
     
     . = ABSOLUTE(0x30000400);
     *(.Rx_PoolSection) 
-  } >RAM_D2 AT> ROM
+
+    __lwip_sec_end__ = .;
+  } >RAM_D2
+
+  PROVIDE(__dma_buffers_start = __dma_buffers_start__);
+  PROVIDE(__dma_buffers_end   = __dma_buffers_end__);
+
+  PROVIDE(__lwip_sec_start = __lwip_sec_start__);
+  PROVIDE(__lwip_sec_end   = __lwip_sec_end__);
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

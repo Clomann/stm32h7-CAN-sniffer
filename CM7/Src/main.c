@@ -26,7 +26,7 @@
 
 //#include "SD.h"
 //#include "Spi_Cmds.h"
-
+#include "utils_mpu.h"
 #include "Core0Task0.h"
 #include "Core0Task1.h"
 
@@ -287,6 +287,8 @@ void Error_Handler(void)
 //   return 0;
 // }
 
+extern uint8_t __dma_buffers_start;
+extern uint8_t __dma_buffers_end;
 
 /**
   * @brief  Configure the MPU attributes
@@ -345,6 +347,20 @@ static void MPU_Config(void)
     MPU_InitStruct.SubRegionDisable = 0x00;
     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
 
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+    uint64_t base = (uint64_t)(uint32_t)&__dma_buffers_start;   
+    MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+    MPU_InitStruct.BaseAddress = base;
+    MPU_InitStruct.Size = mpu_utils_get_size(round_up_pow2((uint64_t)(uint32_t)&__dma_buffers_end - base));
+    MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+    MPU_InitStruct.Number = MPU_REGION_NUMBER2;
+    MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL1;
+    MPU_InitStruct.SubRegionDisable = 0x00;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
     HAL_MPU_ConfigRegion(&MPU_InitStruct);
 
     /* Enable the MPU */
