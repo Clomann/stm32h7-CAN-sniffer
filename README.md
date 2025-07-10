@@ -15,6 +15,9 @@ This is a multi-protocol learning project. It implements a device that logs CAN 
     - [Quality goals](#quality-goals)
     - [System overview](#system-overview)
     - [Building block view](#building-block-view)
+    - [Modules](#modules)
+    - [Interrupts](#interrupts)
+        - [SPI](#spi)
 - [Hardware setupp](#hardware-setupp)
 - [Pin usage](#pin-usage)
 - [Funtional requirements](#funtional-requirements)
@@ -144,7 +147,7 @@ For better performance and higher availability the serving of requests via ether
 configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY is set to 5 per default.
 
 Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY):
-| Module | Prio |  |
+| Module | Priority |  |
 | - | - | - |
 | FDCAN | -5 |  |
 | TIM | -4 |  |
@@ -152,9 +155,9 @@ Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL
 |  | -2 |  |
 |  | -1 |  |
 |  | +0 |  |
-| SPI | +1 |  |
-| ETH | +2 |  |
-| Deferred (SW) | +3 |  |
+| Deferred (SW) | +1 |  |
+| SPI | +2 |  |
+| ETH | +3 |  |
 |  | +4 |  |
 |  | +5 |  |
 

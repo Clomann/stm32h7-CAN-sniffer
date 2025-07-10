@@ -148,8 +148,8 @@ static void CanSendTask(void *arg)
 {
     static TickType_t xPreviousWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(100);
-
-    vTaskSuspend(CanSendTaskHdl);
+    
+    ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
 
     xPreviousWakeTime = xTaskGetTickCount();
 
@@ -172,9 +172,7 @@ static void CanBridgeTask(void *arg)
 
     for (;;)
     {
-        uint32_t n = ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-
-        configASSERT( n == 1 ); 
+        ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
 
         __asm volatile("nop"); 
 
@@ -597,9 +595,6 @@ void appFdcanPoll()
 
 static void Core0Task0Main( void * parameters )
 {
-    static uint32_t timestamp_prev = 0U;
-    uint32_t timestamp = 0U;
-    uint32_t time_delta = 0U;
     static FatFsDeviceType ConfigReadFileDevice;
     uint32_t spiClockSource;
     HAL_StatusTypeDef HalStatus;
@@ -658,26 +653,10 @@ static void Core0Task0Main( void * parameters )
     
     appFdcanInit();
 
-    vTaskResume(CanSendTaskHdl);
+    xTaskNotifyGive(CanSendTaskHdl);
 
     while (run)
     {
-        timestamp = HAL_GetTick() * HAL_GetTickFreq();
-        time_delta = timestamp - timestamp_prev;
-
-        if ( time_delta < 10 )
-        {
-
-        }
-        else if (0 == AppCtrlData.runCanTracer)
-        {
-            
-        }
-        else
-        {
-            timestamp_prev = timestamp;
-        }
-
         http_poll();
 
         appCanLogHandlerPoll(&AppCtrlData);
@@ -725,11 +704,11 @@ void Core0Task0Init()
 }
 
 /*!< Time in micro seconds */
-static volatile uint64_t Time;
+static volatile uint64_t Time = 0;
 
 void TIM_InterruptCallback()
 {
-    static uint64_t Arr;
+    static uint64_t Arr = 0;
 
     TIM_GetArrValue((uint16_t*)&Arr);
     Time += Arr * TIMx_TIME_RESOLUTION;
