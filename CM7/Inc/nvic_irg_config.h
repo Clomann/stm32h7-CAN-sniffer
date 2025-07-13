@@ -1,3 +1,5 @@
+#pragma once
+
 #include "FreeRTOSConfig.h"
 
 #define FDCAN_IRQ_PREEMPT_PRIO          (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY - 5)

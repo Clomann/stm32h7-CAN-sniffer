@@ -6,8 +6,6 @@
 #include "fs_custom.h"
 #include "FileHandler.h"
 
-#include "test_can_trace.c"
-
 struct fs_custom_data {
     FILE *f;
 #if LWIP_HTTPD_EXAMPLE_CUSTOMFILES_DELAYED
