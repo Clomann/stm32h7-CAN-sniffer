@@ -10,9 +10,12 @@
         "canabs.h": "c",
         "fs_custom.h": "c",
         "commtypes.h": "c",
-        "commmessages.h": "c"
+        "commmessages.h": "c",
+        "utils_mpu.h": "c",
+        "stm32h7xx_hal.h": "c"
     },
     "cortex-debug.openocdPath": "/usr/local/bin/openocd",
     "cortex-debug.gdbPath": "/opt/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb", 
-    "makefile.extensionOutputFolder": "./.vscode"
+    "makefile.extensionOutputFolder": "./.vscode",
+    "cortex-debug.variableUseNaturalFormat": false
 }
