@@ -1,22 +1,65 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Cortex Debug",
-            "cwd": "${workspaceFolder}",
-            "executable": "./_bin/SPI_FullDuplex_ComDMA_CM7.elf",
-            "request": "launch",
+            "name": "Debug CM7 (Attach)",
             "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "servertype": "openocd",
-            "device": "STM32H745ZIT6",
-            "configFiles": [
-                "interface/stlink-dap.cfg",
-                "target/stm32h7x.cfg"
-            ]
+            "request": "attach",
+            "servertype": "external",
+            "preLaunchCommands": [
+                "set mem inaccessible-by-default off",
+                "set breakpoint pending on",
+                "set remote hardware-breakpoint-limit unlimited"
+            ],
+            "useHardwareBreakpoints": true,
+            "gdbTarget": "localhost:3333",
+            "cwd": "${workspaceFolder}",
+            "device": "STM32H745ZITx_M7",
+            "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM7.elf"
+        },
+        {
+            "name": "Debug CM4 (Attach)",
+            "type": "cortex-debug",
+            "request": "attach",
+            "servertype": "external",
+            "preLaunchCommands": [
+                "set mem inaccessible-by-default off",
+                "set breakpoint pending on",
+                "set remote hardware-breakpoint-limit unlimited"
+            ],
+            "useHardwareBreakpoints": true,
+            "gdbTarget": "localhost:3334",
+            "cwd": "${workspaceFolder}",
+            "device": "STM32H745ZITx_M4",
+            "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Attach Both Cores",
+            "configurations": [
+                "Debug CM7 (Attach)",
+                "Debug CM4 (Attach)"
+            ],
+            "stopAll": false
+        },
+        {
+            "name": "Start Dual-Core Debug Session",
+            "configurations": [
+                "Debug CM7 (Attach)",
+                "Debug CM4 (Attach)"
+            ],
+            "preLaunchTask": "Start Debug Session",
+            "stopAll": false
+        },
+        {
+            "name": "Flash & Start Dual-Core Debug Session",
+            "configurations": [
+                "Debug CM7 (Attach)",
+                "Debug CM4 (Attach)"
+            ],
+            "preLaunchTask": "Flash CM7 & CM4 and start OpenOCD",
+            "stopAll": false
         }
     ]
 }

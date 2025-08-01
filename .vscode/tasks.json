@@ -1,0 +1,87 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Flash CM7",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c", "port=SWD",
+        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM7.elf", "0x08000000",
+        "-rst"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flash CM4",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c", "port=SWD",
+        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf", "0x08100000",
+        "-rst"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start OpenOCD",
+      "type": "shell",
+      "command": "/usr/local/bin/openocd",
+      "args": [
+        "-s", "/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts/",
+        "-f", "interface/stlink-dap.cfg",
+        "-f", "target/stm32h7x_dual_bank.cfg",
+        "-c", "adapter speed 1000",
+        "-c", "reset_config srst_only srst_nogate connect_deassert_srst",
+        "-c", "init; \
+            targets stm32h7x.cpu0; cortex_m vector_catch reset; \
+            targets stm32h7x.cpu1; cortex_m vector_catch reset; \
+            mmw 0x580244A0 0x8 0x0; \
+            reset run"
+      ],
+      "isBackground": true,
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": {
+        "pattern": [
+          {
+            "regexp": ".",
+            "file": 1,
+            "location": 2,
+            "message": 3
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Info\\s?:.*Listening on port.*",
+          "endsPattern": ".*"
+        }
+      }
+    },
+    {
+      "label": "Flash CM7 & CM4",
+      "dependsOn": ["Flash CM7", "Flash CM4"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Flash CM7 & CM4 and start OpenOCD",
+      "dependsOn": ["Flash CM7 & CM4", "Start OpenOCD"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Start Session",
+      "dependsOn": ["Start OpenOCD"],
+      "dependsOrder": "sequence"
+    }
+  ]
+}
