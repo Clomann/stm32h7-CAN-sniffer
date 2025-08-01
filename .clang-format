@@ -1,0 +1,63 @@
+---
+BasedOnStyle: LLVM
+Language: Cpp
+ColumnLimit: 100
+IndentWidth: 4
+UseTab: Never
+BreakBeforeBinaryOperators: NonAssignment
+
+# C conventions
+PointerAlignment: Right
+SpaceAfterCStyleCast: true
+SpaceBeforeParens: ControlStatements
+
+# Braces – choose one and stick to it
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Always
+  AfterFunction: true
+  AfterEnum: true
+  AfterStruct: true
+  BeforeElse: true
+  BeforeCatch: true
+  IndentBraces: false
+
+# Safer / clearer code
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+InsertBraces: true
+
+# Keep diffs clean
+AlignTrailingComments:
+  Kind: Never
+SortIncludes: Never
+IncludeBlocks: Preserve
+ReflowComments: false
+AlignAfterOpenBracket: BlockIndent
+ContinuationIndentWidth: 4
+BinPackParameters: false
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+PenaltyBreakBeforeFirstCallParameter: 0
+
+# Preprocessor readability
+IndentPPDirectives: AfterHash
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments:  false
+  PadOperators:    true
+
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+  PadOperators: true
+
+# Files
+InsertNewlineAtEOF: true
+MaxEmptyLinesToKeep: 1
+...
+
