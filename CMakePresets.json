@@ -1,5 +1,5 @@
 {
-    "version": 3,
+    "version": 6,
     "configurePresets": [
         {
             "name": "default",
@@ -15,7 +15,27 @@
             "name": "Debug",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DUAL_CORE": "false",
+                "CORE": "CM7"
+            }
+        },
+        {
+            "name": "Debug_CM7",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CORE": "CM7",
+                "DUAL_CORE": "true"
+            }
+        },
+        {
+            "name": "Debug_CM4",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CORE": "CM4",
+                "DUAL_CORE": "true"
             }
         },
         {
@@ -24,6 +44,90 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        }
+    ],
+    "buildPresets": [
+        { 
+            "name": "debug-build", 
+            "configurePreset": "Debug", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "debug-build-cm7", 
+            "configurePreset": "Debug_CM7", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "debug-build-cm4", 
+            "configurePreset": "Debug_CM4", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "release-build", 
+            "configurePreset": "Release", 
+            "jobs": 4,
+            "cleanFirst": false
+        }
+    ],
+    "workflowPresets": [
+        {
+            "description": "Developer workflow",
+            "name": "debug-all",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Debug"
+                },
+                { 
+                    "type": "build",
+                    "name": "debug-build"
+                }
+            ]
+        },
+        {
+            "description": "Developer workflow",
+            "name": "debug-cm7",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Debug_CM7"
+                },
+                { 
+                    "type": "build",
+                    "name": "debug-build-cm7"
+                }
+            ]
+        },
+        {
+            "description": "Developer workflow",
+            "name": "debug-cm4",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Debug_CM4"
+                },
+                { 
+                    "type": "build",
+                    "name": "debug-build-cm4"
+                }
+            ]
+        },
+        {
+            "description": "Release workflow",
+            "name": "release-all",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Release"
+                },
+                { 
+                    "type": "build",
+                    "name": "release-build"
+                }
+            ]
         }
     ]
 }
