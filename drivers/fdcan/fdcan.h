@@ -81,8 +81,8 @@ comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 
     const void *cfg, 
     size_t cfg_size,
-    RingBuffer *tx, 
-    RingBuffer *rx) COMM_FACTORY_USED_ATTR;
+    uint8_t *tx, 
+    uint8_t *rx) COMM_FACTORY_USED_ATTR;
 
 comm_status_t FDCAN_Init(
     CommDriver *dev);
