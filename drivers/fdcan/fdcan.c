@@ -90,8 +90,8 @@ comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 
     const void *cfg, 
     size_t cfg_size,
-    RingBuffer *tx, 
-    RingBuffer *rx)
+    uint8_t *tx, 
+    uint8_t *rx)
 {
 	comm_status_t RetVal;
     FdcanInstanceType * instance;
