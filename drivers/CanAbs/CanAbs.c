@@ -17,6 +17,7 @@ static RingBuffer Fdcan1RxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan1RxFrameBuffer) / sizeof(Fdcan1RxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan1RxFrameBuffer[0]),
+    .stride = sizeof(Fdcan1RxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -26,6 +27,7 @@ static RingBuffer Fdcan1TxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan1TxFrameBuffer) / sizeof(Fdcan1TxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan1TxFrameBuffer[0]),
+    .stride = sizeof(Fdcan1TxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -44,6 +46,7 @@ static RingBuffer Fdcan2RxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan2RxFrameBuffer) / sizeof(Fdcan2RxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan2RxFrameBuffer[0]),
+    .stride = sizeof(Fdcan2RxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -53,6 +56,7 @@ static RingBuffer Fdcan2TxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan2TxFrameBuffer) / sizeof(Fdcan2TxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan2TxFrameBuffer[0]),
+    .stride = sizeof(Fdcan2TxFrameBuffer[0]),
     .isFull = false
 };
 

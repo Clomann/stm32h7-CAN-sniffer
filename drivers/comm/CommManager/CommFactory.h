@@ -12,9 +12,14 @@
 #define COMM_FACTORY_USED_ATTR  __attribute__(( used))
 #define COMM_FACTORY_SECTION  __attribute__((section(".comm_factory"), used))
 
+
+#if !defined(UNIT_TEST)
 #define COMM_REGISTER_DRIVER(proto, fn)                          \
     static const CommFactoryEntry __comm_factory_##proto     \
     COMM_FACTORY_SECTION = { (proto), (fn) }
+#else
+#define COMM_REGISTER_DRIVER(proto, fn) 
+#endif
 
 typedef comm_status_t (*Comm_DriverCreate)(
     CommDriver *drv,
