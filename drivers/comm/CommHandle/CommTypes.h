@@ -16,7 +16,9 @@ typedef enum {
     COMM_ERROR,
     COMM_TIMEOUT,
     COMM_INVALID_PARAMETER,
-    COMM_INVALID_STATE
+    COMM_INVALID_STATE,
+    COMM_NULL_POINTER,
+    COMM_NO_RESSOURCES
 } comm_status_t;
 
 typedef enum {
@@ -59,7 +61,7 @@ typedef struct {
 	CommProtocolType protocol;
 	driver_msgdir_t dir;
     uint32_t length;
-    uint8_t* payload;
+    const uint8_t* payload;
     bool isMmultiframe;
     void* protocol_data;  // Pointer to protocol-specific data
 } Message;

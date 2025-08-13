@@ -10,9 +10,6 @@
 
 #include "diskio.h"
 #include "SdTypes.h"
-#include "Spi_Cmds.h"
-#include "SpiAbs.h"
-
 
 #define SD_SPI_CMD_DUMMY_DATA			0xFF
 #define SD_SPI_CMD_START_TOKEN			0xFE

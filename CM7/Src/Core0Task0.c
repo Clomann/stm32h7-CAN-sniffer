@@ -21,10 +21,12 @@
 #include "gpio.h"
 #include "httpd_post.h"
 #include "spi_port_freertos.h"
+#include "SpiAbs.h"
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
+TASK_VARIABLES(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE)
 
 typedef struct {
   struct {
@@ -210,6 +212,23 @@ void CanAbs_RxNotificationCallback()
 {
     __DSB();                                    /* ensure writes complete */
     HAL_NVIC_SetPendingIRQ(DEFERRED_IRQn);  
+}
+
+void SpiAbs_TaskControlCallback(uint32_t timeout)
+{
+    ulTaskNotifyTake(pdTRUE, timeout);
+}
+
+void SpiAbs_TaskSendReceiveCallback()
+{
+    if (SpiAbs_TaskHdl != NULL)
+    {
+        xTaskNotifyGive(SpiAbs_TaskHdl);
+    }
+    else
+    {
+        Error_Handler();
+    }
 }
 
 static void appConfigHandlerInit(AppControlDataType *data)
@@ -608,6 +627,8 @@ static void Core0Task0Main( void * parameters )
     ( void ) parameters;
     ( void ) MinUnusedStack;
 
+    // Mmc_Init();
+
     /* Initialize HAL SysTick external timer */
     if (0 != TIM_HAL_Init(TIM_HAL_TIME_FREQ) )
     {
@@ -630,7 +651,7 @@ static void Core0Task0Main( void * parameters )
     /*##-2- Start the Full Duplex Communication process ########################*/
     /* While the SPI in TransmitReceive process, user can transmit data through
         "aTxBuffer" buffer & receive data through "aRxBuffer" */
-    Spi_PwrOn();
+    SpiAbs_PwrOn(SPIABS_DEVICE_1);
     if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice, Config.data, &Config.len) )
     {
         SettingsHandler_ParseConfig(Config.data, Config.len, &AppConfig);
@@ -688,7 +709,7 @@ static void Core0Task0Main( void * parameters )
     if (0 == AppCtrlData.mountRes)
     FatFS_SD_Unmount();
 
-    Spi_PwrOff();
+    SpiAbs_PwrOff(SPIABS_DEVICE_1);
 }
 
 void Core0Task0Init()
@@ -699,6 +720,7 @@ void Core0Task0Init()
     TASK_CREATE_STATIC(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE, CORE0_TASK0_PRIO);
     TASK_CREATE_STATIC(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE, CORE0_TASK1_PRIO);
     TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
+    TASK_CREATE_STATIC(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE, CORE0_TASK4_PRIO);
     
     configASSERT( CanBridgeTaskHdl != NULL );
 }
@@ -798,3 +820,4 @@ void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValu
         }
     }
 }
+

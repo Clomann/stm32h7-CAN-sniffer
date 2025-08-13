@@ -18,4 +18,9 @@ typedef struct {
     uint8_t msgMarker;
 } FDCAN_Message;
 
+typedef struct {
+	Message msgBase;
+    void *transaction;
+} SPI_Message;
+
 #endif /* CM7_DRIVERS_COMM_INC_COMMMESSAGES_H_ */
