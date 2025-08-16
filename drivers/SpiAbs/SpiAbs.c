@@ -261,14 +261,41 @@ void SpiAbs_SendReceiveMsg_MsgCallback(
     Context->completed = 1;
 }
 
+typedef struct {
+    CommDriver *drv;
+    uint8_t *data;
+    uint16_t length;
+    uint32_t status;
+} SpiSendReceiveContextType;
+
+/* Dummy function so that SPI driver doesnt drop the Rx slot internally  */
+void SpiAbs_SendReceiveMsgCallback(
+    void *context,
+    uint32_t status,
+    const uint8_t *rx_data,
+    uint32_t len
+)
+{
+    uint32_t CopyLength = 0;
+    SpiSendReceiveContextType *pContext;
+
+    pContext = (SpiSendReceiveContextType *) context;
+
+    if (NULL != pContext && NULL != rx_data)
+    {
+        CopyLength = (len < pContext->length) ? len : pContext->length;
+        memcpy(pContext->data, (uint8_t *)rx_data, CopyLength);
+    }
+}
+
 uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
 {
     uint8_t res;
     CommDriver * pDrv;
     SPI_HandleTypeDef * hdl;
     SPI_Message Msg = {0};
-
-    Msg.transaction = NULL;
+    SpiTransactionType Transaction = {0};
+    SpiSendReceiveContextType Context;
 
     hdl = m_GetHandle(dev);
     
@@ -284,6 +311,15 @@ uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer,
         return COMM_INVALID_PARAMETER;
     }
 
+    Context.drv = pDrv;
+    Context.data = pRxBuffer;
+    Context.length = TxBytes;
+
+    Transaction.length = TxBytes;
+    Transaction.callback = SpiAbs_SendReceiveMsgCallback;
+    Transaction.context = &Context;
+
+    Msg.transaction = &Transaction;
     Msg.msgBase.protocol = DRIVER_SPI;
     Msg.msgBase.payload = pTxBuffer;
     Msg.msgBase.length = TxBytes;
@@ -295,26 +331,8 @@ uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer,
         return res;
     }
 
-    // TODO: handle in caller/ task context
-    RingBuffer *rxSlots;
-    SpiSlotType *rxSlot = NULL;
-
-    rxSlots  = (RingBuffer *)Spi_GetSlots(pDrv->RxFrameBuffer);
-    
+    // TODO: handle in caller/ task context    
     SPI_Poll(pDrv);
-
-    if (COMM_SUCCESS != res )
-    {
-        return res;
-    }
-
-    // TODO: this part is only temporary and shall be handled via ISR/ notifcation via SPI_RxTxCompleteCallback
-    rxSlot = ring_buffer_pop_ptr(rxSlots);
-
-    if (NULL != rxSlot)
-    {
-        memcpy(pRxBuffer, (uint8_t *)rxSlot->data, rxSlot->used_len);
-    }
 
     // from here omn the hardware takes control
     // and calls `Spi_NotifyRxData` on completion
