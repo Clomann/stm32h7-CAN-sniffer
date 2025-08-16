@@ -197,6 +197,7 @@ uint8_t Spi_SendReceiveMsg(SPI_HandleTypeDef * handle, const uint8_t * pTxBuffer
     {
         // Handle timeout
         Spi_Unlock(0);
+        Spi_NotifyRxData(handle, 1);
         return HAL_TIMEOUT;
     }
 
@@ -208,6 +209,8 @@ uint8_t Spi_SendReceiveMsg(SPI_HandleTypeDef * handle, const uint8_t * pTxBuffer
 	memcpy(pRxBuffer, aRxBuffer, TxBytes);
     
     Spi_Unlock(0);
+
+    Spi_NotifyRxData(handle, 0);
 
 	return RetVal;
 }
@@ -410,7 +413,6 @@ uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
     Spi_NotifyTransferComplete(hspi);
-    Spi_NotifyRxData(hspi, 0);
     return res;
 }
 
@@ -418,7 +420,6 @@ uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
     Spi_NotifyTransferError(hspi);
-    Spi_NotifyRxData(hspi, 1);
     return res;
 }
 
