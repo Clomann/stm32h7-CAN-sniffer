@@ -30,7 +30,6 @@ ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxBuffer[BUFFER_A
 
 uint8_t Spi_PollTillIdle(SPI_HandleTypeDef * handle, uint8_t *);
 uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
-static void Error_Handler(void);
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
 
@@ -117,12 +116,28 @@ HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef * handle)
 	res = HAL_SPI_Init(handle);
     return res;
 }
+ 
+static inline bool m_IsCacheAligned(const void* ptr, size_t size)
+{
+    uintptr_t addr = (uintptr_t)ptr;
+    return ((addr & CACHE_LINE_MASK) == 0) && 
+           ((size & CACHE_LINE_MASK) == 0);
+}
 
-uint8_t Spi_Send(SPI_HandleTypeDef * handle, uint8_t * pTxBuffer, uint8_t TxBytes)
+uint8_t Spi_Send(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len)
 {
 	uint8_t RetVal;
 
-	RetVal = HAL_SPI_Transmit_DMA(handle, pTxBuffer, TxBytes);
+    Spi_Lock(0);
+
+    memcpy(aTxBuffer, buffer, len);
+
+    if (!is_in_dma_nocache((void*)aTxBuffer, len))
+	{
+        SCB_CleanDCache_by_Addr ((uint32_t *)aTxBuffer, len);
+    }
+
+	RetVal = HAL_SPI_Transmit_DMA(handle, aTxBuffer, len);
 
 	if (RetVal == HAL_BUSY)
 	{
@@ -130,14 +145,25 @@ uint8_t Spi_Send(SPI_HandleTypeDef * handle, uint8_t * pTxBuffer, uint8_t TxByte
 	}
 	else if (RetVal != HAL_OK)
 	{
-		/* Transfer error in transmission process */
-		Error_Handler();
+	  /* Transfer error in transmission process */
+		Spi_ErrorHandler();
+        Spi_Unlock(0);
+        return HAL_ERROR;
 	}
 
-    m_NotifyTransferIssued(handle);
+    if (m_NotifyTransferIssued(handle) != 0)
+    {
+        // Handle timeout
+        Spi_Unlock(0);
+        return HAL_TIMEOUT;
+    }
 
-	// Wait until the SPI is no longer busy
-	while (HAL_SPI_GetState(handle) != HAL_SPI_STATE_READY) {}
+    if (!is_in_dma_nocache((void*)aTxBuffer, len))
+	{
+        SCB_InvalidateDCache_by_Addr ((uint32_t *)aTxBuffer, len);
+    }
+    
+    Spi_Unlock(0);
 
 	return RetVal;
 }
@@ -162,12 +188,17 @@ uint8_t Spi_SendReceiveMsg(SPI_HandleTypeDef * handle, const uint8_t * pTxBuffer
 	else if (RetVal != HAL_OK)
 	{
 	  /* Transfer error in transmission process */
-		Error_Handler();
+		Spi_ErrorHandler();
         Spi_Unlock(0);
         return HAL_ERROR;
 	}
 
-    m_NotifyTransferIssued(handle);
+    if (m_NotifyTransferIssued(handle) != 0)
+    {
+        // Handle timeout
+        Spi_Unlock(0);
+        return HAL_TIMEOUT;
+    }
 
     if (!is_in_dma_nocache((void*)aRxBuffer, TxBytes))
 	{
@@ -175,6 +206,45 @@ uint8_t Spi_SendReceiveMsg(SPI_HandleTypeDef * handle, const uint8_t * pTxBuffer
     }
     
 	memcpy(pRxBuffer, aRxBuffer, TxBytes);
+    
+    Spi_Unlock(0);
+
+	return RetVal;
+}
+
+uint8_t Spi_Receive(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len)
+{
+	uint8_t RetVal;
+
+    Spi_Lock(0);
+
+	RetVal = HAL_SPI_Receive_DMA(handle, aRxBuffer, len);
+
+	if (RetVal == HAL_BUSY)
+	{
+
+	}
+	else if (RetVal != HAL_OK)
+	{
+	  /* Transfer error in transmission process */
+		Spi_ErrorHandler();
+        Spi_Unlock(0);
+        return HAL_ERROR;
+	}
+
+    if (m_NotifyTransferIssued(handle) != 0)
+    {
+        // Handle timeout
+        Spi_Unlock(0);
+        return HAL_TIMEOUT;
+    }
+
+    if (!is_in_dma_nocache((void*)aRxBuffer, len))
+	{
+        SCB_InvalidateDCache_by_Addr ((uint32_t *)aRxBuffer, len);
+    }
+    
+	memcpy(buffer, aRxBuffer, len);
     
     Spi_Unlock(0);
 
@@ -299,7 +369,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 	if(HAL_SPI_DeInit(handle) != HAL_OK)
 	{
 		/* Initialization Error */
-		Error_Handler();
+		Spi_ErrorHandler();
 	}
 
     /* Set the SPI1 parameters */
@@ -323,7 +393,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 	if(res != HAL_OK)
 	{
 		/* Initialization Error */
-		Error_Handler();
+		Spi_ErrorHandler();
 	}
 
 	return res;
@@ -332,7 +402,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     uint8_t res = 0;
-    Spi_NotifyTransferIssued(hspi);
+    res = Spi_NotifyTransferIssued(hspi);
     return res;
 }
 
@@ -388,7 +458,7 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
   * @param  None
   * @retval None
   */
-static void Error_Handler(void)
+void __attribute__((weak)) Spi_ErrorHandler(void)
 {
   BSP_LED_Off(LED1);
   /* Turn LED3 on */
