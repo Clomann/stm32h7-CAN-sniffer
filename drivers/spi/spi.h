@@ -35,6 +35,21 @@ typedef uint8_t SpiDriverNumberType;
         #_sym_ " is not cache-line aligned"                                    \
     )
 
+#define SPI_E_OK           0U
+#define SPI_E_NOT_OK       1U
+#define SPI_E_NULL_POINTER 1U
+
+typedef uint8_t SpiErrorType;
+
+#define SPI_DIR_TX_RX   0U
+#define SPI_DIR_TX_ONLY 1U
+#define SPI_DIR_RX_ONLY 2U
+// #define SPI_DIR_RX_WITH_CMD      3U
+// #define SPI_DIR_DUPLEX_STREAMING 4U
+// #define SPI_DIR_BURST_READ       5U
+
+typedef uint8_t SpiDirectionType;
+
 typedef struct
 {
     SPI_TypeDef *spi;
@@ -68,6 +83,8 @@ typedef struct
 {
     uint32_t id;
     uint32_t timeout;
+    uint16_t length;
+    SpiDirectionType direction;
     SpiCompleteionCallbackType callback;
     void *context;
 } SpiTransactionType;
@@ -76,7 +93,7 @@ typedef struct
 {
     uint16_t used_len;
     const uint16_t max_len;
-    SpiTransactionType *transaction;
+    SpiTransactionType transaction;
     uint8_t data[];
 } SpiSlotType;
 
@@ -102,8 +119,12 @@ comm_status_t SPI_DeInit(CommDriver *dev);
 
 comm_status_t SPI_Send(CommDriver *dev, const void *);
 
-comm_status_t
-SPI_Read(CommDriver *drv, void *frame, uint8_t length, uint32_t it_mask);
+comm_status_t SPI_Read(
+    CommDriver *drv,
+    void *msg,
+    uint8_t length, /* for comapitibilty (fdcan) */
+    uint32_t RxFifo0ITs /* for comapitibilty (fdcan) */
+);
 
 comm_status_t SPI_Ioctl(CommDriver *dev, int cmd, void *argument);
 
