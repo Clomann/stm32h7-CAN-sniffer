@@ -234,8 +234,13 @@ uint8_t SpiAbs_SendWithCallback(
 
     res = SPI_Send(pDrv, &Msg);
 
+#if SPI_USE_RTOS
     // notify SPI task to check for new messages
     SpiAbs_TaskSendReceiveCallback();
+#else
+    // Process immediately in bare metal mode
+    SPI_Poll(pDrv);
+#endif
 
     return res;
 }
@@ -243,7 +248,6 @@ uint8_t SpiAbs_SendWithCallback(
 typedef struct {
     uint8_t *data;
     uint16_t length;
-    uint32_t status;
 } SpiSendReceiveContextType;
 
 /* Dummy function so that SPI driver doesnt drop the Rx slot internally  */
@@ -439,6 +443,21 @@ int SpiAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t
     return res;
 }
 
+uint8_t SpiAbs_Poll(void)
+{
+    bool work_done;
+
+    work_done = false;
+
+    if (Spi_HasPendingTransfers(&Spi1Driver)) {
+        SPI_Poll(&Spi1Driver);
+    
+        work_done = true;
+    }
+
+    return work_done;
+}
+
 void SpiAbs_Task(void *parameters)
 {
     SpiAbs_TaskControlCallback(0);
@@ -447,21 +466,13 @@ void SpiAbs_Task(void *parameters)
     {
         SpiAbs_TaskControlCallback(0xFFFFFFFFUL);
         
-        while (Spi_HasPendingTransfers(&Spi1Driver))
-        {
-            SPI_Poll(&Spi1Driver);
-        }
+        SpiAbs_Poll();
     }
 }
 
 void __attribute__((weak))  SpiAbs_TaskControlCallback(uint32_t timeout)
 {
     (void) timeout;
-}
-
-void __attribute__((weak)) SpiAbs_TaskSendReceiveNotifyCallback()
-{
-    ;
 }
 
 void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback()

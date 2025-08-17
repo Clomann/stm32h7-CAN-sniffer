@@ -46,46 +46,6 @@ static inline uint8_t is_in_dma_nocache(const void *addr, size_t len)
             (end   <  (uintptr_t)&__dma_buffers_end));
 }
 
-//uint8_t Spi_Receive(uint8_t * pRxBuffer, uint8_t RxBytes)
-//{
-//	uint8_t RetVal;
-//
-//#if CS_ACTIVE_HIGH
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-//#else
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-//#endif
-//
-//	RetVal = HAL_SPI_Receive_DMA(pSpiHandle1, pRxBuffer, RxBytes);
-//
-//	if (RetVal == HAL_BUSY)
-//	{
-//
-//	}
-//	else if (RetVal != HAL_OK)
-//	{
-//	  /* Transfer error in transmission process */
-//	  Error_Handler();
-//	}
-//
-//	while (wTransferState == TRANSFER_WAIT)
-//	{
-//	}
-//
-//	// Wait until the SPI is no longer busy
-//	while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY) {}
-//
-//#if CS_ACTIVE_HIGH
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
-//#else
-//	HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
-//#endif
-//
-//	SCB_InvalidateDCache_by_Addr ((uint32_t *)pRxBuffer, RxBytes);
-//
-//	return RetVal;
-//}
-
 HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef * handle)
 {   
     HAL_StatusTypeDef res;
