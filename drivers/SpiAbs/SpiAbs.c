@@ -241,28 +241,6 @@ uint8_t SpiAbs_SendWithCallback(
 }
 
 typedef struct {
-    uint8_t completed;
-} SpiSyncContextType;
-
-void SpiAbs_SendReceiveMsg_MsgCallback(   
-    void *context,
-    uint32_t status,
-    const uint8_t *rx_data,
-    uint32_t len)
-{
-    SpiSyncContextType *Context;
-
-    (void) status;
-    (void) rx_data;
-    (void) len;
-
-    Context = context;
-
-    Context->completed = 1;
-}
-
-typedef struct {
-    CommDriver *drv;
     uint8_t *data;
     uint16_t length;
     uint32_t status;
@@ -311,7 +289,6 @@ uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer,
         return COMM_INVALID_PARAMETER;
     }
 
-    Context.drv = pDrv;
     Context.data = pRxBuffer;
     Context.length = TxBytes;
 
@@ -483,6 +460,11 @@ void __attribute__((weak))  SpiAbs_TaskControlCallback(uint32_t timeout)
 }
 
 void __attribute__((weak)) SpiAbs_TaskSendReceiveNotifyCallback()
+{
+    ;
+}
+
+void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback()
 {
     ;
 }

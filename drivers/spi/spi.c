@@ -4,30 +4,6 @@
 #include "spi.h"
 #include "Spi_Cmds.h"
 
-#if 0
-/* Buffer used for transmission */
-ALIGN_32BYTES(
-    uint8_t __attribute__((section(".dma_buffer")))
-    aTxBuffer[SPI_MAX_INSTANCES][SPI_TX_RING_SIZE]
-             [DRV_BUFFER_ALIGNED_SIZE(SPI_TX_BUFFER_SIZE)]
-);
-
-/* Buffer used for reception */
-/* Size of buffer */
-ALIGN_32BYTES(
-    uint8_t __attribute__((section(".dma_buffer")))
-    aRxBuffer[SPI_MAX_INSTANCES][SPI_RX_RING_SIZE]
-             [DRV_BUFFER_ALIGNED_SIZE(SPI_RX_BUFFER_SIZE)]
-);
-
-_Static_assert(SPI_TX_RING_SIZE >= 2, "Need at least ping-pong (2) TX buffers");
-_Static_assert(
-    (SPI_BUFFER_ALIGNED_SIZE(SPI_TX_BUFFER_SIZE) & 31U) == 0,
-    "Aligned size must be multiple of 32 bytes"
-);
-
-#endif
-
 _Static_assert(
     offsetof(SpiSlotType, data) == SPI_SLOT_META_BYTES,
     "`SPI_SLOT_META_BYTES` must be equal to the summed size of all data before "
@@ -67,14 +43,10 @@ comm_status_t SPI_Init(CommDriver *drv)
 {
     comm_status_t res;
     SpiInstanceType *instance;
-    SpiConfigType *cfg;
 
     res = COMM_SUCCESS;
 
     instance = (SpiInstanceType *)drv->instance;
-    cfg      = (SpiConfigType *)(drv->config->driver);
-
-    (void)cfg;
 
     res = (comm_status_t)Spi_Init((SPI_HandleTypeDef *)&instance->hspi);
 
@@ -306,8 +278,6 @@ __attribute__((weak)) void SPI_ErrorHandler(void)
 void SPI_InitTask()
 {
 }
-
-ALIGN_32BYTES(volatile uint8_t dummy[1024]) = {0};
 
 void SPI_Poll(CommDriver *drv)
 {
