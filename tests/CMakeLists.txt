@@ -79,6 +79,9 @@ target_include_directories(spi PUBLIC
     ${REPO_ROOT}/drivers/spi
     ${REPO_ROOT}/drivers/comm/CommManager
     ${REPO_ROOT}/drivers/comm/CommHandle
+)
+
+target_include_directories(spi SYSTEM PUBLIC
     ${REPO_ROOT}/libs/STM32_HAL/STM32H7/Drivers/STM32H7xx_HAL_Driver/Inc
     ${REPO_ROOT}/libs/STM32_HAL/STM32H7/Drivers/BSP/STM32H7xx_Nucleo
     ${REPO_ROOT}/libs/STM32_HAL/STM32H7/Drivers/CMSIS/Device/ST/STM32H7xx/Include/
