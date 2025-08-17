@@ -4,7 +4,7 @@ flowchart TB
     subgraph SPITASK["SPI Task"]
         %% =============  QUEUING INGEST  ============= %%
         subgraph ING["spi_submit()"]
-            Alloc["TD pool<br/>(static array)"]
+            Alloc["allocate to bin<br/> according to priority<br/>(static array)"]
             PQ{{"Priority FIFOs<br/>(Hi / Med / Lo)"}}
         end
 
@@ -15,9 +15,8 @@ flowchart TB
         %% =============  COMPLETION STRATEGIES  ============= %%
         subgraph COMP["Completion strategy<br/>(per-transfer)"]
             Selector["Startegy selector"]
-            NONE(Fire-and-forget<br/><i>SPI_SIG_NONE</i>)
-            NOTE(Task notify<br/><i>SPI_SIG_NOTIFY</i>)
-            RQ(Queue return<br/><i>SPI_SIG_QUEUE</i>)
+            NOTE(Task callback)
+            NONE(Fire-and-forget)
         end
     end
 
@@ -46,7 +45,7 @@ flowchart TB
     %% ----- return to waiting task (if any) -----
     NOTE -->|"callback(data)"| TaskBCallback
     TaskBCallback -->|"vTaskNotifyGive()"| WaitTask
-    RQ -->|"callback(data)"| TaskCCallback
+    NOTE -->|"callback(data)"| TaskCCallback
     TaskCCallback -->|"xQueueSend() of TD*"| RespQ
 
     Alloc --> PQ
@@ -57,7 +56,6 @@ flowchart TB
     IRQ -->|"vTaskNotifyGive()"| Driver
     Driver -->|"spi_submit()"| Selector
     Selector -->|"spi_complete(td)"| NOTE
-    Selector -->|"spi_complete(td)"| RQ
     Selector -->|"spi_complete(td)"| NONE
 
     %% styling (optional, keeps colours gentle) %%
