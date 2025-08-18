@@ -13,6 +13,7 @@
 #include "buffers.h"
 
 #define CACHE_LINE_SIZE (32U)
+#define CACHE_LINE_MASK (CACHE_LINE_SIZE - 1)
 
 #define DRV_BUFFER_ALIGNED_SIZE(_buffersize_)                                  \
     (((uint32_t)((_buffersize_ + (CACHE_LINE_SIZE - 1U))) / CACHE_LINE_SIZE) * CACHE_LINE_SIZE)

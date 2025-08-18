@@ -18,7 +18,11 @@ typedef enum {
     COMM_INVALID_PARAMETER,
     COMM_INVALID_STATE,
     COMM_NULL_POINTER,
-    COMM_NO_RESSOURCES
+    COMM_NO_RESSOURCES,
+    COMM_TX_FULL,
+    COMM_RX_FULL,
+    COMM_NO_TX_SLOT,
+    COMM_NO_RX_SLOT
 } comm_status_t;
 
 typedef enum {

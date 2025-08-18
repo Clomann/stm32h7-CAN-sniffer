@@ -22,6 +22,8 @@ static SpiInstanceType spi_instances[SPI_MAX_INSTANCES] = {
 
 static CommInterface SpiInterface;
 
+RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio);
+
 comm_status_t m_find_free(SpiInstanceType **handle)
 {
     comm_status_t res = COMM_ERROR;
@@ -77,6 +79,7 @@ static void m_AssignCheckTransactionWithFallback(
         memset(target, 0, sizeof(SpiTransactionType));
         target->direction = SPI_DIR_TX_RX;
         target->timeout   = 1000;
+        target->prio      = SPI_PRIORITY_DEFAULT;
     }
     else
     {
@@ -93,7 +96,10 @@ static comm_status_t m_PrepareTxSlot(
 {
     comm_status_t res;
     RingBuffer *txSlots;
+    RingBuffer *rxSlots;
     SpiSlotType *txSlot;
+    SpiTransactionType *pTransaction;
+    SpiPriorityType Prio;
 
     res = COMM_SUCCESS;
 
@@ -104,8 +110,32 @@ static comm_status_t m_PrepareTxSlot(
         return res;
     }
 
-    txSlots = (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer);
-    txSlot  = (SpiSlotType *)ring_buffer_reserve(txSlots);
+    pTransaction = (SpiTransactionType *)pMsg->transaction;
+
+    if (NULL == pTransaction)
+    {
+        Prio = SPI_PRIORITY_DEFAULT;
+    }
+    else
+    {
+        Prio = pTransaction->prio;
+    }
+
+    txSlots = (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer, Prio);
+
+    if (txSlots->isFull)
+    {
+        return COMM_TX_FULL;
+    }
+
+    rxSlots = (RingBuffer *)Spi_GetSlots(drv->RxFrameBuffer, Prio);
+
+    if (rxSlots->isFull)
+    {
+        return COMM_RX_FULL;
+    }
+
+    txSlot = (SpiSlotType *)ring_buffer_reserve(txSlots);
 
     if (txSlot == NULL)
     {
@@ -114,10 +144,7 @@ static comm_status_t m_PrepareTxSlot(
         return res;
     }
 
-    m_AssignCheckTransactionWithFallback(
-        &txSlot->transaction,
-        (SpiTransactionType *)pMsg->transaction
-    );
+    m_AssignCheckTransactionWithFallback(&txSlot->transaction, pTransaction);
 
     /* Tx/Rx is kept here for compatibility with functions in SD.c */
     txSlot->transaction.direction = direction;
@@ -283,13 +310,13 @@ void SPI_Poll(CommDriver *drv)
 {
     comm_status_t res = COMM_ERROR;
     SpiInstanceType *instance;
-
     RingBuffer *txSlots;
     SpiSlotType *txSlot;
     RingBuffer *rxSlots;
     SpiSlotType *rxSlot;
-
     SpiTransactionType *Transaction;
+    SpiPriorityType Prio;
+    bool TxSlotFound = false;
 
     if (drv == NULL || NULL == drv->instance || drv->TxFrameBuffer == NULL
         || drv->RxFrameBuffer == NULL)
@@ -300,8 +327,36 @@ void SPI_Poll(CommDriver *drv)
     }
 
     instance = (SpiInstanceType *)drv->instance;
-    txSlots  = (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer);
-    rxSlots  = (RingBuffer *)Spi_GetSlots(drv->RxFrameBuffer);
+
+    for (uint8_t i = 0; i < SPI_PRIORITYn; i++)
+    {
+        Prio = (SpiPriorityType)(SPI_PRIORITYn - 1U - i);
+
+        txSlots = (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer, Prio);
+
+        if (NULL == txSlots)
+        {
+        }
+        else if (0 != txSlots->elementCount)
+        {
+            TxSlotFound = true;
+            break;
+        }
+    }
+
+    if (!TxSlotFound)
+    {
+        return;
+    }
+
+    rxSlots = (RingBuffer *)Spi_GetSlots(drv->RxFrameBuffer, Prio);
+
+    if (rxSlots == NULL)
+    {
+        res = COMM_NULL_POINTER;
+        SPI_ErrorHandler();
+        return;
+    }
 
     // get oldest tx slot
     txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
@@ -394,6 +449,8 @@ uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
     RingBuffer *rxSlots    = NULL;
     SpiSlotType *rxSlot    = {0};
     SpiSlotType rxSlotCopy = {0};
+    SpiPriorityType Prio;
+    bool RxSlotFound = false;
 
     if (NULL == hspi)
     {
@@ -409,7 +466,33 @@ uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
         return res;
     }
 
-    rxSlots = (RingBuffer *)Spi_GetSlots(pDrv->RxFrameBuffer);
+    for (uint8_t i = 0; i < SPI_PRIORITYn; i++)
+    {
+        Prio = (SpiPriorityType)(SPI_PRIORITYn - 1U - i);
+
+        rxSlots = (RingBuffer *)Spi_GetSlots(pDrv->RxFrameBuffer, Prio);
+
+        if (NULL == rxSlots)
+        {
+        }
+        else if (0 != rxSlots->elementCount)
+        {
+            RxSlotFound = true;
+            break;
+        }
+    }
+
+    if (!RxSlotFound)
+    {
+        return COMM_NO_RX_SLOT;
+    }
+
+    if (NULL == rxSlots)
+    {
+        res = COMM_NO_RESSOURCES;
+        SPI_ErrorHandler();
+        return res;
+    }
 
     rxSlot = (SpiSlotType *)ring_buffer_peek_at(rxSlots, 0);
 
@@ -449,7 +532,7 @@ uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
     return res;
 }
 
-RingBuffer *Spi_GetSlots(const uint8_t *const buf)
+RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio)
 {
     SpiBinType *txBins;
 
@@ -459,9 +542,15 @@ RingBuffer *Spi_GetSlots(const uint8_t *const buf)
         return NULL;
     }
 
+    if (prio >= SPI_PRIORITYn)
+    {
+        SPI_ErrorHandler();
+        return NULL;
+    }
+
     txBins = (SpiBinType *)buf;
 
-    return (RingBuffer *)txBins[0].slots;
+    return (RingBuffer *)txBins[prio].slots;
 }
 
 uint32_t Spi_HasPendingTransfers(CommDriver *drv)
@@ -473,7 +562,8 @@ uint32_t Spi_HasPendingTransfers(CommDriver *drv)
         return false;
     }
 
-    txSlots = (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer, SPI_PRIORITY_DEFAULT);
 
     // Check if there are any messages in the TX buffer
     return txSlots->elementCount;

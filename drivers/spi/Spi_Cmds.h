@@ -59,7 +59,6 @@ static inline uint8_t Spi_CsDisable()
 
 HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef *);
 
-//static uint8_t Spi_Receive(uint8_t *r, uint8_t);
 uint8_t Spi_readByte(SPI_HandleTypeDef * handle, uint8_t * pResponse);
 uint8_t Spi_writByte(SPI_HandleTypeDef * handle, const uint8_t *data);
 uint8_t Spi_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse);

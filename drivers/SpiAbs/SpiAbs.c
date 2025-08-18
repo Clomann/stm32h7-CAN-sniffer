@@ -4,10 +4,10 @@
 
 #define SPI_RX_SLOT_REQUIRED_SIZE   (515) /* max payload: token + sector + crc = 1 + 512 + 2 = 515 */
 #define SPI_TX_SLOT_REQUIRED_SIZE   (515)
-#define  SW_RX_SLOT_COUNT (2U)
-#define  SW_TX_SLOT_COUNT (2U)
-#define  SW_RX_BIN_COUNT (2U)
-#define  SW_TX_BIN_COUNT (2U)
+#define  SW_RX_SLOT_COUNT (3U)
+#define  SW_TX_SLOT_COUNT (3U)
+#define  SW_TX_BIN_COUNT (SPI_PRIORITYn)
+#define  SW_RX_BIN_COUNT (SW_TX_BIN_COUNT)
 
 /* SPI 1 */
 
@@ -296,6 +296,7 @@ uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer,
     Context.data = pRxBuffer;
     Context.length = TxBytes;
 
+    Transaction.prio = SPI_PRIORITY_LOW;
     Transaction.length = TxBytes;
     Transaction.callback = SpiAbs_SendReceiveMsgCallback;
     Transaction.context = &Context;
@@ -354,10 +355,11 @@ void SpiAbs_Send_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint
     };
     TaskContextType context = {
         .done = 0,
-        .status = 0
+        .status = 0   
     };
 
     transaction.id = 1;
+    transaction.prio = SPI_PRIORITY_LOW;
     transaction.timeout = 100;
     transaction.callback = SpiAbs_Send_Spi1_CompleteCallback_Task0;
     transaction.context = (void *)&context;
