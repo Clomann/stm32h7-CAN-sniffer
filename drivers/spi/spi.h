@@ -16,6 +16,15 @@
 
 typedef uint8_t SpiDriverNumberType;
 
+#define SPI_PRIORITY_LOW    0U
+#define SPI_PRIORITY_MEDIUM 1U
+#define SPI_PRIORITY_HIGH   2U
+#define SPI_PRIORITYn       3U
+
+#define SPI_PRIORITY_DEFAULT SPI_PRIORITY_LOW
+
+typedef uint8_t SpiPriorityType;
+
 #define SPI_ASSIGN_SLOT(_array_)                                               \
     {.used_len = 0U,                                                           \
      .max_len  = sizeof(_array_) / sizeof(_array_[0]),                         \
@@ -85,6 +94,7 @@ typedef struct
     uint32_t timeout;
     uint16_t length;
     SpiDirectionType direction;
+    SpiPriorityType prio;
     SpiCompleteionCallbackType callback;
     void *context;
 } SpiTransactionType;
@@ -131,5 +141,4 @@ comm_status_t SPI_Ioctl(CommDriver *dev, int cmd, void *argument);
 void SPI_Poll(CommDriver *drv);
 uint32_t Spi_HasPendingTransfers(CommDriver *drv);
 
-RingBuffer *Spi_GetSlots(const uint8_t *const buf);
 void SPI_ErrorHandler(void);

@@ -4,21 +4,25 @@
 
 #include "spi.h"
 #include "SpiAbs.h"
+#include "buffers.h"
 
-static int g_spi_error_handler_calls = 0;
-void SPI_ErrorHandler(void)
-{
-    g_spi_error_handler_calls++;
-}
+extern RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio);
 
 extern volatile int Spi_Init_return_value;
 extern volatile int Spi_Init_call_count;
 extern volatile int Spi_SendReceiveMsg_call_count;
 extern size_t Spi_SendReceiveMsg_last_len;
 
+static int g_spi_error_handler_calls = 0;
+
 void init_driver_instance();
 void deinit_driver_instance();
 void reset_rx_tx_buffers();
+
+void SPI_ErrorHandler(void)
+{
+    g_spi_error_handler_calls++;
+}
 
 void setUp(void)
 {
@@ -86,12 +90,12 @@ int main(void)
     return UNITY_END();
 }
 
-#define SPI_RX_SLOT_REQUIRED_SIZE (515)
 #define SPI_TX_SLOT_REQUIRED_SIZE (515)
-#define SW_RX_SLOT_COUNT          (3U)
+#define SPI_RX_SLOT_REQUIRED_SIZE (515)
 #define SW_TX_SLOT_COUNT          (3U)
-#define SW_RX_BIN_COUNT           (2U)
-#define SW_TX_BIN_COUNT           (2U)
+#define SW_RX_SLOT_COUNT          (3U)
+#define SW_TX_BIN_COUNT           (SPI_PRIORITYn)
+#define SW_RX_BIN_COUNT           (SW_TX_BIN_COUNT)
 
 /* SPI 1 */
 
@@ -539,8 +543,9 @@ void test_SPI_Read_sets_rx_only_direction_and_reserves_slot(void)
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     // Verify that a slot was reserved and configured correctly
-    txSlots = (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer);
-    txSlot  = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
+    txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
 
     TEST_ASSERT_NOT_NULL(txSlot);
     TEST_ASSERT_EQUAL(10, txSlot->used_len);
@@ -613,7 +618,8 @@ void test_SPI_Read_no_available_slots_calls_error_handler(void)
     );
 
     // Fill up all available slots
-    txSlots = (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
     txSlots->elementCount = txSlots->bufferLength; // Make buffer appear full
     txSlots->isFull       = true;
 
@@ -624,11 +630,8 @@ void test_SPI_Read_no_available_slots_calls_error_handler(void)
 
     rc = SPI_Read(&Spi1Driver, &msg, 0, 0);
 
-    TEST_ASSERT_EQUAL(COMM_NULL_POINTER, rc);
-    TEST_ASSERT_TRUE_MESSAGE(
-        g_spi_error_handler_calls >= 1,
-        "SPI_ErrorHandler should be called when no slots are available"
-    );
+    TEST_ASSERT_EQUAL(COMM_TX_FULL, rc);
+    TEST_ASSERT_EQUAL_INT(g_spi_error_handler_calls, 0);
 }
 
 void test_SPI_Read_calls_spi_receive_when_polled(void)
@@ -687,7 +690,8 @@ void test_SPI_Read_sets_transaction_length_correctly(void)
         (uint8_t *)Spi1RxBinsRingBuffer
     );
 
-    txSlots = (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
 
     // Test different message lengths
     msg1.msgBase.length = 15;
@@ -748,8 +752,9 @@ void test_SPI_Send_copies_payload_to_slot_data(void)
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     // Verify payload was copied (this is unique to SPI_Send)
-    txSlots = (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer);
-    txSlot  = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
+    txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(test_data, txSlot->data, sizeof(test_data));
 }
 
@@ -783,8 +788,9 @@ void test_SPI_Send_passes_correct_direction_to_prepare_slot(void)
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     // Verify SPI_Send passes SPI_DIR_TX_RX to m_PrepareTxSlot
-    txSlots = (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer);
-    txSlot  = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
+    txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
     TEST_ASSERT_EQUAL(SPI_DIR_TX_RX, txSlot->transaction.direction);
 }
 
@@ -832,7 +838,8 @@ void test_SPI_Send_propagates_prepare_slot_errors(void)
     );
 
     // Force m_PrepareTxSlot to fail by filling buffer
-    txSlots = (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer);
+    txSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
     txSlots->elementCount = txSlots->bufferLength;
     txSlots->isFull       = true;
 
@@ -843,5 +850,5 @@ void test_SPI_Send_propagates_prepare_slot_errors(void)
     rc = SPI_Send(&Spi1Driver, &msg);
 
     // Verify error is propagated and memcpy is not called
-    TEST_ASSERT_EQUAL(COMM_NULL_POINTER, rc);
+    TEST_ASSERT_EQUAL(COMM_TX_FULL, rc);
 }
