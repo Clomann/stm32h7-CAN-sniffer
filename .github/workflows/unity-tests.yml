@@ -3,6 +3,8 @@ name: test
 on: 
   push: { branches: [ integration, main ] }
   pull_request:  { branches: [ main ] }
+  workflow_dispatch:
+  
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
