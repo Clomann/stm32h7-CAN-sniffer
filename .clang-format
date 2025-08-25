@@ -1,14 +1,15 @@
+# you can test a config here: https://zed0.co.uk/clang-format-configurator/
 ---
 BasedOnStyle: LLVM
 Language: Cpp
-ColumnLimit: 100
+ColumnLimit: 80
 IndentWidth: 4
 UseTab: Never
 BreakBeforeBinaryOperators: NonAssignment
 
 # C conventions
 PointerAlignment: Right
-SpaceAfterCStyleCast: true
+SpaceAfterCStyleCast: false
 SpaceBeforeParens: ControlStatements
 
 # Braces – choose one and stick to it
