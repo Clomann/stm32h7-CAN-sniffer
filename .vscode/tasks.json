@@ -1,6 +1,30 @@
 {
   "version": "2.0.0",
   "tasks": [
+     {
+      "label": "cppcheck",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cppcheck --enable=all --inconclusive --std=c11 --force \
+        --suppressions-list=dev/tools/cppcheck/cppcheck-suppressions.txt \
+        --project=build/compile_commands.json --rule-file=dev/tools/cppcheck/rules.xml \w
+        2> _bin/cppcheck_report.txt"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
     {
       "label": "Flash CM7",
       "type": "shell",
@@ -79,7 +103,7 @@
       "dependsOrder": "sequence"
     },
     {
-      "label": "Start Session",
+      "label": "Start Debug Session",
       "dependsOn": ["Start OpenOCD"],
       "dependsOrder": "sequence"
     }
