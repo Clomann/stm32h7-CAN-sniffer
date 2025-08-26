@@ -12,7 +12,6 @@
 
 #include "FileHandler.h"
 #include "HttpAbs.h"
-#include "CanLogBuffer.h"
 #include "fdcan_msg_port.h"
 #include "SettingsHandler.h"
 #include "CanAbs.h"
@@ -23,34 +22,20 @@
 #include "spi_port_freertos.h"
 #include "SpiAbs.h"
 
+#include "ConfigManager.h"
+#include "CanLogManager.h"
+
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE)
 
 typedef struct {
-  struct {
-   char * filename;
-    uint32_t fnamemaxlen;
-    uint32_t count;
-    uint32_t timestamp;
-    uint8_t openRes;
-    uint32_t fileHeadIndex;
-    uint32_t fileTailIndex;
-    bool fileIndexWrapped;
-    FatFsDeviceType writeFileDevice;
-  } CanLog;
-  struct {
-    char * filename;
-    uint32_t fnamemaxlen;
-    uint32_t count;
-    uint32_t timestamp;
-    uint8_t openRes;
-    FatFsDeviceType writeFileDevice;
-  } Config;
-  uint8_t mountRes;
-  bool runCanTracer;
-  bool applyConfig;
+    CanLogControlDataType *Log;
+    ConfigFileManagerType *Config;
+    uint8_t mountRes;
+    bool runCanTracer;
+    bool applyConfig;
 } AppControlDataType;
 
 
@@ -61,28 +46,10 @@ static FDCAN_Message Can2TestMsg2;
 
 uint8_t run;
 static AppConfigType AppConfig;
-static char CanLogFileName[255] = "/logs/CAN.LOG";
-static char ConfigFileName[255] = "CONF.TXT";
 
 static AppControlDataType AppCtrlData = { 
-  .CanLog = {
-    .filename = CanLogFileName,
-    .fnamemaxlen = sizeof(CanLogFileName),
-    .count = 0,
-    .timestamp = 0,
-    .openRes = 1,
-    .writeFileDevice.readTargetSize = 0U,
-  },
-  .Config = {
-    .filename = ConfigFileName,
-    .fnamemaxlen = sizeof(ConfigFileName),
-    .count = 0,
-    .timestamp = 0,
-    .openRes = 1,
-    .writeFileDevice.readTargetSize = 0U,
-  },
   .mountRes = 1,
-  .runCanTracer = 0,
+  .runCanTracer = 0
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -92,36 +59,9 @@ void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2);
 static void appFdcanPoll();
 
 /* Private functions ---------------------------------------------------------*/
-#define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
-#define MAX_LOG_FILE_SIZE   (8U * 1024U )
-#define MAX_LOG_INDEX       (16U)
-
-uint8_t FsCustom_GetCanLogHeadIndex(uint32_t *index)
+void CanLogFileManager_ErrorHandler()
 {
-    *index = AppCtrlData.CanLog.fileHeadIndex;
-    return 0U;
-}
-
-uint8_t FsCustom_GetCanLogTailIndex(uint32_t *index)
-{
-    *index = AppCtrlData.CanLog.fileTailIndex;
-    return 0U;
-}
-
-uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
-{
-    *capacity = MAX_LOG_INDEX;
-    return 0U;
-}
-
-uint8_t FsCustom_IsTracerRunning(uint8_t *running)
-{
-    uint8_t res;
-
-    res = 0;
-    *running = AppCtrlData.runCanTracer;
-
-    return res;
+    Error_Handler();
 }
 
 void FDCAN_ErrorHandler()
@@ -231,323 +171,6 @@ void SpiAbs_TaskSendReceiveCallback()
     }
 }
 
-static void appConfigHandlerInit(AppControlDataType *data)
-{
-  SettingsHandler_Init(&AppConfig);
-
-  if ( RES_OK == data->mountRes)
-  {
-    data->Config.openRes = FatFS_SD_OpenFileForWrite(
-                              &(data->Config.writeFileDevice),
-                              data->Config.filename);
-
-    /* enforce f_seek to zero via custom flags to not clear content later */
-    data->Config.writeFileDevice.fflags = FA_CREATE_ALWAYS | FA_WRITE;
-  }
-  else 
-  {
-    data->Config.openRes = 1U;
-  }
-}
-
-static int find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix)
-{
-    FatFS_FileIterator it;
-    FILINFO *fno;
-    int highest = -1;
-
-    if ( FatFS_SD_FileIterator_Open(&it, dirPath, prefix) != FR_OK)
-        return -1;
-
-    while ( FatFS_SD_FileIterator_Next(&it, &fno) == FR_OK) {
-        const char *suffix = fno->fname + strlen(prefix);
-        char *endptr;
-        long val = strtol(suffix, &endptr, 10);
-
-        if (*endptr == '\0' && val >= 0 && val <= maxSuffix && val > highest) {
-            highest = (int)val;
-        }
-    }
-
-    FatFS_SD_FileIterator_Close(&it);
-    return highest;
-}
-
-static unsigned int appCanLogOpenMostRecentFile(AppControlDataType *data)
-{
-    int lastUsed;
-
-    lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);     
-
-#if 0U == PERSIST_CAN_LOG_FILE_HEAD_TAIL
-    lastUsed = 0U;
-#endif
-
-    data->CanLog.fileHeadIndex = lastUsed;
-
-    // Build candidate filename
-    snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)lastUsed);
-
-    data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
-                                    &(data->CanLog.writeFileDevice), 
-                                    data->CanLog.filename);
-    
-    return 0U;
-}
-
-static unsigned int appCanLogCheckNewFileOpen(AppControlDataType *data)
-{
-    FRESULT FileSizeRes;
-    uint32_t FileSize;
-
-    FileSizeRes = FatFS_SD_GetBufferedFileSize(&(data->CanLog.writeFileDevice), &FileSize);
-
-    if (FileSizeRes == FR_OK && FileSize >= MAX_LOG_FILE_SIZE)
-    {
-        // File exists and is full, advance to next one
-        if (0 == FatFS_SD_CloseFile(
-            &(data->CanLog.writeFileDevice)))
-        {
-            if (data->CanLog.fileHeadIndex >= MAX_LOG_INDEX)
-            {
-                data->CanLog.fileIndexWrapped = 1;
-            }
-            
-            data->CanLog.fileHeadIndex = (data->CanLog.fileHeadIndex + 1) % (MAX_LOG_INDEX + 1);
-
-            if (1 == data->CanLog.fileIndexWrapped)
-            {
-                data->CanLog.fileTailIndex = (data->CanLog.fileHeadIndex + 1) % (MAX_LOG_INDEX + 1);
-            }
-            
-            snprintf(data->CanLog.filename, data->CanLog.fnamemaxlen, "/logs/CAN.LOG%d", (int)data->CanLog.fileHeadIndex);
-    
-            (void) f_unlink(data->CanLog.filename);
-
-            data->CanLog.openRes = FatFS_SD_OpenFileForWrite(
-                &(data->CanLog.writeFileDevice), 
-                data->CanLog.filename);
-    
-            if (0 != data->CanLog.openRes)
-            {
-                Error_Handler();
-            }
-            FatFS_SD_Flush(&(data->CanLog.writeFileDevice));
-        }
-        else
-        {            
-            Error_Handler();
-        }
-    }
-    
-    return 0U;
-}
-
-static FRESULT appCanLogHandlerInit(AppControlDataType *data)
-{
-    FILINFO info;
-    FRESULT res;
-
-    data->CanLog.fileHeadIndex = 0;
-    data->CanLog.fileTailIndex = 0;
-    data->CanLog.fileIndexWrapped = 0;
-
-    CanLogBuffer_Init();
-
-    fdcan_msg_port_init();
-
-    res = f_stat("/logs", &info);
-
-    if ( (res == FR_OK) && (info.fattrib & AM_DIR)) 
-    {
-
-    }
-    else if (res == FR_NO_FILE)
-    {
-        // Directory does not exist — create it
-        res = f_mkdir("/logs");
-        if (res != FR_OK) {
-            Error_Handler();
-        }
-    }
-    else if ( (res == FR_OK) && (!(info.fattrib & AM_DIR))) 
-    {
-        Error_Handler();
-    }
-
-    if ( RES_OK == data->mountRes)
-    {
-        appCanLogOpenMostRecentFile(data);
-    }
-    else 
-    {
-        data->CanLog.openRes = 1U;
-    }
-
-    return res;
-}
-
-static void appCanLogFillEntry(CanLogClassicCanEntryType *entry, FDCAN_ClassicFrame *frame, uint64_t *timestamp, uint8_t channel)
-{
-    memset(entry, 0x0, sizeof(CanLogClassicCanEntryType));
-
-    entry->header.header_len = sizeof(entry->header);
-    entry->header.type = CANLOG_CLASSIC_TYPE;
-    entry->header.total_len = sizeof(CanLogClassicCanEntryType);
-    entry->timestamp = *timestamp;
-    entry->channel = channel;
-    entry->dlc = frame->dlc;
-    memcpy( (uint8_t *)&entry->can_id, (uint8_t *)&frame->id, sizeof(entry->can_id) );
-    memcpy( entry->data, frame->data, sizeof(entry->data) );
-}
-
-static comm_status_t appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel)
-{
-    comm_status_t res = COMM_SUCCESS;
-
-    CanLogClassicCanEntryType NewEntry;
-
-    appCanLogFillEntry(&NewEntry, frame, (uint64_t*)&frame->timestamp, channel);
-
-    CanLogBuffer_AddClassicCanEntry(&NewEntry);
-
-    return res;
-}
-
-static comm_status_t appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
-{
-    comm_status_t res = COMM_SUCCESS;
-
-    if (FR_OK == FatFS_SD_WriteFile(
-        dev, 
-        (const char *)data, 
-        length) )
-    {
-        if (FR_OK != FatFS_SD_Flush(dev) )
-        {
-            res = COMM_ERROR;
-        }
-    }
-    else
-    {
-        res = COMM_ERROR;
-    }
-
-    return res;
-}
-
-static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
-{
-    uint32_t DataLength;
-    comm_status_t res = COMM_SUCCESS;
-    static uint8_t Data[BLOCK_SIZE] = {0};
-
-    if ( CANLOG_E_OK ==  CanLogBuffer_ReadNextBlock(Data, &DataLength) )
-    {
-        res = appCanLogStoreToSd(dev, (char *)Data, DataLength);
-    }
-    else
-    {
-        res = COMM_ERROR;
-    }
-
-    return res;
-}
-
-static void appCanLogHandlerPoll(AppControlDataType *data)
-{
-    comm_status_t res = COMM_SUCCESS;
-    bool IsOffState;
-    uint8_t BlockIsReady;
-    FDCAN_ClassicFrame NewFrame;
-    static volatile bool RunTracerOld = 0;
-
-    if (RunTracerOld == AppCtrlData.runCanTracer)
-    {
-
-    }
-    else if (true == AppCtrlData.runCanTracer)
-    {
-        CanAbs_IsStateOff_Can1(&IsOffState);
-
-        if (true == IsOffState)
-        {
-            /* nothing to do */
-        }
-        else if (COMM_SUCCESS != CanAbs_Start_Can1())
-        {
-            res = COMM_ERROR;
-            Error_Handler();
-        }
-
-        CanAbs_IsStateOff_Can2(&IsOffState);
-
-        if (true == IsOffState)
-        {
-            /* nothing to do */
-        }
-        else if (COMM_SUCCESS != CanAbs_Start_Can2())
-        {
-            res = COMM_ERROR;
-            Error_Handler();
-        }
-
-        if (COMM_SUCCESS == res)
-        {
-            RunTracerOld = AppCtrlData.runCanTracer;
-        }
-        else
-        {
-            AppCtrlData.runCanTracer = false;
-        }
-    }
-    else
-    {
-        if (COMM_SUCCESS != CanAbs_Stop_Can1())
-        {
-            AppCtrlData.runCanTracer = false;
-        }
-        else if (COMM_SUCCESS != CanAbs_Stop_Can2())
-        {
-            AppCtrlData.runCanTracer = false;
-        }
-        else
-        {
-            RunTracerOld = AppCtrlData.runCanTracer;
-        }
-    }
-
-    appCanLogCheckNewFileOpen(data);
-
-    while (0 < fdcan_msg_port_read(&NewFrame, 0))
-    {
-        appCanLogStoreToFrameBuffer(&NewFrame, NewFrame.channel);
-
-        CanLogBuffer_IsBlockReady(&BlockIsReady);
-
-        if ( 0 != data->CanLog.openRes )
-        {    
-            /* quit */
-            Error_Handler();
-        }
-        else if ( 0 < BlockIsReady )
-        {
-            appCanLogStoreBlock(&(data->CanLog.writeFileDevice));
-        }
-        else
-        {
-        }
-    }
-}
-
-static void appCanLogHandlerDeInit(AppControlDataType * data)
-{
-  if ( 0 == data->CanLog.openRes )
-  { 
-    FatFS_SD_CloseFile(&(data->CanLog.writeFileDevice));
-  }
-}
-
 static void appFdcanInit()
 {
     static uint8_t TxData[8];
@@ -615,6 +238,7 @@ void appFdcanPoll()
 static void Core0Task0Main( void * parameters )
 {
     static FatFsDeviceType ConfigReadFileDevice;
+    static FatFsDeviceType *pConfigWriteFileDevice;
     uint32_t spiClockSource;
     HAL_StatusTypeDef HalStatus;
     static struct Config { 
@@ -662,12 +286,18 @@ static void Core0Task0Main( void * parameters )
 
     run = 1U;
 
-    if (0 != AppCtrlData.mountRes)
-    AppCtrlData.mountRes = FatFS_SD_Mount();
+    if (RES_OK != AppCtrlData.mountRes)
+    {
+        AppCtrlData.mountRes = FatFS_SD_Mount();
+    }
 
-    appCanLogHandlerInit(&AppCtrlData);
+    AppCtrlData.Log = CanLogHandler_Init(&AppCtrlData.mountRes, &AppCtrlData.runCanTracer);
+    AppCtrlData.Config = ConfigManager_Init(&AppCtrlData.mountRes);
 
-    appConfigHandlerInit(&AppCtrlData);
+    SettingsHandler_Init(&AppConfig);
+
+    appCanLogHandlerInit(AppCtrlData.Log);
+    appConfigHandlerInit(AppCtrlData.Config);
 
     GPIO_Dbg_Init();
     GPIO_Mco1_Init();
@@ -680,11 +310,12 @@ static void Core0Task0Main( void * parameters )
     {
         http_poll();
 
-        appCanLogHandlerPoll(&AppCtrlData);
+        appCanLogHandlerPoll(AppCtrlData.Log);
 
-        if (0 == AppCtrlData.Config.openRes)
+        if (0 == ConfigManager_GetOpenRes(AppCtrlData.Config))
         {
-            SettingsHandler_Poll(&(AppCtrlData.Config.writeFileDevice), &AppConfig);
+            pConfigWriteFileDevice = ConfigManager_GetFile(AppCtrlData.Config);
+            SettingsHandler_Poll(pConfigWriteFileDevice, &AppConfig);
         }
 
         if (0 == AppCtrlData.applyConfig)
@@ -704,10 +335,13 @@ static void Core0Task0Main( void * parameters )
         MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
     }
 
-    appCanLogHandlerDeInit(&AppCtrlData);
+    appCanLogHandlerDeInit(AppCtrlData.Log);
 
-    if (0 == AppCtrlData.mountRes)
-    FatFS_SD_Unmount();
+    if (RES_OK == AppCtrlData.mountRes)
+    {
+        FatFS_SD_Unmount();
+        AppCtrlData.mountRes = RES_NOTRDY;
+    }
 
     SpiAbs_PwrOff(SPIABS_DEVICE_1);
 }
