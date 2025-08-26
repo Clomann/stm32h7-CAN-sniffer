@@ -137,6 +137,8 @@ if(CORE STREQUAL "CM7")
         ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
         ${PROJ_PATH}/CM7/Src/Core0Task0.c
         ${PROJ_PATH}/CM7/Src/Core0Task1.c
+        ${PROJ_PATH}/CM7/Src/CanLogManager.c
+        ${PROJ_PATH}/CM7/Src/ConfigManager.c
         ${PROJ_PATH}/CM7/Src/utils_mpu.c
 
         ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
@@ -238,6 +240,7 @@ target_link_options(${EXECUTABLE} PRIVATE
     -Wl,--print-memory-usage
     -Wl,--warn-unresolved-symbols
     -Wl,--trace
+    -Wl,--no-undefined
     # -Wl,--gc-sections,--print-gc-sections
 )
 
