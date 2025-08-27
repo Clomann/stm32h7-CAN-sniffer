@@ -22,6 +22,7 @@
 #include "spi_port_freertos.h"
 #include "SpiAbs.h"
 
+#include "SettingsHandler.h"
 #include "ConfigManager.h"
 #include "CanLogManager.h"
 
@@ -32,7 +33,7 @@ TASK_VARIABLES(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE)
 
 typedef struct {
     CanLogControlDataType *Log;
-    ConfigFileManagerType *Config;
+    ConfigManagerType Config;
     uint8_t mountRes;
     bool runCanTracer;
     bool applyConfig;
@@ -48,8 +49,8 @@ uint8_t run;
 static AppConfigType AppConfig;
 
 static AppControlDataType AppCtrlData = { 
-  .mountRes = 1,
-  .runCanTracer = 0
+    .mountRes = 1,
+    .runCanTracer = 0
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -237,14 +238,8 @@ void appFdcanPoll()
 
 static void Core0Task0Main( void * parameters )
 {
-    static FatFsDeviceType ConfigReadFileDevice;
-    static FatFsDeviceType *pConfigWriteFileDevice;
     uint32_t spiClockSource;
     HAL_StatusTypeDef HalStatus;
-    static struct Config { 
-        char data[1024U];
-        uint32_t len;
-    } Config = {0U};
     static UBaseType_t MinUnusedStack;
 
     /* Unused parameters. */
@@ -276,11 +271,6 @@ static void Core0Task0Main( void * parameters )
     /* While the SPI in TransmitReceive process, user can transmit data through
         "aTxBuffer" buffer & receive data through "aRxBuffer" */
     SpiAbs_PwrOn(SPIABS_DEVICE_1);
-    if (0U == FatFS_SD_LoadConfig(&ConfigReadFileDevice, Config.data, &Config.len) )
-    {
-        SettingsHandler_ParseConfig(Config.data, Config.len, &AppConfig);
-        SettingsHandler_Init(&AppConfig);
-    }
 
     http_init();
 
@@ -292,12 +282,21 @@ static void Core0Task0Main( void * parameters )
     }
 
     AppCtrlData.Log = CanLogHandler_Init(&AppCtrlData.mountRes, &AppCtrlData.runCanTracer);
-    AppCtrlData.Config = ConfigManager_Init(&AppCtrlData.mountRes);
-
-    SettingsHandler_Init(&AppConfig);
-
     appCanLogHandlerInit(AppCtrlData.Log);
-    appConfigHandlerInit(AppCtrlData.Config);
+    
+    ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
+    if (ConfigManager_Initialize(&AppCtrlData.Config) == CONFIG_OK)
+    {
+        if (ConfigManager_LoadConfig(&AppCtrlData.Config, &AppConfig) != CONFIG_OK) 
+        {
+            AppConfig.can1.baudrate = 0;
+            AppConfig.can1.mode = 0;
+            AppConfig.can2.baudrate = 0;
+            AppConfig.can2.mode = 0;
+        }
+
+        SettingsHandler_Init(&AppConfig);
+    }
 
     GPIO_Dbg_Init();
     GPIO_Mco1_Init();
@@ -312,10 +311,12 @@ static void Core0Task0Main( void * parameters )
 
         appCanLogHandlerPoll(AppCtrlData.Log);
 
-        if (0 == ConfigManager_GetOpenRes(AppCtrlData.Config))
+        if (SettingsHandler_Poll(&AppConfig)) 
         {
-            pConfigWriteFileDevice = ConfigManager_GetFile(AppCtrlData.Config);
-            SettingsHandler_Poll(pConfigWriteFileDevice, &AppConfig);
+            if (ConfigManager_UpdateConfig(&AppCtrlData.Config, &AppConfig, true) == CONFIG_OK) 
+            {
+                AppConfig.updated = 0;
+            }
         }
 
         if (0 == AppCtrlData.applyConfig)
@@ -439,7 +440,6 @@ void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValu
             param = pcParam[i];
             value = pcValue[i];
 
-            /* check parameter "baudrate" */
             if (strcmp(param , "action") == 0)
             {
                 if(strcmp(value, "Stop") == 0)
@@ -455,3 +455,31 @@ void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValu
     }
 }
 
+/* Hooks */
+
+int ConfigManager_SerializeHook(const void* config, char* buffer, uint32_t maxLength, uint32_t* length) 
+{
+    if (!config || !buffer || !length) 
+    {
+        return -1;
+    }
+    
+    return SettingsHandler_CreateJsonString((AppConfigType*)config, buffer, maxLength, length);
+}
+
+int ConfigManager_DeserializeHook(const char* buffer, uint32_t length, void* config) 
+{
+    if (!buffer || !config) 
+    {
+        return -1;
+    }
+    
+    if (SETTINGS_OK == SettingsHandler_ParseConfig((char*)buffer, length, (AppConfigType*)config))
+    {
+        return CONFIG_OK;
+    }
+    else
+    {
+        return CONFIG_NOT_OK;
+    }
+}
