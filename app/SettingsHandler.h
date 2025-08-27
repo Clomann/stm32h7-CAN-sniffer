@@ -5,6 +5,12 @@
 
 #include "FileHandler.h"
 
+typedef enum
+{
+    SETTINGS_OK = 0,
+    SETTINGS_NOT_OK,
+} SettingsHandlerErrorType;
+
 typedef struct {
     /*!< Baudrate in bit/s (e.g. 250000 for 250 kbit/s) */
     uint32_t baudrate;
@@ -22,9 +28,9 @@ typedef struct {
 } AppConfigType;
 
 int SettingsHandler_ParseConfig(char *buff, uint32_t len, AppConfigType *cfg);
-int FatFS_SD_LoadConfig(FatFsDeviceType *dev, char *data, uint32_t *len);
 uint8_t SettingsHandler_Init(AppConfigType *cfg);
-uint8_t SettingsHandler_Poll(FatFsDeviceType *dev, AppConfigType *cfg);
+uint8_t SettingsHandler_Poll(AppConfigType *cfg);
+int SettingsHandler_CreateJsonString(AppConfigType* config, char* buffer, uint32_t maxLength, uint32_t* length);
 
 /* Shim functions needed to be implemented by the caller */
 void SettingsHandler_ApplyRequestCallback();

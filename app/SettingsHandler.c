@@ -379,7 +379,14 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         }
     }
 
-    return result;
+    if (JSONSuccess == result)
+    {
+        return SETTINGS_OK;
+    }
+    else
+    {
+        return SETTINGS_NOT_OK;
+    }
 }
 
 int FatFS_SD_LoadConfig(FatFsDeviceType *dev, char *data, uint32_t *len)
@@ -441,30 +448,18 @@ static uint8_t m_CreateJSonString(AppConfigType *cfg, char *json, uint32_t maxLe
     return 0U;
 }
 
-static uint8_t m_StoreConfig(FatFsDeviceType *dev, AppConfigType *cfg)
-{
-    FRESULT res;
-
-    uint32_t ConfigLength;
-    char json_buffer[SETTINGS_HANDLER_JSON_BUFFER_SIZE];
-
-    m_CreateJSonString(cfg, json_buffer, sizeof(json_buffer), &ConfigLength);
-    
-    res = FatFS_SD_WriteFile(dev, json_buffer, ConfigLength);
-    if (FR_OK == res )
-        FatFS_SD_Flush(dev);
-
-    cfg->updated = 0U;
-    
-    return res;
+int SettingsHandler_CreateJsonString(AppConfigType* config, char* buffer, uint32_t maxLength, uint32_t* length) {
+    return m_CreateJSonString(config, buffer, maxLength, length);
 }
 
-uint8_t SettingsHandler_Poll(FatFsDeviceType *dev, AppConfigType *cfg)
+uint8_t SettingsHandler_Poll(AppConfigType *cfg) 
 {
-    if (1U == cfg->updated)
+    if (cfg->updated)
     {
-        return m_StoreConfig(dev, cfg);
+        return 1;
     }
-
-    return 1U;
+    else 
+    {
+        return 0;
+    }
 }
