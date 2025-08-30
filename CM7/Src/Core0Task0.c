@@ -27,6 +27,7 @@
 #include "ConfigManager.h"
 #include "CanLogManager.h"
 #include "CanCtrl.h"
+#include "WebInterface.h"
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -215,35 +216,6 @@ void Core0Task0Init()
     TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
 }
 
-void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
-{
-    uint32_t i = 0;
-    char * param = NULL;
-    char * value = NULL;
-
-    if (iIndex==0)
-    {
-        /* Check cgi parameter */
-        for (i = 0; i<(uint32_t)iNumParams; i++)
-        {
-            param = pcParam[i];
-            value = pcValue[i];
-
-            if (strcmp(param , "action") == 0)
-            {
-                if(strcmp(value, "Stop") == 0)
-                {
-                    AppCtrlData.runCanTracer = 0;
-                }
-                else if(strcmp(value, "Start") == 0)
-                {
-                    AppCtrlData.runCanTracer = 1;
-                }
-            }
-        }
-    }
-}
-
 /* Hooks */
 
 int ConfigManager_SerializeHook(const void* config, char* buffer, uint32_t maxLength, uint32_t* length) 
@@ -271,4 +243,9 @@ int ConfigManager_DeserializeHook(const char* buffer, uint32_t length, void* con
     {
         return CONFIG_NOT_OK;
     }
+}
+
+void WebInterface_GetActionHook(uint8_t action)
+{
+    AppCtrlData.runCanTracer = action;
 }
