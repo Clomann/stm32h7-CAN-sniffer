@@ -210,29 +210,32 @@ static void appFdcanInit()
 void appFdcanPoll()
 {
     volatile uint8_t res;
-    
-    res = CanAbs_Send_Can1(&Can1TestMsg1);
-    if ( 0 != res)
-    {
-        Error_Handler();
-    }
 
-    res = CanAbs_Send_Can1(&Can1TestMsg2);
-    if ( 0 != res)
+    if (AppCtrlData.runCanTracer)
     {
-        Error_Handler();
-    }
+        res = CanAbs_Send_Can1(&Can1TestMsg1);
+        if ( 0 != res)
+        {
+             Error_Handler();
+        }
 
-    res = CanAbs_Send_Can2(&Can2TestMsg1);
-    if ( 0 != res)
-    {
-        Error_Handler();
-    }
+        res = CanAbs_Send_Can1(&Can1TestMsg2);
+        if ( 0 != res)
+        {
+            Error_Handler();
+        }
 
-    res = CanAbs_Send_Can2(&Can2TestMsg2);
-    if ( 0 != res)
-    {
-        Error_Handler();
+        res = CanAbs_Send_Can2(&Can2TestMsg1);
+        if ( 0 != res)
+        {
+            Error_Handler();
+        }
+
+        res = CanAbs_Send_Can2(&Can2TestMsg2);
+        if ( 0 != res)
+        {
+            Error_Handler();
+        }
     }
 }
 
