@@ -139,6 +139,7 @@ if(CORE STREQUAL "CM7")
         ${PROJ_PATH}/CM7/Src/Core0Task1.c
         ${PROJ_PATH}/CM7/Src/CanLogManager.c
         ${PROJ_PATH}/CM7/Src/ConfigManager.c
+        ${PROJ_PATH}/CM7/Src/CanCtrl.c
         ${PROJ_PATH}/CM7/Src/utils_mpu.c
 
         ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
