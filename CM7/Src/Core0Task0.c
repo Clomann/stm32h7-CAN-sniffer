@@ -12,25 +12,23 @@
 
 #include "FileHandler.h"
 #include "HttpAbs.h"
-#include "fdcan_msg_port.h"
 #include "SettingsHandler.h"
 #include "CanAbs.h"
 #include "fs_custom.h"
 #include "timer.h"
 #include "gpio.h"
 #include "httpd_post.h"
-#include "spi_port_freertos.h"
-#include "SpiAbs.h"
+
+#include "CanBridgeTask.h"
+#include "CanSendTask.h"
+#include "SpiTask.h"
 
 #include "SettingsHandler.h"
 #include "ConfigManager.h"
 #include "CanLogManager.h"
 #include "CanCtrl.h"
 
-TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
-TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
-TASK_VARIABLES(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE)
 
 typedef struct {
     CanLogControlDataType *Log;
@@ -52,6 +50,11 @@ static AppControlDataType AppCtrlData = {
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+void SpiTask_ErrorHandlerHook(void)
+{
+    Error_Handler();
+}
+
 void CANCONTROL_ErrorHandlerHook()
 {
     Error_Handler();
@@ -96,99 +99,8 @@ static void appCanCtrlDataSetter(
     CanCtrlData.can2.mode = AppConfig.can2.mode;
 }
 
-static void CanSendTask(void *arg)
-{
-    static TickType_t xPreviousWakeTime;
-    const TickType_t xFrequency = pdMS_TO_TICKS(100);
-    
-    ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-
-    xPreviousWakeTime = xTaskGetTickCount();
-
-    while (1)
-    {
-        vTaskDelayUntil(&xPreviousWakeTime, xFrequency);
-    
-        appCanCtrlDataSetter(
-            &CanCtrlData, 
-            (const AppControlDataType *)&AppCtrlData, 
-            (const AppConfigType *)&AppConfig);
-        appFdcanPoll(&CanCtrlData);
-    }
-}
-
-static void CanBridgeTask(void *arg)
-{
-    FDCAN_ClassicFrame Frame;
-    static UBaseType_t MinUnusedStack;
-    
-    ( void ) MinUnusedStack;
-
-    ulTaskNotifyTake(pdTRUE, 0);
-
-    for (;;)
-    {
-        ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-
-        __asm volatile("nop"); 
-
-        while (0 == CanAbs_Receive_Can1(&Frame))
-        {
-            fdcan_msg_port_receive(&Frame);
-        }
-    
-        while (0 == CanAbs_Receive_Can2(&Frame))
-        {
-            fdcan_msg_port_receive(&Frame);
-        }
-
-        MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
-    }
-}
-
-void DEFERRED_IRQHandler(void)
-{
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-    HAL_NVIC_ClearPendingIRQ(DEFERRED_IRQn);
-
-    /* “Give” one notification to the bridge task */
-    vTaskNotifyGiveFromISR(CanBridgeTaskHdl,
-                           &xHigherPriorityTaskWoken);   /* may set it to pdTRUE */
-
-    /* If the bridge task has a higher priority, switch to it
-       immediately after exiting the ISR.  The macro name is
-       port-specific: on Cortex-M it is usually portYIELD_FROM_ISR(). */
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-void CanAbs_RxNotificationCallback()
-{
-    __DSB();                                    /* ensure writes complete */
-    HAL_NVIC_SetPendingIRQ(DEFERRED_IRQn);  
-}
-
-void SpiAbs_TaskControlCallback(uint32_t timeout)
-{
-    ulTaskNotifyTake(pdTRUE, timeout);
-}
-
-void SpiAbs_TaskSendReceiveCallback()
-{
-    if (SpiAbs_TaskHdl != NULL)
-    {
-        xTaskNotifyGive(SpiAbs_TaskHdl);
-    }
-    else
-    {
-        Error_Handler();
-    }
-}
-
 static void Core0Task0Main( void * parameters )
 {
-    uint32_t spiClockSource;
-    HAL_StatusTypeDef HalStatus;
     static UBaseType_t MinUnusedStack;
 
     /* Unused parameters. */
@@ -202,28 +114,11 @@ static void Core0Task0Main( void * parameters )
     {
         Error_Handler();
     }
-    
-    HalStatus = spi_port_freertos_init((TaskHandle_t*)&Core0Task0MainHdl);
 
-    if(HalStatus != HAL_OK)
-    {
-        /* Initialization Error */
-        Error_Handler();
-    }
-
-    spiClockSource = __HAL_RCC_GET_SPI1_SOURCE();
-    (void)spiClockSource;
-
-    /* USER CODE END 5 */
-
-    /*##-2- Start the Full Duplex Communication process ########################*/
-    /* While the SPI in TransmitReceive process, user can transmit data through
-        "aTxBuffer" buffer & receive data through "aRxBuffer" */
-    SpiAbs_PwrOn(SPIABS_DEVICE_1);
+    /* initialialize port early to allow for taskless SPI communication */
+    SpiTask_PortInit((TaskHandle_t*)&Core0Task0MainHdl);
 
     http_init();
-
-    run = 1U;
 
     if (RES_OK != AppCtrlData.mountRes)
     {
@@ -256,8 +151,11 @@ static void Core0Task0Main( void * parameters )
         (const AppConfigType *)&AppConfig);    
     appFdcanInit(&CanCtrlData);
 
-    xTaskNotifyGive(CanSendTaskHdl);
+    /* Release CanSendTask */
+    CanSendTask_Notify();
 
+    run = 1U;
+    
     while (run)
     {
         http_poll();
@@ -272,6 +170,8 @@ static void Core0Task0Main( void * parameters )
             }
         }
 
+        CanSendTask_SetSendingActive(AppCtrlData.runCanTracer);
+
         if (0 == AppCtrlData.applyConfig)
         {
         }
@@ -281,7 +181,7 @@ static void Core0Task0Main( void * parameters )
                 &CanCtrlData, 
                 (const AppControlDataType *)&AppCtrlData, 
                 (const AppConfigType *)&AppConfig);
-            // appCanCtrlSetBaudrate(&CanCtrlData);
+            appCanCtrlSetBaudrate(&CanCtrlData);
             appCanCtrlSetMode(&CanCtrlData);
             AppCtrlData.applyConfig = 0;
         }
@@ -301,20 +201,18 @@ static void Core0Task0Main( void * parameters )
         AppCtrlData.mountRes = RES_NOTRDY;
     }
 
-    SpiAbs_PwrOff(SPIABS_DEVICE_1);
+    SpiAbs_PortDeInit();
 }
 
 void Core0Task0Init()
 {
-    HAL_NVIC_SetPriority(DEFERRED_IRQn, DEFERRED_IRQ_PREEMPT_PRIO, 0);             /* 6 ≥ configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY */
-    HAL_NVIC_EnableIRQ(DEFERRED_IRQn);
-    
-    TASK_CREATE_STATIC(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE, CORE0_TASK0_PRIO);
-    TASK_CREATE_STATIC(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE, CORE0_TASK1_PRIO);
+    CanBridgeTaskInit();
+
+    CanSendTaskInit();
+
+    SpiTask_Init();
+
     TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
-    TASK_CREATE_STATIC(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE, CORE0_TASK4_PRIO);
-    
-    configASSERT( CanBridgeTaskHdl != NULL );
 }
 
 void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])

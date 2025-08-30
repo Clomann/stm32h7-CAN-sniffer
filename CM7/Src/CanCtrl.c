@@ -4,7 +4,7 @@
 #include "timer.h"
 #include "CanAbs.h"
 
-#define TIMx_TIME_RESOLUTION        (1U)
+#define TIMx_TIME_RESOLUTION (1U)
 
 /*!< Time in micro seconds */
 static volatile uint64_t Time = 0;
@@ -14,7 +14,7 @@ static FDCAN_Message Can1TestMsg2;
 static FDCAN_Message Can2TestMsg1;
 static FDCAN_Message Can2TestMsg2;
 
-void appFdcanInit(CanCtrlDataType * data)
+void appFdcanInit(CanCtrlDataType *data)
 {
     static uint8_t TxData[8];
     static uint8_t TxData2[8];
@@ -69,11 +69,11 @@ void appFdcanInit(CanCtrlDataType * data)
     }
 }
 
-void appFdcanPoll(CanCtrlDataType * data)
+void appFdcanPoll(_Bool sendingActive)
 {
     volatile uint8_t res;
 
-    if (data->sendingActive)
+    if (sendingActive)
     {
         res = CanAbs_Send_Can1(&Can1TestMsg1);
         if (0 != res)
@@ -101,7 +101,7 @@ void appFdcanPoll(CanCtrlDataType * data)
     }
 }
 
-void appCanCtrlSetBaudrate(CanCtrlDataType * data)
+void appCanCtrlSetBaudrate(CanCtrlDataType *data)
 {
     if (COMM_SUCCESS != CanAbs_SetBaudrate_Can1(data->can1.baudrate))
     {
@@ -114,7 +114,7 @@ void appCanCtrlSetBaudrate(CanCtrlDataType * data)
     }
 }
 
-void appCanCtrlSetMode(CanCtrlDataType * data)
+void appCanCtrlSetMode(CanCtrlDataType *data)
 {
     if (COMM_SUCCESS != CanAbs_SetMode_Can1(data->can1.mode))
     {
@@ -131,7 +131,7 @@ void TIM_InterruptCallback()
 {
     static uint64_t Arr = 0;
 
-    TIM_GetArrValue((uint16_t*)&Arr);
+    TIM_GetArrValue((uint16_t *)&Arr);
     Time += Arr * TIMx_TIME_RESOLUTION;
 }
 
@@ -139,7 +139,6 @@ void TIM_HAL_InterruptCallback()
 {
     HAL_IncTick();
 }
-
 
 /**
  * 
@@ -153,7 +152,8 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
 
     res = COMM_SUCCESS;
 
-    do {
+    do
+    {
         time_snapshot1 = Time;
         TIM_GetCounterValue(&cnt);
         time_snapshot2 = Time;
