@@ -368,14 +368,12 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             CanLogFileManager_ErrorHandler();
         }
 
-        if (COMM_SUCCESS == res)
-        {
-            RunTracerOld = *CanLogCtrlData.runCanTracer;
-        }
-        else
+        if (COMM_SUCCESS != res)
         {
             *CanLogCtrlData.runCanTracer = false;
         }
+
+        RunTracerOld = *CanLogCtrlData.runCanTracer;
     }
     else
     {
@@ -383,14 +381,13 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         {
             *CanLogCtrlData.runCanTracer = false;
         }
-        else if (COMM_SUCCESS != CanAbs_Stop_Can2())
+
+        if (COMM_SUCCESS != CanAbs_Stop_Can2())
         {
             *CanLogCtrlData.runCanTracer = false;
         }
-        else
-        {
-            RunTracerOld = *CanLogCtrlData.runCanTracer;
-        }
+
+        RunTracerOld = *CanLogCtrlData.runCanTracer;
     }
 
     appCanLogCheckNewFileOpen(data);

@@ -402,12 +402,12 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
 void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2)
 {
     
-    if (COMM_SUCCESS == CanAbs_SetBaudrate_Can1(baudrate1))
+    if (COMM_SUCCESS != CanAbs_SetBaudrate_Can1(baudrate1))
     {
         Error_Handler();
     }
 
-    if (COMM_SUCCESS == CanAbs_SetBaudrate_Can2(baudrate2))
+    if (COMM_SUCCESS != CanAbs_SetBaudrate_Can2(baudrate2))
     {
         Error_Handler();
     }
@@ -415,12 +415,12 @@ void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2)
 
 void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2)
 {
-    if (COMM_SUCCESS == CanAbs_SetMode_Can1(mode1))
+    if (COMM_SUCCESS != CanAbs_SetMode_Can1(mode1))
     {
         Error_Handler();
     }
 
-    if (COMM_SUCCESS == CanAbs_SetMode_Can2(mode2))
+    if (COMM_SUCCESS != CanAbs_SetMode_Can2(mode2))
     {
         Error_Handler();
     }
