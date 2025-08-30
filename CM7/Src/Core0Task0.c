@@ -25,6 +25,7 @@
 #include "SettingsHandler.h"
 #include "ConfigManager.h"
 #include "CanLogManager.h"
+#include "CanCtrl.h"
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
@@ -39,14 +40,9 @@ typedef struct {
     bool applyConfig;
 } AppControlDataType;
 
-
-static FDCAN_Message Can1TestMsg1;
-static FDCAN_Message Can1TestMsg2;
-static FDCAN_Message Can2TestMsg1;
-static FDCAN_Message Can2TestMsg2;
-
 uint8_t run;
 static AppConfigType AppConfig;
+static CanCtrlDataType CanCtrlData;
 
 static AppControlDataType AppCtrlData = { 
     .mountRes = 1,
@@ -54,12 +50,13 @@ static AppControlDataType AppCtrlData = {
 };
 
 /* Private function prototypes -----------------------------------------------*/
-void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2);
-void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2);
-
-static void appFdcanPoll();
 
 /* Private functions ---------------------------------------------------------*/
+void CANCONTROL_ErrorHandlerHook()
+{
+    Error_Handler();
+}
+
 void CanLogFileManager_ErrorHandler()
 {
     Error_Handler();
@@ -87,6 +84,18 @@ void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
     __BKPT(1);                     /* hit here => stack overflow      */
 }
 
+static void appCanCtrlDataSetter(
+    CanCtrlDataType * data, 
+    const AppControlDataType *appData, 
+    const AppConfigType * appConfig)
+{
+    CanCtrlData.sendingActive = appData->runCanTracer; 
+    CanCtrlData.can1.baudrate = AppConfig.can1.baudrate;
+    CanCtrlData.can1.mode = AppConfig.can1.mode;
+    CanCtrlData.can2.baudrate = AppConfig.can2.baudrate;
+    CanCtrlData.can2.mode = AppConfig.can2.mode;
+}
+
 static void CanSendTask(void *arg)
 {
     static TickType_t xPreviousWakeTime;
@@ -99,8 +108,12 @@ static void CanSendTask(void *arg)
     while (1)
     {
         vTaskDelayUntil(&xPreviousWakeTime, xFrequency);
-        
-        appFdcanPoll();
+    
+        appCanCtrlDataSetter(
+            &CanCtrlData, 
+            (const AppControlDataType *)&AppCtrlData, 
+            (const AppConfigType *)&AppConfig);
+        appFdcanPoll(&CanCtrlData);
     }
 }
 
@@ -172,73 +185,6 @@ void SpiAbs_TaskSendReceiveCallback()
     }
 }
 
-static void appFdcanInit()
-{
-    static uint8_t TxData[8];
-    static uint8_t TxData2[8];
-    
-    memset(TxData, 0xFF, sizeof(TxData));
-    memset(TxData2, 0xFF, sizeof(TxData2));
-
-    /* Initialize FDCAN timestamp external timer */
-    if (0 != TIMx_Init(TIMx_TIME_RESOLUTION) )
-    {
-        Error_Handler();
-    }
-
-    if ( 0 == CanAbs_Init_Can1(AppConfig.can1.baudrate) ) 
-    {
-        CanAbs_CreateMessage_Standard(&Can1TestMsg1, 0x321, &TxData[0], sizeof(TxData) / sizeof(*TxData));
-        CanAbs_CreateMessage_Standard(&Can1TestMsg2, 0x322, &TxData[0], sizeof(TxData) / sizeof(*TxData));
-    }
-    else
-    {
-        Error_Handler();
-    }
-
-    if ( 0 == CanAbs_Init_Can2(AppConfig.can2.baudrate) ) 
-    {
-        CanAbs_CreateMessage_Standard(&Can2TestMsg1, 0x323, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
-        CanAbs_CreateMessage_Standard(&Can2TestMsg2, 0x324, &TxData2[0], sizeof(TxData2) / sizeof(*TxData2));
-    }
-    else
-    {
-        Error_Handler();
-    }
-}
-
-void appFdcanPoll()
-{
-    volatile uint8_t res;
-
-    if (AppCtrlData.runCanTracer)
-    {
-        res = CanAbs_Send_Can1(&Can1TestMsg1);
-        if ( 0 != res)
-        {
-             Error_Handler();
-        }
-
-        res = CanAbs_Send_Can1(&Can1TestMsg2);
-        if ( 0 != res)
-        {
-            Error_Handler();
-        }
-
-        res = CanAbs_Send_Can2(&Can2TestMsg1);
-        if ( 0 != res)
-        {
-            Error_Handler();
-        }
-
-        res = CanAbs_Send_Can2(&Can2TestMsg2);
-        if ( 0 != res)
-        {
-            Error_Handler();
-        }
-    }
-}
-
 static void Core0Task0Main( void * parameters )
 {
     uint32_t spiClockSource;
@@ -303,8 +249,12 @@ static void Core0Task0Main( void * parameters )
 
     GPIO_Dbg_Init();
     GPIO_Mco1_Init();
-    
-    appFdcanInit();
+
+    appCanCtrlDataSetter(
+        &CanCtrlData, 
+        (const AppControlDataType *)&AppCtrlData, 
+        (const AppConfigType *)&AppConfig);    
+    appFdcanInit(&CanCtrlData);
 
     xTaskNotifyGive(CanSendTaskHdl);
 
@@ -327,8 +277,12 @@ static void Core0Task0Main( void * parameters )
         }
         else if (0 == AppCtrlData.runCanTracer)
         {
-            appCanCtrlSetBaudrate(AppConfig.can1.baudrate, AppConfig.can2.baudrate);
-            appCanCtrlSetMode(AppConfig.can1.mode, AppConfig.can2.mode);
+            appCanCtrlDataSetter(
+                &CanCtrlData, 
+                (const AppControlDataType *)&AppCtrlData, 
+                (const AppConfigType *)&AppConfig);
+            // appCanCtrlSetBaudrate(&CanCtrlData);
+            appCanCtrlSetMode(&CanCtrlData);
             AppCtrlData.applyConfig = 0;
         }
         else
@@ -361,72 +315,6 @@ void Core0Task0Init()
     TASK_CREATE_STATIC(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE, CORE0_TASK4_PRIO);
     
     configASSERT( CanBridgeTaskHdl != NULL );
-}
-
-/*!< Time in micro seconds */
-static volatile uint64_t Time = 0;
-
-void TIM_InterruptCallback()
-{
-    static uint64_t Arr = 0;
-
-    TIM_GetArrValue((uint16_t*)&Arr);
-    Time += Arr * TIMx_TIME_RESOLUTION;
-}
-
-void TIM_HAL_InterruptCallback()
-{
-    HAL_IncTick();
-}
-
-/**
- * 
- * \param[out] timestamp in micro seconds.
- */
-comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
-{
-    comm_status_t res;
-    uint64_t time_snapshot1, time_snapshot2;
-    uint16_t cnt;
-
-    res = COMM_SUCCESS;
-
-    do {
-        time_snapshot1 = Time;
-        TIM_GetCounterValue(&cnt);
-        time_snapshot2 = Time;
-    } while (time_snapshot1 != time_snapshot2);
-
-    *timestamp = time_snapshot1 + (uint64_t)(cnt * TIMx_TIME_RESOLUTION);
-
-    return res;
-}
-
-void appCanCtrlSetBaudrate(uint32_t baudrate1, uint32_t baudrate2)
-{
-    
-    if (COMM_SUCCESS != CanAbs_SetBaudrate_Can1(baudrate1))
-    {
-        Error_Handler();
-    }
-
-    if (COMM_SUCCESS != CanAbs_SetBaudrate_Can2(baudrate2))
-    {
-        Error_Handler();
-    }
-}
-
-void appCanCtrlSetMode(uint8_t mode1, uint8_t mode2)
-{
-    if (COMM_SUCCESS != CanAbs_SetMode_Can1(mode1))
-    {
-        Error_Handler();
-    }
-
-    if (COMM_SUCCESS != CanAbs_SetMode_Can2(mode2))
-    {
-        Error_Handler();
-    }
 }
 
 void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
