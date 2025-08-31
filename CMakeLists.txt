@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
+set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps")
+
 # Let callers override this: -DCPU_PARAMETERS=";-mthumb;-mcpu=cortex-m7;..."
 set(CPU_PARAMETERS "" CACHE STRING "Target CPU/ABI flags (list)")
 set(DUAL_CORE "" CACHE STRING "Configure two target cofiguration (true/false).")
@@ -216,7 +218,6 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -Wall
     -Wextra
     -Wpedantic
-    -Wno-unused-parameter
     -Werror=implicit-function-declaration
     # Full debug configuration
     $<$<CONFIG:Release>:-O2>
