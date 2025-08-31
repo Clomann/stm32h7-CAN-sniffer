@@ -4,10 +4,12 @@ drivers/buffers.h
 tests/spi/test_spi.c 
 tests/spi/stubs/SpiAbs.h 
 tests/spi/stubs/SpiAbs.c 
-CM7/Src/CanLogManager.h 
-CM7/Src/CanLogManager.c 
-CM7/Src/ConfigManager.h 
-CM7/Src/ConfigManager.c 
+app/CanLogManager.h 
+app/CanLogManager.c 
+app/ConfigManager.h 
+app/ConfigManager.c 
+app/WebInterface.h
+app/WebInterface.c
 CM7/Src/CanCtrl.h
 CM7/Src/CanCtrl.c
 CM7/Src/CanBridgeTask.h 
@@ -16,5 +18,3 @@ CM7/Src/CanSendTask.h
 CM7/Src/CanSendTask.c 
 CM7/Src/SpiTask.h 
 CM7/Src/SpiTask.c 
-CM7/Src/WebInterface.h
-CM7/Src/WebInterface.c
