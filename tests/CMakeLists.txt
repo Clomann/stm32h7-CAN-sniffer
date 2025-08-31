@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(UnitTests C)
 
+set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps")  # persistent folder
+
 # Resolve repo root one level up from tests/
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 message(STATUS "Repo root: ${REPO_ROOT}")
@@ -101,14 +103,77 @@ target_include_directories(test_spi PRIVATE
     ${REPO_ROOT}/drivers/spi
 )
 
+# ===== app =====
+
+# Low weight ring buffer (lwrb) fetch
+include(FetchContent)
+
+FetchContent_Declare(
+    lwrb
+    GIT_REPOSITORY https://github.com/MaJerle/lwrb.git
+    GIT_TAG        main
+)
+
+FetchContent_MakeAvailable(lwrb)
+
+set(symbols_APP
+        "STM32H745xx"
+        "USE_HAL_DRIVER"
+        "CORE_CM7"
+        "NO_SYS=1"
+        "USE_STM32H7XX_NUCLEO_144_MB1363"
+        "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
+        "UNIT_TEST"
+    )
+
+add_library(app STATIC
+    ${REPO_ROOT}/tests/app/CanLogManager/test_CanLogManager.c
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/CanAbs.c
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/fs_custom.c
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/fdcan_msg_port.c
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/ff.c
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/FileHandler.c
+    ${REPO_ROOT}/app/CanLogBuffer.c
+    ${REPO_ROOT}/app/CanLogManager.c
+)
+
+target_include_directories(app PUBLIC
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/
+    ${REPO_ROOT}/tests/app/CanLogManager
+    ${REPO_ROOT}/tests/app
+    ${REPO_ROOT}/app
+    ${REPO_ROOT}/libs/ff15a/source
+    ${REPO_ROOT}/drivers
+    ${REPO_ROOT}/drivers/CanAbs
+    ${REPO_ROOT}/drivers/comm/CommManager
+    ${REPO_ROOT}/drivers/comm/CommHandle
+    ${REPO_ROOT}/ports
+    ${REPO_ROOT}/app/http/inc
+)
+
+target_link_libraries(app PRIVATE unity lwrb)
+
+target_compile_definitions(app PUBLIC ${symbols_APP})
+
+add_executable(test_app
+    app/test_app.c
+)
+target_link_libraries(test_app PRIVATE app unity)
+
+target_include_directories(test_app PRIVATE
+    ${unity_SOURCE_DIR}/src
+)
+
 # --- Register tests with CTest ---
 add_test(NAME FDCAN_Test COMMAND test_fdcan)
 add_test(NAME BUFFER_Test COMMAND test_buffer)
 add_test(NAME SPI_Test COMMAND test_spi)
+add_test(NAME APP_Test COMMAND test_app)
 
 # --- Create a custom "test_all" build target ---
 add_custom_target(tests DEPENDS 
     test_fdcan 
     test_buffer
     test_spi
+    test_app
 )
