@@ -426,4 +426,3 @@ static void closeFile(ConfigManagerType *manager)
         manager->fileOpen = false;
     }
 }
-
