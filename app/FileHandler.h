@@ -1,23 +1,7 @@
 #pragma once
 
-#include <stdint.h>
-#include <string.h>
-
-#include "ff.h"
+#include "FileHandlerTypes.h"
 #include "MmcAdapter.h"
-
-typedef struct {
-    uint32_t readTargetSize;
-    FIL file;
-    uint32_t fflags;
-} FatFsDeviceType;
-
-typedef struct {
-    DIR dir;
-    FILINFO fno;
-    const char *prefix;
-    size_t prefixLen;
-} FatFS_FileIterator;
 
 FRESULT FatFS_SD_Mount(void);
 FRESULT FatFS_SD_Unmount(void);
