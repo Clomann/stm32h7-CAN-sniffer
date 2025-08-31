@@ -24,6 +24,7 @@ struct CanLogControlDataType
     } CanLog;
     uint8_t *mountRes;
     bool *runCanTracer;
+    bool runCanTracerOld;
 };
 
 static char CanLogFileName[255] = "/logs/CAN.LOG";
@@ -110,6 +111,8 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
 {
     int lastUsed;
 
+    (void)data;
+
     lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);
 
 #if 0U == PERSIST_CAN_LOG_FILE_HEAD_TAIL
@@ -138,6 +141,8 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 {
     FRESULT FileSizeRes;
     uint32_t FileSize;
+
+    (void)data;
 
     FileSizeRes = FatFS_SD_GetBufferedFileSize(
         &(CanLogCtrlData.CanLog.writeFileDevice),
@@ -212,6 +217,8 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
     FILINFO info;
     FRESULT res;
 
+    *CanLogCtrlData.runCanTracer           = false;
+    CanLogCtrlData.runCanTracerOld         = false;
     CanLogCtrlData.CanLog.fileHeadIndex    = 0;
     CanLogCtrlData.CanLog.fileTailIndex    = 0;
     CanLogCtrlData.CanLog.fileIndexWrapped = 0;
@@ -337,9 +344,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     bool IsOffState;
     uint8_t BlockIsReady;
     FDCAN_ClassicFrame NewFrame;
-    static volatile bool RunTracerOld = 0;
 
-    if (RunTracerOld == *CanLogCtrlData.runCanTracer)
+    if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
     {
     }
     else if (true == *CanLogCtrlData.runCanTracer)
@@ -373,7 +379,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             *CanLogCtrlData.runCanTracer = false;
         }
 
-        RunTracerOld = *CanLogCtrlData.runCanTracer;
+        CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
     }
     else
     {
@@ -387,7 +393,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             *CanLogCtrlData.runCanTracer = false;
         }
 
-        RunTracerOld = *CanLogCtrlData.runCanTracer;
+        CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
     }
 
     appCanLogCheckNewFileOpen(data);
@@ -415,6 +421,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
 void appCanLogHandlerDeInit(CanLogControlDataType *data)
 {
+    (void)data;
+
     if (0 == CanLogCtrlData.CanLog.openRes)
     {
         FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice));
