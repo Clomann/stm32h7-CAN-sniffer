@@ -84,6 +84,7 @@ void SettingsHandler_ApplyRequestCallback()
 void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
 {
     ( void ) name;
+    
     taskDISABLE_INTERRUPTS();
     __BKPT(1);                     /* hit here => stack overflow      */
 }
@@ -94,10 +95,10 @@ static void appCanCtrlDataSetter(
     const AppConfigType * appConfig)
 {
     CanCtrlData.sendingActive = appData->runCanTracer; 
-    CanCtrlData.can1.baudrate = AppConfig.can1.baudrate;
-    CanCtrlData.can1.mode = AppConfig.can1.mode;
-    CanCtrlData.can2.baudrate = AppConfig.can2.baudrate;
-    CanCtrlData.can2.mode = AppConfig.can2.mode;
+    CanCtrlData.can1.baudrate = appConfig->can1.baudrate;
+    CanCtrlData.can1.mode = appConfig->can1.mode;
+    CanCtrlData.can2.baudrate = appConfig->can2.baudrate;
+    CanCtrlData.can2.mode = appConfig->can2.mode;
 }
 
 static void Core0Task0Main( void * parameters )
@@ -143,7 +144,6 @@ static void Core0Task0Main( void * parameters )
         SettingsHandler_Init(&AppConfig);
     }
 
-    GPIO_Dbg_Init();
     GPIO_Mco1_Init();
 
     appCanCtrlDataSetter(

@@ -177,6 +177,7 @@ uint8_t SpiAbs_Init_Spi1()
 uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t * resp)
 {
     SPI_HandleTypeDef * hdl;
+    uint8_t dummy = 0xFF;
 
     hdl = m_GetHandle(dev);
     
@@ -185,12 +186,15 @@ uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t * resp)
         return HAL_ERROR;
     }
 
-    return Spi_readByte(hdl, resp);
+    // return Spi_readByte(hdl, resp);
+
+    return SpiAbs_Send_Spi1_Task0(&dummy, resp, 1);
 }
 
 uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 {
     SPI_HandleTypeDef * hdl;
+    uint8_t Byte;
 
     hdl = m_GetHandle(dev);
     
@@ -199,7 +203,8 @@ uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
         return HAL_ERROR;
     }
 
-    return Spi_writByte(hdl, data);   
+    // return Spi_writByte(hdl, data); 
+    return SpiAbs_Send_Spi1_Task0(data, &Byte, 1); 
 }
 
 uint8_t SpiAbs_SendWithCallback(
@@ -230,6 +235,50 @@ uint8_t SpiAbs_SendWithCallback(
     Msg.msgBase.protocol = DRIVER_SPI;
     Msg.msgBase.payload = pTxBuffer;
     Msg.msgBase.length = TxBytes;
+    Msg.transaction = (void *)transaction;
+
+    res = SPI_Send(pDrv, &Msg);
+
+#if SPI_USE_RTOS
+    // notify SPI task to check for new messages
+    SpiAbs_TaskSendReceiveCallback();
+#else
+    // Process immediately in bare metal mode
+    SPI_Poll(pDrv);
+#endif
+
+    return res;
+}
+
+
+uint8_t SpiAbs_ReceiveWithCallback(
+    enum SPIABS_DEVICE dev, 
+    SpiTransactionType *transaction, 
+    const uint8_t * data, 
+    uint8_t bytes)
+{
+    uint8_t res;
+    CommDriver * pDrv;
+    SPI_HandleTypeDef * hdl;
+    SPI_Message Msg = {0};
+
+    hdl = m_GetHandle(dev);
+    
+    if (NULL == hdl)
+    {
+        return HAL_ERROR;
+    }
+    
+    pDrv = m_GetDriver(dev);
+
+    if (NULL == pDrv)
+    { 
+        return COMM_INVALID_PARAMETER;
+    }
+
+    Msg.msgBase.protocol = DRIVER_SPI;
+    Msg.msgBase.payload = data;
+    Msg.msgBase.length = bytes;
     Msg.transaction = (void *)transaction;
 
     res = SPI_Send(pDrv, &Msg);
@@ -324,11 +373,65 @@ uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer,
 }
 
 typedef struct {
+    uint8_t *data;
+    uint16_t bytes;
     uint8_t status;
     uint8_t done;
 } TaskContextType;
 
 void SpiAbs_Send_Spi1_CompleteCallback_Task0(void * context, uint32_t status, const uint8_t *data, uint32_t len)
+{
+    TaskContextType *pTaskContext;
+    (void) status;
+    (void) data;
+    (void) len;
+
+    if (NULL != context)
+    {
+        pTaskContext = (TaskContextType *)context;
+        pTaskContext->status = status;
+        pTaskContext->done = 1;
+
+        pTaskContext->bytes = len;
+        memcpy(pTaskContext->data, data, len);
+    }
+    else
+    {
+        SpiAbs_ErrorHandler();
+    }
+}
+
+uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
+{
+    uint8_t res;
+    SpiTransactionType transaction = {
+        .callback = NULL,
+        .context = NULL
+    };
+    TaskContextType context = {
+        .done = 0,
+        .status = 0,
+        .data = pRxBuffer,
+        .bytes = TxBytes
+    };
+
+    transaction.id = 1;
+    transaction.prio = SPI_PRIORITY_LOW;
+    transaction.timeout = 100;
+    transaction.callback = SpiAbs_Send_Spi1_CompleteCallback_Task0;
+    transaction.context = (void *)&context;
+
+    res = SpiAbs_SendWithCallback(SPIABS_DEVICE_1, &transaction, pTxBuffer, TxBytes);
+
+    while (1 != context.done)
+    {
+        ;
+    }
+
+    return res;
+}
+
+void SpiAbs_Receive_Spi1_CompleteCallback_Task0(void * context, uint32_t status, const uint8_t *data, uint32_t len)
 {
     TaskContextType *pTaskContext;
     (void) status;
@@ -347,8 +450,9 @@ void SpiAbs_Send_Spi1_CompleteCallback_Task0(void * context, uint32_t status, co
     }
 }
 
-void SpiAbs_Send_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
+uint8_t SpiAbs_Receive_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
 {
+    uint8_t res;
     SpiTransactionType transaction = {
         .callback = NULL,
         .context = NULL
@@ -361,16 +465,20 @@ void SpiAbs_Send_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint
     transaction.id = 1;
     transaction.prio = SPI_PRIORITY_LOW;
     transaction.timeout = 100;
-    transaction.callback = SpiAbs_Send_Spi1_CompleteCallback_Task0;
+    transaction.callback = SpiAbs_Receive_Spi1_CompleteCallback_Task0;
     transaction.context = (void *)&context;
 
-    SpiAbs_SendWithCallback(SPIABS_DEVICE_1, &transaction, pTxBuffer, TxBytes);
+    res = SpiAbs_ReceiveWithCallback(SPIABS_DEVICE_1, &transaction, pTxBuffer, TxBytes);
 
     while (1 != context.done)
     {
-        
+        ;
     }
+
+    return res;
 }
+
+uint8_t m_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse);
 
 uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t * pResponse)
 {
@@ -383,7 +491,57 @@ uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t * pResponse)
         return HAL_ERROR;
     }
 
-    return Spi_PollForResponse(hdl, pResponse);
+    return m_PollForResponse(hdl, pResponse);
+}
+
+
+uint8_t m_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse)
+{
+	uint8_t NoResponseReceived;
+	uint8_t RetVal;
+	uint8_t counter;
+	const uint8_t RetryCount = 10;
+
+	counter = 0;
+	NoResponseReceived = 1;
+
+	do
+	{
+		// Spi_readByte(handle, pResponse);
+        SpiAbs_readByte(SPIABS_DEVICE_1, pResponse);
+
+		if (0xFF != *pResponse)
+		{
+			NoResponseReceived = 0;
+		}
+
+		counter++;
+	} while (NoResponseReceived && (RetryCount > counter) );
+
+	if (0 == NoResponseReceived)
+	{
+		RetVal = 0;
+	}
+	else
+	{
+		RetVal = 1;
+	}
+
+	return RetVal;
+}
+
+uint8_t SpiAbs_GoHighSpeed(enum SPIABS_DEVICE dev)
+{
+    SPI_HandleTypeDef * hdl;
+
+    hdl = m_GetHandle(dev);
+    
+    if (NULL == hdl)
+    {
+        return HAL_ERROR;
+    }
+
+    return Spi_goHighSpeed(hdl);
 }
 
 uint8_t SpiAbs_PwrOn(enum SPIABS_DEVICE dev)
@@ -467,17 +625,17 @@ void SpiAbs_Task(void *parameters)
     while (1)
     {
         SpiAbs_TaskControlCallback(0xFFFFFFFFUL);
-        
+
         SpiAbs_Poll();
     }
 }
 
-void __attribute__((weak))  SpiAbs_TaskControlCallback(uint32_t timeout)
-{
-    (void) timeout;
-}
+// void __attribute__((weak))  SpiAbs_TaskControlCallback(uint32_t timeout)
+// {
+//     (void) timeout;
+// }
 
-void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback()
-{
-    ;
-}
+// void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback()
+// {
+//     ;
+// }
