@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include "Spi_Cmds.h"
+#include "stm32h745xx.h"
+#include "stm32h7xx_hal_rcc_ex.h"
+#include "spi_utils.h"
 
 /* Private define ------------------------------------------------------------*/
 enum {
@@ -46,21 +49,74 @@ static inline uint8_t is_in_dma_nocache(const void *addr, size_t len)
             (end   <  (uintptr_t)&__dma_buffers_end));
 }
 
+uint8_t m_GetRccInstance(SPI_HandleTypeDef * handle, uint64_t *instance)
+{
+    uint8_t res = 0;
+
+    if (NULL == handle->Instance)
+    {
+        res = 1;
+        return res;
+    }
+
+    if (handle->Instance == SPI1)
+    {
+        *instance = RCC_PERIPHCLK_SPI1;
+    }
+    else if (handle->Instance == SPI2)
+    {
+        *instance = RCC_PERIPHCLK_SPI2;
+    }
+    else if (handle->Instance == SPI3)
+    {
+        *instance = RCC_PERIPHCLK_SPI3;
+    }
+    else if (handle->Instance == SPI4)
+    {
+        *instance = RCC_PERIPHCLK_SPI4;
+    }
+    else if (handle->Instance == SPI5)
+    {
+        *instance = RCC_PERIPHCLK_SPI5;
+    }
+    else if (handle->Instance == SPI6)
+    {
+        *instance = RCC_PERIPHCLK_SPI6;
+    }
+    else
+    {
+        res = 2;
+    }
+
+    return res;
+}
+
 HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef * handle)
 {   
     HAL_StatusTypeDef res;
+    uint32_t SpiClock;
+    uint64_t RccInstance;
 
     if (NULL == handle)
     {
         Spi_ErrorHandler();
     }
 
+    handle->Instance               = SPI1;
+    res = m_GetRccInstance(handle, &RccInstance);
+    
+    if (HAL_OK != res)
+    {
+        Spi_ErrorHandler();
+    }
+
+    SpiClock = HAL_RCCEx_GetPeriphCLKFreq(RccInstance);
+
     pSpiHandle1 = handle;
 
-	/* Set the SPI1 parameters */
-	handle->Instance               = SPI1;
 	handle->Init.Mode              = SPI_MODE_MASTER;
-	handle->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+	// handle->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+    handle->Init.BaudRatePrescaler = SpiUtils_ComputePrescaler(SpiClock, 4000000U);
 	handle->Init.Direction         = SPI_DIRECTION_2LINES;
 	handle->Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
 	handle->Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
@@ -326,36 +382,33 @@ uint8_t Spi_PollTillIdle(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 {
 	uint8_t res;
+    volatile uint32_t SpiClock;
+    uint64_t RccInstance;
 
 	res = 0U;
 
-	if(HAL_SPI_DeInit(handle) != HAL_OK)
+    __disable_irq();
+
+	if(HAL_SPI_Abort(handle) != HAL_OK)
 	{
-		/* Initialization Error */
 		Spi_ErrorHandler();
 	}
 
-    /* Set the SPI1 parameters */
-	handle->Instance               = SPI1;
-	handle->Init.Mode              = SPI_MODE_MASTER;
-	handle->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-	handle->Init.Direction         = SPI_DIRECTION_2LINES;
-	handle->Init.CLKPhase          = SPI_PHASE_1EDGE;  // CPHA = 0: Data captured on the rising edge
-	handle->Init.CLKPolarity       = SPI_POLARITY_LOW;  // CPOL = 0: Clock is low when idle
-	handle->Init.DataSize          = SPI_DATASIZE_8BIT;
-	handle->Init.FirstBit          = SPI_FIRSTBIT_MSB;
-	handle->Init.TIMode            = SPI_TIMODE_DISABLE;
-	handle->Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-	handle->Init.CRCPolynomial     = 7;
-	handle->Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
-	handle->Init.NSS               = SPI_NSS_SOFT;
-	handle->Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
-	handle->Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
+    res = m_GetRccInstance(handle, &RccInstance);
+
+    if (HAL_OK != res)
+    {
+        return res;
+    }
+
+    SpiClock = HAL_RCCEx_GetPeriphCLKFreq(RccInstance);
+
+	handle->Init.BaudRatePrescaler = SpiUtils_ComputePrescaler(SpiClock, 15000000U);
 	res = HAL_SPI_Init(handle);
+    __enable_irq();
 
 	if(res != HAL_OK)
 	{
-		/* Initialization Error */
 		Spi_ErrorHandler();
 	}
 

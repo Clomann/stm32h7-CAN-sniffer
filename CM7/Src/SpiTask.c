@@ -21,7 +21,7 @@ void SpiTask_PortInit(TaskHandle_t *handle)
 {
     HAL_StatusTypeDef HalStatus;
 
-    HalStatus = spi_port_freertos_init(handle);
+    HalStatus = spi_port_freertos_init((TaskHandle_t *)&SpiTaskHdl);
 
     if (HalStatus != HAL_OK)
     {

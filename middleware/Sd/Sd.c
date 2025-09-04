@@ -253,7 +253,8 @@ uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
 	uint8_t buffer[COUNTOF(aTxSpiCmd)];
 
 	SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
-	SpiAbs_SendReceiveMsg(SPIABS_DEVICE_1, aTxSpiCmd, buffer, COUNTOF(aTxSpiCmd));
+	
+    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiCmd, (uint8_t *)buffer, COUNTOF(aTxSpiCmd));
 
 	return 0;
 }
@@ -277,8 +278,10 @@ uint8_t SD_Spi_PowerUp(void)
 	uint8_t buffer[COUNTOF(aTxSpiInit)];
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);
-	SpiAbs_SendReceiveMsg(SPIABS_DEVICE_1, (uint8_t*)aTxSpiInit, (uint8_t *)buffer, COUNTOF(aTxSpiInit));
-	return 0;
+	
+    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiInit, (uint8_t *)buffer, COUNTOF(aTxSpiInit));
+	
+    return 0;
 }
 
 uint8_t SD_Spi_WaitTillIdle()
@@ -293,7 +296,7 @@ uint8_t SD_Spi_WaitTillIdle()
 	// wait till card is idle
 	do
 	{
-		SpiAbs_SendReceiveMsg(SPIABS_DEVICE_1, aTxSpiDummy1, (uint8_t *)buffer, COUNTOF(aTxSpiDummy1));
+		SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiDummy1, (uint8_t *)buffer, COUNTOF(aTxSpiDummy1));
 	} while( 0xFF != buffer[0] && ( RetryCount > counter++) );
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -428,8 +431,10 @@ uint8_t SD_Spi_SendCSDRequest(Spi_R1Response * pResponse)
 uint8_t SD_Spi_ReadRes7(uint8_t * pRxBuffer)
 {
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
-	SpiAbs_SendReceiveMsg(SPIABS_DEVICE_1, aTxSpiDummy4, pRxBuffer, COUNTOF(aTxSpiDummy4)); // Read CMD8 response
-	SpiAbs_CsEnable(SPIABS_DEVICE_1);
+	
+    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiDummy4, (uint8_t *)pRxBuffer, COUNTOF(aTxSpiDummy4));
+    
+    SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
 	return 0;
 }
@@ -532,9 +537,16 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
 		RetVal = 1;
 	}
 
-	if (0U != RetVal) RetVal = RES_ERROR;
-	
-    	return RetVal;
+	if (0U == RetVal) 
+    {
+        RetVal = SpiAbs_GoHighSpeed(SPIABS_DEVICE_1);
+    }
+	else
+    {
+        RetVal = RES_ERROR;
+    }
+
+    return RetVal;
 }
 
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType * csd)

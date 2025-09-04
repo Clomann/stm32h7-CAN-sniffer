@@ -5,6 +5,7 @@
 #include "spi.h"
 #include "SpiAbs.h"
 #include "buffers.h"
+#include "spi_utils.h"
 
 extern RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio);
 
@@ -49,17 +50,17 @@ void test_SPI_Send_calls_abs_with_msg_length(void);
 void test_SPI_CreateDriver_invalid_device_number(void);
 void test_SPI_CreateDriver_all_instances_used(void);
 void test_SPI_Init_hal_failure(void);
-
 void test_SPI_Read_sets_rx_only_direction_and_reserves_slot(void);
 void test_SPI_Read_null_driver_calls_error_handler(void);
 void test_SPI_Read_null_tx_slots_calls_error_handler(void);
 void test_SPI_Read_no_available_slots_calls_error_handler(void);
 void test_SPI_Read_sets_transaction_length_correctly(void);
-
 void test_SPI_Send_copies_payload_to_slot_data(void);
 void test_SPI_Send_passes_correct_direction_to_prepare_slot(void);
 void test_SPI_Send_handles_zero_length_memcpy_safely(void);
 void test_SPI_Send_propagates_prepare_slot_errors(void);
+
+void test_SpiUtils_ComputePrescaler(void);
 
 int main(void)
 {
@@ -75,17 +76,17 @@ int main(void)
     RUN_TEST(test_SPI_CreateDriver_invalid_device_number);
     RUN_TEST(test_SPI_CreateDriver_all_instances_used);
     RUN_TEST(test_SPI_Init_hal_failure);
-
     RUN_TEST(test_SPI_Read_sets_rx_only_direction_and_reserves_slot);
     RUN_TEST(test_SPI_Read_null_driver_calls_error_handler);
     RUN_TEST(test_SPI_Read_null_tx_slots_calls_error_handler);
     RUN_TEST(test_SPI_Read_no_available_slots_calls_error_handler);
     RUN_TEST(test_SPI_Read_sets_transaction_length_correctly);
-
     RUN_TEST(test_SPI_Send_copies_payload_to_slot_data);
     RUN_TEST(test_SPI_Send_passes_correct_direction_to_prepare_slot);
     RUN_TEST(test_SPI_Send_handles_zero_length_memcpy_safely);
     RUN_TEST(test_SPI_Send_propagates_prepare_slot_errors);
+
+    RUN_TEST(test_SpiUtils_ComputePrescaler);
 
     return UNITY_END();
 }
@@ -851,4 +852,28 @@ void test_SPI_Send_propagates_prepare_slot_errors(void)
 
     // Verify error is propagated and memcpy is not called
     TEST_ASSERT_EQUAL(COMM_TX_FULL, rc);
+}
+
+void test_SpiUtils_ComputePrescaler()
+{
+    TEST_ASSERT_EQUAL_INT(
+        SPI_BAUDRATEPRESCALER_2,
+        SpiUtils_ComputePrescaler(20000000, 100000000)
+    );
+    TEST_ASSERT_EQUAL_INT(
+        SPI_BAUDRATEPRESCALER_2,
+        SpiUtils_ComputePrescaler(20000000, 10000000)
+    );
+    TEST_ASSERT_EQUAL_INT(
+        SPI_BAUDRATEPRESCALER_4,
+        SpiUtils_ComputePrescaler(20000000, 5000000)
+    );
+    TEST_ASSERT_EQUAL_INT(
+        SPI_BAUDRATEPRESCALER_256,
+        SpiUtils_ComputePrescaler(20000000, 1)
+    );
+    TEST_ASSERT_EQUAL_INT(
+        SPI_BAUDRATEPRESCALER_64,
+        SpiUtils_ComputePrescaler(20000000, 500000)
+    );
 }
