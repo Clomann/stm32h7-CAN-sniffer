@@ -175,36 +175,13 @@ uint8_t SpiAbs_Init_Spi1()
 }
 
 uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t * resp)
-{
-    SPI_HandleTypeDef * hdl;
-    uint8_t dummy = 0xFF;
-
-    hdl = m_GetHandle(dev);
-    
-    if (NULL == hdl)
-    {
-        return HAL_ERROR;
-    }
-
-    // return Spi_readByte(hdl, resp);
-
-    return SpiAbs_Send_Spi1_Task0(&dummy, resp, 1);
+{    
+    return SpiAbs_Receive_Spi1_Task0(resp, 1); 
 }
 
 uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 {
-    SPI_HandleTypeDef * hdl;
-    uint8_t Byte;
-
-    hdl = m_GetHandle(dev);
-    
-    if (NULL == hdl)
-    {
-        return HAL_ERROR;
-    }
-
-    // return Spi_writByte(hdl, data); 
-    return SpiAbs_Send_Spi1_Task0(data, &Byte, 1); 
+    return SpiAbs_Send_Spi1_Task0(data, 1); 
 }
 
 uint8_t SpiAbs_SendWithCallback(
@@ -401,7 +378,7 @@ void SpiAbs_Send_Spi1_CompleteCallback_Task0(void * context, uint32_t status, co
     }
 }
 
-uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
+uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * data, uint16_t bytes)
 {
     uint8_t res;
     SpiTransactionType transaction = {
@@ -411,17 +388,18 @@ uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, u
     TaskContextType context = {
         .done = 0,
         .status = 0,
-        .data = pRxBuffer,
-        .bytes = TxBytes
+        .data = aRxSpiSink,
+        .bytes = bytes
     };
 
     transaction.id = 1;
     transaction.prio = SPI_PRIORITY_LOW;
     transaction.timeout = 100;
     transaction.callback = SpiAbs_Send_Spi1_CompleteCallback_Task0;
+    transaction.direction = SPI_DIR_TX_RX;
     transaction.context = (void *)&context;
 
-    res = SpiAbs_SendWithCallback(SPIABS_DEVICE_1, &transaction, pTxBuffer, TxBytes);
+    res = SpiAbs_SendWithCallback(SPIABS_DEVICE_1, &transaction, data, bytes);
 
     while (1 != context.done)
     {
@@ -443,6 +421,9 @@ void SpiAbs_Receive_Spi1_CompleteCallback_Task0(void * context, uint32_t status,
         pTaskContext = (TaskContextType *)context;
         pTaskContext->status = status;
         pTaskContext->done = 1;
+
+        pTaskContext->bytes = len;
+        memcpy(pTaskContext->data, data, len);
     }
     else
     {
@@ -450,7 +431,7 @@ void SpiAbs_Receive_Spi1_CompleteCallback_Task0(void * context, uint32_t status,
     }
 }
 
-uint8_t SpiAbs_Receive_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
+uint8_t SpiAbs_Receive_Spi1_Task0(uint8_t * data, uint16_t bytes)
 {
     uint8_t res;
     SpiTransactionType transaction = {
@@ -459,16 +440,19 @@ uint8_t SpiAbs_Receive_Spi1_Task0(const uint8_t * pTxBuffer, uint8_t * pRxBuffer
     };
     TaskContextType context = {
         .done = 0,
-        .status = 0   
+        .status = 0,
+        .data = data,
+        .bytes = bytes
     };
 
     transaction.id = 1;
     transaction.prio = SPI_PRIORITY_LOW;
     transaction.timeout = 100;
     transaction.callback = SpiAbs_Receive_Spi1_CompleteCallback_Task0;
+    transaction.direction = SPI_DIR_TX_RX;
     transaction.context = (void *)&context;
 
-    res = SpiAbs_ReceiveWithCallback(SPIABS_DEVICE_1, &transaction, pTxBuffer, TxBytes);
+    res = SpiAbs_ReceiveWithCallback(SPIABS_DEVICE_1, &transaction, aRxSpiDummy, bytes);
 
     while (1 != context.done)
     {

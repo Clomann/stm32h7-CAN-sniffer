@@ -25,6 +25,7 @@ static SPI_HandleTypeDef *pSpiHandle1;
 /* Buffer used for transmission */
 ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aTxBuffer[]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
 ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxSpiDummy[1024U]);
+ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxSpiSink[1024U]);
 
 /* Buffer used for reception */
 /* Size of buffer */
