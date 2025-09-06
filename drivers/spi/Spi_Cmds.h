@@ -23,6 +23,7 @@ extern uint8_t __dma_buffers_end; /* see linker script */
 
 extern const uint8_t aTxSpiInit[18];
 extern uint8_t aRxSpiDummy[1024];
+extern uint8_t aRxSpiSink[1024];
 
 static inline uint8_t Spi_PwrOn()
 {
