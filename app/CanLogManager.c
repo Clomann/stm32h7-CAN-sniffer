@@ -151,6 +151,11 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 
     if (FileSizeRes == FR_OK && FileSize >= MAX_LOG_FILE_SIZE)
     {
+        if (FR_OK != FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice)))
+        {
+            CanLogFileManager_ErrorHandler();
+        }
+
         // File exists and is full, advance to next one
         if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)))
         {
@@ -187,7 +192,10 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
             {
                 CanLogFileManager_ErrorHandler();
             }
-            FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice));
+            if (FR_OK != FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice)))
+            {
+                CanLogFileManager_ErrorHandler();
+            }
         }
         else
         {

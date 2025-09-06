@@ -182,7 +182,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_MspDeInit(SPI_HandleTypeDef *hspi)
 {
-  if(hspi->Instance == SPI1)
+  if(hspi->Instance == SPI1 && 0)
   {
     /*##-1- Reset peripherals ##################################################*/
     SPI1_FORCE_RESET();
@@ -207,7 +207,7 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef *hspi)
     HAL_NVIC_DisableIRQ(SPI1_DMA_RX_IRQn);
 
     /*##-5- Disable the NVIC for SPI ###########################################*/
-    HAL_NVIC_EnableIRQ(SPI1_IRQn);
+    HAL_NVIC_DisableIRQ(SPI1_IRQn);
   }
 }
 

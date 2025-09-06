@@ -9,5 +9,9 @@ _deps/
 tests/_deps
 tests/build/
 
-cmake_install.cmake
+CMAkeCache.txt
+*.cmake
 CMakeFiles/*
+*/CMakeFiles/*
+
+*/Testing/Temporary/*

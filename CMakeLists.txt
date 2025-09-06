@@ -219,6 +219,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -Wextra
     -Wpedantic
     -Werror=implicit-function-declaration
+    -Wno-unused-parameter
     # Full debug configuration
     $<$<CONFIG:Release>:-O2>
     $<$<CONFIG:Debug>:-Og;-g3;-ggdb>

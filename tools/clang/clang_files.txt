@@ -1,6 +1,9 @@
 drivers/spi/spi.c 
 drivers/spi/spi.h 
+drivers/spi/spi_utils.h
 drivers/buffers.h 
+drivers/gpio/gpio.c 
+drivers/gpio/gpio.h
 tests/spi/test_spi.c 
 tests/spi/stubs/SpiAbs.h 
 tests/spi/stubs/SpiAbs.c 
@@ -20,6 +23,7 @@ CM7/Src/CanSendTask.h
 CM7/Src/CanSendTask.c 
 CM7/Src/SpiTask.h 
 CM7/Src/SpiTask.c 
+
 
 tests/test_template.c
 tests/app/test_app.c 

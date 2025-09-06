@@ -295,10 +295,11 @@ uint8_t Spi_ParseResponse(const uint8_t * buffer, uint8_t length, uint8_t * resp
 uint8_t Spi_readByte(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 {
 	uint8_t RetVal;
+    const uint16_t Bytes = 1;
 
-	RetVal = Spi_SendReceiveMsg(handle, (uint8_t*)aTxSpiDummy1, (uint8_t *)aRxBuffer, COUNTOF(aTxSpiDummy1));
+	RetVal = Spi_SendReceiveMsg(handle, (uint8_t*)aRxSpiDummy, (uint8_t *)aRxBuffer, Bytes);
 
-	Spi_ParseResponse(aRxBuffer, COUNTOF(aTxSpiDummy1), pResponse);
+	Spi_ParseResponse(aRxBuffer, (uint8_t)Bytes, pResponse);
 
 	return RetVal;
 }
@@ -407,7 +408,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 
     SpiClock = HAL_RCCEx_GetPeriphCLKFreq(RccInstance);
 
-	handle->Init.BaudRatePrescaler = SpiUtils_ComputePrescaler(SpiClock, 15000000U);
+	handle->Init.BaudRatePrescaler = SpiUtils_ComputePrescaler(SpiClock, 4000000U);
 	res = HAL_SPI_Init(handle);
     __enable_irq();
 

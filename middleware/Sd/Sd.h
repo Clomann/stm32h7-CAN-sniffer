@@ -18,6 +18,7 @@
 #define SD_SECTOR_LENGTH				0x000000200	/* Sector lemngth in bytes (512 bytes) */
 #define SD_SECTOR_COUNT					(SD_TOTAL_SIZE/SD_BLOCK_LENGTH)
 #define SD_MAX_READ_RESPONSE_ATTEMPTS	(1563U)
+#define SD_SECTOR_CHUNK_SIZE            64U /*!< Number of bytes send in one transaction */       
 
 /*!The sector is the smallest individual reference-able regions on a disk.*/
 #define SD_SDHC_SECTOR_SIZE		512U 

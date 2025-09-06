@@ -69,9 +69,10 @@ static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
 
 uint8_t aTxSpiCmd[6];
 
+#define SD_SPI_INIT_BYTES   18U
+
 ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiInit[18]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiDummy1[1]) = {0xFF};
-ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiDummy4[4]) = {0xFF, 0xFF, 0xFF, 0xFF};
+ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aRxSpiDummy[512U]) = {0xFF};
 
 static uint8_t SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t * buffer)
 {
@@ -250,11 +251,9 @@ static void SD_Spi_Csd2Bitfield(uint8_t * csd, SdCsdRegisterType * out)
 
 uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
 {
-	uint8_t buffer[COUNTOF(aTxSpiCmd)];
-
 	SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
 	
-    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiCmd, (uint8_t *)buffer, COUNTOF(aTxSpiCmd));
+    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiCmd, COUNTOF(aTxSpiCmd));
 
 	return 0;
 }
@@ -275,12 +274,10 @@ uint8_t SD_Spi_SendCommandPollResponse(uint8_t cmd, uint32_t payload, uint8_t * 
 
 uint8_t SD_Spi_PowerUp(void)
 {
-	uint8_t buffer[COUNTOF(aTxSpiInit)];
-
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);
 	
-    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiInit, (uint8_t *)buffer, COUNTOF(aTxSpiInit));
-	
+    SpiAbs_SendReceive_Spi1_Task0((uint8_t*)aTxSpiInit, (uint8_t *)SPI_CMD_READ_BUFFER, COUNTOF(aTxSpiInit));
+
     return 0;
 }
 
@@ -288,7 +285,7 @@ uint8_t SD_Spi_WaitTillIdle()
 {
 	uint8_t RetVal = 1;
 	uint8_t counter = 0;
-	uint8_t buffer[COUNTOF(aTxSpiDummy1)];
+	uint8_t buffer[1U];
 	const uint8_t RetryCount = 10;
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
@@ -296,7 +293,7 @@ uint8_t SD_Spi_WaitTillIdle()
 	// wait till card is idle
 	do
 	{
-		SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiDummy1, (uint8_t *)buffer, COUNTOF(aTxSpiDummy1));
+		SpiAbs_Receive_Spi1_Task0((uint8_t *)buffer, 1U);
 	} while( 0xFF != buffer[0] && ( RetryCount > counter++) );
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -432,7 +429,7 @@ uint8_t SD_Spi_ReadRes7(uint8_t * pRxBuffer)
 {
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 	
-    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiDummy4, (uint8_t *)pRxBuffer, COUNTOF(aTxSpiDummy4));
+    SpiAbs_Receive_Spi1_Task0((uint8_t *)pRxBuffer, 4U);
     
     SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
@@ -500,6 +497,7 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
 
 				}
 
+                OcrResponse.cpusb = 0;
 				while (0U == RetVal && 0U == OcrResponse.cpusb)
 				{
 					HAL_Delay(10);
@@ -577,11 +575,13 @@ uint8_t SD_Spi_ReadCSD(SdCsdRegisterType * csd)
 		if(resp.byte == SD_SPI_CMD_START_TOKEN)
 		{
 			// read 512 byte block
-			for(uint16_t i = 0; i < SD_SPI_CSD_LENGTH; i++)
-			{
-				SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-				SPI_CMD_READ_BUFFER[i] = resp.byte;
-			}
+			// for(uint16_t i = 0; i < SD_SPI_CSD_LENGTH; i++)
+			// {
+			// 	SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+			// 	SPI_CMD_READ_BUFFER[i] = resp.byte;
+			// }
+
+            SpiAbs_Receive_Spi1_Task0(SPI_CMD_READ_BUFFER, SD_SPI_CSD_LENGTH);
 
 			// read 16-bit CRC
 			SpiAbs_readByte(SPIABS_DEVICE_1, &Crc1);
@@ -724,6 +724,19 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 			readBuffer[i] = resp.byte;
 		}
 
+        // for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SECTOR_CHUNK_SIZE)
+		// {
+        //     if (SD_SECTOR_LENGTH - i > SD_SECTOR_CHUNK_SIZE)
+        //     {
+        //         SpiAbs_Receive_Spi1_Task0(&readBuffer[i], SD_SECTOR_CHUNK_SIZE);
+        //     }
+        //     else
+        //     {
+        //         SpiAbs_Receive_Spi1_Task0(&readBuffer[i], SD_SECTOR_LENGTH - i);
+        //     }
+		// }
+
+
 		// read 16-bit CRC
 		SpiAbs_readByte(SPIABS_DEVICE_1, &Crc1);
 		SpiAbs_readByte(SPIABS_DEVICE_1, &Crc2);
@@ -773,6 +786,18 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const  *buff)
 		{
 			SpiAbs_writByte(SPIABS_DEVICE_1, &buff[i]);
 		}
+
+        // for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SECTOR_CHUNK_SIZE)
+		// {
+        //     if (SD_SECTOR_LENGTH - i > SD_SECTOR_CHUNK_SIZE)
+        //     {
+        //         SpiAbs_Send_Spi1_Task0(&buff[i], SD_SECTOR_CHUNK_SIZE);
+        //     }
+        //     else
+        //     {
+        //         SpiAbs_Send_Spi1_Task0(&buff[i], SD_SECTOR_LENGTH - i);
+        //     }
+		// }
 
 		SpiAbs_writByte(SPIABS_DEVICE_1, (uint8_t const *)&Crc1);
 		SpiAbs_writByte(SPIABS_DEVICE_1, (uint8_t const *)&Crc2);

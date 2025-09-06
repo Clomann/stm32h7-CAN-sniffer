@@ -32,6 +32,16 @@
             "cwd": "${workspaceFolder}",
             "device": "STM32H745ZITx_M4",
             "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf"
+        },
+        {
+            "name": "Debug (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/test_app",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "stdio": [null, null, null]
         }
     ],
     "compounds": [

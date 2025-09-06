@@ -162,10 +162,12 @@ comm_status_t SPI_Send(CommDriver *drv, const void *msg)
     comm_status_t res;
     SPI_Message *pMsg;
     SpiSlotType *txSlot;
+    SpiTransactionType *transaction;
 
-    pMsg = (SPI_Message *)msg;
+    pMsg        = (SPI_Message *)msg;
+    transaction = (SpiTransactionType *)pMsg->transaction;
 
-    res = m_PrepareTxSlot(drv, pMsg, SPI_DIR_TX_RX, &txSlot);
+    res = m_PrepareTxSlot(drv, pMsg, transaction->direction, &txSlot);
     if (res != COMM_SUCCESS)
     {
         return res;
@@ -444,11 +446,11 @@ CommDriver *m_FindCorrespondingDriver(SPI_HandleTypeDef *hspi)
 
 uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
 {
-    uint8_t res            = 0;
-    CommDriver *pDrv       = NULL;
-    RingBuffer *rxSlots    = NULL;
-    SpiSlotType *rxSlot    = {0};
-    SpiSlotType rxSlotCopy = {0};
+    uint8_t res         = 0;
+    CommDriver *pDrv    = NULL;
+    RingBuffer *rxSlots = NULL;
+    SpiSlotType *rxSlot = {0};
+    SpiSlotType *rxSlotCopy;
     SpiPriorityType Prio;
     bool RxSlotFound = false;
 
@@ -508,8 +510,8 @@ uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
     else if (rxSlot->transaction.callback != NULL)
     {
         // Async with callback
-        res = ring_buffer_pop(rxSlots, &rxSlotCopy);
-        if (COMM_SUCCESS == res)
+        rxSlotCopy = ring_buffer_peek_at(rxSlots, 0);
+        if (NULL != rxSlotCopy)
         {
             rxSlot->transaction.callback(
                 rxSlot->transaction.context,
@@ -518,6 +520,7 @@ uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
                 rxSlot->used_len
             );
         }
+        (void)ring_buffer_pop_ptr(rxSlots);
     }
     else if (rxSlot->transaction.callback == NULL)
     {

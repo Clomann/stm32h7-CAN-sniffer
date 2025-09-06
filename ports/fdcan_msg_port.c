@@ -16,7 +16,7 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrame *frame)
 
     xMessageBufferSendFromISR(CanFrameBuffer, (uint8_t *)frame, sizeof(FDCAN_ClassicFrame), &xHigher);
     
-    portYIELD_FROM_ISR(xHigher); 
+    // portYIELD_FROM_ISR(xHigher); 
 }
 
 void fdcan_msg_port_init(void)
