@@ -13,6 +13,7 @@
 
 #define SD_SPI_CMD_DUMMY_DATA			0xFF
 #define SD_SPI_CMD_START_TOKEN			0xFE
+#define SD_SECTOR_CHUNK_SIZE            64U
 
 #define SD_TOTAL_SIZE					0x800000000	/* 32 Gb in bytes */
 #define SD_SECTOR_LENGTH				0x000000200	/* Sector lemngth in bytes (512 bytes) */
