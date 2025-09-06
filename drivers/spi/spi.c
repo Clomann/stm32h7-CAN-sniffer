@@ -47,6 +47,8 @@ comm_status_t SPI_Init(CommDriver *drv)
     SpiInstanceType *instance;
 
     res = COMM_SUCCESS;
+    
+    memset(aRxSpiDummy, 0xFF, sizeof(aRxSpiDummy));
 
     instance = (SpiInstanceType *)drv->instance;
 

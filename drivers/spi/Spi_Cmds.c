@@ -24,6 +24,7 @@ static SPI_HandleTypeDef *pSpiHandle1;
 
 /* Buffer used for transmission */
 ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aTxBuffer[]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
+ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxSpiDummy[1024U]);
 
 /* Buffer used for reception */
 /* Size of buffer */
@@ -295,10 +296,11 @@ uint8_t Spi_ParseResponse(const uint8_t * buffer, uint8_t length, uint8_t * resp
 uint8_t Spi_readByte(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 {
 	uint8_t RetVal;
+    uint16_t Bytes = 1;
 
-	RetVal = Spi_SendReceiveMsg(handle, (uint8_t*)aTxSpiDummy1, (uint8_t *)aRxBuffer, COUNTOF(aTxSpiDummy1));
+	RetVal = Spi_SendReceiveMsg(handle, (uint8_t*)aRxSpiDummy, (uint8_t *)aRxBuffer, Bytes);
 
-	Spi_ParseResponse(aRxBuffer, COUNTOF(aTxSpiDummy1), pResponse);
+	Spi_ParseResponse(aRxBuffer, (uint8_t)Bytes, pResponse);
 
 	return RetVal;
 }

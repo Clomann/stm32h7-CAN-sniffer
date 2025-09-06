@@ -8,6 +8,8 @@ enum SPIABS_DEVICE {
     SPIABS_DEVICEn
 };
 
+extern uint8_t aRxSpiDummy[1024];
+
 uint8_t SpiAbs_Init_Spi1(void);
 void * SpiAbs_GetHandle_Spi1(void);
 
