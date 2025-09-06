@@ -162,10 +162,12 @@ comm_status_t SPI_Send(CommDriver *drv, const void *msg)
     comm_status_t res;
     SPI_Message *pMsg;
     SpiSlotType *txSlot;
+    SpiTransactionType *transaction;
 
-    pMsg = (SPI_Message *)msg;
+    pMsg        = (SPI_Message *)msg;
+    transaction = (SpiTransactionType *)pMsg->transaction;
 
-    res = m_PrepareTxSlot(drv, pMsg, SPI_DIR_TX_RX, &txSlot);
+    res = m_PrepareTxSlot(drv, pMsg, transaction->direction, &txSlot);
     if (res != COMM_SUCCESS)
     {
         return res;
