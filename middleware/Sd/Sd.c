@@ -70,8 +70,6 @@ static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
 uint8_t aTxSpiCmd[6];
 
 ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiInit[18]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiDummy1[1]) = {0xFF};
-ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiDummy4[4]) = {0xFF, 0xFF, 0xFF, 0xFF};
 
 static uint8_t SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t * buffer)
 {
@@ -288,7 +286,7 @@ uint8_t SD_Spi_WaitTillIdle()
 {
 	uint8_t RetVal = 1;
 	uint8_t counter = 0;
-	uint8_t buffer[COUNTOF(aTxSpiDummy1)];
+	uint8_t buffer[1];
 	const uint8_t RetryCount = 10;
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
@@ -296,7 +294,7 @@ uint8_t SD_Spi_WaitTillIdle()
 	// wait till card is idle
 	do
 	{
-		SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiDummy1, (uint8_t *)buffer, COUNTOF(aTxSpiDummy1));
+		SpiAbs_Send_Spi1_Task0((uint8_t*)aRxSpiDummy, (uint8_t *)buffer, sizeof(buffer));
 	} while( 0xFF != buffer[0] && ( RetryCount > counter++) );
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -432,7 +430,7 @@ uint8_t SD_Spi_ReadRes7(uint8_t * pRxBuffer)
 {
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 	
-    SpiAbs_Send_Spi1_Task0((uint8_t*)aTxSpiDummy4, (uint8_t *)pRxBuffer, COUNTOF(aTxSpiDummy4));
+    SpiAbs_Send_Spi1_Task0((uint8_t*)aRxSpiDummy, (uint8_t *)pRxBuffer, 4);
     
     SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
