@@ -181,6 +181,8 @@ uint8_t Spi_Send(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len)
     
     Spi_Unlock(0);
 
+    Spi_NotifyRxData(handle, 0);
+
 	return RetVal;
 }
 
@@ -266,6 +268,8 @@ uint8_t Spi_Receive(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len)
 	memcpy(buffer, aRxBuffer, len);
     
     Spi_Unlock(0);
+
+    Spi_NotifyRxData(handle, 0);
 
 	return RetVal;
 }
@@ -454,6 +458,15 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   m_NotifyTransferComplete(hspi);
 }
 
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  m_NotifyTransferComplete(hspi);
+}
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+{  
+  m_NotifyTransferComplete(hspi);
+}
 
 /**
   * @brief  SPI error callbacks.
