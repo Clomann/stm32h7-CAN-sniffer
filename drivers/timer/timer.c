@@ -118,13 +118,18 @@ uint8_t TIMx_Init(uint32_t resolution)
         // find lowest frequency that yields the desired resolution
         freq_int = BASE_CONSTANT / (resolution * (Arr + 1));
         if (BASE_CONSTANT == freq_int * resolution * (Arr + 1)) {
-            freq = freq_int;
+            freq = freq_int / 10;
             break;
         }
         else
         {
             Arr--;
         }
+    }
+
+    if (0 == Arr) 
+    {
+        TIM_ErrorHandlerHook();
     }
 
     res = ComputePrescalerAndARR(
@@ -135,6 +140,11 @@ uint8_t TIMx_Init(uint32_t resolution)
             &Arr);
 
     if (0 != res) return res;
+    
+    if (resolution != (InputClock/ (1+Prescaler)) / 1000000U)
+    {
+        TIM_ErrorHandlerHook();
+    }
 
     /* Set TIMx instance */
     TimHandle.Instance = TIMx;
@@ -280,4 +290,9 @@ uint8_t TIM_HAL_Init(uint32_t freq)
 void TIM_HAL_IRQHandler(void)
 {
     HAL_TIM_IRQHandler(&TimHalHandle);
+}
+
+void __attribute__((weak)) TIM_ErrorHandlerHook(void)
+{
+    ;
 }

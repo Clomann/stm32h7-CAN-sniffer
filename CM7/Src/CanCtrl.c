@@ -129,7 +129,7 @@ void appCanCtrlSetMode(CanCtrlDataType *data)
 
 void TIM_InterruptCallback()
 {
-    static uint64_t Arr = 0;
+    uint64_t Arr = 0;
 
     TIM_GetArrValue((uint16_t *)&Arr);
     Time += Arr * TIMx_TIME_RESOLUTION;

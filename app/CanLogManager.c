@@ -37,7 +37,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data);
 static void appCanLogFillEntry(
     CanLogClassicCanEntryType *entry,
     FDCAN_ClassicFrame *frame,
-    uint64_t *timestamp,
+    uint64_t timestamp,
     uint8_t channel
 );
 static comm_status_t
@@ -187,7 +187,11 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
             {
                 CanLogFileManager_ErrorHandler();
             }
-            FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice));
+            
+            if (FR_OK != FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice)))
+            {
+                CanLogFileManager_ErrorHandler();
+            }
         }
         else
         {
@@ -261,23 +265,17 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 static void appCanLogFillEntry(
     CanLogClassicCanEntryType *entry,
     FDCAN_ClassicFrame *frame,
-    uint64_t *timestamp,
+    uint64_t timestamp,
     uint8_t channel
 )
 {
-    memset(entry, 0x0, sizeof(CanLogClassicCanEntryType));
-
     entry->header.header_len = sizeof(entry->header);
     entry->header.type       = CANLOG_CLASSIC_TYPE;
     entry->header.total_len  = sizeof(CanLogClassicCanEntryType);
-    entry->timestamp         = *timestamp;
+    entry->timestamp         = timestamp;
     entry->channel           = channel;
     entry->dlc               = frame->dlc;
-    memcpy(
-        (uint8_t *)&entry->can_id,
-        (uint8_t *)&frame->id,
-        sizeof(entry->can_id)
-    );
+    entry->can_id = frame->id;
     memcpy(entry->data, frame->data, sizeof(entry->data));
 }
 
@@ -286,12 +284,12 @@ appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel)
 {
     comm_status_t res = COMM_SUCCESS;
 
-    CanLogClassicCanEntryType NewEntry;
+    CanLogClassicCanEntryType NewEntry = {0};
 
     appCanLogFillEntry(
         &NewEntry,
         frame,
-        (uint64_t *)&frame->timestamp,
+        frame->timestamp,
         channel
     );
 

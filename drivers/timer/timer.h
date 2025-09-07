@@ -40,3 +40,5 @@ void TIM_ErrorHandler(void);
 
 void TIM_HAL_InterruptCallback(void);
 void TIM_HAL_ErrorHandler(void);
+
+void TIM_ErrorHandlerHook(void);
