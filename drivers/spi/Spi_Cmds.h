@@ -72,7 +72,7 @@ uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
 uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi);
 uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err);
 
-void Spi_ErrorHandler(void);
+void Spi_ErrorHandlerHook(void);
 
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);

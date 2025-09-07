@@ -101,7 +101,7 @@ HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef * handle)
 
     if (NULL == handle)
     {
-        Spi_ErrorHandler();
+        Spi_ErrorHandlerHook();
     }
 
     handle->Instance               = SPI1;
@@ -109,7 +109,7 @@ HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef * handle)
     
     if (HAL_OK != res)
     {
-        Spi_ErrorHandler();
+        Spi_ErrorHandlerHook();
     }
 
     SpiClock = HAL_RCCEx_GetPeriphCLKFreq(RccInstance);
@@ -164,7 +164,7 @@ uint8_t Spi_Send(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len)
 	else if (RetVal != HAL_OK)
 	{
 	  /* Transfer error in transmission process */
-		Spi_ErrorHandler();
+		Spi_ErrorHandlerHook();
         Spi_Unlock(0);
         return HAL_ERROR;
 	}
@@ -208,7 +208,7 @@ uint8_t Spi_SendReceiveMsg(SPI_HandleTypeDef * handle, const uint8_t * pTxBuffer
 	else if (RetVal != HAL_OK)
 	{
 	  /* Transfer error in transmission process */
-		Spi_ErrorHandler();
+		Spi_ErrorHandlerHook();
         Spi_Unlock(0);
         return HAL_ERROR;
 	}
@@ -250,7 +250,7 @@ uint8_t Spi_Receive(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len)
 	else if (RetVal != HAL_OK)
 	{
 	  /* Transfer error in transmission process */
-		Spi_ErrorHandler();
+		Spi_ErrorHandlerHook();
         Spi_Unlock(0);
         return HAL_ERROR;
 	}
@@ -297,7 +297,7 @@ uint8_t Spi_ParseResponse(const uint8_t * buffer, uint8_t length, uint8_t * resp
 uint8_t Spi_readByte(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 {
 	uint8_t RetVal;
-    uint16_t Bytes = 1;
+    const uint16_t Bytes = 1;
 
 	RetVal = Spi_SendReceiveMsg(handle, (uint8_t*)aRxSpiDummy, (uint8_t *)aRxBuffer, Bytes);
 
@@ -398,7 +398,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 
 	if(HAL_SPI_Abort(handle) != HAL_OK)
 	{
-		Spi_ErrorHandler();
+		Spi_ErrorHandlerHook();
 	}
 
     res = m_GetRccInstance(handle, &RccInstance);
@@ -416,7 +416,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 
 	if(res != HAL_OK)
 	{
-		Spi_ErrorHandler();
+		Spi_ErrorHandlerHook();
 	}
 
 	return res;
@@ -488,7 +488,7 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
   * @param  None
   * @retval None
   */
-void __attribute__((weak)) Spi_ErrorHandler(void)
+void __attribute__((weak)) Spi_ErrorHandlerHook(void)
 {
   BSP_LED_Off(LED1);
   /* Turn LED3 on */
