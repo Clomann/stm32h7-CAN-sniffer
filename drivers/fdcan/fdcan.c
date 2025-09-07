@@ -933,7 +933,7 @@ comm_status_t get_fdcan_config(
     ram_usage(instance->fdcan, &instance->hfdcan.Init.MessageRAMOffset);
     instance->hfdcan.Init.StdFiltersNbr = 1;
     instance->hfdcan.Init.ExtFiltersNbr = 0;
-    instance->hfdcan.Init.RxFifo0ElmtsNbr = 1;
+    instance->hfdcan.Init.RxFifo0ElmtsNbr = FDCAN_RAM_RX_ELEMENTS;
     instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
     instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
     instance->hfdcan.Init.RxBuffersNbr = 0;
