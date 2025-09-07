@@ -296,6 +296,6 @@ comm_status_t CanAbs_SetMode_Can2(uint32_t mode)
 
 comm_status_t CanAbs_IsStateOff_Can2(bool * isOff)
 {
-    *isOff = Fdcan1Driver.state == DRIVER_STATE_OFF;
+    *isOff = Fdcan2Driver.state == DRIVER_STATE_OFF;
     return COMM_SUCCESS;
 }
