@@ -156,26 +156,42 @@ void NotifyConsumerTask(void)
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
     FDCAN_ClassicFrame NewFrame;
+    uint32_t frames_processed = 0;
+    const uint32_t MAX_FRAMES_PER_ISR = FDCAN_RAM_RX_ELEMENTS / 2U;
 
     if (FDCAN_1 == hfdcan->Instance)
     {
-        if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+        while ( (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) > 0) && 
+               (frames_processed < MAX_FRAMES_PER_ISR) )
         {
-            NewFrame.channel = 1;
-            FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver, &NewFrame.timestamp);
-            ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
-            NotifyConsumerTask();
+            if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+            {
+                NewFrame.channel = 1;
+                FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver, &NewFrame.timestamp);
+                ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
+                frames_processed++;
+
+            }
         }
     }
     else if (FDCAN_2 == hfdcan->Instance)
     {
-        if (Fdcan2Driver.interface->read(&Fdcan2Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+        while ( (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) > 0) && 
+               (frames_processed < MAX_FRAMES_PER_ISR) )
         {
-            NewFrame.channel = 2;
-            FDCAN_GetMostRecentInterruptTimestamp(&Fdcan2Driver, &NewFrame.timestamp);
-            ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
-            NotifyConsumerTask();
+            if (Fdcan2Driver.interface->read(&Fdcan2Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+            {
+                NewFrame.channel = 2;
+                FDCAN_GetMostRecentInterruptTimestamp(&Fdcan2Driver, &NewFrame.timestamp);
+                ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
+                frames_processed++;
+
+            }
         }
+    }
+    
+    if (frames_processed > 0) {
+        NotifyConsumerTask();
     }
 }
 
