@@ -527,7 +527,7 @@ static comm_status_t FDCAN_SetMode(
 
     if (COMM_SUCCESS == res)
     {
-        if (HAL_FDCAN_Init(&instance->hfdcan) != HAL_OK)
+        if (HAL_FDCAN_Init(&instance->hfdcan) != HAL_OK) 
         {
             /* Initialization Error */
             res = COMM_ERROR;
@@ -573,6 +573,7 @@ comm_status_t FDCAN_Ioctl(
             }
             else
             {
+                HAL_FDCAN_ActivateNotification(&instance->hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
                 dev->state = DRIVER_STATE_STARTED;
             }
             break;
@@ -580,6 +581,15 @@ comm_status_t FDCAN_Ioctl(
             if (DRIVER_STATE_STARTED != dev->state)
             {
                 /* nothing to do */
+            }
+            else if ( (HAL_FDCAN_DeactivateNotification(&instance->hfdcan, 
+                        FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != HAL_OK )
+                    || ( HAL_FDCAN_AbortTxRequest(&instance->hfdcan, 
+                        FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2) != HAL_OK) )
+            {
+                /* Start Error */
+                res = COMM_ERROR;
+                FDCAN_ErrorHandler();   
             }
             else if (HAL_FDCAN_Stop(&instance->hfdcan) != HAL_OK)
             {
@@ -589,6 +599,7 @@ comm_status_t FDCAN_Ioctl(
             }
             else 
             {
+                __HAL_FDCAN_CLEAR_IT(&instance->hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE);
                 dev->state = DRIVER_STATE_STOPPED;
             }
             break;
