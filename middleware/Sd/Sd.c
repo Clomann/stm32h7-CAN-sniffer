@@ -493,7 +493,8 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
 				{
 
 				}
-
+                
+                OcrResponse.cpusb = 0;
 				while (0U == RetVal && 0U == OcrResponse.cpusb)
 				{
 					HAL_Delay(10);
@@ -547,7 +548,7 @@ uint8_t SD_Spi_ReadCSD(SdCsdRegisterType * csd)
 {
 	Spi_R1Response resp;
 	uint32_t readAttempts;
-	uint8_t Crc1,Crc2;
+	uint8_t Crc = 0;
 	uint8_t RetVal = 0;
 
 	SD_Spi_SendCommandPollResponse(SD_SPI_CMD9, 0x00000000, &resp.byte);
@@ -570,18 +571,12 @@ uint8_t SD_Spi_ReadCSD(SdCsdRegisterType * csd)
 		// if response token is 0xFE
 		if(resp.byte == SD_SPI_CMD_START_TOKEN)
 		{
-			// read 512 byte block
-			for(uint16_t i = 0; i < SD_SPI_CSD_LENGTH; i++)
-			{
-				SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-				SPI_CMD_READ_BUFFER[i] = resp.byte;
-			}
+			SpiAbs_Receive_Spi1_Task0(SPI_CMD_READ_BUFFER, SD_SPI_CSD_LENGTH);
 
 			// read 16-bit CRC
-			SpiAbs_readByte(SPIABS_DEVICE_1, &Crc1);
-			SpiAbs_readByte(SPIABS_DEVICE_1, &Crc2);
+            SpiAbs_Receive_Spi1_Task0((uint8_t *)&Crc, sizeof(Crc));
 
-			if (0 != Crc1 || 0 != Crc2)
+			if (0 != Crc)
 			{
 				RetVal = 0U;
 			}
@@ -613,7 +608,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 	uint8_t RetVal;
 	uint32_t readAttempts, tokenPollCount;
 	uint8_t *readBuffer;
-	uint8_t CardStatus1, CardStatus2, Dummy;
+	uint8_t CardStatus, Dummy;
     uint16_t Crc = 0;
 	Spi_R1Response resp;
 	uint8_t GotResponse;
@@ -641,12 +636,10 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 	switch (pResponse->byte)
 	{
 	case 0x00: // card is ready
-		SpiAbs_readByte(SPIABS_DEVICE_1, &CardStatus1);
-		SpiAbs_readByte(SPIABS_DEVICE_1, &CardStatus2);
+        SpiAbs_Receive_Spi1_Task0(&CardStatus, sizeof(CardStatus));
 		break;
 	case 0x01: // idle state
-		SpiAbs_readByte(SPIABS_DEVICE_1, &CardStatus1);
-		SpiAbs_readByte(SPIABS_DEVICE_1, &CardStatus2);
+        SpiAbs_Receive_Spi1_Task0(&CardStatus, sizeof(CardStatus));
 		RetVal = SD_Spi_Initialize(0U);
 		break;	
 	case 0xFF: // not responding
@@ -712,11 +705,11 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 	if (0U == RetVal)
 	{
-        for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SECTOR_CHUNK_SIZE)
+        for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SPI_SECTOR_CHUNK_SIZE)
 		{
-            if (SD_SECTOR_LENGTH - i > SD_SECTOR_CHUNK_SIZE)
+            if (SD_SECTOR_LENGTH - i > SD_SPI_SECTOR_CHUNK_SIZE)
             {
-                SpiAbs_Receive_Spi1_Task0(&readBuffer[i], SD_SECTOR_CHUNK_SIZE);
+                SpiAbs_Receive_Spi1_Task0(&readBuffer[i], SD_SPI_SECTOR_CHUNK_SIZE);
             }
             else
             {
@@ -725,7 +718,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 		}
 
 		// read 16-bit CRC
-        SpiAbs_Receive_Spi1_Task0(&Crc, sizeof(Crc));
+        SpiAbs_Receive_Spi1_Task0((uint8_t *)&Crc, sizeof(Crc));
 
 		if (0 != Crc)
 		{
@@ -767,11 +760,11 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const  *buff)
 		// Send 0xFE start token
 		SpiAbs_writByte(SPIABS_DEVICE_1, &StartDataToken);
 
-        for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SECTOR_CHUNK_SIZE)
+        for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SPI_SECTOR_CHUNK_SIZE)
 		{
-            if (SD_SECTOR_LENGTH - i > SD_SECTOR_CHUNK_SIZE)
+            if (SD_SECTOR_LENGTH - i > SD_SPI_SECTOR_CHUNK_SIZE)
             {
-                SpiAbs_Send_Spi1_Task0(&buff[i], SD_SECTOR_CHUNK_SIZE);
+                SpiAbs_Send_Spi1_Task0(&buff[i], SD_SPI_SECTOR_CHUNK_SIZE);
             }
             else
             {
@@ -779,7 +772,7 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const  *buff)
             }
 		}
 
-        SpiAbs_Send_Spi1_Task0(&Crc, sizeof(Crc));
+        SpiAbs_Send_Spi1_Task0((uint8_t *)&Crc, sizeof(Crc));
 
 		SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
 		if (SD_DEF_DATA_RESP_TOKEN != (0x0F & resp.byte))
