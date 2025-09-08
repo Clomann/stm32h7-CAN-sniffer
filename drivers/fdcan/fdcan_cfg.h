@@ -24,6 +24,8 @@
 /* FDCAN 1 ========================================= */
 #define FDCAN_1             FDCAN1
 
+#define FDCCAN_USE_TIMESTAMP_COUNTER   (1U)
+
 /*!< timestamp resolution in micro seconds */
 #define FDCAN_1_TIMESTAMP_RESOLUTION     (1U)
 

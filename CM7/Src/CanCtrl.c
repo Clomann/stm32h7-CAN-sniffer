@@ -131,6 +131,7 @@ void TIM_InterruptCallback()
 {
     uint64_t Arr = 0;
 
+    /* add one full timer period to timer */
     TIM_GetArrValue((uint16_t *)&Arr);
     Time += Arr * TIMx_TIME_RESOLUTION;
 }
@@ -144,13 +145,11 @@ void TIM_HAL_InterruptCallback()
  * 
  * \param[out] timestamp in micro seconds.
  */
-comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
+uint64_t FDCAN_GetTimestampHook(void)
 {
-    comm_status_t res;
+    uint64_t timestamp;
     uint64_t time_snapshot1, time_snapshot2;
     uint16_t cnt;
-
-    res = COMM_SUCCESS;
 
     do
     {
@@ -159,7 +158,16 @@ comm_status_t FDCAN_GetTimestamp(uint64_t *timestamp)
         time_snapshot2 = Time;
     } while (time_snapshot1 != time_snapshot2);
 
-    *timestamp = time_snapshot1 + (uint64_t)(cnt * TIMx_TIME_RESOLUTION);
+    timestamp = time_snapshot1 + (uint64_t)(cnt * TIMx_TIME_RESOLUTION);
 
-    return res;
+    return timestamp;
+}
+
+uint32_t FDCAN_GetTimerPeriodHook(void)
+{
+    uint16_t Arr;
+
+    TIM_GetArrValue(&Arr);
+
+    return (uint16_t)Arr;
 }

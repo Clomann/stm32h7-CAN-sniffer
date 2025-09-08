@@ -16,7 +16,7 @@ typedef struct {
     FDCAN_GlobalTypeDef *fdcan;
     FDCAN_HandleTypeDef hfdcan;
     FDCAN_RxHeaderTypeDef rxheader;
-    uint32_t mostRecentInterrupTimestamp;
+    uint64_t mostRecentInterrupTimestamp;
 } FdcanInstanceType;
  
 static FdcanInstanceType fdcan_hfdcan[FDCAN_MAX_INSTANCES] = {
@@ -83,8 +83,7 @@ comm_status_t fdcan_init_tx_header(
     FDCAN_TxHeaderTypeDef *, 
     uint32_t);
 
-comm_status_t SampleTime(
-    uint32_t *timestamp);
+uint64_t  SampleTime(void);
 
 comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 
@@ -161,6 +160,12 @@ comm_status_t FDCAN_Init(
 
     // TODO make init function consistent with driver creation
     get_fdcan_config(instance, &sFilterConfig);
+
+#if FDCCAN_USE_TIMESTAMP_COUNTER
+    HAL_FDCAN_EnableTimestampCounter(&instance->hfdcan, FDCAN_TIMESTAMP_EXTERNAL);
+#else
+    HAL_FDCAN_EnableTimestampCounter(&instance->hfdcan, FDCAN_TIMESTAMP_INTERNAL);
+#endif
 
     if (HAL_FDCAN_Init(&instance->hfdcan) != HAL_OK)
     {
@@ -370,7 +375,7 @@ comm_status_t FDCAN_Read(
 
 
     pNewFrame->id = instance->rxheader.Identifier;
-    pNewFrame->timestamp = instance->mostRecentInterrupTimestamp; // RxHeader.RxTimestamp;
+    pNewFrame->timestamp = instance->rxheader.RxTimestamp;
 
     memcpy(pNewFrame->data, &Data, pNewFrame->dlc);
 
@@ -394,18 +399,9 @@ comm_status_t FDCAN_RegisterRxMessage(Message *pMsg)
 	return COMM_ERROR;
 }
 
-/**
-  * @brief  This function handles PPP interrupt request.
-  * @param  None
-  * @retval None
-  */
-/*void PPP_IRQHandler(void)
+uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev)
 {
-}*/
-
-void FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev, uint32_t *timestamp)
-{
-    *timestamp = ((FdcanInstanceType*)dev->instance)->mostRecentInterrupTimestamp;
+    return ((FdcanInstanceType*)dev->instance)->mostRecentInterrupTimestamp;
 }
 
 void FDCAN_1_IRQHandler(void)
@@ -417,7 +413,8 @@ void FDCAN_1_IRQHandler(void)
         FDCAN_ErrorHandler();
     }
 
-    SampleTime((uint32_t *)&instance->mostRecentInterrupTimestamp);
+    /* capture timestamp at the moment of the interrupt */
+    instance->mostRecentInterrupTimestamp = SampleTime();
     HAL_FDCAN_IRQHandler(&instance->hfdcan);
 }
 
@@ -430,7 +427,7 @@ void FDCAN_2_IRQHandler(void)
         FDCAN_ErrorHandler();
     }
 
-    SampleTime((uint32_t *)&instance->mostRecentInterrupTimestamp);
+    instance->mostRecentInterrupTimestamp = SampleTime();
     HAL_FDCAN_IRQHandler(&instance->hfdcan);
 }
 
@@ -953,7 +950,7 @@ comm_status_t get_fdcan_config(
     instance->hfdcan.Init.TxFifoQueueElmtsNbr = 4;
     instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
     instance->hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
-
+    
     pFilterConfig->IdType = FDCAN_STANDARD_ID;
     pFilterConfig->FilterIndex = 0;
     pFilterConfig->FilterType = FDCAN_FILTER_MASK;
@@ -966,14 +963,7 @@ comm_status_t get_fdcan_config(
 	return RetVal;
 }
 
-comm_status_t SampleTime(uint32_t *timestamp)
+uint64_t SampleTime(void)
 {
-    comm_status_t res = 0;
-    uint64_t time;
-
-    (void) FDCAN_GetTimestamp(&time);
-
-    memcpy((uint8_t*)timestamp, (uint8_t*)&time, sizeof(*timestamp));
-
-    return res;
+    return FDCAN_GetTimestampHook();
 }
