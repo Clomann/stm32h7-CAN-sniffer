@@ -64,10 +64,7 @@ uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
 
 uint8_t MMCAdapter_write(const BYTE *buff, LBA_t sector, UINT count)
 {
-	for (uint32_t i=0; i<count; i++)
-	{
-		SD_Spi_writeBlock(sector + i, &buff[i * SD_SECTOR_LENGTH]);
-	}
+	SD_Spi_writeMultiBlock(sector, buff, count);
 
 	return 0U;
 }

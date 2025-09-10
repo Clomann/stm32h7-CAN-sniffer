@@ -37,6 +37,11 @@
 
 #define SD_DEF_DATA_RESP_TOKEN   0x05
 #define SD_DEF_START_DATA_MARKER 0xFE
+#define SD_DEF_MULTI_BLOCK_START_TOKEN 0xFC
+#define SD_DEF_MULTI_BLOCK_STOP_TOKEN 0xFD
+#define SD_DEF_DATA_ACCEPTED_TOKEN  0x05
+#define SD_DEF_CRC_ERROR_TOKEN  0x0B
+#define SD_DEF_WRITE_ERROR_TOKEN 0x0D
 
 #define SD_E_OK 0U
 
@@ -73,6 +78,8 @@ enum SD_Spi_Commands
     SD_SPI_CMD17,
     /*!< WRITE_BLOCK: Writes a block of the size selected by the SET_BLOCKLEN command. */
     SD_SPI_CMD24,
+    /*!< : . */
+    SD_SPI_CMD25,
     SD_SPI_CMD55,
     SD_SPI_CMD58,
     /*! SD_SEND_OP_COND: Sends host capacity support information and 
@@ -94,8 +101,11 @@ uint8_t SD_Spi_ReadOCR(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadRes7(uint8_t *pRxBuffer);
 uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response *pResponse);
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
+uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff);
+
+void Sd_Spi_ErrorHandlerHook(void);
 
 #endif /* CM7_INC_SD_H_ */
