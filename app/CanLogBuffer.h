@@ -9,7 +9,7 @@
 #define CANLOG_E_BOCK_FULL      3U
 
 #define CANLOG_VERSION      1U
-#define BLOCK_SIZE          512U
+#define BLOCK_SIZE          (512U * 4U)
 #define LOG_BUFFER_SIZE     (3U * BLOCK_SIZE)
 
 typedef enum {
