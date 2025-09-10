@@ -76,6 +76,11 @@ void TIM_ErrorHandler()
     Error_Handler();
 }
 
+void Sd_Spi_ErrorHandlerHook(void)
+{
+    Error_Handler();
+}
+
 void SettingsHandler_ApplyRequestCallback()
 {
     AppCtrlData.applyConfig = 1;

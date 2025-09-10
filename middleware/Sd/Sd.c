@@ -132,6 +132,14 @@ static uint8_t SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t * buf
 		buffer[4] = payload & 0xFF;
 		buffer[5] = 0x01;
 		break;
+    case SD_SPI_CMD25:
+		buffer[0] = 0x59;
+		buffer[1] = (payload >> 24) & 0xFF;
+		buffer[2] = (payload >> 16) & 0xFF;
+		buffer[3] = (payload >> 8) & 0xFF;
+		buffer[4] = payload & 0xFF;
+		buffer[5] = 0x01;
+		break;
 	case SD_SPI_CMD55:
 		buffer[0] = 0x77;
 		buffer[1] = 0x00;
@@ -735,6 +743,113 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 	return RetVal;
 }
 
+uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t cnt)
+{
+    uint8_t res;
+    uint32_t readResponseAttempts;
+	uint16_t Crc=0U; 
+	Spi_R1Response resp;
+    const uint8_t StartDataToken = SD_DEF_MULTI_BLOCK_START_TOKEN;
+    const uint8_t StopDataToken = SD_DEF_MULTI_BLOCK_STOP_TOKEN;
+
+	res = 0U;
+
+	SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+	SD_Spi_SendCommand(SD_SPI_CMD25, address);
+
+	SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+    if(resp.byte == 0xFF)
+	{
+        res = SD_E_CMD_NO_R1;
+	}
+
+    if (0 == res)
+	{
+        for (uint32_t j = 0; j < cnt; j++)
+        {
+            SpiAbs_writByte(SPIABS_DEVICE_1, &StartDataToken);
+
+            for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SPI_SECTOR_CHUNK_SIZE)
+            {
+                if (SD_SECTOR_LENGTH - i > SD_SPI_SECTOR_CHUNK_SIZE)
+                {
+                    SpiAbs_Send_Spi1_Task0(&buff[i + j * SD_SECTOR_LENGTH], SD_SPI_SECTOR_CHUNK_SIZE);
+                }
+                else
+                {
+                    SpiAbs_Send_Spi1_Task0(&buff[i + j * SD_SECTOR_LENGTH], SD_SECTOR_LENGTH - i);
+                }
+            }
+
+            SpiAbs_Send_Spi1_Task0((uint8_t *)&Crc, sizeof(Crc));
+
+            SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+            if ((resp.byte & 0x1F) == SD_DEF_DATA_ACCEPTED_TOKEN)
+            {
+
+            }
+            else if ((resp.byte & 0x1F) == SD_DEF_CRC_ERROR_TOKEN)
+            {
+                res = SD_E_CMD_NO_DATA_RESP_TOKEN;
+            }
+            else if ((resp.byte & 0x1F) == SD_DEF_WRITE_ERROR_TOKEN)
+            {
+                res = SD_E_CMD_NO_DATA_RESP_TOKEN;
+            }
+            
+            if (0 == res)
+            {
+                readResponseAttempts = 0;
+                do 
+                { //Waiting for the end of the state BUSY
+                    SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+                } while ( (resp.byte != 0xFF) && (++readResponseAttempts<SD_MAX_READ_RESPONSE_ATTEMPTS) );
+                
+                if (readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS)
+                {
+                    res = SD_E_CMD_NO_GOING_IDLE;
+                }
+            }
+
+            if (0 != res)
+            {
+                break;
+            }
+        }
+    }
+
+    if (0 == res)
+	{
+		SpiAbs_writByte(SPIABS_DEVICE_1, &StopDataToken);
+	}
+
+    if (0 == res)
+	{
+		readResponseAttempts = 0;
+		do 
+		{ //Waiting for the end of the state BUSY
+			SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+		} while ( (resp.byte != 0xFF) && (++readResponseAttempts<SD_MAX_READ_RESPONSE_ATTEMPTS) );
+		
+		if (readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS)
+		{
+			res = SD_E_CMD_NO_GOING_IDLE;
+		}
+	}
+
+    if (0 != res)
+    {
+        Sd_Spi_ErrorHandlerHook();
+    }
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+    return res;
+}
+
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const  *buff)
 {
 	uint8_t RetVal;
@@ -819,4 +934,3 @@ uint8_t SD_Spi_readFAT(Spi_R1Response * pResponse)
 
 	return RetVal;
 }
-
