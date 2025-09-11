@@ -25,6 +25,7 @@ struct CanLogControlDataType
     uint8_t *mountRes;
     bool *runCanTracer;
     bool runCanTracerOld;
+    bool *commitLog;
 };
 
 static char CanLogFileName[255] = "/logs/CAN.LOG";
@@ -149,7 +150,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
         &FileSize
     );
 
-    if (FileSizeRes == FR_OK && FileSize >= MAX_LOG_FILE_SIZE)
+    if (FileSizeRes == FR_OK && (FileSize >= MAX_LOG_FILE_SIZE || data->commitLog))
     {
         // File exists and is full, advance to next one
         if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)))
@@ -202,7 +203,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
     return 0U;
 }
 
-CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run)
+CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 {
     memset(&CanLogCtrlData, 0x0, sizeof(CanLogCtrlData));
 
@@ -212,6 +213,7 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run)
 
     CanLogCtrlData.mountRes     = mount_res;
     CanLogCtrlData.runCanTracer = run;
+    CanLogCtrlData.commitLog = commit;
 
     return &CanLogCtrlData;
 }
@@ -392,9 +394,18 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
 
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
+
+        CanLogCtrlData.commitLog = 1;
     }
 
     appCanLogCheckNewFileOpen(data);
+
+    if (CanLogCtrlData.commitLog)
+    {
+        appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
+        
+        CanLogCtrlData.commitLog = 0;
+    }
 
     while (0 < fdcan_msg_port_read(&NewFrame, 0))
     {
@@ -407,7 +418,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             /* quit */
             CanLogFileManager_ErrorHandler();
         }
-        else if (0 < BlockIsReady)
+        else if (BlockIsReady)
         {
             appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
         }
