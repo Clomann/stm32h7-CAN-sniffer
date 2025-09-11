@@ -13,10 +13,10 @@
 #include "CanLogManagerTypes.h"
 
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
-#define MAX_LOG_FILE_SIZE              (8U * 1024U)
+#define MAX_LOG_FILE_SIZE              (16U * 1024U)
 #define MAX_LOG_INDEX                  (16U)
 
-#define CAN_LOG_MAX_FILE_SIZE_KB 8U
+#define CAN_LOG_MAX_FILE_SIZE_KB 16U
 #define CAN_LOG_MAX_FILE_SIZE    (CAN_LOG_MAX_FILE_SIZE_KB * 1024U)
 #define CAN_LOG_MAX_INDEX        16U
 #define CAN_LOG_FILENAME_MAX_LEN 255U
@@ -28,7 +28,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data);
 void appCanLogHandlerDeInit(CanLogControlDataType *data);
 
 /* Initialize the global control data */
-CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run);
+CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit);
 
 /* Hooks */
 void CanLogFileManager_ErrorHandler(void);

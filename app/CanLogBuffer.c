@@ -60,12 +60,10 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
     while (CANLOG_E_OK == res)
     {
         if (lwrb_get_full(&Rb1) < sizeof(EntryHeader)) {
-            res = CANLOG_E_NOT_OK;
             break; // Not enough data
         }
 
         if (lwrb_peek(&Rb1, 0, &EntryHeader, sizeof(EntryHeader)) != sizeof(EntryHeader)) {
-            res = CANLOG_E_NOT_OK;
             break; // Error
         }
 
@@ -79,17 +77,14 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
         }
 
         if ((offset + total_len) > BLOCK_SIZE) {
-            res = CANLOG_E_OK;
             break; // Output block full
         }
 
         if (lwrb_get_full(&Rb1) < total_len) {
-            res = CANLOG_E_NOT_OK;
             break;
         }
 
         if (lwrb_read(&Rb1, &data[offset], total_len) != total_len) {
-            res = CANLOG_E_NOT_OK;
             break;
         }
 

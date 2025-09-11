@@ -37,6 +37,7 @@ typedef struct {
     uint8_t mountRes;
     bool runCanTracer;
     bool applyConfig;
+    bool commitLog;
 } AppControlDataType;
 
 uint8_t run;
@@ -45,7 +46,8 @@ static CanCtrlDataType CanCtrlData;
 
 static AppControlDataType AppCtrlData = { 
     .mountRes = 1,
-    .runCanTracer = 0
+    .runCanTracer = 0,
+    .commitLog = 0
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -132,7 +134,10 @@ static void Core0Task0Main( void * parameters )
         AppCtrlData.mountRes = FatFS_SD_Mount();
     }
 
-    AppCtrlData.Log = CanLogHandler_Init(&AppCtrlData.mountRes, &AppCtrlData.runCanTracer);
+    AppCtrlData.Log = CanLogHandler_Init(
+        &AppCtrlData.mountRes, 
+        &AppCtrlData.runCanTracer, 
+        &AppCtrlData.commitLog);
     appCanLogHandlerInit(AppCtrlData.Log);
     
     ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
