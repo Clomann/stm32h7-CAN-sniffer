@@ -219,7 +219,7 @@ int main(void)
    PeriphClkInitStruct.PLL2.PLL2M = 2;
    PeriphClkInitStruct.PLL2.PLL2N = 96;
    PeriphClkInitStruct.PLL2.PLL2FRACN = 1;
-   PeriphClkInitStruct.PLL2.PLL2P = 20; /* PLL2P: drives SPI1 */
+   PeriphClkInitStruct.PLL2.PLL2P = 5; /* PLL2P: drives SPI1 */
    PeriphClkInitStruct.PLL2.PLL2Q = 20; /* PLL2P: drives SPI4 */
    PeriphClkInitStruct.PLL2.PLL2R = 2;
  

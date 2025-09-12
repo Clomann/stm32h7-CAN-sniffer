@@ -56,4 +56,8 @@
 
 #define CS_ACTIVE_HIGH 0
 
+#ifndef SPI_USE_RTOS
+#define SPI_USE_RTOS 1
+#endif
+
 #endif /* CM7_INC_SPICFG_H_ */

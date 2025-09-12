@@ -13,6 +13,7 @@
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_nucleo.h"
 
+#include "CommFactory.h"
 #include "SpiCfg.h"
 
 #define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
@@ -21,8 +22,8 @@ extern uint8_t __dma_buffers_start; /* see linker script */
 extern uint8_t __dma_buffers_end; /* see linker script */
 
 extern const uint8_t aTxSpiInit[18];
-extern const uint8_t aTxSpiDummy1[1];
-extern const uint8_t aTxSpiDummy4[4];
+extern uint8_t aRxSpiDummy[1024];
+extern uint8_t aRxSpiSink[1024];
 
 static inline uint8_t Spi_PwrOn()
 {
@@ -56,22 +57,22 @@ static inline uint8_t Spi_CsDisable()
 	return 0;
 }
 
-HAL_StatusTypeDef SPI_Init(SPI_HandleTypeDef *);
+HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef *);
 
-//static uint8_t Spi_Receive(uint8_t *r, uint8_t);
-uint8_t Spi_readByte(uint8_t * pResponse);
-uint8_t Spi_writByte(const uint8_t *data);
-uint8_t Spi_PollForResponse(uint8_t *);
-uint8_t Spi_PollTillIdle(uint8_t *);
-uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
-uint8_t Spi_SendReceiveMsg(const uint8_t *, uint8_t *, uint8_t);
-uint8_t Spi_goHighSpeed(void);
+uint8_t Spi_readByte(SPI_HandleTypeDef * handle, uint8_t * pResponse);
+uint8_t Spi_writByte(SPI_HandleTypeDef * handle, const uint8_t *data);
+uint8_t Spi_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse);
+uint8_t Spi_Send(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len);
+uint8_t Spi_Receive(SPI_HandleTypeDef * handle, uint8_t * buffer, uint16_t len);
+uint8_t Spi_SendReceiveMsg(SPI_HandleTypeDef * handle, const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint16_t TxBytes);
+uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle);
 
 uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
 uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
 uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi);
+uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err);
 
-void Spi_ErrorHandler(void);
+void Spi_ErrorHandlerHook(void);
 
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);

@@ -4,6 +4,9 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/HttpAbs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/CanLogBuffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/SettingsHandler.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/CanLogManager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ConfigManager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/WebInterface.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/app_ethernet.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/ethernetif.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/fs_custom.c

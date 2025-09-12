@@ -90,8 +90,8 @@ comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 
     const void *cfg, 
     size_t cfg_size,
-    RingBuffer *tx, 
-    RingBuffer *rx)
+    uint8_t *tx, 
+    uint8_t *rx)
 {
 	comm_status_t RetVal;
     FdcanInstanceType * instance;
@@ -613,6 +613,48 @@ comm_status_t FDCAN_Ioctl(
     return res;
 }
 
+static inline void gpio_clk_enable(GPIO_TypeDef *port)
+{
+    if (port == GPIOA) 
+    { 
+        __HAL_RCC_GPIOA_CLK_ENABLE(); 
+    }
+    else if (port == GPIOB) 
+    { 
+        __HAL_RCC_GPIOB_CLK_ENABLE(); 
+    }
+    else if (port == GPIOC) 
+    { 
+        __HAL_RCC_GPIOC_CLK_ENABLE(); 
+    }
+    else if (port == GPIOD) 
+    { 
+        __HAL_RCC_GPIOD_CLK_ENABLE(); 
+    }
+    else if (port == GPIOE) 
+    { 
+        __HAL_RCC_GPIOE_CLK_ENABLE(); 
+    }
+#ifdef GPIOF
+    else if (port == GPIOF) 
+    { 
+        __HAL_RCC_GPIOF_CLK_ENABLE(); 
+    }
+#endif
+#ifdef GPIOG
+    else if (port == GPIOG) 
+    { 
+        __HAL_RCC_GPIOG_CLK_ENABLE(); 
+    }
+#endif
+#ifdef GPIOH
+    else if (port == GPIOH) 
+    { 
+        __HAL_RCC_GPIOH_CLK_ENABLE(); 
+    }
+#endif
+}
+
 HAL_StatusTypeDef FDCAN_GpioClck(FDCAN_GlobalTypeDef *fdcan)
 {
     HAL_StatusTypeDef res;
@@ -621,13 +663,13 @@ HAL_StatusTypeDef FDCAN_GpioClck(FDCAN_GlobalTypeDef *fdcan)
 
     if (FDCAN_1 == fdcan)
     {
-        FDCAN_1_TX_GPIO_CLK_ENABLE();
-        FDCAN_1_RX_GPIO_CLK_ENABLE();
+        CLK_ENABLE(FDCAN_1_TX_GPIO_PORT);
+        CLK_ENABLE(FDCAN_1_RX_GPIO_PORT);
     }
     else if (FDCAN_2 == fdcan)
     {
-        FDCAN_2_TX_GPIO_CLK_ENABLE();
-        FDCAN_2_RX_GPIO_CLK_ENABLE();
+        CLK_ENABLE(FDCAN_2_TX_GPIO_PORT);
+        CLK_ENABLE(FDCAN_2_RX_GPIO_PORT);
     }
     else
     {

@@ -1,5 +1,5 @@
 #include "unity.h"
-#include "fdcan_utils.h"  // <-- your header file to test (adjust to your real one)
+#include "fdcan_utils.h"
 
 void setUp(void)
 {
@@ -11,18 +11,17 @@ void tearDown(void)
     // This function is called **after each test**.
 }
 
-// Example function under test:
-static int add_numbers(int a, int b)
-{
-    return a + b;
-}
+void bittiming(void);
 
-// --- Actual test cases ---
+// --- Main function to run tests ---
 
-void test_add_numbers_should_add_two_positive_numbers(void)
+int main(void)
 {
-    int result = add_numbers(2, 3);
-    TEST_ASSERT_EQUAL_INT(5, result);
+    UNITY_BEGIN();
+    
+    RUN_TEST(bittiming);
+    
+    return UNITY_END();
 }
 
 void bittiming(void)
@@ -138,15 +137,4 @@ void bittiming(void)
 
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(10, sjw, "Test 7: Bit timinng sjw");
-}
-
-// --- Main function to run tests ---
-
-int main(void)
-{
-    UNITY_BEGIN();
-
-    RUN_TEST(bittiming);
-
-    return UNITY_END();
 }

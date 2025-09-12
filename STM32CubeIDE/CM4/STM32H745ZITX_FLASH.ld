@@ -47,6 +47,15 @@ FLASH (rx)      : ORIGIN = 0x08100000, LENGTH = 1024K
 RAM (xrw)      : ORIGIN = 0x10000000, LENGTH = 288K
 }
 
+/* Define program headers with explicit permissions */
+PHDRS
+{
+  FLASH PT_LOAD FLAGS(5); /* Read + Execute (R=4, E=1, Total=5) */
+  DATA PT_LOAD FLAGS(6); /* Read + Write (R=4, W=2, Total=6) */
+  BSS PT_LOAD FLAGS(6);    /* R+W for .bss */
+  STACK PT_LOAD FLAGS(6);  /* R+W for heap/stack */
+}
+
 /* Define output sections */
 SECTIONS
 {
@@ -56,7 +65,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :FLASH
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -73,7 +82,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >FLASH :FLASH
 
   /* Constant data goes into FLASH */
   .rodata :
@@ -82,35 +91,37 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :FLASH
 
   .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >FLASH
+  } >FLASH :FLASH
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >FLASH
+  } >FLASH :FLASH
+
   .init_array :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >FLASH
+  } >FLASH :FLASH
+  
   .fini_array :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >FLASH
+  } >FLASH :FLASH
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
@@ -125,7 +136,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >RAM AT> FLASH :DATA
 
   
   /* Uninitialized data section */
@@ -142,7 +153,7 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >RAM
+  } >RAM :BSS
 
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack :
@@ -153,9 +164,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
-
-  
+  } >RAM :STACK
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
@@ -167,5 +176,3 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 }
-
-

@@ -31,7 +31,7 @@ uint8_t spi_port_freertos_init(void *handle)
 
     if (NULL == handle)
     {
-        Spi_ErrorHandler();
+        Spi_ErrorHandlerHook();
     }
 
     pCanBridgeTaskHdl = (TaskHandle_t*)handle;
@@ -49,7 +49,7 @@ void Spi_NotifyRegister(void *hspi)
     
     if (NULL == handle)
     {
-        Spi_ErrorHandler();
+        Spi_ErrorHandlerHook();
     }
 #if SPI_PORT_USE_SEMAPHORE
     for (int i = 0; i < MAX_SPI_INSTANCES; ++i) {
