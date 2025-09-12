@@ -12,8 +12,8 @@ comm_status_t CommManager_Init(
     CommDriver *drv,
     const void *cfg,
     size_t cfg_size,
-    RingBuffer *tx,
-    RingBuffer *rx)
+    uint8_t *tx,
+    uint8_t *rx)
 {
     const CommFactoryEntry *e = CommFactory_Find(drv->protocol);
     if (!e) 

@@ -4,7 +4,7 @@
  *  Created on: 14.09.2024
  *      Author: Clemens
  */
-
+#pragma once
 
 #define FDCAN_MAX_INSTANCES     2U
 
@@ -20,12 +20,8 @@
 #define FDCANx_FORCE_RESET()    __HAL_RCC_FDCAN_FORCE_RESET()
 #define FDCANx_RELEASE_RESET()  __HAL_RCC_FDCAN_RELEASE_RESET()
 
-
 /* FDCAN 1 ========================================= */
 #define FDCAN_1             FDCAN1
-
-#define FDCAN_1_RX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
-#define FDCAN_1_TX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
 
 /*!< timestamp resolution in micro seconds */
 #define FDCAN_1_TIMESTAMP_RESOLUTION     (1U)
@@ -47,9 +43,6 @@
 /* FDCAN 2 ========================================= */
 #define FDCAN_2             FDCAN2
 
-#define FDCAN_2_RX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
-#define FDCAN_2_TX_GPIO_CLK_ENABLE() __HAL_RCC_GPIOB_CLK_ENABLE()
-
 /*!< timestamp resolution in micro seconds */
 #define FDCAN_2_TIMESTAMP_RESOLUTION     (1U)
 
@@ -66,3 +59,5 @@
 #define FDCAN_2_IRQHandler FDCAN2_IT0_IRQHandler
 
 #define FDCAN_2_MAX_MSG_COUNT 10u
+
+#define CLK_ENABLE(port_macro) gpio_clk_enable(port_macro)

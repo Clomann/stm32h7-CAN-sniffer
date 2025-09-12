@@ -17,6 +17,7 @@ static RingBuffer Fdcan1RxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan1RxFrameBuffer) / sizeof(Fdcan1RxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan1RxFrameBuffer[0]),
+    .stride = sizeof(Fdcan1RxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -26,6 +27,7 @@ static RingBuffer Fdcan1TxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan1TxFrameBuffer) / sizeof(Fdcan1TxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan1TxFrameBuffer[0]),
+    .stride = sizeof(Fdcan1TxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -44,6 +46,7 @@ static RingBuffer Fdcan2RxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan2RxFrameBuffer) / sizeof(Fdcan2RxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan2RxFrameBuffer[0]),
+    .stride = sizeof(Fdcan2RxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -53,6 +56,7 @@ static RingBuffer Fdcan2TxRingBuffer = {
     .tail = 0,
     .bufferLength = sizeof(Fdcan2TxFrameBuffer) / sizeof(Fdcan2TxFrameBuffer[0]),
     .elementSize = sizeof(Fdcan2TxFrameBuffer[0]),
+    .stride = sizeof(Fdcan2TxFrameBuffer[0]),
     .isFull = false
 };
 
@@ -65,7 +69,7 @@ static inline int can_ioctl(struct CommDriver *dev, int cmd, void *arg) {
     return dev->interface->ioctl(dev, cmd, arg);
 }
 
-int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, RingBuffer *tx, RingBuffer *rx)
+int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t *rx)
 {
     unsigned int res = COMM_SUCCESS;
 
@@ -83,7 +87,7 @@ int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, RingBuffer *tx, Ring
 
 int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrame *frame)
 {
-    return ring_buffer_pop(dev->RxFrameBuffer, (void*)frame);
+    return ring_buffer_pop((RingBuffer *)dev->RxFrameBuffer, (void*)frame);
 }
 
 comm_status_t CanAbs_Send(CommDriver *dev, FDCAN_Message *msg)
@@ -159,7 +163,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         {
             NewFrame.channel = 1;
             FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver, &NewFrame.timestamp);
-            ring_buffer_put(Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
+            ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
             NotifyConsumerTask();
         }
     }
@@ -169,7 +173,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         {
             NewFrame.channel = 2;
             FDCAN_GetMostRecentInterruptTimestamp(&Fdcan2Driver, &NewFrame.timestamp);
-            ring_buffer_put(Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
+            ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
             NotifyConsumerTask();
         }
     }
@@ -182,7 +186,7 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
 {
     comm_status_t res;
 
-    res = CanAbs_Init(&Fdcan1Driver, &Fdcan1Config, &Fdcan1TxRingBuffer, &Fdcan1RxRingBuffer);
+    res = CanAbs_Init(&Fdcan1Driver, &Fdcan1Config, (uint8_t *)&Fdcan1TxRingBuffer, (uint8_t *)&Fdcan1RxRingBuffer);
 
     if (0 == COMM_SUCCESS)
     {
@@ -234,7 +238,7 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
 {
     comm_status_t res;
 
-    res = CanAbs_Init(&Fdcan2Driver, &Fdcan2Config, &Fdcan2TxRingBuffer, &Fdcan2RxRingBuffer);
+    res = CanAbs_Init(&Fdcan2Driver, &Fdcan2Config, (uint8_t *)&Fdcan2TxRingBuffer, (uint8_t *)&Fdcan2RxRingBuffer);
 
     if (0 == COMM_SUCCESS)
     {

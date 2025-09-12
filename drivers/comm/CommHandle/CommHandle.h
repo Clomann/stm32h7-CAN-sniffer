@@ -12,6 +12,19 @@
 #include "CommTypes.h"
 #include "buffers.h"
 
+#define CACHE_LINE_SIZE (32U)
+#define CACHE_LINE_MASK (CACHE_LINE_SIZE - 1)
+
+#define DRV_BUFFER_ALIGNED_SIZE(_buffersize_)                                  \
+    (((uint32_t)((_buffersize_ + (CACHE_LINE_SIZE - 1U))) / CACHE_LINE_SIZE) * CACHE_LINE_SIZE)
+
+#define DRV_ALIGNED_ARRAY(_name_, _size_)                                      \
+    ALIGN_32BYTES(                                                             \
+        uint8_t __attribute__((                                                \
+            section(".dma_buffer")                                             \
+        )) _name_[(DRV_BUFFER_ALIGNED_SIZE(_size_))]                           \
+    )
+
 typedef struct CommDriver CommDriver;
 
 /*! Opaque init funciton that needs to be implemented by each driver.

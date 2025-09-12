@@ -1,5 +1,20 @@
 cmake_minimum_required(VERSION 3.22)
 
+set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps")
+
+# Let callers override this: -DCPU_PARAMETERS=";-mthumb;-mcpu=cortex-m7;..."
+set(CPU_PARAMETERS "" CACHE STRING "Target CPU/ABI flags (list)")
+set(DUAL_CORE "" CACHE STRING "Configure two target cofiguration (true/false).")
+
+set(IS_DUAL_CORE FALSE)
+if(DUAL_CORE_LOWER STREQUAL "true" OR DUAL_CORE_LOWER STREQUAL "on" OR DUAL_CORE_LOWER STREQUAL "1")
+    set(IS_DUAL_CORE TRUE)
+endif()
+
+if(NOT DEFINED CORE)
+  message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
+endif()
+
 # Setup compiler settings
 set(CMAKE_C_STANDARD                11)
 set(CMAKE_C_STANDARD_REQUIRED       ON)
@@ -10,29 +25,65 @@ set(CMAKE_CXX_EXTENSIONS            ON)
 set(PROJ_PATH                       ${CMAKE_CURRENT_SOURCE_DIR})
 set(STM32_HAL_PATH                  ${CMAKE_CURRENT_SOURCE_DIR}/libs/STM32_HAL/STM32H7)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJ_PATH}/_bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJ_PATH}/_bin/${CMAKE_BUILD_TYPE})
 
 message("Build type: "              ${CMAKE_BUILD_TYPE})
 
 #
 # Core project settings
 #
-project(SPI_FullDuplex_ComDMA_CM7)          # Modified
+project(SPI_FullDuplex_ComDMA_${CORE})          # Modified
 enable_language(C CXX ASM)
-
 
 #
 # Core MCU flags, CPU, instruction set and FPU setup
 # Needs to be set properly for your MCU
 #
-set(CPU_PARAMETERS
-    -mthumb
+if(CORE STREQUAL "CM7" AND NOT CPU_PARAMETERS)
+    set(CPU_PARAMETERS
+        -mthumb
 
-    # This needs attention to properly set for used MCU
-    -mcpu=cortex-m7                 # Modified
-    -mfpu=fpv5-d16                  # Modified
-    -mfloat-abi=hard                # Modified
-)
+        # This needs attention to properly set for used MCU
+        -mcpu=cortex-m7                 # Modified
+        -mfpu=fpv5-d16                  # Modified
+        -mfloat-abi=hard                # Modified
+    )
+
+    #
+    # Symbols definition
+    #
+    set(symbols_SYMB                    # Modified
+        "STM32H745xx"
+        "USE_HAL_DRIVER"
+        "CORE_CM7"
+        "NO_SYS=1"
+        "USE_STM32H7XX_NUCLEO_144_MB1363"
+        "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
+    )
+elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
+    set(CPU_PARAMETERS
+        -mthumb
+
+        # This needs attention to properly set for used MCU
+        -mcpu=cortex-m4                 # Modified
+        -mfpu=fpv5-d16                  # Modified
+        -mfloat-abi=hard                # Modified
+    )
+
+    #
+    # Symbols definition
+    #
+    set(symbols_SYMB                    # Modified
+        "STM32H745xx"
+        "USE_HAL_DRIVER"
+        "CORE_CM4"
+        "NO_SYS=1"
+        "USE_STM32H7XX_NUCLEO_144_MB1363"
+        "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
+    )
+else()
+  message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
+endif()
 
 # push flags to all targets
 add_compile_options(${CPU_PARAMETERS})
@@ -70,58 +121,81 @@ set(FREERTOS_HEAP 4            CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(freertos_kernel)
 
 # Set linker script
-set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld) # Modified
+if(CORE STREQUAL "CM7")
+    set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld)
+elseif(CORE STREQUAL "CM4")
+    set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM4/STM32H745ZITX_FLASH.ld)
+endif()
+
 set(EXECUTABLE                      ${CMAKE_PROJECT_NAME})
 
-#
-# List of source files to compile
-#
-set(sources_SRCS                    # Modified
-    ${PROJ_PATH}/CM7/Src/main.c
-    ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
-    ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
-    ${PROJ_PATH}/CM7/Src/Core0Task0.c
-    ${PROJ_PATH}/CM7/Src/Core0Task1.c
-    ${PROJ_PATH}/CM7/Src/utils_mpu.c
+if(CORE STREQUAL "CM7")
+    #
+    # List of source files to compile
+    #
+    set(sources_SRCS                    # Modified
+        ${PROJ_PATH}/CM7/Src/main.c
+        ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
+        ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
+        ${PROJ_PATH}/CM7/Src/Core0Task0.c
+        ${PROJ_PATH}/CM7/Src/Core0Task1.c
+        ${PROJ_PATH}/CM7/Src/CanBridgeTask.c
+        ${PROJ_PATH}/CM7/Src/CanSendTask.c
+        ${PROJ_PATH}/CM7/Src/CanCtrl.c
+        ${PROJ_PATH}/CM7/Src/SpiTask.c
+        ${PROJ_PATH}/CM7/Src/utils_mpu.c
 
-    ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
-    ${PROJ_PATH}/middleware/freertos/freertos_interface.c
+        ${PROJ_PATH}/middleware/freertos/freertos_interface.c
 
-    ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
-    ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
-    ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
-)
+        ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
+        ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
+        ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
+    )
 
-#
-# Include directories
-#
-set(include_path_DIRS               # Modified
-    ${PROJ_PATH}/CM7/Inc
+    #
+    # Include directories
+    #
+    set(include_path_DIRS               # Modified
+        ${PROJ_PATH}/CM7/Inc
+        ${PROJ_PATH}/Common/Inc
+        ${PROJ_PATH}/middleware/freertos
+    )
 
-    ${PROJ_PATH}/Common/Inc
+    add_subdirectory(adapters)
+    add_subdirectory(app)
+    add_subdirectory(drivers)
+    add_subdirectory(libs)
+    add_subdirectory(middleware)
+    add_subdirectory(ports)
 
-    ${PROJ_PATH}/middleware/freertos
-)
+elseif(CORE STREQUAL "CM4")
+    #
+    # List of source files to compile
+    #
+    set(sources_SRCS                    # Modified
+        ${PROJ_PATH}/CM4/Src/main.c
+        ${PROJ_PATH}/CM4/Src/stm32h7xx_hal_msp.c
+        ${PROJ_PATH}/CM4/Src/stm32h7xx_it.c
 
-add_subdirectory(adapters)
-add_subdirectory(app)
-add_subdirectory(drivers)
-add_subdirectory(libs)
-add_subdirectory(middleware)
-add_subdirectory(ports)
+        ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
 
-#
-# Symbols definition
-#
-set(symbols_SYMB                    # Modified
-    "STM32H745xx"
-    "USE_HAL_DRIVER"
-    "CORE_CM7"
-    "NO_SYS=1"
-    "USE_STM32H7XX_NUCLEO_144_MB1363"
-    "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
-)
+        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/syscalls.c
+        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/sysmem.c
+        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/startup/startup_stm32h745zitx.s
+    )
+
+    #
+    # Include directories
+    #
+    set(include_path_DIRS               # Modified
+        ${PROJ_PATH}/CM4/Inc
+        ${PROJ_PATH}/Common/Inc
+    )
+    
+    add_subdirectory(libs)
+endif()
 
 # Executable files
 add_executable(${EXECUTABLE} ${sources_SRCS})
@@ -144,10 +218,10 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -Wall
     -Wextra
     -Wpedantic
-    -Wno-unused-parameter
     -Werror=implicit-function-declaration
     # Full debug configuration
-    -Og -g3 -ggdb
+    $<$<CONFIG:Release>:-O2>
+    $<$<CONFIG:Debug>:-Og;-g3;-ggdb>
     -fstack-usage
     -ffunction-sections
     -fdata-sections
@@ -157,7 +231,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
 target_link_options(${EXECUTABLE} PRIVATE
     -T${linker_script_SRC}
     ${CPU_PARAMETERS}
-    -Wl,-Map=${CMAKE_PROJECT_NAME}.map
+    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_PROJECT_NAME}.map
     --specs=nosys.specs
     -u _printf_float                # STDIO float formatting support
     -Wl,--start-group
@@ -167,8 +241,10 @@ target_link_options(${EXECUTABLE} PRIVATE
     -lsupc++
     -Wl,--end-group
     -Wl,--print-memory-usage
-    -Wl,--warn-unresolved-symbols
+    -Wl,--error-unresolved-symbols
+    -Wl,--fatal-warnings
     -Wl,--trace
+    -Wl,--no-undefined
     # -Wl,--gc-sections,--print-gc-sections
 )
 
@@ -181,10 +257,10 @@ add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
 
 # Convert output to hex and binary
 add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${EXECUTABLE}> ${EXECUTABLE}.hex
+    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${EXECUTABLE}> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${EXECUTABLE}.hex
 )
 
 # Convert to bin file -> add conditional check?
 add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${EXECUTABLE}> ${EXECUTABLE}.bin
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${EXECUTABLE}> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${EXECUTABLE}.bin
 )

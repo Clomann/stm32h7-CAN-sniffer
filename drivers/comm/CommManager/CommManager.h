@@ -6,7 +6,6 @@
  */
 
 #pragma once
-#pragma once
 
 #include <string.h>
 
@@ -33,13 +32,13 @@ typedef struct CommDriver {
     void *instance;
 	CommProtocolType protocol;
 	CommDriverStatesType state;
-	RingBuffer *RxFrameBuffer;
-	RingBuffer *TxFrameBuffer;
+	uint8_t *RxFrameBuffer;
+	uint8_t *TxFrameBuffer;
 } CommDriver;
 
 comm_status_t CommManager_Init(
     CommDriver *drv,
     const void *cfg,
     size_t cfg_size,
-    RingBuffer *tx,
-    RingBuffer *rx);
+    uint8_t *tx,
+    uint8_t *rx);
