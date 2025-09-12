@@ -1,197 +1,97 @@
-# STM32H7 CAN sniffer
+STM32H7 CAN sniffer
 ====================
 
-This is a multi-protocol learning project. It implements a device that logs CAN traffic and stores the data onto a SD card. The device can be configured and the logged data can be accessed via a web interface.
-
-# Content
+[![Build](https://github.com/Clomann/stm32h745-spi-to-microSD/actions/workflows/build.yml/badge.svg?branch=main&event=push)](https://github.com/Clomann/stm32h745-spi-to-microSD/actions/workflows/build.yml)
 
 <!-- TOC -->
 
 - [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
-- [Content](#content)
-- [How To Use](#how-to-use)
-- [Software architecture](#software-architecture)
-    - [Introduction and goals](#introduction-and-goals)
-    - [Quality goals](#quality-goals)
-    - [System overview](#system-overview)
-    - [Building block view](#building-block-view)
-    - [Modules](#modules)
-    - [Interrupts](#interrupts)
-        - [SPI](#spi)
-- [Hardware setupp](#hardware-setupp)
-- [Pin usage](#pin-usage)
-- [Funtional requirements](#funtional-requirements)
-    - [General](#general)
-    - [CAN](#can)
-    - [Data Logging Requirements](#data-logging-requirements)
-    - [Server Requirements](#server-requirements)
-    - [Storage and File Management Requirements](#storage-and-file-management-requirements)
-- [Hardware Constraints](#hardware-constraints)
-- [Wishlist](#wishlist)
-- [Design decisions](#design-decisions)
-- [Third party libraries](#third-party-libraries)
-    - [FatFS and SD card driver](#fatfs-and-sd-card-driver)
+- [Quick start](#quick-start)
+    - [Build the code](#build-the-code)
+<!-- TOC -->
+
+- [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
+- [Quick start](#quick-start)
+    - [Build the code](#build-the-code)
+    - [Download the code](#download-the-code)
+    - [Access the web GUI](#access-the-web-gui)
+- [Architecture](#architecture)
+    - [Software](#software)
+    - [Hardware](#hardware)
 
 <!-- /TOC -->
-
-# How To Use
-
-The project consists of the source code written to run on a NUCLE 144 STM32H745ZI discovery board. It uses GPIO to interface to:
-- SD card
-- CAN tranceiver
-- the on board ETH interface
-
-It is build using cmake and make based on the gcc toolcain. You can run 
+To creake the  the software, you can use following command from the repos root directoy:
 
 ```sh
 cmake --preset "Debug" -B ./build/
-```
-to build the make project using cmake and then 
+``` 
+
+Running this command might take a while because following dependencies are pulled while generating the configuration:
+
+- FreeRTOS (see [FreeRTOS on github](https://github.com/FreeRTOS/FreeRTOS-LTS.git))
+- lwrb (see [lwrb on github](https://github.com/MaJerle/lwrb.git))
+
+To build the actual code, run the following from the root directory:
 
 ```sh
 make -C build -j4
-```
-
-to build the application.
-
- [!NOTE]]: Use a high quality SD card because many cheap once have issues with SPI. Thus, the quality of the SD card influences the reliablity accesing it through SPI. The system was tested with a Kingston Industrial graded card.
-
-# Software architecture
-
-## Introduction and goals
-The main of this project is to offer practical challanges to gain experience in:
-- applying software architecture concepts in an embedded environment
-- developing hardware drivers and there abstractions
-- using and integrating thrid party libraries
-- practicing tool chain management (cmake, vs code, gcc) 
-- leaning about industry relevant protocols (SPI, I2C, Ethernet, etc.)
-
-The application itself shall provide a basic software piece offering:
-- functions for data management and persisting
-- connectivity
-- user interaction
-- extendable and modularized HW interface to easily add protocols in the future
-
-Therefore, a central goal is to make the core application reusable and portable in a way, to also use it with other uCs of the family.
-
-## Quality goals
-
-| Goal | Motivation and description |
-|-|-|
-| Transferability | The app shall be modularized and open to extension so that the code can be resued in other projects. A clean interface between main app and HW abstraction is neede. |
-| Reliability | Data aquisition shall be reliable also at high throughput |
-| Maintainability | It shall be easy to add funcitons in the main app, but also to change driver implementations without affecting other parts of the code base. | 
-
-## System overview
-
-```mermaid
-block-beta
-    columns 2
-
-    Application:2
-    block:drivers:2
-        Eth["Network \ndevice 1\n (Ethernet)"]
-        Can["Network \ndevice 2\n (classic CAN)"]
-        Blck["Block device \n(SD card)"]
-    end
-
 ``` 
 
-## Building block view
+Alternatively, use the cmake workflow and just run 
 
- The following figure shows the layers of the CAn sniffer software.
-
- ```mermaid 
- %%{init: 
-    { 'theme':'default', 
-      'sequence': {
-        'useMaxWidth':true
-        } 
-    } 
-}%%
-
-block-beta 
-    columns 4
-
-    Application:4
-
-    block:middleware:4
-        DUMMY1[" "]:1
-        DUMMY2[" "]:1
-        %% ISOTP["ISO-TP"]:1
-        %% J1939[" "]:1
-
-
-        block:middlewarefs:1
-            columns 1
-            FatFS
-        StorageDeviceControls["Storage Device Controls"]
-    end
-
-    lwIP["HTTP/TCP/IP Stack (lwIP)"]
-    end
-    
-    CANDRIVERABS["CAN driver abstraction"]:2
-    SDCARDDRIVER["SD card driver"]
-    NETIF["Network interface abstarction"]
-    
-    CANDRIVER["CAN driver"]:2
-    SPIDRIVER["SPI driver"]
-    ETHDRIVER["ETH driver"]
+```sh
+cmake --workflow --preset debug-all
 ```
 
-For better performance and higher availability the serving of requests via ethernet shall be executed on another core to not interfere with the CAN trace logging when large files are loaded for user downloads.
+to generate the configuration and start the build in one go.
 
-## Modules
-## Interrupts
-configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY is set to 5 per default.
+## Download the code
 
-Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY):
-| Module | Priority |  |
-| - | - | - |
-| FDCAN | -5 |  |
-| TIM | -4 |  |
-|  | -3 |  |
-|  | -2 |  |
-|  | -1 |  |
-|  | +0 |  |
-| Deferred (SW) | +1 |  |
-| SPI | +2 |  |
-| ETH | +3 |  |
-|  | +4 |  |
-|  | +5 |  |
 
-### SPI
-The SPI driver design aims at decoupling the driver from the application and RTOS. Thus, an abstraction layer is used to handle all driver specific objects in a layered architecture. Using weak callback definitions lets the driver run either blocking in standalone mode or lets the caller inject their own functions (e. g. semaphore handling within the port layer):
-```mermaid 
- %%{init: 
-    { 'theme':'default', 
-      'sequence': {
-        'useMaxWidth':true
-        } 
-    } 
-}%%
+## Access the web GUI
 
-block-beta 
-    columns 1
+The IP address is assigned to the board by the DHCP server.
+You have to identify the IP address manually via the MAC-Address:
 
-    Application["application / tasks"]
-    port["spi_port_freertos.c:
-        NO driver symbols, NO IRQs, NO globals
-        only: create context, register app-callbacks"]
-    abs["SpiAbs.c
-        owns per-instance state (+ weak IRQ handler)
-        registers itself with Spi_Cmds
-        calls user callbacks (from isr or task ctx)"]
-    drv["pure HAL/LL; no state, no RTOS, no statics"]
-```
+> 00:80:E1:00:00:00
 
-# Hardware setupp
+# Architecture
 
-This section gives a brief overview of the hardware setup. The hardware setup is based on a NUCLEO-H745ZI-Q development board.
+This is a brief overview of the architecture. You can read the full architecture documentation [HERE](doc/arc42-template-EN.md).
 
-# Pin usage
-Following diagram shows which pins are connected to the external components:
+## Software 
+
+The driver design is inspired by Linux's opaque‑ops and linker‑list registration patterns (SPI, CAN, Ethernet) and they run bare-metal
+on FreeRTOS. Task orchestration is realized by prioritized preemptive task scheduling. 
+
+The overall structure of the software is in layers and uses dependecy inversion from driver to application to make the application more portable (see [building block view](doc/arc42-template-EN.md#Building%20Block%20View)).
+
+
+
+The full arc42 template based document (doc/arc42-template-EN.md) covers bin more detail:
+
+- building blocks (modules, interfaces)
+- runtime view (ISRs, queues)
+- quality scenarios (SD write latency, CAN Rx latency)
+
+Read it [here](doc/arc42-template-EN.md).
+
+## Hardware
+
+To get the system running, you need to connect the necessary adapters to the NUCLEO-144 board. 
+
+Following diagram shows which pins are connected to which external components:
+
+
+
+| Peripheral | Pins |
+| - | - |
+| CAN 1 | Rx: PB12, Tx: PB6 |
+| CAN 2 | Rx: PA11, Tx: PA12 |
+| SPI 1 | SS: PA4, CLK: PA5, MISO: PA6, MOSI: PD11 |
+| ETH | MDC: PC1, REF_CLK: PA1, MDIO: PA2, CRS_DV: PA7, RXD0: PC4, RXD1: PC5, TXD1: PB13, TX_EN: PG11, TXD0: PG13 |
+| SDMMC1 | D6: PC6, D7: PC7, D0: PC8, D1: PC9, D2: PC10, D3: PC11, CK: PC12, CMD: PD2, CLKIN: PB8, CDIR: PB9 |
+|  |  |
 
 ```mermaid
 flowchart TD
@@ -216,13 +116,13 @@ flowchart TD
         end
 
         subgraph CAN1 [CAN 1]
-                CAN1_Tx["Tx (B9)<br>"]
-                CAN1_Rx["Rx (B8)<br>"]
+                CAN1_Tx["Tx<br>(B6)"]
+                CAN1_Rx["Rx<br>(B12)"]
         end
 
         subgraph CAN2 [CAN 2]
-                CAN2_Tx["Tx (B13)<br>"]
-                CAN2_Rx["Rx (B12)<br>"]
+                CAN2_Tx["Tx<br>(A12)"]
+                CAN2_Rx["Rx<br>(A11)"]
         end
     end
 
@@ -280,65 +180,3 @@ flowchart TD
 
 ```
 
-
-# Funtional requirements
-
-This section states the most important functional requirements for the CAN sniffer.
-
-## General
-The CAN sniffer shall implement following functions:
-- Support for classic CAN
-- Store all received CAN frames to a SD card
-- impement a small server which allows to:
-  - download and delete log files with CAN traces
-  - configure the CAN sniffer remotely via the network (e. g. CAN ID filters, baudrate, etc.)
-
-The CAN sniffer shall be able to capture all CAN frames at 100 % bus load reliably and store them persistently without losing any frames.
-
-## CAN
-The CAN sniffer shall have following CAN specific functions:
-- The system shall support standard (11-bit) and extended (29-bit) CAN identifiers.
-- The system shall support baudrates of up to 1 Mbit/s
-- The system shall be able to filter messages based on CAN ID ranges.
-- The system shall detect and log error frames.
-- The system shall log bus load statistics.
-- The system shall support ISO-TP (ISO 15765-2) reassembly for multi-frame messages.
-
-## Data Logging Requirements
-- The system shall log messages to an SD card formatted with FAT32.
-- The system shall store CAN messages in a timestamped log format.
-- The system shall allow log retrieval via a network or direct SD card access.
-- The system shall support automatic log file rotation to prevent SD card overflow.
-- The system shall include metadata (e. g. timestamp, frame type) for each message.
-
-## Server Requirements
-- The system shall host a web interface accessible over Wi-Fi or LAN.
-- The web interface shall allow live message monitoring.
-- The web interface shall provide options to configure the message filters based on CAN IDs.
-- The system shall support starting and stopping logging sessions via the web interface.
-- The system shall support remote log file download.
-- optional: The system shall support firmware updates via the web interface.
-
-## Storage and File Management Requirements
-- The system shall implement buffered writes to the SD card to minimize wear.
-- The system shall create a new log file at the start of each session.
-- The system shall allow oldest logs to be deleted automatically if storage is full.
-
-# Hardware Constraints
-- The system shall operate with an STM32H7 microcontroller.
-- The system shall support an SPI-connected SD card.
-- The system shall support a low-power mode when logging is not active.
-- The system shall indicate operational status via LED indicators.
-
-# Wishlist
-- the web interface shall support client side CAN log parsing to offload the 
-formatting from the server
-
-# Design decisions
-
-To be found in [design decisions](./doc/design_decisions.md).
-
-# Third party libraries
-
-## FatFS and SD card driver
- http://elm-chan.org/fsw/ff/
