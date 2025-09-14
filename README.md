@@ -3,15 +3,14 @@ STM32H7 CAN sniffer
 
 [![Build](https://github.com/Clomann/stm32h745-spi-to-microSD/actions/workflows/build.yml/badge.svg?branch=main&event=push)](https://github.com/Clomann/stm32h745-spi-to-microSD/actions/workflows/build.yml)
 
+This project implements the software for a device that logs CAN traffic on two CAN channels and stores the data on an SD card. The device can be configured and the logged data can be accessed via a simple built-in web GUI.
+
 <!-- TOC -->
 
 - [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
 - [Quick start](#quick-start)
-    - [Build the code](#build-the-code)
-<!-- TOC -->
-
-- [STM32H7 CAN sniffer](#stm32h7-can-sniffer)
-- [Quick start](#quick-start)
+    - [System overview](#system-overview)
+    - [Prerequisites](#prerequisites)
     - [Build the code](#build-the-code)
     - [Download the code](#download-the-code)
     - [Access the web GUI](#access-the-web-gui)
@@ -20,6 +19,46 @@ STM32H7 CAN sniffer
     - [Hardware](#hardware)
 
 <!-- /TOC -->
+
+# Quick start
+
+The project consists of the source code written to run on a NUCLE 144 STM32H745ZI discovery board. It uses GPIO to interface to:
+- SD card
+- CAN tranceiver
+- the on board ETH interface
+
+It is built using cmake and make based on the gcc toolchain.
+
+This section briefly explains how to build and download the software for and to the device using the tool configuration included in this project.
+
+## System overview
+
+The system uses following components:
+- NUCLEO-H745ZI-Q STM32 board
+- two TJA1050 based CAN transceiver breakout boards
+- a 3 V micro SD card adapter beakout board
+
+![alt text](doc/images/system_overview/system_overview.drawio.jpg)
+
+More details of the systems technical context and a picture of the prototypical built can be found [here](doc/arc42-template-EN.md#technical-context)
+
+> **NOTE**: Use a high quality SD card because cheap once can have reliablity issues when used with SPI (e. g. SD card initializes correctly and some writes/reads work but then it hangs untill power cycled for no apparent reason). The system was tested with a Kingston Industrial graded card.
+
+## Prerequisites
+
+Following tool versions are used to develop, debug and run the program on the target:
+
+| Component | Version | Scope |
+|-|-|-|
+| cmake | 3.28.1 | build |
+| make | 3.81 | build |
+| GNU Tools for STM32 | 13.3.1 | build/ debug |
+| OpenOCD | 0.12.0 | download/ debug |
+| Cppcheck | 2.17.1 | develop |
+| clang-format | 20.1.8 | develop |
+
+## Build the code
+
 To creake the  the software, you can use following command from the repos root directoy:
 
 ```sh
@@ -47,6 +86,16 @@ to generate the configuration and start the build in one go.
 
 ## Download the code
 
+You can run the commands
+
+> STM32_Programmer_CLI -c port=SWD -d _bin/Debug/SPI_FullDuplex_ComDMA_CM7.elf 0x08000000 -rst
+
+and
+
+> STM32_Programmer_CLI -c port=SWD -d _bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf 0x08100000 -rst
+
+from the root directory.
+
 
 ## Access the web GUI
 
@@ -68,7 +117,7 @@ The overall structure of the software is in layers and uses dependecy inversion 
 
 
 
-The full arc42 template based document (doc/arc42-template-EN.md) covers bin more detail:
+The full arc42 template based document (doc/arc42-template-EN.md) covers the following in more detail:
 
 - building blocks (modules, interfaces)
 - runtime view (ISRs, queues)
@@ -116,13 +165,13 @@ flowchart TD
         end
 
         subgraph CAN1 [CAN 1]
-                CAN1_Tx["Tx<br>(B6)"]
-                CAN1_Rx["Rx<br>(B12)"]
+            CAN1_Tx["Tx<br>(B9)"]
+            CAN1_Rx["Rx<br>(B8)"]
         end
 
         subgraph CAN2 [CAN 2]
-                CAN2_Tx["Tx<br>(A12)"]
-                CAN2_Rx["Rx<br>(A11)"]
+            CAN2_Tx["Tx<br>(B6)"]
+            CAN2_Rx["Rx<br>(B12)"]
         end
     end
 
