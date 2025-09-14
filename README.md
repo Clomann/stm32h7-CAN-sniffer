@@ -109,10 +109,34 @@ flowchart TD
         end
         
         subgraph SPI1 [SPI1 - Master]
-                SPI1_SS["SS (PA4)<br>CN7.D13"]
-                SPI1_CLK["CLK (PA5)<br>CN7.D13"]
-                SPI1_MISO["MISO (PA6)<br>CN7.D12"]
-                SPI1_MOSI["MOSI (PB5)<br>CN7.D11"]
+            SPI1_SS["SS (PA4)<br>CN7.D13"]
+            SPI1_CLK["CLK (PA5)<br>CN7.D13"]
+            SPI1_MISO["MISO (PA6)<br>CN7.D12"]
+            SPI1_MOSI["MOSI (PB5)<br>CN7.D11"]
+            SPI1_SS["SS (PA4)<br>CN7.D13"]
+            SPI1_CLK["CLK (PA5)<br>CN7.D13"]
+            SPI1_MISO["MISO (PA6)<br>CN7.D12"]
+            SPI1_MOSI["MOSI (PB5)<br>CN7.D11"]
+        end
+
+        subgraph SDMMC1 [SDMMC1 - Master]
+            SDMMC1_CLKIN["CLKIN<br>(PB8)"]
+            SDMMC1_D0["D0<br>(PC8)"]
+            SDMMC1_D1["D1<br>(PC9)"]
+            SDMMC1_D2["D2<br>(PC10)"]
+            SDMMC1_D3["D3<br>(PC11)"]
+            SDMMC1_CK["CK<br>(PC12)"]
+            SDMMC1_CMD["CMD<br>(PD2)"]
+        end
+
+        subgraph SDMMC1 [SDMMC1 - Master]
+            SDMMC1_CLKIN["CLKIN<br>(PB8)"]
+            SDMMC1_D0["D0<br>(PC8)"]
+            SDMMC1_D1["D1<br>(PC9)"]
+            SDMMC1_D2["D2<br>(PC10)"]
+            SDMMC1_D3["D3<br>(PC11)"]
+            SDMMC1_CK["CK<br>(PC12)"]
+            SDMMC1_CMD["CMD<br>(PD2)"]
         end
 
         subgraph CAN1 [CAN 1]
@@ -145,6 +169,26 @@ flowchart TD
         SPI4_MOSI["MOSI (PE14)<br>CN10.D4"]
     end
 
+    subgraph SDIO1 [SDIO device]
+        SDIO1_CLKIN["CLKIN<br>PB8"]
+        SDIO1_D0["D0"]
+        SDIO1_D1["D1"]
+        SDIO1_D2["D2"]
+        SDIO1_D3["D3"]
+        SDIO1_CK["CK"]
+        SDIO1_CMD["CMD"]
+    end
+
+    subgraph SDIO1 [SDIO device]
+        SDIO1_CLKIN["CLKIN<br>PB8"]
+        SDIO1_D0["D0"]
+        SDIO1_D1["D1"]
+        SDIO1_D2["D2"]
+        SDIO1_D3["D3"]
+        SDIO1_CK["CK"]
+        SDIO1_CMD["CMD"]
+    end
+
     subgraph CAN1TRCV [CAN 1 Tranceiver]
         CAN1TRANC_Tx["CAN Tx"]
         CAN1TRANC_Rx["CAN Rx"]
@@ -169,6 +213,22 @@ flowchart TD
     SPI1_SS --- |SS| SPI4_SS
     SPI1_CLK --- |CLK| SPI4_CLK
     SPI1_MOSI --- |MOSI| SPI4_MOSI
+
+    SDMMC1_CLKIN --- SDIO1_CLKIN
+    SDMMC1_D0    --- SDIO1_D0
+    SDMMC1_D1    --- SDIO1_D1
+    SDMMC1_D2    --- SDIO1_D2
+    SDMMC1_D3    --- SDIO1_D3
+    SDMMC1_CK    --- SDIO1_CK
+    SDMMC1_CMD   --- SDIO1_CMD
+
+    SDMMC1_CLKIN --- SDIO1_CLKIN
+    SDMMC1_D0    --- SDIO1_D0
+    SDMMC1_D1    --- SDIO1_D1
+    SDMMC1_D2    --- SDIO1_D2
+    SDMMC1_D3    --- SDIO1_D3
+    SDMMC1_CK    --- SDIO1_CK
+    SDMMC1_CMD   --- SDIO1_CMD
 
     CAN1_Tx --- |Tx| CAN1TRANC_Tx
     CAN1_Rx --- |Rx| CAN1TRANC_Rx
