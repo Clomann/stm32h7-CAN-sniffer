@@ -410,7 +410,7 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef * handle)
 
     SpiClock = HAL_RCCEx_GetPeriphCLKFreq(RccInstance);
 
-	handle->Init.BaudRatePrescaler = SpiUtils_ComputePrescaler(SpiClock, 15000000U);
+	handle->Init.BaudRatePrescaler = SpiUtils_ComputePrescaler(SpiClock, 25000000U);
 	res = HAL_SPI_Init(handle);
     __enable_irq();
 
