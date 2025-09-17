@@ -116,7 +116,7 @@ uint8_t SpiAbs_SendWithCallback(
     enum SPIABS_DEVICE dev, 
     SpiTransactionType *transaction, 
     const uint8_t * pTxBuffer, 
-    uint8_t TxBytes);
+    uint16_t TxBytes);
 
 static CommDriver * m_GetDriver(enum SPIABS_DEVICE dev)
 {
@@ -188,7 +188,7 @@ uint8_t SpiAbs_SendWithCallback(
     enum SPIABS_DEVICE dev, 
     SpiTransactionType *transaction, 
     const uint8_t * pTxBuffer, 
-    uint8_t TxBytes)
+    uint16_t TxBytes)
 {
     uint8_t res;
     CommDriver * pDrv;
@@ -232,7 +232,7 @@ uint8_t SpiAbs_ReceiveWithCallback(
     enum SPIABS_DEVICE dev, 
     SpiTransactionType *transaction, 
     const uint8_t * data, 
-    uint8_t bytes)
+    uint16_t bytes)
 {
     uint8_t res;
     CommDriver * pDrv;
@@ -296,7 +296,12 @@ void SpiAbs_SendReceiveMsgCallback(
     }
 }
 
-uint8_t SpiAbs_SendReceiveMsg(enum SPIABS_DEVICE dev, const uint8_t * pTxBuffer, uint8_t * pRxBuffer, uint8_t TxBytes)
+uint8_t SpiAbs_SendReceiveMsg(
+    enum SPIABS_DEVICE dev, 
+    const uint8_t * pTxBuffer, 
+    uint8_t * pRxBuffer, 
+    uint16_t TxBytes
+)
 {
     uint8_t res;
     CommDriver * pDrv;

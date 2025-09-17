@@ -25,7 +25,7 @@
 #define SD_SDHC_SECTOR_SIZE 512U
 
 /*!< maximum byte count that can be trasmitted in one SPI operation */
-#define SD_SPI_MAX_TRANSFER_SIZE (128U)
+#define SD_SPI_MAX_TRANSFER_SIZE (512U)
 
 #define SD_SPI_SECTOR_CHUNK_SIZE                                               \
     ((SD_SDHC_SECTOR_SIZE > SD_SPI_MAX_TRANSFER_SIZE                           \
