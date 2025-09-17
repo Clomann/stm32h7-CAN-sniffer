@@ -48,6 +48,12 @@
 #define USE_HAL_SPI_REGISTER_CALLBACKS = 1U;
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
 
+// External symbols from linker script
+extern volatile char _estack;
+extern volatile char _end;
+volatile uint32_t stack_top;
+volatile uint32_t heap_stack_end;
+
 /* Private function prototypes -----------------------------------------------*/
 static void MPU_Config(void);
 static void SystemClock_Config(void);
@@ -55,6 +61,20 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
+
+static void MemoryLayoutChecks(void) 
+{  
+    stack_top = (uint32_t)&_estack;  
+    heap_stack_end = (uint32_t)&_end;
+
+    // This will fail to compile if heap overlaps stack
+    assert(heap_stack_end <= stack_top);
+}
+
+static void SystemChecks(void)
+{
+    MemoryLayoutChecks();
+}
 
 /**
   * @brief  Main program
@@ -139,6 +159,7 @@ int main(void)
     BSP_LED_Init(LED3);
 
     /*##-1- Configure the SPI peripheral #######################################*/
+    SystemChecks();
 
     Core0Task0Init();
     Core0Task1Init();

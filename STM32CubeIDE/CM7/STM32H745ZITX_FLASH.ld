@@ -35,7 +35,8 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = 0x24020000;    /* end of RAM */
+PROVIDE(_estack = 0x24020000);    /* end of RAM (Compatible with H743's 128KB RAM_D1) */
+
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200 ;      /* required amount of heap  */
 _Min_Stack_Size = 0x400 ; /* required amount of stack */
@@ -43,12 +44,12 @@ _Min_Stack_Size = 0x400 ; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
-DTCMRAM (xrw)     : ORIGIN = 0x20000000, LENGTH = 128K
-RAM_D1 (xrw)      : ORIGIN = 0x24000000, LENGTH = 512K
-RAM_D2 (xrw)      : ORIGIN = 0x30000000, LENGTH = 288K
-RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 64K
-ITCMRAM (xrw)     : ORIGIN = 0x00000000, LENGTH = 64K
+  FLASH (rx)        : ORIGIN = 0x08000000, LENGTH = 1024K
+  DTCMRAM (xrw)     : ORIGIN = 0x20000000, LENGTH = 128K
+  RAM_D1 (xrw)      : ORIGIN = 0x24000000, LENGTH = 512K
+  RAM_D2 (xrw)      : ORIGIN = 0x30000000, LENGTH = 288K
+  RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 64K
+  ITCMRAM (xrw)     : ORIGIN = 0x00000000, LENGTH = 64K
 }
 
 /* Define output sections */
@@ -165,12 +166,6 @@ SECTIONS
     . = ALIGN(8);
   } >RAM_D1
 
-  .dma_buffer (NOLOAD) : ALIGN(32) {
-    __dma_buffers_start__ = .;
-    *(.dma_buffer)
-    __dma_buffers_end__   = .;
-  } >RAM_D1
-
   .lwip_sec (NOLOAD): {
     . = ABSOLUTE(0x30000000);
     __lwip_sec_start__ = .;
@@ -186,11 +181,29 @@ SECTIONS
     __lwip_sec_end__ = .;
   } >RAM_D2
 
+  .ram_d2 (NOLOAD): {
+    . = ALIGN(4);
+    *(.ram_d2)
+    . = ALIGN(4);
+  } >RAM_D2
+
+  .dma_buffer (NOLOAD) : ALIGN(32) {
+    __dma_buffers_start__ = .;
+    *(.dma_buffer)
+    __dma_buffers_end__   = .;
+  } >RAM_D2
+
   PROVIDE(__dma_buffers_start = __dma_buffers_start__);
   PROVIDE(__dma_buffers_end   = __dma_buffers_end__);
 
   PROVIDE(__lwip_sec_start = __lwip_sec_start__);
   PROVIDE(__lwip_sec_end   = __lwip_sec_end__);
+
+  .ram_d3 (NOLOAD): {
+    . = ALIGN(4);
+    *(.ram_d3)
+    . = ALIGN(4);
+  } >RAM_D3
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

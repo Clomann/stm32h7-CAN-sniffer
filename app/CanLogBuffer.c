@@ -1,7 +1,8 @@
 #include "CanLogBuffer.h"
 #include "lwrb/lwrb.h"
 
-static uint8_t CanLogBuf1[LOG_BUFFER_SIZE];
+__attribute__((section(".ram_d2")))
+static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
 static lwrb_t Rb1;
 
 uint8_t CanLogBuffer_Init()
