@@ -80,6 +80,9 @@ static inline SemaphoreHandle_t prvGetSem(SPI_HandleTypeDef *hspi)
 uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     BaseType_t res;
+
+    (void) (hspi);
+    
 #if SPI_PORT_USE_SEMAPHORE
     SemaphoreHandle_t xSem = prvGetSem(hspi);
     configASSERT(xSem);                        /* forgot to register?   */
@@ -100,6 +103,8 @@ uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     BaseType_t xHigherPrioTaskWoken = pdFALSE;
     volatile uint32_t IrqPrio = NVIC_GetPriority(SPI1_IRQn);
+
+    (void) (hspi);
 
     configASSERT(__get_IPSR() != 0);
     configASSERT( IrqPrio >= configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
@@ -125,6 +130,8 @@ uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     BaseType_t xHigherPrioTaskWoken = pdFALSE;
+
+    (void) (hspi);
 
 #if SPI_PORT_USE_SEMAPHORE
     SemaphoreHandle_t xSem = prvGetSem(hspi);

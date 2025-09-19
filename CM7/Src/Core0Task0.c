@@ -1,5 +1,6 @@
 #include "Core0Task0.h"
 #include "Core0TasksCfg.h"
+#include "TasksHooks.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -22,12 +23,17 @@
 #include "CanBridgeTask.h"
 #include "CanSendTask.h"
 #include "SpiTask.h"
+#include "SdBridgeTask.h"
 
 #include "SettingsHandler.h"
 #include "ConfigManager.h"
 #include "CanLogManager.h"
 #include "CanCtrl.h"
 #include "WebInterface.h"
+
+volatile uint32_t FrameCountCanAbs = 0;
+volatile uint32_t FrameCountCanBridgeTask = 0;
+volatile uint32_t FrameCountCanLogManager = 0;
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -53,6 +59,11 @@ static AppControlDataType AppCtrlData = {
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+void  CanAbs_ErrorHandler(void)
+{
+    Error_Handler();
+}
+
 void SpiTask_ErrorHandlerHook(void)
 {
     Error_Handler();
@@ -90,7 +101,8 @@ void SettingsHandler_ApplyRequestCallback()
 
 void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
 {
-    ( void ) name;
+    (void) (name);
+    (void) (t);
     
     taskDISABLE_INTERRUPTS();
     __BKPT(1);                     /* hit here => stack overflow      */
@@ -101,11 +113,11 @@ static void appCanCtrlDataSetter(
     const AppControlDataType *appData, 
     const AppConfigType * appConfig)
 {
-    CanCtrlData.sendingActive = appData->runCanTracer; 
-    CanCtrlData.can1.baudrate = appConfig->can1.baudrate;
-    CanCtrlData.can1.mode = appConfig->can1.mode;
-    CanCtrlData.can2.baudrate = appConfig->can2.baudrate;
-    CanCtrlData.can2.mode = appConfig->can2.mode;
+    data->sendingActive = appData->runCanTracer; 
+    data->can1.baudrate = appConfig->can1.baudrate;
+    data->can1.mode = appConfig->can1.mode;
+    data->can2.baudrate = appConfig->can2.baudrate;
+    data->can2.mode = appConfig->can2.mode;
 }
 
 static void Core0Task0Main( void * parameters )
@@ -125,7 +137,7 @@ static void Core0Task0Main( void * parameters )
     }
 
     /* initialialize port early to allow for taskless SPI communication */
-    SpiTask_PortInit((TaskHandle_t*)&Core0Task0MainHdl);
+    SpiTask_PortInit();
 
     http_init();
 
@@ -195,6 +207,10 @@ static void Core0Task0Main( void * parameters )
             appCanCtrlSetBaudrate(&CanCtrlData);
             appCanCtrlSetMode(&CanCtrlData);
             AppCtrlData.applyConfig = 0;
+
+            FrameCountCanAbs = 0;
+            FrameCountCanBridgeTask = 0;
+            FrameCountCanLogManager = 0;
         }
         else
         {
@@ -202,6 +218,11 @@ static void Core0Task0Main( void * parameters )
         }
 
         MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
+
+        if (MinUnusedStack < 50)
+        {
+            Tasks_ErrorHandler();
+        }
     }
 
     appCanLogHandlerDeInit(AppCtrlData.Log);
@@ -222,6 +243,8 @@ void Core0Task0Init()
     CanSendTaskInit();
 
     SpiTask_Init();
+
+    SdBridgeTask_Init();
 
     TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
 }

@@ -21,6 +21,8 @@ comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate);
 comm_status_t CanAbs_SetMode_Can2(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can2(bool * isOff);
 
+void  CanAbs_ErrorHandler(void);
+
 /**
   * @brief  Create a Tx CAN message with standard ID.
   * @param  msg: pointer to an FDCAN_Message structure that is the message

@@ -1,6 +1,7 @@
 #include "SpiAbs.h"
 #include "Spi_Cmds.h"
 #include "spi.h"
+#include "TasksHooks.h"
 
 #define SPI_RX_SLOT_REQUIRED_SIZE   (515) /* max payload: token + sector + crc = 1 + 512 + 2 = 515 */
 #define SPI_TX_SLOT_REQUIRED_SIZE   (515)
@@ -287,6 +288,8 @@ void SpiAbs_SendReceiveMsgCallback(
     uint32_t CopyLength = 0;
     SpiSendReceiveContextType *pContext;
 
+    (void) (status);
+
     pContext = (SpiSendReceiveContextType *) context;
 
     if (NULL != pContext && NULL != rx_data)
@@ -364,6 +367,7 @@ typedef struct {
 void SpiAbs_Send_Spi1_CompleteCallback_Task0(void * context, uint32_t status, const uint8_t *data, uint32_t len)
 {
     TaskContextType *pTaskContext;
+
     (void) status;
     (void) data;
     (void) len;
@@ -372,10 +376,11 @@ void SpiAbs_Send_Spi1_CompleteCallback_Task0(void * context, uint32_t status, co
     {
         pTaskContext = (TaskContextType *)context;
         pTaskContext->status = status;
-        pTaskContext->done = 1;
-
         pTaskContext->bytes = len;
         memcpy(pTaskContext->data, data, len);
+        __DMB();
+
+        pTaskContext->done = 1;
     }
     else
     {
@@ -386,11 +391,11 @@ void SpiAbs_Send_Spi1_CompleteCallback_Task0(void * context, uint32_t status, co
 uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * data, uint16_t bytes)
 {
     uint8_t res;
-    SpiTransactionType transaction = {
+    volatile SpiTransactionType transaction = {
         .callback = NULL,
         .context = NULL
     };
-    TaskContextType context = {
+    volatile TaskContextType context = {
         .done = 0,
         .status = 0,
         .data = aRxSpiSink,
@@ -408,8 +413,9 @@ uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * data, uint16_t bytes)
 
     while (1 != context.done)
     {
-        ;
+        __NOP();
     }
+    __DMB();
 
     return res;
 }
@@ -417,6 +423,7 @@ uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t * data, uint16_t bytes)
 void SpiAbs_Receive_Spi1_CompleteCallback_Task0(void * context, uint32_t status, const uint8_t *data, uint32_t len)
 {
     TaskContextType *pTaskContext;
+    
     (void) status;
     (void) data;
     (void) len;
@@ -425,10 +432,11 @@ void SpiAbs_Receive_Spi1_CompleteCallback_Task0(void * context, uint32_t status,
     {
         pTaskContext = (TaskContextType *)context;
         pTaskContext->status = status;
-        pTaskContext->done = 1;
-
         pTaskContext->bytes = len;
         memcpy(pTaskContext->data, data, len);
+        
+        __DMB();
+        pTaskContext->done = 1;
     }
     else
     {
@@ -439,11 +447,11 @@ void SpiAbs_Receive_Spi1_CompleteCallback_Task0(void * context, uint32_t status,
 uint8_t SpiAbs_Receive_Spi1_Task0(uint8_t * data, uint16_t bytes)
 {
     uint8_t res;
-    SpiTransactionType transaction = {
+    volatile SpiTransactionType transaction = {
         .callback = NULL,
         .context = NULL
     };
-    TaskContextType context = {
+    volatile TaskContextType context = {
         .done = 0,
         .status = 0,
         .data = data,
@@ -461,8 +469,10 @@ uint8_t SpiAbs_Receive_Spi1_Task0(uint8_t * data, uint16_t bytes)
 
     while (1 != context.done)
     {
-        ;
+        __NOP();
     }
+
+    __DMB();
 
     return res;
 }
@@ -482,7 +492,6 @@ uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t * pResponse)
 
     return m_PollForResponse(hdl, pResponse);
 }
-
 
 uint8_t m_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 {
@@ -609,6 +618,8 @@ uint8_t SpiAbs_Poll(void)
 
 void SpiAbs_Task(void *parameters)
 {
+    (void) (parameters);
+
     SpiAbs_TaskControlCallback(0);
 
     while (1)
@@ -616,6 +627,7 @@ void SpiAbs_Task(void *parameters)
         SpiAbs_TaskControlCallback(0xFFFFFFFFUL);
 
         SpiAbs_Poll();
+
     }
 }
 

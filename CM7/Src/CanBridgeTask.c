@@ -5,6 +5,7 @@
 #include "CanBridgeTask.h"
 #include "CanAbs.h"
 #include "fdcan_msg_port.h"
+#include "TasksHooks.h"
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 
@@ -32,6 +33,7 @@ void CanBridgeTask(void *arg)
     static UBaseType_t MinUnusedStack;
 
     (void)MinUnusedStack;
+    (void) (arg);
 
     ulTaskNotifyTake(pdTRUE, 0);
 
@@ -44,14 +46,21 @@ void CanBridgeTask(void *arg)
         while (0 == CanAbs_Receive_Can1(&Frame))
         {
             fdcan_msg_port_receive(&Frame);
+            FrameCountCanBridgeTask++;
         }
 
         while (0 == CanAbs_Receive_Can2(&Frame))
         {
             fdcan_msg_port_receive(&Frame);
+            FrameCountCanBridgeTask++;
         }
 
         MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
+
+        if (MinUnusedStack < 50)
+        {
+            Tasks_ErrorHandler();
+        }
     }
 }
 

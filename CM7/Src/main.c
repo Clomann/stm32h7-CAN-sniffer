@@ -29,6 +29,7 @@
 #include "utils_mpu.h"
 #include "Core0Task0.h"
 #include "Core0Task1.h"
+#include "TasksHooks.h"
 
 /** @addtogroup STM32H7xx_HAL_Examples
   * @{
@@ -61,6 +62,11 @@ static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
+
+void Tasks_ErrorHandler()
+{
+    Error_Handler();
+}
 
 static void MemoryLayoutChecks(void) 
 {  
