@@ -5,6 +5,7 @@
 #include "SpiTask.h"
 #include "SpiAbs.h"
 #include "spi_port_freertos.h"
+#include "TasksHooks.h"
 
 TASK_VARIABLES(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE)
 
@@ -17,7 +18,7 @@ void SpiTask_Init()
     );
 }
 
-void SpiTask_PortInit(TaskHandle_t *handle)
+void SpiTask_PortInit()
 {
     HAL_StatusTypeDef HalStatus;
 
@@ -44,6 +45,15 @@ void SpiTask(void *parameters)
 
 void SpiAbs_TaskControlCallback(uint32_t timeout)
 {
+    static UBaseType_t MinUnusedStack;
+
+    MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
+
+    if (MinUnusedStack < 50)
+    {
+        Tasks_ErrorHandler();
+    }
+        
     ulTaskNotifyTake(pdTRUE, timeout);
 }
 

@@ -334,3 +334,9 @@ comm_status_t CanAbs_IsStateOff_Can2(bool * isOff)
     *isOff = Fdcan2Driver.state == DRIVER_STATE_OFF;
     return COMM_SUCCESS;
 }
+
+__attribute__((weak))
+void  CanAbs_ErrorHandler(void)
+{
+    ;
+}

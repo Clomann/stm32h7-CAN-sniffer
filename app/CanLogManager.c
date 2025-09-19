@@ -7,6 +7,9 @@
 #include "CanLogBuffer.h"
 #include "CanAbs.h"
 #include "fdcan_msg_port.h"
+#include "SdBridgeTask.h"
+
+extern volatile uint32_t FrameCountCanLogManager;
 
 struct CanLogControlDataType
 {
@@ -28,8 +31,8 @@ struct CanLogControlDataType
     bool *commitLog;
 };
 
-static char CanLogFileName[255] = "/logs/CAN.LOG";
-static CanLogControlDataType CanLogCtrlData;
+volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
+volatile static CanLogControlDataType CanLogCtrlData;
 
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
@@ -150,7 +153,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
         &FileSize
     );
 
-    if (FileSizeRes == FR_OK && (FileSize >= MAX_LOG_FILE_SIZE || data->commitLog))
+    if (FileSizeRes == FR_OK && (FileSize >= MAX_LOG_FILE_SIZE || *(data->commitLog)))
     {
         // File exists and is full, advance to next one
         if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)))
@@ -324,7 +327,7 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
 {
     uint32_t DataLength;
     comm_status_t res               = COMM_SUCCESS;
-    static uint8_t Data[BLOCK_SIZE] = {0};
+    volatile static uint8_t Data[BLOCK_SIZE] = {0};
 
     if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(Data, &DataLength))
     {
@@ -335,7 +338,13 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         res = COMM_ERROR;
     }
 
+    
     return res;
+}
+
+void SdBridgeTask_ActionHook()
+{
+    appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
 }
 
 void appCanLogHandlerPoll(CanLogControlDataType *data)
@@ -395,24 +404,19 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
 
-        CanLogCtrlData.commitLog = 1;
+        *(CanLogCtrlData.commitLog) = true;
     }
 
     appCanLogCheckNewFileOpen(data);
 
-    if (CanLogCtrlData.commitLog)
-    {
-        appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
-        
-        CanLogCtrlData.commitLog = 0;
-    }
-
     while (0 < fdcan_msg_port_read(&NewFrame, 0))
     {
+        FrameCountCanLogManager++;
+
         appCanLogStoreToFrameBuffer(&NewFrame, NewFrame.channel);
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
-
+        
         if (0 != CanLogCtrlData.CanLog.openRes)
         {
             /* quit */
@@ -420,11 +424,20 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
         else if (BlockIsReady)
         {
-            appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
+            SdBridgeTask_Notify();
+            // appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
         }
         else
         {
         }
+    }
+
+    if (*(CanLogCtrlData.commitLog))
+    {
+        SdBridgeTask_Notify();
+        // appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
+        
+        *(CanLogCtrlData.commitLog) = false;
     }
 }
 

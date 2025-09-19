@@ -139,6 +139,7 @@ if(CORE STREQUAL "CM7")
         ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
         ${PROJ_PATH}/CM7/Src/Core0Task0.c
         ${PROJ_PATH}/CM7/Src/Core0Task1.c
+        ${PROJ_PATH}/CM7/Src/SdBridgeTask.c
         ${PROJ_PATH}/CM7/Src/CanBridgeTask.c
         ${PROJ_PATH}/CM7/Src/CanSendTask.c
         ${PROJ_PATH}/CM7/Src/CanCtrl.c
@@ -159,6 +160,7 @@ if(CORE STREQUAL "CM7")
     #
     set(include_path_DIRS               # Modified
         ${PROJ_PATH}/CM7/Inc
+        ${PROJ_PATH}/CM7/Src
         ${PROJ_PATH}/Common/Inc
         ${PROJ_PATH}/middleware/freertos
     )
@@ -220,7 +222,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -Wpedantic
     -Werror=implicit-function-declaration
     # Full debug configuration
-    $<$<CONFIG:Release>:-O2>
+    $<$<CONFIG:Release>:-O1;-g3;-ggdb>
     $<$<CONFIG:Debug>:-Og;-g3;-ggdb>
     -fstack-usage
     -ffunction-sections

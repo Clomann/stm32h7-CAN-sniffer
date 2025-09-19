@@ -5,7 +5,7 @@
 
 #include "stm32h7xx_hal.h"
 
-void SpiTask_PortInit(TaskHandle_t *handle);
+void SpiTask_PortInit(void);
 
 void SpiAbs_PortDeInit(void);
 

@@ -616,7 +616,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 	uint8_t RetVal;
 	uint32_t readAttempts, tokenPollCount;
 	uint8_t *readBuffer;
-	uint8_t CardStatus, Dummy;
+	uint8_t CardStatus, Dummy[SD_SPI_PRE_CMD_CLOCKS];
     uint16_t Crc = 0;
 	Spi_R1Response resp;
 	uint8_t GotResponse;
@@ -632,9 +632,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);	
 
-	for (i = 0U; i < SD_SPI_PRE_CMD_CLOCKS; i++) {
-		SpiAbs_readByte(SPIABS_DEVICE_1, &Dummy); // Ensure idle state
-	}
+    SpiAbs_Receive_Spi1_Task0(&Dummy, sizeof(Dummy));
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
@@ -662,9 +660,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);	
 
-	for (i = 0U; i < SD_SPI_PRE_CMD_CLOCKS; i++) {
-		SpiAbs_readByte(SPIABS_DEVICE_1, &Dummy); // Ensure idle state
-	}
+    SpiAbs_Receive_Spi1_Task0(&Dummy, sizeof(Dummy));
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
@@ -736,9 +732,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);
 	
-	for (i = 0U; i < SD_SPI_PRE_CMD_CLOCKS; i++) {
-		SpiAbs_readByte(SPIABS_DEVICE_1, &Dummy); // Ensure idle state
-	}
+    SpiAbs_Receive_Spi1_Task0(&Dummy, sizeof(Dummy));
 
 	return RetVal;
 }
@@ -751,6 +745,7 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
 	Spi_R1Response resp;
     const uint8_t StartDataToken = SD_DEF_MULTI_BLOCK_START_TOKEN;
     const uint8_t StopDataToken = SD_DEF_MULTI_BLOCK_STOP_TOKEN;
+    volatile static uint8_t Tmp[sizeof(StartDataToken) + SD_SECTOR_LENGTH + sizeof(Crc)];
 
 	res = 0U;
 
@@ -769,21 +764,11 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
 	{
         for (uint32_t j = 0; j < cnt; j++)
         {
-            SpiAbs_writByte(SPIABS_DEVICE_1, &StartDataToken);
-
-            for(uint32_t i = 0; i < SD_SECTOR_LENGTH; i += SD_SPI_SECTOR_CHUNK_SIZE)
-            {
-                if (SD_SECTOR_LENGTH - i > SD_SPI_SECTOR_CHUNK_SIZE)
-                {
-                    SpiAbs_Send_Spi1_Task0(&buff[i + j * SD_SECTOR_LENGTH], SD_SPI_SECTOR_CHUNK_SIZE);
-                }
-                else
-                {
-                    SpiAbs_Send_Spi1_Task0(&buff[i + j * SD_SECTOR_LENGTH], SD_SECTOR_LENGTH - i);
-                }
-            }
-
-            SpiAbs_Send_Spi1_Task0((uint8_t *)&Crc, sizeof(Crc));
+            memcpy(&Tmp[0], &StartDataToken, sizeof(StartDataToken));
+            memcpy(&Tmp[sizeof(StartDataToken)], &buff[j], SD_SECTOR_LENGTH);
+            memcpy(&Tmp[sizeof(StartDataToken) + SD_SECTOR_LENGTH], &Crc, sizeof(Crc));
+            
+            SpiAbs_Send_Spi1_Task0(Tmp, sizeof(Tmp));
 
             SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
 
