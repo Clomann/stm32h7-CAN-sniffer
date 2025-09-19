@@ -165,6 +165,7 @@ if(CORE STREQUAL "CM7")
         ${PROJ_PATH}/middleware/freertos
     )
 
+    add_subdirectory(CM7)
     add_subdirectory(adapters)
     add_subdirectory(app)
     add_subdirectory(drivers)
