@@ -35,6 +35,8 @@ void CanSendTask(void *arg)
     static TickType_t xPreviousWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(100);
 
+    (void) (arg);
+    
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
     xPreviousWakeTime = xTaskGetTickCount();

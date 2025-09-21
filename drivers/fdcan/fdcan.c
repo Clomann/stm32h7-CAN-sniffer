@@ -391,11 +391,15 @@ comm_status_t FDCAN_Read(
 
 comm_status_t FDCAN_RegisterTxMessage(Message *pMsg)
 {
+    (void) (pMsg);
+    
 	return COMM_ERROR;
 }
 
 comm_status_t FDCAN_RegisterRxMessage(Message *pMsg)
 {
+    (void) (pMsg);
+
 	return COMM_ERROR;
 }
 

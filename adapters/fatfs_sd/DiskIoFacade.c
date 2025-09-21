@@ -43,6 +43,10 @@ uint8_t MMC_disk_read(BYTE * buff, LBA_t sector, UINT count)
 {
 	uint8_t result;
 
+    (void) (buff);
+    (void) (sector);
+    (void) (count);
+
 	result = MMCAdapter_read(buff, sector, count);
 
 	return result;
@@ -51,6 +55,10 @@ uint8_t MMC_disk_read(BYTE * buff, LBA_t sector, UINT count)
 uint8_t MMC_disk_write(const BYTE *buff, LBA_t sector, UINT count)
 {
 	uint8_t result;
+
+    (void) (buff);
+    (void) (sector);
+    (void) (count);
 
 	result = MMCAdapter_write(buff, sector, count);
 
@@ -157,6 +165,10 @@ uint8_t RAM_disk_read(BYTE * buff, LBA_t sector, UINT count)
 {
 	uint8_t result;
 
+    (void) (buff);
+    (void) (sector);
+    (void) (count);
+
 	result = 0U;
 
 	return result;
@@ -165,6 +177,10 @@ uint8_t RAM_disk_read(BYTE * buff, LBA_t sector, UINT count)
 uint8_t USB_disk_read(BYTE * buff, LBA_t sector, UINT count)
 {
 	uint8_t result;
+    
+    (void) (buff);
+    (void) (sector);
+    (void) (count);
 
 	result = 0U;
 
@@ -175,6 +191,10 @@ uint8_t RAM_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 {
 	uint8_t result;
 
+    (void) (buff);
+    (void) (sector);
+    (void) (count);
+
 	result = 0U;
 
 	return result;
@@ -183,6 +203,10 @@ uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 
 {
 	uint8_t result;
+
+    (void) (buff);
+    (void) (sector);
+    (void) (count);
 
 	result = 0U;
 
@@ -196,6 +220,9 @@ DRESULT RAM_disk_ioctl(
 {
 	DRESULT result;
 
+    (void) (cmd);
+    (void) (buff);
+
 	result = 0U;
 
 	return result;
@@ -208,6 +235,9 @@ DRESULT USB_disk_ioctl(
 {
 	DRESULT result;
 
+    (void) (cmd);
+    (void) (buff);
+    
 	result = 0U;
 
 	return result;
