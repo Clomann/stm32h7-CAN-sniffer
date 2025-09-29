@@ -31,6 +31,10 @@ void appCtrlCgiHandler(
                 {
                     WebInterface_GetActionHook(1);
                 }
+                else if (strcmp(value, "Format") == 0)
+                {
+                    WebInterface_RequestFormattingHook();
+                }
             }
         }
     }

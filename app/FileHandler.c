@@ -149,3 +149,35 @@ FRESULT FatFS_SD_FileIterator_Close(FatFS_FileIterator *it)
 {
     return f_closedir(&it->dir);
 }
+
+FRESULT FatFS_SD_Formatting_Request(void)
+{
+    FRESULT res;
+    FatFsDeviceType File;
+    const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
+
+    FatFS_SD_OpenFileForOverWrite(&File, FormatRequestFileName);
+
+    FatFS_SD_CloseFile(&File);
+
+    return res;
+}
+
+FRESULT FatFS_SD_Format_Fat32(uint32_t cluster_size)
+{
+    FRESULT res;
+    const TCHAR Dir[] = "0:/";
+    MKFS_PARM fmt_opt;
+    BYTE work_buffer[FF_MAX_SS];
+    
+    fmt_opt.fmt = FM_FAT32;           // Force FAT32
+    fmt_opt.n_fat = 2;                // Number of FAT copies (1 or 2)
+    fmt_opt.align = 0;                // Alignment (0 = auto)
+    fmt_opt.n_root = 0;               // Number of root entries (0 = auto for FAT32)
+    fmt_opt.au_size = cluster_size;   // 32KB clusters ← KEY SETTING
+
+    res = f_mkfs(Dir, &fmt_opt, work_buffer, (UINT)sizeof(work_buffer));
+
+    return res;
+}
+

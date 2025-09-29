@@ -820,14 +820,6 @@ int32_t ETH_PHY_IO_GetTick(void)
   return HAL_GetTick();
 }
 
-void ethernet_link_probe(struct netif *netif)
-{
-
-  // ethernet_link_check(netif);  // Or call a single iteration of ethernet_link_thread logic
-  // netif_set_up(netif);         // Ensure interface is marked up
-}
-
-
 void send_udp_message(void)
 {
     struct udp_pcb *pcb = udp_new();
