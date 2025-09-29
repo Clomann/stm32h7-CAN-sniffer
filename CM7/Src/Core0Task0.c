@@ -108,6 +108,32 @@ void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
     __BKPT(1);                     /* hit here => stack overflow      */
 }
 
+static void appHandleFormattingRequest(void)
+{
+    _Bool ReformattingRequested;
+    FatFsDeviceType DevTmp;
+    const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
+
+    if (RES_OK == FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName))
+    {
+        ReformattingRequested = true;
+    }
+    else
+    {
+        ReformattingRequested = false;
+    }
+
+    if (ReformattingRequested && 0 == FatFS_SD_Unmount())
+    {
+        AppCtrlData.mountRes = 1;
+
+        if (RES_OK == FatFS_SD_Format_Fat32(32U * 1024U))
+        {
+            AppCtrlData.mountRes = FatFS_SD_Mount();
+        }
+    }
+}
+
 static void appCanCtrlDataSetter(
     CanCtrlDataType * data, 
     const AppControlDataType *appData, 
@@ -140,11 +166,13 @@ static void Core0Task0Main( void * parameters )
     SpiTask_PortInit();
 
     http_init();
-
+    
     if (RES_OK != AppCtrlData.mountRes)
     {
         AppCtrlData.mountRes = FatFS_SD_Mount();
     }
+    
+    appHandleFormattingRequest();
 
     AppCtrlData.Log = CanLogHandler_Init(
         &AppCtrlData.mountRes, 
@@ -189,8 +217,10 @@ static void Core0Task0Main( void * parameters )
         {
             if (ConfigManager_UpdateConfig(&AppCtrlData.Config, &AppConfig, true) == CONFIG_OK) 
             {
-                AppConfig.updated = 0;
+                Error_Handler();
             }
+            
+            AppConfig.updated = 0;
         }
 
         CanSendTask_SetSendingActive(AppCtrlData.runCanTracer);
@@ -281,4 +311,9 @@ int ConfigManager_DeserializeHook(const char* buffer, uint32_t length, void* con
 void WebInterface_GetActionHook(uint8_t action)
 {
     AppCtrlData.runCanTracer = action;
+}
+
+void WebInterface_RequestFormattingHook(void)
+{
+    FatFS_SD_Formatting_Request();
 }

@@ -62,59 +62,59 @@ DRESULT MMC_disk_ioctl(
 	void *buff		/* Buffer to send/receive control data */
 )
 {
-DRESULT result;
+    DRESULT result;
 
-result = RES_ERROR;
+    result = RES_ERROR;
 
-switch (cmd)
-{
-/* Generic command (Used by FatFs) */
-case CTRL_SYNC:
-	result = MMCAdapter_CtrlSync();
-	break;
-case GET_SECTOR_COUNT:
-	MMCAdapter_GetSectorCount(buff);
-	break;
-case GET_SECTOR_SIZE:
-	MMCAdapter_GetSectorSize(buff);
-	break;
-case GET_BLOCK_SIZE:
-	MMCAdapter_GetBlockSize(buff);
-	break;
-case CTRL_TRIM:
-	MMCAdapter_CtrlTrim(buff);
-	break;
+    switch (cmd)
+    {
+    /* Generic command (Used by FatFs) */
+    case CTRL_SYNC:
+        result = MMCAdapter_CtrlSync();
+        break;
+    case GET_SECTOR_COUNT:
+        result = MMCAdapter_GetSectorCount(buff);
+        break;
+    case GET_SECTOR_SIZE:
+        result = MMCAdapter_GetSectorSize(buff);
+        break;
+    case GET_BLOCK_SIZE:
+        result = MMCAdapter_GetBlockSize(buff);
+        break;
+    case CTRL_TRIM:
+        result = MMCAdapter_CtrlTrim(buff);
+        break;
 
-/* MMC/SDC specific ioctl command */
-case MMC_GET_TYPE:
-	MMCAdapter_MmcGetType(buff);
-	break;
-case MMC_GET_CSD:
-	MMCAdapter_MmcGetCsd(buff);
-	break;
-case MMC_GET_CID:
-	MMCAdapter_MmcGetCid(buff);
-	break;
-case MMC_GET_OCR:
-	MMCAdapter_MmcGetOcr(buff);
-	break;
-case MMC_GET_SDSTAT:
-	MMCAdapter_MmcGetSdstat(buff);
-	break;
-case ISDIO_READ:
-	result = RES_ERROR;
-	break;
-case ISDIO_WRITE:
-	result = RES_ERROR;
-	break;
-case ISDIO_MRITE:
-	result = RES_ERROR;
-	break;
-default: 
-	result = RES_PARERR; 
-	break;
-}
-return result;
+    /* MMC/SDC specific ioctl command */
+    case MMC_GET_TYPE:
+        result = MMCAdapter_MmcGetType(buff);
+        break;
+    case MMC_GET_CSD:
+        result = MMCAdapter_MmcGetCsd(buff);
+        break;
+    case MMC_GET_CID:
+        result = MMCAdapter_MmcGetCid(buff);
+        break;
+    case MMC_GET_OCR:
+        result = MMCAdapter_MmcGetOcr(buff);
+        break;
+    case MMC_GET_SDSTAT:
+        result = MMCAdapter_MmcGetSdstat(buff);
+        break;
+    case ISDIO_READ:
+        result = RES_ERROR;
+        break;
+    case ISDIO_WRITE:
+        result = RES_ERROR;
+        break;
+    case ISDIO_MRITE:
+        result = RES_ERROR;
+        break;
+    default: 
+        result = RES_PARERR; 
+        break;
+    }
+    return result;
 }
 
 uint8_t RAM_disk_status()

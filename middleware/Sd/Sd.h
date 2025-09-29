@@ -80,6 +80,27 @@ enum SD_Spi_Commands
     SD_SPI_CMD24,
     /*!< : . */
     SD_SPI_CMD25,
+    /*!< ERASE_WR_BLK_START_ADDR: Sets the address of the first write block to be erased.
+        Argument: [31:0] Data Address
+        Response format: R1
+
+        \note SDSC Card (CCS=0) uses byte unit address and SDHC and SDXC Cards (CCS=1) use block unit address (512 bytes unit)
+    */
+    SD_SPI_CMD32,
+    /*!< ERASE_WR_BLK_END_ADDR: Sets the address of the last write block of the continuous range to be erased. 
+        Argument: [31:0] Data Address
+        Response format: R1
+
+        \note SDSC Card (CCS=0) uses byte unit address and SDHC and SDXC Cards (CCS=1) use block unit address (512 bytes unit)
+    */
+    SD_SPI_CMD33,
+    /*!< ERASE: Erases all previously selected write blocks 
+        Argument: [31:0] Stuff Bits
+        Response format: R1b
+
+        \note  R1b: R1 response with an optional trailing busy signal
+    */
+    SD_SPI_CMD38,
     SD_SPI_CMD55,
     SD_SPI_CMD58,
     /*! SD_SEND_OP_COND: Sends host capacity support information and 

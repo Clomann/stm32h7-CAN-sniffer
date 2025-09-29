@@ -150,26 +150,59 @@
         <br>
         <br>
     </form>
-    <!-- APPLY FORM (via JS, adds `action=apply`) -->
-    <form method="POST" action="/can.cgi" id="apply-form">
-        <input type="hidden" name="baud1" id="apply-baudrate1">
-        <input type="hidden" name="mode1" id="apply-mode1">
-        <input type="hidden" name="baud2" id="apply-baudrate2">
-        <input type="hidden" name="mode2" id="apply-mode2">
-        <input type="hidden" name="action" value="apply">
-        <button type="submit" id="apply-button">Apply</button>
-    </form>
-    
-    <!-- SAVE FORM (via JS, adds `action=save`) -->
-    <form method="POST" action="/can.cgi" id="save-form">
-        <input type="hidden" name="baud1" id="save-baudrate1">
-        <input type="hidden" name="mode1" id="save-mode1">
-        <input type="hidden" name="baud2" id="save-baudrate2">
-        <input type="hidden" name="mode2" id="save-mode2">
-        <input type="hidden" name="action" value="save">
-        <button type="submit" id="save-button">Save</button>
-    </form>
+
+    <table>
+        <tbody>
+            <tr>
+                <!-- APPLY FORM (via JS, adds `action=apply`) -->
+                <form method="POST" action="/can.cgi" id="apply-form">
+                    <input type="hidden" name="baud1" id="apply-baudrate1">
+                    <input type="hidden" name="mode1" id="apply-mode1">
+                    <input type="hidden" name="baud2" id="apply-baudrate2">
+                    <input type="hidden" name="mode2" id="apply-mode2">
+                    <input type="hidden" name="action" value="apply">
+                    <button type="submit" id="apply-button">Apply</button>
+                </form>
+            </tr>
+            <tr>
+                <!-- SAVE FORM (via JS, adds `action=save`) -->
+                <form method="POST" action="/can.cgi" id="save-form">
+                    <input type="hidden" name="baud1" id="save-baudrate1">
+                    <input type="hidden" name="mode1" id="save-mode1">
+                    <input type="hidden" name="baud2" id="save-baudrate2">
+                    <input type="hidden" name="mode2" id="save-mode2">
+                    <input type="hidden" name="action" value="save">
+                    <button type="submit" id="save-button">Save</button>
+                </form>
+            </tr>
+        </tbody>
+    </table>
+
+    <br>
+    <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
+        <tbody>
+            <tr>
+                <td class="tabtitle" style="height: 15px; background-color: rgb(255, 255, 255);">
+                        <strong>SD card file system functions</strong>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    Here you can change (re)format the SD card in case any issues occured 
+    (e. g. file system corruption due to brown out or performance degradation).
+    <br/>
+    To do so, click the button below. A format request will be stored on the card 
+    and the formatting will be done on the next restart of the system.
+    <br>
+    <br>
   
+    <!-- APPLY FORM (via JS, adds `action=format`) -->
+    <form method="POST" action="/can.cgi" id="format-form">
+        <input type="hidden" name="action" value="format">
+        <button type="submit" id="format-button">Format</button>
+    </form>
+
     <h3>
         <font size="-1">
             <span style="color: black;"></span>
@@ -190,6 +223,7 @@
         const btnApply     = document.getElementById("apply-button");
         const btnStart     = document.getElementById("start-button");
         const btnStop      = document.getElementById("stop-button");
+        const btnFormat    = document.getElementById("format-button");
         /* ----------------------------------- */
     
         /* -------- sniffer-state polling -------- */
@@ -205,7 +239,9 @@
                     btnStart.disabled = true;
                     btnStart.title    = "Stop the sniffer first.";
                     btnStop.disabled = false;
-                    btnStop.title    = "";
+                    btnStop.title    = "Stop the sniffer first.";
+                    btnFormat.disabled = true;
+                    btnFormat.title    = "Stop the sniffer first.";
                 } else {
                     btnApply.disabled = false;
                     btnApply.title    = "";
@@ -213,6 +249,8 @@
                     btnStart.title    = "";
                     btnStop.disabled = true;
                     btnStop.title    = "Start the sniffer first.";
+                    btnFormat.disabled = false;
+                    btnFormat.title    = "";
                 }
             } catch (e) {
                 console.error("Status poll failed:", e);
@@ -249,6 +287,9 @@
                 .addEventListener("submit", updateHiddenFields);
     
         document.getElementById("save-form")
+                .addEventListener("submit", updateHiddenFields);
+
+        document.getElementById("format-form")
                 .addEventListener("submit", updateHiddenFields);
 
         document.getElementById("ctrl-form")

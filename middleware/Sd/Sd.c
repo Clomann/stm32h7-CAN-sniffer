@@ -140,6 +140,30 @@ static uint8_t SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t * buf
 		buffer[4] = payload & 0xFF;
 		buffer[5] = 0x01;
 		break;
+    case SD_SPI_CMD32:
+		buffer[0] = 0x40 + 32U;
+		buffer[1] = (payload >> 24) & 0xFF;
+		buffer[2] = (payload >> 16) & 0xFF;
+		buffer[3] = (payload >> 8) & 0xFF;
+		buffer[4] = payload & 0xFF;
+		buffer[5] = 0x01;
+		break;
+    case SD_SPI_CMD33:
+		buffer[0] = 0x40 + 32U;
+		buffer[1] = (payload >> 24) & 0xFF;
+		buffer[2] = (payload >> 16) & 0xFF;
+		buffer[3] = (payload >> 8) & 0xFF;
+		buffer[4] = payload & 0xFF;
+		buffer[5] = 0x01;
+		break;
+	case SD_SPI_CMD38:
+		buffer[0] = 0x40 + 38U;
+		buffer[1] = 0x00;
+		buffer[2] = 0x00;
+		buffer[3] = 0x00;
+		buffer[4] = 0x00;
+		buffer[5] = 0x01;
+		break;
 	case SD_SPI_CMD55:
 		buffer[0] = 0x77;
 		buffer[1] = 0x00;
