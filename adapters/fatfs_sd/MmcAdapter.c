@@ -45,23 +45,14 @@ uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
 	uint8_t RetVal = RES_OK;
 	uint8_t RetryCount = 0U;
 
-    for (uint32_t i=0; i<count; i++)
-	{
-		do
-		{
-			RetVal = SD_Spi_readSingleBlock(sector + i, &resp);
-			RetryCount++;
-		} while (0U != RetVal && RetryCount<10);
-
-		if (0U == RetVal)
-		{
-			SD_Spi_GetReadBytes(&buff[i * SD_SECTOR_LENGTH]);
-		}
-		else
-		{
-			RetVal = RES_ERROR;
-		}
-	}
+    if (SD_E_OK == SD_Spi_readMultiBlock(sector, buff, count))
+    {
+        return RES_OK;
+    }
+    else
+    {
+        return RES_ERROR;
+    }
 
 	return RetVal;
 }

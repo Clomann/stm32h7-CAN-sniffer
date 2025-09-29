@@ -51,6 +51,8 @@
 #define SD_E_CMD_NO_DATA_RESP_TOKEN 2U
 /*!< The card did never sent 0xFF */
 #define SD_E_CMD_NO_GOING_IDLE 3U
+/*!< The card did never sent start data token */
+#define SD_E_CMD_NO_START_TOKEN 4U
 
 /**
  * Enumeration listing the implemented SPI commands.
@@ -69,6 +71,9 @@ enum SD_Spi_Commands
     SD_SPI_CMD8,
     /*!< SPI CMD9: Read the Card-Specific Data (CSD) register */
     SD_SPI_CMD9,
+    /*!< STOP_TRANSMISSION: The host can send the STOP_TRANSMISSION (CMD12) 
+        command on the CMD pin at any time while a data transfer is in progress. */
+    SD_SPI_CMD12,
     /*!< SEND_STATUS: Asks the selected card to send its status register. */
     SD_SPI_CMD13,
     /*!<  SET_BLOCKLEN: set block length of Standard Capacity SD cards 
@@ -76,9 +81,11 @@ enum SD_Spi_Commands
     SD_SPI_CMD16,
     /*!< READ_SINGLE_BLOCK */
     SD_SPI_CMD17,
+    /*!< READ_MULTI_BLOCK */
+    SD_SPI_CMD18,
     /*!< WRITE_BLOCK: Writes a block of the size selected by the SET_BLOCKLEN command. */
     SD_SPI_CMD24,
-    /*!< : . */
+    /*!< WRITE_MULTI_BLOCK: . */
     SD_SPI_CMD25,
     /*!< ERASE_WR_BLK_START_ADDR: Sets the address of the first write block to be erased.
         Argument: [31:0] Data Address
@@ -102,6 +109,7 @@ enum SD_Spi_Commands
     */
     SD_SPI_CMD38,
     SD_SPI_CMD55,
+    /*!< READ_OCR: . */
     SD_SPI_CMD58,
     /*! SD_SEND_OP_COND: Sends host capacity support information and 
 	activates the card's initialization process.
@@ -121,6 +129,7 @@ uint8_t SD_Spi_SendOpCond(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadOCR(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadRes7(uint8_t *pRxBuffer);
 uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response *pResponse);
+uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cnt);
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
 uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
