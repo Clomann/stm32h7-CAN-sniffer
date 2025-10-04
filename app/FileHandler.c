@@ -9,7 +9,7 @@ FRESULT FatFS_SD_Mount()
 
 FRESULT FatFS_SD_Unmount()
 {  
-  return f_mount(NULL, "", 0U);		/* Give a work area to the default drive */
+  return f_mount(NULL, "", 0U);
 }
 
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
@@ -24,12 +24,27 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
 
 FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
 {  
-  FRESULT fr;
+    FRESULT fr;
 
-  dev->fflags = FA_CREATE_ALWAYS | FA_WRITE;
-  fr = f_open(&dev->file, name, dev->fflags);
+    dev->fflags = FA_WRITE;
+    fr = f_open(&dev->file, name, dev->fflags);
 
-  return fr;
+    if (FR_OK != fr)
+    {
+        dev->fflags = FA_CREATE_ALWAYS | FA_WRITE;
+        fr = f_open(&dev->file, name, dev->fflags);
+    }
+    else
+    {
+    }
+
+    if (fr == FR_OK) 
+    {
+        // Reset to beginning but keep allocation
+        fr = f_lseek(&dev->file, 0);
+    }
+
+    return fr;
 }
 
 FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name)
@@ -55,24 +70,36 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
 {
     FRESULT res = FR_OK;
     UINT BytesWritten = 0U;
-    uint32_t FileSize = 0U;
+    volatile uint32_t FileSize = 0U;
 
     if ((dev->fflags & FA_CREATE_ALWAYS) == 0)  // Only seek if we did NOT truncate the file
     {
-        FileSize = f_size(&dev->file);
+        FileSize = f_tell(&dev->file);
     }
     else
     {
         FileSize = 0U;
     }
 
-    if (FR_OK == f_lseek(&dev->file, FileSize))
+    res = f_lseek(&dev->file, FileSize);
+
+    if (FR_OK != res) {
+        // File corrupted - truncate to known good size and continue
+        FileSize = f_size(&dev->file);
+        f_truncate(&dev->file);
+        res = f_lseek(&dev->file, f_size(&dev->file));
+    }
+
+    if (FR_OK == res)
     {
-        /* write to the start of the file */
         res = f_write(&dev->file, content, len, &BytesWritten);
     }
 
-    if ( 0 == res && len == BytesWritten )
+    if (0 != res)
+    {
+
+    }
+    else if ( 0 == res && len == BytesWritten )
         res = FR_OK;
     else
         res = FR_DISK_ERR;
@@ -180,4 +207,3 @@ FRESULT FatFS_SD_Format_Fat32(uint32_t cluster_size)
 
     return res;
 }
-
