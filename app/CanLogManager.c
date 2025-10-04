@@ -180,9 +180,11 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
                 (int)CanLogCtrlData.CanLog.fileHeadIndex
             );
 
+#if !PREALLOCATE_LOG_FILES
             (void)f_unlink(CanLogCtrlData.CanLog.filename);
+#endif
 
-            CanLogCtrlData.CanLog.openRes = FatFS_SD_OpenFileForWrite(
+            CanLogCtrlData.CanLog.openRes = FatFS_SD_OpenFileForOverWrite(
                 &(CanLogCtrlData.CanLog.writeFileDevice),
                 CanLogCtrlData.CanLog.filename
             );
@@ -221,6 +223,154 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
     return &CanLogCtrlData;
 }
 
+static FRESULT delete_all_files(const char* path) {
+    DIR dir;
+    FILINFO fno;
+    FRESULT res;
+    char full_path[256];
+    
+    // Open directory
+    res = f_opendir(&dir, path);
+    if (res != FR_OK) return res;
+    
+    // Read all entries
+    while (1) {
+        res = f_readdir(&dir, &fno);
+        if (res != FR_OK || fno.fname[0] == 0) break; // End of dir
+        
+        // Skip directories (optional - remove if you want to delete subdirs too)
+        if (fno.fattrib & AM_DIR) continue;
+        
+        // Build full path
+        sprintf(full_path, "%s/%s", path, fno.fname);
+        
+        // Delete the file
+        res = f_unlink(full_path);
+        if (res != FR_OK) {
+            f_closedir(&dir);
+            return res; // Return on error
+        }
+    }
+    
+    f_closedir(&dir);
+    return FR_OK;
+}
+
+static bool m_verify_preallocation(const char* path) {
+    FIL fil;
+    FRESULT res;
+    UINT bytes_written;
+    BYTE dummy_byte = 0;
+    bool can_seek;
+    bool verified;
+    
+    res = f_open(&fil, path, FA_WRITE);
+    if (res != FR_OK) return false;
+    
+    // Try seeking to near the expected pre-allocated size
+    res = f_lseek(&fil, MAX_LOG_FILE_SIZE - 512U);
+    can_seek = (res == FR_OK);
+
+    res = f_write(&fil, &dummy_byte, 1, &bytes_written);
+    verified = (res == FR_OK && bytes_written == 1);
+    
+    f_close(&fil);
+    return can_seek && verified;
+}
+
+volatile static uint32_t UnseekableFiles = 0;
+
+static FRESULT m_preallocate_log_files(void)
+{
+    FIL logfile;
+    FRESULT res;
+    UINT bytes_written;
+    BYTE dummy_byte = 0;
+    char full_path[256];
+    volatile uint32_t FileSize;
+
+    UnseekableFiles = 0;
+
+    for (uint32_t i = 0; i < MAX_LOG_INDEX; i++)
+    {
+        snprintf(full_path, sizeof(full_path), "/logs/CAN.LOG%d", (int)i);
+        
+        // Check if file already exists and is properly sized
+        if (1U == m_verify_preallocation(full_path)) {
+            // File exists and is properly sized - skip
+            continue;
+        }
+
+        UnseekableFiles++;
+
+        // File doesn't exist or is too small - create/resize it
+        res = f_open(&logfile, full_path, FA_WRITE | FA_CREATE_NEW);
+        if (res == FR_EXIST) {
+            // File exists but is too small - open for expansion
+            res = f_open(&logfile, full_path, FA_WRITE);
+        }
+        
+        if (res != FR_OK) {
+            continue;
+        }
+        
+        if (res == FR_OK) {
+            res = f_expand(&logfile, MAX_LOG_FILE_SIZE, 0);
+
+            if (res == FR_OK) 
+            {
+                
+                res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 512U);
+                if (res != FR_OK) 
+                {
+                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 1024U);
+                }
+                if (res != FR_OK) 
+                {
+                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 3U*512U);
+                }
+                if (res != FR_OK) 
+                {
+                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 4U*512U);
+                }
+                if (res != FR_OK) 
+                {
+                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 5U*512U);
+                }
+            }
+
+            if (res == FR_OK) 
+            {
+                res = f_write(&logfile, &dummy_byte, 1, &bytes_written);
+            }
+            
+            if (res == FR_OK && bytes_written == 1) 
+            {
+                res = f_lseek(&logfile, 0);
+            }
+        }
+        
+        f_close(&logfile);
+    }
+
+    CanLogCtrlData.CanLog.fileHeadIndex = 0;
+
+    // Build candidate filename
+    snprintf(
+        CanLogCtrlData.CanLog.filename,
+        CanLogCtrlData.CanLog.fnamemaxlen,
+        "/logs/CAN.LOG%d",
+        0
+    );
+
+    CanLogCtrlData.CanLog.openRes = FatFS_SD_OpenFileForWrite(
+        &(CanLogCtrlData.CanLog.writeFileDevice),
+        CanLogCtrlData.CanLog.filename
+    );
+
+    return FR_OK;
+}
+
 FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 {
     FILINFO info;
@@ -236,6 +386,18 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 
     fdcan_msg_port_init();
 
+#if CANLOGMANAGER_CLEAR_ALL_LOGS
+    res = f_stat("/logs", &info);
+
+    if ((res == FR_OK) && (info.fattrib & AM_DIR))
+    {
+        if (FR_OK == delete_all_files("/logs"))
+        {
+            f_rmdir("/logs");
+        }
+    }
+#endif
+
     res = f_stat("/logs", &info);
 
     if ((res == FR_OK) && (info.fattrib & AM_DIR))
@@ -243,7 +405,7 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
     }
     else if (res == FR_NO_FILE)
     {
-        // Directory does not exist — create it
+        // Directory does not exist
         res = f_mkdir("/logs");
         if (res != FR_OK)
         {
@@ -254,6 +416,16 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
     {
         CanLogFileManager_ErrorHandler();
     }
+
+#if PREALLOCATE_LOG_FILES
+    if (RES_OK == *CanLogCtrlData.mountRes)
+    {
+        m_preallocate_log_files();
+    }
+    else
+    {
+    }
+#endif
 
     if (RES_OK == *CanLogCtrlData.mountRes)
     {
@@ -288,8 +460,7 @@ static comm_status_t
 appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel)
 {
     comm_status_t res = COMM_SUCCESS;
-
-    CanLogClassicCanEntryType NewEntry = {0};
+    CanLogClassicCanEntryType NewEntry;
 
     appCanLogFillEntry(
         &NewEntry,
@@ -337,7 +508,6 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     {
         res = COMM_ERROR;
     }
-
     
     return res;
 }

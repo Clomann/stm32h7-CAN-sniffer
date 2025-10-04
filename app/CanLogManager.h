@@ -22,6 +22,8 @@
 #define CAN_LOG_FILENAME_MAX_LEN 255U
 #define CAN_LOG_BASE_DIR         "/logs/"
 #define CAN_LOG_FILE_PREFIX      "CAN.LOG"
+#define CANLOGMANAGER_CLEAR_ALL_LOGS 0U
+#define PREALLOCATE_LOG_FILES         1U
 
 FRESULT appCanLogHandlerInit(CanLogControlDataType *data);
 void appCanLogHandlerPoll(CanLogControlDataType *data);

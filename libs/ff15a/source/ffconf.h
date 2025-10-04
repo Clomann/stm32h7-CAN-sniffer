@@ -38,7 +38,7 @@
 /* This option switches fast seek feature. (0:Disable or 1:Enable) */
 
 
-#define FF_USE_EXPAND	0
+#define FF_USE_EXPAND	1
 /* This option switches f_expand(). (0:Disable or 1:Enable) */
 
 
@@ -237,7 +237,7 @@
 /  Note that enabling exFAT discards ANSI C (C89) compatibility. */
 
 
-#define FF_FS_NORTC		0
+#define FF_FS_NORTC		1
 #define FF_NORTC_MON	11
 #define FF_NORTC_MDAY	1
 #define FF_NORTC_YEAR	2024
