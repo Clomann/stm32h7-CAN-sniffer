@@ -11,6 +11,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/CanCtrl.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/SpiTask.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/utils_mpu.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/profiling.c
 )
 
 # Include directories

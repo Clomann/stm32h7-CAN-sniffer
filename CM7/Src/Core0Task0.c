@@ -8,6 +8,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
+#include "profiling.h"
 
 #include "nvic_irg_config.h"
 
@@ -253,6 +254,8 @@ static void Core0Task0Main( void * parameters )
         {
             Tasks_ErrorHandler();
         }
+
+        update_task_stats();
     }
 
     appCanLogHandlerDeInit(AppCtrlData.Log);
@@ -276,6 +279,8 @@ void Core0Task0Init()
 
     SdBridgeTask_Init();
 
+    force_profiling_link();
+    
     TASK_CREATE_STATIC(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE, CORE0_TASK2_PRIO);
 }
 

@@ -68,7 +68,12 @@ void vGenerateCore2Interrupt( void * xUpdatedMessageBuffer );
 #define configUSE_MALLOC_FAILED_HOOK            0
 #define configUSE_APPLICATION_TASK_TAG          0
 #define configUSE_COUNTING_SEMAPHORES           1
-#define configGENERATE_RUN_TIME_STATS           0
+#define configGENERATE_RUN_TIME_STATS           1
+#define configUSE_STATS_FORMATTING_FUNCTIONS    1
+#define configRUN_TIME_COUNTER_TYPE             uint64_t
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() /* Nothing */
+extern uint64_t Profiling_GetTimestamp(void);
+#define portGET_RUN_TIME_COUNTER_VALUE()        Profiling_GetTimestamp()
 
 #define configSUPPORT_STATIC_ALLOCATION         1
 /* Co-routine definitions. */
