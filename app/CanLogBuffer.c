@@ -5,6 +5,8 @@ __attribute__((section(".ram_d2")))
 static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
 static lwrb_t Rb1;
 
+extern uint64_t CanLogBufferFrameCount;
+
 uint8_t CanLogBuffer_Init()
 {
     return lwrb_init(&Rb1, CanLogBuf1, sizeof(CanLogBuf1));
@@ -14,6 +16,8 @@ uint8_t CanLogBuffer_AddClassicCanEntry(const CanLogClassicCanEntryType * entry)
 {
     if (sizeof(CanLogClassicCanEntryType) == lwrb_write(&Rb1, entry, sizeof(CanLogClassicCanEntryType)))
     {
+        CanLogBufferFrameCount++;
+        
         return 0;
     }
     
