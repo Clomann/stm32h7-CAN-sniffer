@@ -974,7 +974,7 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
         for (uint32_t j = 0; j < cnt; j++)
         {
             memcpy(&Tmp[0], &StartDataToken, sizeof(StartDataToken));
-            memcpy(&Tmp[sizeof(StartDataToken)], &buff[j], SD_SECTOR_LENGTH);
+            memcpy(&Tmp[sizeof(StartDataToken)], &buff[j * SD_SECTOR_LENGTH], SD_SECTOR_LENGTH);
             memcpy(&Tmp[sizeof(StartDataToken) + SD_SECTOR_LENGTH], &Crc, sizeof(Crc));
             
             SpiAbs_Send_Spi1_Task0(Tmp, sizeof(Tmp));
