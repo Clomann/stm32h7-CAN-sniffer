@@ -129,7 +129,7 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
     snprintf(
         CanLogCtrlData.CanLog.filename,
         CanLogCtrlData.CanLog.fnamemaxlen,
-        "/logs/CAN.LOG%d",
+        FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d",
         (int)lastUsed
     );
 
@@ -293,7 +293,7 @@ static FRESULT m_preallocate_log_files(void)
 
     for (uint32_t i = 0; i < MAX_LOG_INDEX; i++)
     {
-        snprintf(full_path, sizeof(full_path), "/logs/CAN.LOG%d", (int)i);
+        snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
         
         // Check if file already exists and is properly sized
         if (1U == m_verify_preallocation(full_path)) {
@@ -359,7 +359,7 @@ static FRESULT m_preallocate_log_files(void)
     snprintf(
         CanLogCtrlData.CanLog.filename,
         CanLogCtrlData.CanLog.fnamemaxlen,
-        "/logs/CAN.LOG%d",
+        FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d",
         0
     );
 
@@ -387,18 +387,18 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
     fdcan_msg_port_init();
 
 #if CANLOGMANAGER_CLEAR_ALL_LOGS
-    res = f_stat("/logs", &info);
+    res = f_stat(FILEHANDLER_PARTITION_NO "/logs", &info);
 
     if ((res == FR_OK) && (info.fattrib & AM_DIR))
     {
-        if (FR_OK == delete_all_files("/logs"))
+        if (FR_OK == delete_all_files(FILEHANDLER_PARTITION_NO "/logs"))
         {
-            f_rmdir("/logs");
+            f_rmdir(FILEHANDLER_PARTITION_NO "/logs");
         }
     }
 #endif
 
-    res = f_stat("/logs", &info);
+    res = f_stat(FILEHANDLER_PARTITION_NO "/logs", &info);
 
     if ((res == FR_OK) && (info.fattrib & AM_DIR))
     {
@@ -406,7 +406,7 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
     else if (res == FR_NO_FILE)
     {
         // Directory does not exist
-        res = f_mkdir("/logs");
+        res = f_mkdir(FILEHANDLER_PARTITION_NO "/logs");
         if (res != FR_OK)
         {
             CanLogFileManager_ErrorHandler();

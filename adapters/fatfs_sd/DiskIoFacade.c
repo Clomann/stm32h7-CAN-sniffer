@@ -9,6 +9,11 @@
 
 #include "MmcAdapter.h"
 
+PARTITION VolToPart[FF_VOLUMES] = {
+    {0, 1},    // "0:" = Physical drive 0, Partition 1
+    {0, 2}     // "1:" = Physical drive 0, Partition 2
+};
+
 /**
   * @brief  Gets Time from RTC (generated when FS_NORTC==0; see ff.c)
   * @param  None

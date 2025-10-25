@@ -396,10 +396,10 @@ int FatFS_SD_LoadConfig(FatFsDeviceType *dev, char *data, uint32_t *len)
     UINT BytesRead = 0U;
     uint32_t FileSize = 0U;
 
-    fr = f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
+    fr = f_mount(&FatFs, SETTINGSHANDLER_PARTITION_NO, 0U);		/* Give a work area to the default drive */
 
     if (fr == FR_OK)
-        fr = f_open(&dev->file, "conf.txt", FA_READ | FA_OPEN_EXISTING);	/* Create a file */
+        fr = f_open(&dev->file, SETTINGSHANDLER_PARTITION_NO "conf.txt", FA_READ | FA_OPEN_EXISTING);	/* Create a file */
 
     if (fr == FR_OK) {
         FileSize = f_size(&dev->file);

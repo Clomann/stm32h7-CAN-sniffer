@@ -1,15 +1,25 @@
 #include "FileHandler.h"
+#include "ff.h"
 
 static FATFS FatFs;		/* FatFs work area needed for each volume */
+static FATFS FatFs2;
 
 FRESULT FatFS_SD_Mount()
 {  
-  return f_mount(&FatFs, "", 0U);		/* Give a work area to the default drive */
+    FRESULT res;
+    res =  f_mount(&FatFs, FILEHANDLER_PARTITION_NO, 1U);
+    
+    if (FR_OK == res)
+    {
+        res = f_mount(&FatFs, FILEHANDLER_PARTITION_NO, 1U);
+    }
+
+    return res;
 }
 
 FRESULT FatFS_SD_Unmount()
 {  
-  return f_mount(NULL, "", 0U);
+  return f_mount(NULL, FILEHANDLER_PARTITION_NO, 1U);
 }
 
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
