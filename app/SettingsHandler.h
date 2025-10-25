@@ -5,6 +5,8 @@
 
 #include "FileHandler.h"
 
+#define SETTINGSHANDLER_PARTITION_NO FILEHANDLER_PARTITION_NO
+
 typedef enum
 {
     SETTINGS_OK = 0,

@@ -1,6 +1,7 @@
 #include "lwip/apps/fs.h"
 #include "lwip/def.h"
 
+#include <stdint.h>
 #include <string.h>
 
 #include "fs_custom.h"
@@ -28,30 +29,55 @@ static const char redirect_reply[] =
 #warning "LWIP_HTTPD_DYNAMIC_FILE_READ is NOT enabled!"
 #endif
 
+#define CANLOG_MAX_PATH_LENGTH    64U
+#define CANLOG_MAX_META_DATA_SIZE 96U
+#define CANLOG_MAX_STATUS_SIZE    32U
+#define CANLOG_FILE_PATH          "/logs/CAN.LOG"
+#define CANLOG_META_DATA_PATH     "/logs/meta"
+#define CANLOG_STATUS_PATH        "/logger/status"
+#define CANLOG_POST_REDIRECT_PATH "/postredir"
+
+#define CANLOG_META_DATA_STRING \
+    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}"
+
+#define CANLOG_STATUS_STRING \
+    "{ \"active\": %s }"
+
 typedef struct {
     uint8_t stage;
     uint32_t index;
     uint32_t callcount;
-    const char name[256];
+    char name[CANLOG_MAX_PATH_LENGTH];
 } CustomHandlerState;
 
 static CustomHandlerState reqState;
 static FatFsDeviceType CanLogReadFileDevice;
 
+/* WARNING: Not thread-safe. MetaData/StatusData shared across requests.
+ * Assumes single-threaded or serialized HTTP request processing. */
+static char MetaData[CANLOG_MAX_META_DATA_SIZE];
+static char StatusData[CANLOG_MAX_STATUS_SIZE];
+
 int fs_open_custom(struct fs_file *file, const char *name)
 {
-    char CanLogFilename[64] = "/logs/CAN.LOG";
+    char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
     uint32_t FileSize = 0U;
 
     /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
-    if (strncmp(name, CanLogFilename, 13) == 0)
+    if (0 == strncmp(name, CANLOG_FILE_PATH, sizeof(CANLOG_FILE_PATH) - 1))
     {
         reqState.index = 0;
         reqState.stage = 0;
         reqState.callcount = 0;
-        strncpy((char *)reqState.name, name, sizeof(reqState.name));
+        strncat(
+            FileName, 
+            CANLOG_FILE_PATH, 
+            sizeof(FileName) - strlen(FileName) - 1
+        );
+        strncpy((char *)reqState.name, FileName, sizeof(reqState.name) - 1);
+        reqState.name[sizeof(reqState.name) - 1] = '\0';
 
-        if ( 0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, name) )
+        if ( 0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, FileName) )
         {
             return 0;
         }
@@ -68,12 +94,13 @@ int fs_open_custom(struct fs_file *file, const char *name)
     
         return 1;
     }
-    else if (strcmp(name, "/logs/meta") == 0) {
+    else if (0 == strncmp(name, CANLOG_META_DATA_PATH, sizeof(CANLOG_META_DATA_PATH) - 1)) 
+    {
         uint32_t HeadIndex;
         uint32_t TailIndex;
         uint32_t Capacity;
         uint32_t Progression;
-        static char meta[96];
+        int DataSize;
 
         (void) FsCustom_GetCanLogHeadIndex(&HeadIndex);
         (void) FsCustom_GetCanLogTailIndex(&TailIndex);
@@ -92,20 +119,28 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             HeadIndex = TailIndex;
         }
-        
-        int n = snprintf(meta,sizeof meta,
-            "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}",
-            HeadIndex, TailIndex, Capacity,
-            (TailIndex + TailIndex - 1) % Capacity);
+
+        DataSize = snprintf(
+            MetaData,
+            sizeof MetaData,
+            CANLOG_META_DATA_STRING,
+            (unsigned long int)HeadIndex, 
+            (unsigned long int)TailIndex, 
+            (unsigned long int)Capacity, 
+            (unsigned long int)((HeadIndex + Capacity - 1) % Capacity)
+        );
     
-        file->data           = meta;
-        file->len            = n;
+        if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData)) {
+            return 0;  // Error: formatting failed or buffer too small
+        }
+
+        file->data           = MetaData;
+        file->len            = DataSize;
         file->index          = 0;
         file->is_custom_file = 0;       /* httpd sends static buffer     */
         return 1;
     }
-    else if (strcmp(name, "/logger/status") == 0) {
-        static char meta[32];
+    else if (0 == strncmp(name, CANLOG_STATUS_PATH, sizeof(CANLOG_STATUS_PATH) - 1)) {
         uint8_t IsTracerRunning = 1;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
@@ -113,17 +148,18 @@ int fs_open_custom(struct fs_file *file, const char *name)
             IsTracerRunning =  1;
         }
 
-        int n = snprintf(meta,sizeof meta,
-            "{ \"active\": %s }",
+        int n = snprintf(StatusData,
+            sizeof(StatusData),
+            CANLOG_STATUS_STRING,
             IsTracerRunning ? "true" : "false");
     
-        file->data           = meta;
+        file->data           = StatusData;
         file->len            = n;
         file->index          = 0;
         file->is_custom_file = 0;       /* httpd sends static buffer     */
         return 1;
     }
-    else if (strcmp(name, "/postredir") == 0) {
+    else if (0 == strncmp(name, CANLOG_POST_REDIRECT_PATH, sizeof(CANLOG_POST_REDIRECT_PATH) - 1)) {
         file->data   = redirect_reply;
         file->len    = sizeof(redirect_reply) - 1;
         file->flags	= FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
@@ -144,9 +180,13 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
 void fs_state_free(struct fs_file *file, void *state)
 {
-  LWIP_UNUSED_ARG(file);
-  if (state != NULL) {
-  }
+    LWIP_UNUSED_ARG(file);
+    if (state != NULL) {
+        if (state == &reqState) 
+        { 
+            (void) FatFS_SD_CloseFile(&CanLogReadFileDevice);
+        }
+    }
 }
 
 #define CHUNK_SIZE  (512U)

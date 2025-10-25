@@ -3,6 +3,7 @@
 #include "FileHandlerTypes.h"
 #include "MmcAdapter.h"
 
+#define FILEHANDLER_PARTITION_NO   ""
 #define FILEHANDLER_FORMATTING_REQUEST_FILENAME "formatting_requested.txt"
 
 FRESULT FatFS_SD_Mount(void);
