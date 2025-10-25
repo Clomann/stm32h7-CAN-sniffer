@@ -133,7 +133,7 @@ int main(void)
         Error_Handler();
     }
 
-    if (__HAL_RCC_GET_SPI4_SOURCE() != RCC_SPI1CLKSOURCE_PLL2) {
+    if (__HAL_RCC_GET_SPI4_SOURCE() != RCC_SPI4CLKSOURCE_PLL2) {
         Error_Handler();
     }
 
