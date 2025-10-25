@@ -41,8 +41,7 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
 
     if (FR_OK != fr)
     {
-        dev->fflags = FA_CREATE_ALWAYS | FA_WRITE;
-        fr = f_open(&dev->file, name, dev->fflags);
+        fr = f_open(&dev->file, name, dev->fflags | FA_CREATE_ALWAYS);
     }
     else
     {
@@ -211,7 +210,7 @@ FRESULT FatFS_SD_Format_Fat32(uint32_t cluster_size)
     fmt_opt.n_fat = 2;                // Number of FAT copies (1 or 2)
     fmt_opt.align = 0;                // Alignment (0 = auto)
     fmt_opt.n_root = 0;               // Number of root entries (0 = auto for FAT32)
-    fmt_opt.au_size = cluster_size;   // 32KB clusters ← KEY SETTING
+    fmt_opt.au_size = cluster_size; 
 
     res = f_mkfs(Dir, &fmt_opt, work_buffer, (UINT)sizeof(work_buffer));
 
