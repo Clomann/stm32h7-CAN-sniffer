@@ -66,7 +66,7 @@
 /* Buffer used for transmission */
 static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
 
-uint8_t aTxSpiCmd[6];
+uint8_t aTxSpiCmd[7];
 
 ALIGN_32BYTES(const uint8_t __attribute__((used,section(".dma_buffer.ro"))) aTxSpiInit[18]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -74,142 +74,145 @@ static uint8_t SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t * buf
 {
 	uint8_t RetVal;
 
+    // first dummy byte to give SD card some idle time
+    buffer[0] = 0xFF;
+
 	switch (cmd) {
 	case SD_SPI_CMD0:
-		buffer[0] = 0x40;
-		buffer[1] = 0x00;
+		buffer[1] = 0x40;
 		buffer[2] = 0x00;
 		buffer[3] = 0x00;
 		buffer[4] = 0x00;
-		buffer[5] = 0x95;
+		buffer[5] = 0x00;
+		buffer[6] = 0x95;
 		break;
 	case SD_SPI_CMD8:
-		buffer[0] = 0x48;
-		buffer[1] = 0x00;
+		buffer[1] = 0x48;
 		buffer[2] = 0x00;
-		buffer[3] = 0x01;
-		buffer[4] = 0xAA;
-		buffer[5] = 0x87;
+		buffer[3] = 0x00;
+		buffer[4] = 0x01;
+		buffer[5] = 0xAA;
+		buffer[6] = 0x87;
 		break;
 	case SD_SPI_CMD9:
-		buffer[0] = 0x49;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x49;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD12:
-		buffer[0] = 0x4C;
-		buffer[1] = 0x00;
+		buffer[1] = 0x4C;
 		buffer[2] = 0x00;
 		buffer[3] = 0x00;
 		buffer[4] = 0x00;
-		buffer[5] = 0x01;
+		buffer[5] = 0x00;
+		buffer[6] = 0x01;
 		break;
     case SD_SPI_CMD13:
-		buffer[0] = 0x4D;
-		buffer[1] = 0x00;
+		buffer[1] = 0x4D;
 		buffer[2] = 0x00;
 		buffer[3] = 0x00;
 		buffer[4] = 0x00;
-		buffer[5] = 0x01;
+		buffer[5] = 0x00;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD16:
-		buffer[0] = 0x50;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x50;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD17:
-		buffer[0] = 0x51;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x51;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
     case SD_SPI_CMD18:
-		buffer[0] = 0x52;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x52;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD24:
-		buffer[0] = 0x58;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x58;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
     case SD_SPI_CMD25:
-		buffer[0] = 0x59;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x59;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
     case SD_SPI_CMD32:
-		buffer[0] = 0x40 + 32U;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x40 + 32U;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
     case SD_SPI_CMD33:
-		buffer[0] = 0x40 + 32U;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x40 + 32U;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD38:
-		buffer[0] = 0x40 + 38U;
-		buffer[1] = 0x00;
+		buffer[1] = 0x40 + 38U;
 		buffer[2] = 0x00;
 		buffer[3] = 0x00;
 		buffer[4] = 0x00;
-		buffer[5] = 0x01;
+		buffer[5] = 0x00;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD55:
-		buffer[0] = 0x77;
-		buffer[1] = 0x00;
+		buffer[1] = 0x77;
 		buffer[2] = 0x00;
 		buffer[3] = 0x00;
 		buffer[4] = 0x00;
-		buffer[5] = 0x01;
+		buffer[5] = 0x00;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_CMD58:
-		buffer[0] = 0x7A;
-		buffer[1] = 0x00;
+		buffer[1] = 0x7A;
 		buffer[2] = 0x00;
 		buffer[3] = 0x00;
 		buffer[4] = 0x00;
-		buffer[5] = 0x01;
+		buffer[5] = 0x00;
+		buffer[6] = 0x01;
 		break;
 	case SD_SPI_ACMD41:
-		buffer[0] = 0x69;
-		buffer[1] = (payload >> 24) & 0xFF;
-		buffer[2] = (payload >> 16) & 0xFF;
-		buffer[3] = (payload >> 8) & 0xFF;
-		buffer[4] = payload & 0xFF;
-		buffer[5] = 0x01;
+		buffer[1] = 0x69;
+		buffer[2] = (payload >> 24) & 0xFF;
+		buffer[3] = (payload >> 16) & 0xFF;
+		buffer[4] = (payload >> 8) & 0xFF;
+		buffer[5] = payload & 0xFF;
+		buffer[6] = 0x01;
 		break;
 	default:
-		buffer[0] = 0xFF;
 		buffer[1] = 0xFF;
 		buffer[2] = 0xFF;
 		buffer[3] = 0xFF;
 		buffer[4] = 0xFF;
 		buffer[5] = 0xFF;
+		buffer[6] = 0xFF;
 		RetVal = 1;
 	}
 
@@ -1018,6 +1021,9 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
     if (0 == res)
 	{
 		SpiAbs_writByte(SPIABS_DEVICE_1, &StopDataToken);
+
+        SD_Spi_SendCommand(SD_SPI_CMD12, address);  // Send CMD12
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte); 
 	}
 
     if (0 == res)
