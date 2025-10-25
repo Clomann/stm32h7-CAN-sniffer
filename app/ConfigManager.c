@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "ConfigManager.h"
+#include "ff.h"
 
 __attribute__((weak)) int ConfigManager_SerializeHook(
     const void *config,
@@ -40,8 +41,6 @@ ConfigResultType ConfigManager_SaveRaw(
     const char *data,
     uint32_t dataSize
 );
-
-ConfigResultType ConfigManager_Flush(ConfigManagerType *manager);
 
 static ConfigResultType validateManager(const ConfigManagerType *manager);
 static ConfigResultType openForRead(ConfigManagerType *manager);
@@ -221,33 +220,7 @@ ConfigResultType ConfigManager_SaveRaw(
     manager->needsSync = true;
 
     manager->lastError = CONFIG_OK;
-    return CONFIG_OK;
-}
-
-ConfigResultType ConfigManager_Flush(ConfigManagerType *manager)
-{
-    ConfigResultType result = validateManager(manager);
-    if (result != CONFIG_OK)
-    {
-        return result;
-    }
-
-    if (!manager->fileOpen || !manager->needsSync)
-    {
-        return CONFIG_OK;
-    }
-
-    FRESULT fr = FatFS_SD_Flush(&manager->writeFileDevice);
     closeFile(manager);
-
-    if (fr != FR_OK)
-    {
-        manager->lastError = CONFIG_ERROR_FILE_WRITE;
-        return CONFIG_ERROR_FILE_WRITE;
-    }
-
-    manager->needsSync = false;
-    manager->lastError = CONFIG_OK;
     return CONFIG_OK;
 }
 
@@ -322,10 +295,7 @@ ConfigResultType ConfigManager_UpdateConfig(
     if (needsUpdate)
     {
         ConfigResultType result = ConfigManager_SaveConfig(manager, config);
-        if (result == CONFIG_OK)
-        {
-            result = ConfigManager_Flush(manager);
-        }
+        
         return result;
     }
 
