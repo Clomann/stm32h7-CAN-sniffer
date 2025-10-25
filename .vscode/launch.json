@@ -32,6 +32,48 @@
             "cwd": "${workspaceFolder}",
             "device": "STM32H745ZITx_M4",
             "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf"
+        },
+        {
+            "name": "Release CM7 (Attach)",
+            "type": "cortex-debug",
+            "request": "attach",
+            "servertype": "external",
+            "preLaunchCommands": [
+                "set mem inaccessible-by-default off",
+                "set breakpoint pending on",
+                "set remote hardware-breakpoint-limit unlimited"
+            ],
+            "useHardwareBreakpoints": true,
+            "gdbTarget": "localhost:3333",
+            "cwd": "${workspaceFolder}",
+            "device": "STM32H745ZITx_M7",
+            "executable": "${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7.elf"
+        },
+        {
+            "name": "Release CM4 (Attach)",
+            "type": "cortex-debug",
+            "request": "attach",
+            "servertype": "external",
+            "preLaunchCommands": [
+                "set mem inaccessible-by-default off",
+                "set breakpoint pending on",
+                "set remote hardware-breakpoint-limit unlimited"
+            ],
+            "useHardwareBreakpoints": true,
+            "gdbTarget": "localhost:3334",
+            "cwd": "${workspaceFolder}",
+            "device": "STM32H745ZITx_M4",
+            "executable": "${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM4.elf"
+        },
+        {
+            "name": "Debug (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/test_spi",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "stdio": [null, null, null]
         }
     ],
     "compounds": [
@@ -59,6 +101,24 @@
                 "Debug CM4 (Attach)"
             ],
             "preLaunchTask": "Flash CM7 & CM4 and start OpenOCD",
+            "stopAll": false
+        },
+        {
+            "name": "Start Dual-Core Release Session",
+            "configurations": [
+                "Release CM7 (Attach)",
+                "Release CM4 (Attach)"
+            ],
+            "preLaunchTask": "Start OpenOCD Session",
+            "stopAll": false
+        },
+        {
+            "name": "Flash & Start Dual-Core Debug Session (Release)",
+            "configurations": [
+                "Release CM7 (Attach)",
+                "Release CM4 (Attach)"
+            ],
+            "preLaunchTask": "Flash CM7 & CM4 and start OpenOCD (Release)",
             "stopAll": false
         }
     ]

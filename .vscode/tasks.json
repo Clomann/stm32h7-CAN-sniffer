@@ -56,6 +56,36 @@
       "problemMatcher": []
     },
     {
+      "label": "Flash CM7 (Release)",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c", "port=SWD",
+        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM7.elf", "0x08000000",
+        "-rst"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flash CM4 (Release)",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c", "port=SWD",
+        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM4.elf", "0x08100000",
+        "-rst"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Start OpenOCD",
       "type": "shell",
       "command": "/usr/local/bin/openocd",
@@ -103,7 +133,22 @@
       "dependsOrder": "sequence"
     },
     {
+      "label": "Flash CM7 & CM4 (Release)",
+      "dependsOn": ["Flash CM7 (Release)", "Flash CM4 (Release)"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Flash CM7 & CM4 and start OpenOCD (Release)",
+      "dependsOn": ["Flash CM7 & CM4 (Release)", "Start OpenOCD"],
+      "dependsOrder": "sequence"
+    },
+    {
       "label": "Start Debug Session",
+      "dependsOn": ["Start OpenOCD"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Start OpenOCD Session",
       "dependsOn": ["Start OpenOCD"],
       "dependsOrder": "sequence"
     }
