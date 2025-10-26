@@ -69,7 +69,7 @@ uint8_t FsCustom_GetCanLogTailIndex(uint32_t *index)
 
 uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
 {
-    *capacity = MAX_LOG_INDEX;
+    *capacity = MAX_LOG_INDEX + 1;
     return 0U;
 }
 
