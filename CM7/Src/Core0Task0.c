@@ -35,7 +35,8 @@
 volatile uint32_t FrameCountCanAbs = 0;
 volatile uint32_t FrameCountCanBridgeTask = 0;
 volatile uint32_t FrameCountCanLogManager = 0;
-volatile uint32_t CanLogBufferFrameCount = 0;
+volatile uint32_t CanLogBufferFrameCount1 = 0;
+volatile uint32_t CanLogBufferFrameCount2 = 0;
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -243,7 +244,8 @@ static void Core0Task0Main( void * parameters )
             FrameCountCanAbs = 0;
             FrameCountCanBridgeTask = 0;
             FrameCountCanLogManager = 0;
-            CanLogBufferFrameCount = 0;
+            CanLogBufferFrameCount1 = 0;
+            CanLogBufferFrameCount2 = 0;
         }
         else
         {
