@@ -1,3 +1,4 @@
+#include "ff.h"
 #include "lwip/apps/fs.h"
 #include "lwip/def.h"
 
@@ -47,6 +48,7 @@ typedef struct {
     uint8_t stage;
     uint32_t index;
     uint32_t callcount;
+    uint32_t byteCount;
     char name[CANLOG_MAX_PATH_LENGTH];
 } CustomHandlerState;
 
@@ -60,18 +62,21 @@ static char StatusData[CANLOG_MAX_STATUS_SIZE];
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
-    char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
     uint32_t FileSize = 0U;
-
+    
     /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
     if (0 == strncmp(name, CANLOG_FILE_PATH, sizeof(CANLOG_FILE_PATH) - 1))
     {
+        char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
+        
         reqState.index = 0;
         reqState.stage = 0;
         reqState.callcount = 0;
+        reqState.byteCount = 0;
+
         strncat(
             FileName, 
-            CANLOG_FILE_PATH, 
+            name, 
             sizeof(FileName) - strlen(FileName) - 1
         );
         strncpy((char *)reqState.name, FileName, sizeof(reqState.name) - 1);
@@ -189,38 +194,48 @@ void fs_state_free(struct fs_file *file, void *state)
     }
 }
 
-#define CHUNK_SIZE  (512U)
-
 int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
+    FRESULT fr;
     uint32_t len = 0U;
     CustomHandlerState *state = (CustomHandlerState *)file->pextension;
+    uint32_t ByteCount;
 
     if (state == NULL) {
         return FS_READ_EOF;
     }
 
-    volatile uint32_t FileIndex = state->callcount * CHUNK_SIZE;
+    ByteCount = state->byteCount;
     
-    if (FileIndex >= CanLogReadFileDevice.readTargetSize)
+    if (ByteCount >= CanLogReadFileDevice.readTargetSize)
     {
         state->callcount = 0;
+        state->byteCount = 0;
         return FS_READ_EOF;
     }
 
-    if (CanLogReadFileDevice.readTargetSize > FileIndex + CHUNK_SIZE)
+    if (count <= 0)
     {
-        len = CHUNK_SIZE;
+        return FS_READ_EOF;
+    }
+    else if (CanLogReadFileDevice.readTargetSize - ByteCount > (uint32_t)count)
+    {
+        len = count;
     }
     else
     {
-        len = CanLogReadFileDevice.readTargetSize - FileIndex ;   
+        len = CanLogReadFileDevice.readTargetSize - ByteCount;   
     }
 
-    FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
+    fr = FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
+
+    if (FR_OK != fr)
+    {
+        return FS_READ_EOF;
+    }
 
     state->callcount++;
-    
+    state->byteCount += len;
     
     return len; // triggers send
 }
