@@ -1,5 +1,9 @@
+#include <stdlib.h>
+
 #include "FileHandler.h"
 #include "ff.h"
+
+#include "core_json.h"
 
 static FATFS FatFs;		/* FatFs work area needed for each volume */
 static FATFS FatFs2;
@@ -29,6 +33,22 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
   dev->fflags = FA_OPEN_APPEND | FA_WRITE;
   fr = f_open(&dev->file, name, dev->fflags);
 
+  if (FR_OK == fr)
+  {
+      fr = f_lseek(&dev->file, dev->writeIndex);
+  }
+
+  if (fr == FR_OK)
+  {
+    fr = f_truncate(&dev->file);
+    
+    if (fr == FR_OK) 
+    {
+      // Reset to beginning but keep allocation
+      fr = f_lseek(&dev->file, dev->writeIndex);
+    }      
+  }
+
   return fr;
 }
 
@@ -37,6 +57,8 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
     FRESULT fr;
 
     dev->fflags = FA_WRITE;
+    dev->writeIndex = 0;
+    
     fr = f_open(&dev->file, name, dev->fflags);
 
     if (FR_OK != fr)
@@ -51,6 +73,16 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
     {
         // Reset to beginning but keep allocation
         fr = f_lseek(&dev->file, 0);
+    }
+
+    if (fr == FR_OK)
+    {
+        fr = f_truncate(&dev->file);
+        if (fr == FR_OK) 
+        {
+            // Reset to beginning but keep allocation
+            fr = f_lseek(&dev->file, 0);
+        }      
     }
 
     return fr;
@@ -79,24 +111,30 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
 {
     FRESULT res = FR_OK;
     UINT BytesWritten = 0U;
-    volatile uint32_t FileSize = 0U;
+    uint8_t Truncate;
+    uint32_t FileSize = 0U;
+    
+    Truncate = (dev->fflags & FA_CREATE_ALWAYS);
 
-    if ((dev->fflags & FA_CREATE_ALWAYS) == 0)  // Only seek if we did NOT truncate the file
+    if (Truncate > 0)  // Only seek if we did NOT truncate the file
     {
-        FileSize = f_tell(&dev->file);
+        FileSize = 0U;
     }
     else
     {
-        FileSize = 0U;
+        FileSize = f_tell(&dev->file);
     }
 
     res = f_lseek(&dev->file, FileSize);
 
     if (FR_OK != res) {
         // File corrupted - truncate to known good size and continue
-        FileSize = f_size(&dev->file);
-        f_truncate(&dev->file);
-        res = f_lseek(&dev->file, f_size(&dev->file));
+        res = f_truncate(&dev->file);
+        
+        if (FR_OK == res) 
+        {
+            res = f_lseek(&dev->file, f_tell(&dev->file));
+        }
     }
 
     if (FR_OK == res)
@@ -104,14 +142,46 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
         res = f_write(&dev->file, content, len, &BytesWritten);
     }
 
-    if (0 != res)
-    {
-
+    if (FR_OK == res && BytesWritten != len) {
+        res = FR_DISK_ERR;  // Partial write = error
     }
-    else if ( 0 == res && len == BytesWritten )
-        res = FR_OK;
+
+    return res;
+}
+
+FRESULT FatFS_SD_WriteBeginningOfFile(
+    FatFsDeviceType *dev, 
+    const char *content, 
+    const uint32_t len
+)
+{
+    FRESULT res = FR_OK;
+    UINT BytesWritten = 0U;
+
+    res = f_lseek(&dev->file, 0);
+
+    if (FR_OK != res) {
+        // File corrupted - truncate to known good size and continue
+        res = f_truncate(&dev->file);
+        
+        if (FR_OK == res) 
+        {
+            res = f_lseek(&dev->file, 0);
+        }
+    }
+
+    if (FR_OK == res)
+    {
+        res = f_write(&dev->file, content, len, &BytesWritten);
+    }
+
+    if (FR_OK == res && BytesWritten != len) {
+        res = FR_DISK_ERR;  // Partial write = error
+    }
     else
-        res = FR_DISK_ERR;
+    {
+        res = f_lseek(&dev->file, 0);
+    }
 
     return res;
 }
@@ -130,7 +200,9 @@ FRESULT FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t len)
 
 FRESULT FatFS_SD_CloseFile(FatFsDeviceType *dev)
 {
-  return f_close(&dev->file);							/* Close the file */
+    dev->writeIndex = f_tell(&dev->file);
+
+    return f_close(&dev->file);							/* Close the file */
 }
 
 FRESULT FatFS_SD_GetFileSize(FatFsDeviceType *dev, uint32_t *size)
@@ -215,4 +287,51 @@ FRESULT FatFS_SD_Format_Fat32(uint32_t cluster_size)
     res = f_mkfs(Dir, &fmt_opt, work_buffer, (UINT)sizeof(work_buffer));
 
     return res;
+}
+
+int FileHandler_GetValue(
+    char *buff, 
+    uint32_t buffLen, 
+    char const *key, 
+    uint32_t keyLen, 
+    char **value, 
+    size_t *valLen
+)
+{
+    JSONStatus_t result;
+
+    *valLen = 0U;
+    
+    result = JSON_Search( buff, buffLen, key, keyLen,
+        value, valLen );
+        
+    if( result == JSONSuccess )
+    {
+        // The pointer "value" will point to a location in the "buffer".
+        char save = (*value)[ *valLen ];
+        // After saving the character, set it to a null byte for printing.
+        (*value)[ *valLen ] = '\0';
+        
+        // // Restore the original character.
+        (*value)[ *valLen ] = save;  
+    }
+
+    return result;
+}
+
+int FileHandler_ConvertToInteger(char *data, uint32_t *val, uint8_t base)
+{
+    char *endptr;
+    long value = strtol(data, &endptr, base);
+
+    // Check if the conversion was successful
+    if (*endptr != '\0') {
+        // Handle conversion error: non-numeric characters were encountered
+    } 
+    else
+    {
+        *val = (uint32_t) value;
+    }
+
+    return 0U;
 }

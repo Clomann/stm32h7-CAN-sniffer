@@ -204,53 +204,6 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
   return 0;
 }
 
-static int FileHandler_GetValue(
-    char *buff, 
-    uint32_t buffLen, 
-    char const *key, 
-    uint32_t keyLen, 
-    char **value, 
-    size_t *valLen
-)
-{
-    JSONStatus_t result;
-
-    *valLen = 0U;
-    
-    result = JSON_Search( buff, buffLen, key, keyLen,
-        value, valLen );
-        
-    if( result == JSONSuccess )
-    {
-        // The pointer "value" will point to a location in the "buffer".
-        char save = (*value)[ *valLen ];
-        // After saving the character, set it to a null byte for printing.
-        (*value)[ *valLen ] = '\0';
-        
-        // // Restore the original character.
-        (*value)[ *valLen ] = save;  
-    }
-
-    return result;
-}
-
-static int m_ConvertToInteger(char *data, uint32_t *val, uint8_t base)
-{
-    char *endptr;
-    long value = strtol(data, &endptr, base);
-
-    // Check if the conversion was successful
-    if (*endptr != '\0') {
-        // Handle conversion error: non-numeric characters were encountered
-    } 
-    else
-    {
-        *val = (uint32_t) value;
-    }
-
-    return 0U;
-}
-
 #define ERROR_INVALID_FORMAT   -1
 #define ERROR_TOO_MANY_SEGMENTS -2
 #define SUCCESS 0
@@ -280,7 +233,7 @@ static int IpStringToIntArray(const char *ip, uint8_t len, uint8_t *arr)
         {
             if (CharCount == 0U) return ERROR_INVALID_FORMAT; // Prevent ".." or leading/trailing dots
 
-            m_ConvertToInteger(element, &ValTmp, 10U);  
+            FileHandler_ConvertToInteger(element, &ValTmp, 10U);  
             if (ValTmp > 255) return ERROR_INVALID_FORMAT; // Invalid octet value
 
             arr[ElemCount++] = (uint8_t) ValTmp;
@@ -297,7 +250,7 @@ static int IpStringToIntArray(const char *ip, uint8_t len, uint8_t *arr)
 
     if (CharCount == 0U) return ERROR_INVALID_FORMAT; // Handle trailing dot case
 
-    m_ConvertToInteger(element, &ValTmp, 10U);
+    FileHandler_ConvertToInteger(element, &ValTmp, 10U);
     if (ValTmp > 255) return ERROR_INVALID_FORMAT; // Check last segment
 
     arr[ElemCount++] = (uint8_t) ValTmp;
@@ -340,7 +293,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
-            if ( 0U == m_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
+            if ( 0U == FileHandler_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
                 cfg->can1.baudrate = Baudrate;
         }
         
@@ -349,7 +302,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
-            if (0U == m_ConvertToInteger(TmpBuf, &Mode, 10U))
+            if (0U == FileHandler_ConvertToInteger(TmpBuf, &Mode, 10U))
                 cfg->can1.mode = Mode;
         }
 
@@ -358,7 +311,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
-            if ( 0U == m_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
+            if ( 0U == FileHandler_ConvertToInteger(TmpBuf, &Baudrate, 10U) )
                 cfg->can2.baudrate = Baudrate;
         }
         
@@ -367,7 +320,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
-            if (0U == m_ConvertToInteger(TmpBuf, &Mode, 10U))
+            if (0U == FileHandler_ConvertToInteger(TmpBuf, &Mode, 10U))
                 cfg->can2.mode = Mode;
         }
 

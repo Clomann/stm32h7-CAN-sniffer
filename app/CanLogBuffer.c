@@ -4,19 +4,27 @@
 __attribute__((section(".ram_d2")))
 static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
 static lwrb_t Rb1;
+static uint8_t EpochCount = 0;
+static uint8_t BlockCount = 0;
 
-extern uint64_t CanLogBufferFrameCount;
+extern uint64_t CanLogBufferFrameCount1;
+extern uint64_t CanLogBufferFrameCount2;
 
 uint8_t CanLogBuffer_Init()
 {
     return lwrb_init(&Rb1, CanLogBuf1, sizeof(CanLogBuf1));
 }
 
+void CanLogBuffer_SetEpochCount(uint8_t epoch)
+{
+    EpochCount = epoch;
+}
+
 uint8_t CanLogBuffer_AddClassicCanEntry(const CanLogClassicCanEntryType * entry)
 {
     if (sizeof(CanLogClassicCanEntryType) == lwrb_write(&Rb1, entry, sizeof(CanLogClassicCanEntryType)))
     {
-        CanLogBufferFrameCount++;
+        CanLogBufferFrameCount1++;
         
         return 0;
     }
@@ -48,6 +56,20 @@ uint8_t CanLogBuffer_IsBlockReady(uint8_t *rdy)
     return 0;
 }
 
+uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
+{
+    uint32_t delta;
+
+    if (Rb1.w_ptr >= Rb1.r_ptr)
+        delta = (Rb1.w_ptr - Rb1.r_ptr);
+    else
+        delta = (uint32_t)( (int32_t)(Rb1.size) - (int32_t)Rb1.r_ptr + (int32_t)Rb1.w_ptr );
+        
+    *slots = delta / sizeof(CanLogClassicCanEntryType);
+    
+    return 0;
+}
+
 uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
 {
     uint8_t res;
@@ -56,7 +78,7 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
     uint32_t offset;
     CanLogBlockHeaderType BlockHeader;
     CanLogEntryHeaderType EntryHeader;
-    
+
     res = CANLOG_E_OK;
     total_len = 0;
     offset = sizeof(CanLogBlockHeaderType);
@@ -93,6 +115,7 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
             break;
         }
 
+        CanLogBufferFrameCount2++;
         offset += total_len;
     }
     
@@ -104,11 +127,12 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
     
         BlockHeader.block_fill = offset;
         BlockHeader.block_size = BLOCK_SIZE;
-        BlockHeader.header_size = sizeof(CanLogBlockHeaderType);
+        BlockHeader.header_size = sizeof(BlockHeader);
         BlockHeader.version = CANLOG_VERSION;
-        memset(BlockHeader.reserved, 0xFF, sizeof(BlockHeader.reserved));
+        BlockHeader.cnt = BlockCount++;
+        BlockHeader.epoch = EpochCount;
 
-        memcpy(data, &BlockHeader, BlockHeader.header_size);
+        memcpy(data, &BlockHeader, sizeof(BlockHeader));
     }
     else
     {

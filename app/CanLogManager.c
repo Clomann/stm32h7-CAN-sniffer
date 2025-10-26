@@ -3,13 +3,30 @@
 
 #include "CanLogManager.h"
 
+#include "CanLogManagerTypes.h"
+#include "ErrorContext.h"
+#include "ff.h"
 #include "fs_custom.h"
 #include "CanLogBuffer.h"
 #include "CanAbs.h"
 #include "fdcan_msg_port.h"
 #include "SdBridgeTask.h"
+#include "core_json.h"
+
+typedef struct
+{
+    uint32_t epoch;
+    uint32_t fileIndex;
+    uint32_t byteOffset;
+    uint32_t crc;
+} CanLogMetaDataType;
 
 extern volatile uint32_t FrameCountCanLogManager;
+
+static volatile CanLogMetaDataType LogMetaData;
+static uint8_t LogMetaDataOpenRes;
+
+static uint8_t EmptyBlock[512] = {0};
 
 struct CanLogControlDataType
 {
@@ -52,7 +69,7 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
 
 void __attribute__((weak)) CanLogFileManager_ErrorHandler()
 {
-    ;
+    __asm volatile("nop");
 }
 
 uint8_t FsCustom_GetCanLogHeadIndex(uint32_t *index)
@@ -114,6 +131,7 @@ find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix)
 static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
 {
     int lastUsed;
+    volatile FRESULT res;
 
     (void)data;
 
@@ -138,7 +156,42 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
         CanLogCtrlData.CanLog.filename
     );
 
-    return 0U;
+    res = f_lseek(&(CanLogCtrlData.CanLog.writeFileDevice.file), 0);
+
+    return res;
+}
+
+static CanLogResult appCanLogReopenFile(CanLogControlDataType *data)
+{
+    CanLogResult res;
+
+    res = CAN_LOG_OK;
+
+    if (FR_OK != FatFS_SD_OpenFileForWrite(
+            &(CanLogCtrlData.CanLog.writeFileDevice), 
+            data->CanLog.filename)
+        )
+    {
+        res = CAN_LOG_NOT_OK;
+        CanLogFileManager_ErrorHandler();
+    }
+
+    return res;
+}
+
+static CanLogResult appCanLogCloseFile(CanLogControlDataType *data)
+{
+    CanLogResult res;
+
+    res = CAN_LOG_OK;
+
+    if (FR_OK != FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)))
+    {
+        res = CAN_LOG_NOT_OK;
+        CanLogFileManager_ErrorHandler();
+    }
+
+    return res;
 }
 
 static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
@@ -153,7 +206,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
         &FileSize
     );
 
-    if (FileSizeRes == FR_OK && (FileSize >= MAX_LOG_FILE_SIZE || *(data->commitLog)))
+    if (FileSizeRes == FR_OK && (FileSize >= MAX_LOG_FILE_SIZE ) )
     {
         // File exists and is full, advance to next one
         if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)))
@@ -259,7 +312,7 @@ static FRESULT delete_all_files(const char* path) {
 static bool m_verify_preallocation(const char* path) {
     FIL fil;
     FRESULT res;
-    UINT bytes_written;
+    UINT bytes_read;
     BYTE dummy_byte = 0;
     bool can_seek;
     bool verified;
@@ -271,8 +324,8 @@ static bool m_verify_preallocation(const char* path) {
     res = f_lseek(&fil, MAX_LOG_FILE_SIZE - 512U);
     can_seek = (res == FR_OK);
 
-    res = f_write(&fil, &dummy_byte, 1, &bytes_written);
-    verified = (res == FR_OK && bytes_written == 1);
+    res = f_read(&fil, &dummy_byte, 1, &bytes_read);
+    verified = (res == FR_OK && bytes_read == 1);
     
     f_close(&fil);
     return can_seek && verified;
@@ -371,10 +424,245 @@ static FRESULT m_preallocate_log_files(void)
     return FR_OK;
 }
 
+static int CanLogManager_ParseMetaData(char *buffer, uint32_t len, CanLogMetaDataType *meta)
+{
+    // Variables used in this example.
+    JSONStatus_t result;
+    char TmpBuf[64];
+    char * value;
+    size_t valueLength;
+    size_t bufferLength = len;
+    uint32_t Epoch;
+    const char queryKey1[] = "epoch";
+    const size_t queryKeyLength1 = sizeof( queryKey1 ) - 1;
+    uint32_t FileIndex;
+    const char queryKey2[] = "index";
+    const size_t queryKeyLength2 = sizeof( queryKey2 ) - 1;
+    uint32_t ByteOffset;
+    const char queryKey3[] = "offset";
+    const size_t queryKeyLength3 = sizeof( queryKey3 ) - 1;
+    uint32_t Crc;
+    const char queryKey4[] = "crc";
+    const size_t queryKeyLength4 = sizeof( queryKey4 ) - 1;
+
+    result = JSON_Validate( buffer, bufferLength );    
+
+    if( result == JSONSuccess )
+    {
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey1, queryKeyLength1, &value, &valueLength);
+        if( JSONSuccess ==  result )
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if ( 0U == FileHandler_ConvertToInteger(TmpBuf, &Epoch, 10U) )
+                meta->epoch = Epoch;
+        }
+        
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey2, queryKeyLength2, &value, &valueLength );
+        if( JSONSuccess == result ) 
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if (0U == FileHandler_ConvertToInteger(TmpBuf, &FileIndex, 10U))
+                meta->fileIndex = FileIndex;
+        }
+
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey3, queryKeyLength3, &value, &valueLength);
+        if( JSONSuccess ==  result )
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if ( 0U == FileHandler_ConvertToInteger(TmpBuf, &ByteOffset, 10U) )
+                meta->byteOffset = ByteOffset;
+        }
+        
+        result = FileHandler_GetValue( buffer, bufferLength, queryKey4, queryKeyLength4, &value, &valueLength );
+        if( JSONSuccess == result ) 
+        {
+            strncpy(TmpBuf, value, valueLength);
+            TmpBuf[valueLength] = '\0';
+            if (0U == FileHandler_ConvertToInteger(TmpBuf, &Crc, 10U))
+                meta->crc = Crc;
+        }
+    }
+
+    if (JSONSuccess == result)
+    {
+        return CANLOG_E_OK;
+    }
+    else
+    {
+        return CANLOG_E_NOT_OK;
+    }
+}
+
+#if CANLOGAMANGER_PERSIST_METADATA
+static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
+{
+    FILINFO info;
+    FRESULT res;
+    FILINFO fno;
+    FatFsDeviceType Dev;
+    char Content[128];
+    uint32_t BufferSize;
+    uint32_t FileSize;
+    uint32_t ReadSize;
+    ErrorContextType ErrorContext;
+
+    res = f_stat(CAN_LOG_META_FILENAME, &fno);
+
+    switch (res) 
+    {
+    case FR_OK:
+        res = FatFS_SD_OpenFileForRead(&Dev, CAN_LOG_META_FILENAME);
+        break;
+    case FR_NO_FILE:
+    case FR_NO_PATH:
+        break;
+    default:
+    }
+
+    if (FR_OK == res)
+    {
+        BufferSize = sizeof(Content);
+        
+        res = FatFS_SD_GetFileSize(&Dev, &FileSize);
+        if (res != FR_OK)
+        {
+            res = CANLOG_E_FILE_READ;
+        }
+
+        
+        if (CANLOG_E_OK == res)
+        {
+            // Read data
+            ReadSize = (FileSize < BufferSize) ? FileSize : BufferSize;
+            res = FatFS_SD_ReadFile(&Dev, Content, ReadSize);
+                    
+            if (CANLOG_E_OK != res)
+            {
+                res = CANLOG_E_FILE_READ;
+            }
+
+        }   
+
+        if (FR_OK == res)
+        {
+            res = CanLogManager_ParseMetaData(Content, ReadSize, data);
+        }
+
+        res = FatFS_SD_CloseFile(&Dev);
+
+        if (FR_OK != res)
+        {
+            ErrorContext.code = res;
+            ErrorContext.line = __LINE__;
+            snprintf(
+                ErrorContext.function, 
+                sizeof(ErrorContext.function),
+                "%s",
+                "SD_Spi_writeMultiBlock"
+            );
+
+            CanLogFileManager_ErrorHandler();
+        }
+    }
+    else
+    {
+        res = CANLOG_E_FILE_OPEN;
+    }
+
+    return res;
+}
+
+static uint8_t m_MetaDataToJSonString(CanLogMetaDataType *data, char *json, uint32_t maxLength, uint32_t *len)
+{
+    // Create the JSON string
+    snprintf(json, maxLength,
+        "{\n"
+        "    \"epoch\":%d,\n"
+        "    \"index\":%d,\n"
+        "    \"offset\":%d,\n"
+        "    \"crc\":%d\n"
+        "}\n",
+        data->epoch,
+        data->fileIndex,
+        data->byteOffset,
+        data->crc
+    );
+
+    *len = strnlen(json, maxLength);
+    return 0U;
+}
+
+static FRESULT m_MetaDataStore(CanLogMetaDataType *data)
+{
+    FILINFO info;
+    FRESULT res;
+    FatFsDeviceType Dev;
+    char Content[128];
+    uint32_t BufferSize;
+    uint32_t BytesWritten;
+    uint32_t StringSize;
+    uint32_t WriteSize;
+
+    res = FatFS_SD_OpenFileForOverWrite(&Dev, CAN_LOG_META_FILENAME);
+
+    if (FR_OK == res)
+    {
+        BufferSize = sizeof(Content);
+
+        (void) m_MetaDataToJSonString(data, Content, BufferSize, &StringSize);
+        
+        if (CANLOG_E_OK == res)
+        {
+            // Read data
+            WriteSize = (StringSize < BufferSize) ? StringSize : BufferSize;
+            res = FatFS_SD_WriteFile(&Dev, Content, WriteSize);
+                    
+            if (CANLOG_E_OK != res)
+            {
+                res = CANLOG_E_FILE_WRITE;
+                CanLogFileManager_ErrorHandler();
+            }
+        }   
+        else
+        {
+            CanLogFileManager_ErrorHandler();
+        }
+
+        FatFS_SD_CloseFile(&Dev);
+    }
+    else
+    {
+        res = CANLOG_E_FILE_OPEN;
+    }
+
+    return res;
+}
+#endif
+
 FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 {
     FILINFO info;
     FRESULT res;
+
+#if CANLOGAMANGER_PERSIST_METADATA
+    memset(&LogMetaData, 0, sizeof(LogMetaData));
+
+    LogMetaDataOpenRes = m_MetaDataLoad(&LogMetaData);
+
+    if (0 != LogMetaDataOpenRes)
+    {
+        CanLogFileManager_ErrorHandler();
+    }
+
+    LogMetaData.epoch++;
+
+    CanLogBuffer_SetEpochCount(LogMetaData.epoch);
+
+    m_MetaDataStore(&LogMetaData);
+#endif
 
     *CanLogCtrlData.runCanTracer           = false;
     CanLogCtrlData.runCanTracerOld         = false;
@@ -491,6 +779,13 @@ appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
         res = COMM_ERROR;
     }
 
+    (void) FatFS_SD_GetBufferedFileSize(
+        &(CanLogCtrlData.CanLog.writeFileDevice),
+        &LogMetaData.byteOffset
+    );
+
+    LogMetaData.fileIndex = CanLogCtrlData.CanLog.fileHeadIndex;
+
     return res;
 }
 
@@ -522,6 +817,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     comm_status_t res = COMM_SUCCESS;
     bool IsOffState;
     uint8_t BlockIsReady;
+    uint32_t SlotsToWrite = 0;
     FDCAN_ClassicFrame NewFrame;
 
     if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
@@ -529,6 +825,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     }
     else if (true == *CanLogCtrlData.runCanTracer)
     {
+        if (CAN_LOG_OK != appCanLogReopenFile(data))
+        {
+            CanLogFileManager_ErrorHandler();
+        }
+
         CanAbs_IsStateOff_Can1(&IsOffState);
 
         if (true == IsOffState)
@@ -595,7 +896,6 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         else if (BlockIsReady)
         {
             SdBridgeTask_Notify();
-            // appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
         }
         else
         {
@@ -603,9 +903,18 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     }
 
     if (*(CanLogCtrlData.commitLog))
-    {
-        SdBridgeTask_Notify();
-        // appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
+    {    
+        CanLogBuffer_UsedSlots(&SlotsToWrite);
+
+        if (SlotsToWrite > 0)
+        {
+            SdBridgeTask_Notify();
+        }
+
+        if (CAN_LOG_OK != appCanLogCloseFile(data))
+        {
+            CanLogFileManager_ErrorHandler();
+        }
         
         *(CanLogCtrlData.commitLog) = false;
     }
