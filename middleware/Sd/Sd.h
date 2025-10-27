@@ -10,6 +10,7 @@
 
 #include "diskio.h"
 #include "SdTypes.h"
+#include "ErrorContext.h"
 
 #define SD_SPI_CMD_DUMMY_DATA  0xFF
 #define SD_SPI_CMD_START_TOKEN 0xFE
@@ -53,6 +54,8 @@
 #define SD_E_CMD_NO_GOING_IDLE 3U
 /*!< The card did never sent start data token */
 #define SD_E_CMD_NO_START_TOKEN 4U
+/*!< The card did never sent start data token */
+#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 5U
 
 /**
  * Enumeration listing the implemented SPI commands.
@@ -136,6 +139,6 @@ uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff);
 
-void Sd_Spi_ErrorHandlerHook(void);
+void Sd_Spi_ErrorHandlerHook(ErrorContextType *context);
 
 #endif /* CM7_INC_SD_H_ */
