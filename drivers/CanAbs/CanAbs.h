@@ -3,6 +3,8 @@
 #include "stm32h7xx_hal.h"
 #include "CommManager.h"
 
+extern volatile uint32_t CanAbs_FrameCount;
+
 comm_status_t CanAbs_Init_Can1(uint32_t baudrate);
 comm_status_t CanAbs_Send_Can1(FDCAN_Message *msg);
 comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrame *frame);

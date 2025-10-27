@@ -9,7 +9,7 @@
 #include "fdcan_msg_port.h"
 #include "SdBridgeTask.h"
 
-extern volatile uint32_t FrameCountCanLogManager;
+extern volatile uint32_t CanLogManager_FrameCount;
 
 struct CanLogControlDataType
 {
@@ -581,7 +581,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     while (0 < fdcan_msg_port_read(&NewFrame, 0))
     {
-        FrameCountCanLogManager++;
+        CanLogManager_FrameCount++;
 
         appCanLogStoreToFrameBuffer(&NewFrame, NewFrame.channel);
 
