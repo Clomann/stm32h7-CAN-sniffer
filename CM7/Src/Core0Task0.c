@@ -32,10 +32,11 @@
 #include "CanCtrl.h"
 #include "WebInterface.h"
 
-volatile uint32_t FrameCountCanAbs = 0;
-volatile uint32_t FrameCountCanBridgeTask = 0;
-volatile uint32_t FrameCountCanLogManager = 0;
-volatile uint32_t CanLogBufferFrameCount = 0;
+volatile uint32_t CanAbs_FrameCount = 0;
+volatile uint32_t CanBridgeTask_FrameCount = 0;
+volatile uint32_t CanLogManager_FrameCount = 0;
+volatile uint32_t CanLogBuffer_FrameCount1 = 0;
+volatile uint32_t CanLogBuffer_FrameCount2 = 0;
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -240,10 +241,11 @@ static void Core0Task0Main( void * parameters )
             appCanCtrlSetMode(&CanCtrlData);
             AppCtrlData.applyConfig = 0;
 
-            FrameCountCanAbs = 0;
-            FrameCountCanBridgeTask = 0;
-            FrameCountCanLogManager = 0;
-            CanLogBufferFrameCount = 0;
+            CanAbs_FrameCount = 0;
+            CanBridgeTask_FrameCount = 0;
+            CanLogManager_FrameCount = 0;
+            CanLogBuffer_FrameCount1 = 0;
+            CanLogBuffer_FrameCount2 = 0;
         }
         else
         {

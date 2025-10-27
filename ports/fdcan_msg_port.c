@@ -10,7 +10,7 @@ static MessageBufferHandle_t CanFrameBuffer;
 __attribute__((section(".ram_d3"))) 
 uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE];
 static StaticMessageBuffer_t MessageBuffer;
-static volatile uint32_t FrameDropCount = 0;
+static volatile uint32_t FrameDropCount_FcdanMsgPort = 0;
 
 // STATIC_ASSERT( CAN_FRAME_BUFFER_SIZE >= 2U * sizeof(FDCAN_ClassicFrame) );
 
@@ -25,7 +25,7 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrame *frame)
     {
         GPIO_Dbg_On(GPIO_PIN_1);
         GPIO_Dbg_Off(GPIO_PIN_1);
-        FrameDropCount++;
+        FrameDropCount_FcdanMsgPort++;
         CanAbs_ErrorHandler();
     }
     else
@@ -37,6 +37,8 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrame *frame)
 
 void fdcan_msg_port_init(void)
 {
+    FrameDropCount_FcdanMsgPort = 0U;
+
     CanFrameBuffer = xMessageBufferCreateStatic(
                         CAN_FRAME_BUFFER_SIZE,
                         MessageBufferStorageArea,
