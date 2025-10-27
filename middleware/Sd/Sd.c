@@ -61,7 +61,9 @@
 
 #define SD_SPI_PRE_CMD_CLOCKS 8U
 
-/*! SD card instances buffer*/
+static ErrorContextType ErrorContext = {
+    .file = __FILE_NAME__
+};
 
 /* Buffer used for transmission */
 static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
@@ -871,7 +873,16 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 
     if (0 != res)
     {
-        Sd_Spi_ErrorHandlerHook();
+        ErrorContext.line = __LINE__;
+        ErrorContext.code = res;
+        snprintf(
+            ErrorContext.function, 
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH, 
+            "%s", 
+            "SD_Spi_readMultiBlock"
+        );
+
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -1042,7 +1053,16 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
 
     if (0 != res)
     {
-        Sd_Spi_ErrorHandlerHook();
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function, 
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH, 
+            "%s", 
+             "SD_Spi_writeMultiBlock"
+        );
+        
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);

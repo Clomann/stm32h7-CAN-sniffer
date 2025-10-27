@@ -92,7 +92,7 @@ void TIM_ErrorHandler()
     Error_Handler();
 }
 
-void Sd_Spi_ErrorHandlerHook(void)
+void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
 {
     Error_Handler();
 }
