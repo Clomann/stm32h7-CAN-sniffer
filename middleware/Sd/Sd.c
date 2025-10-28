@@ -779,15 +779,13 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cnt)
 {
-    volatile uint8_t res;
-    volatile uint32_t readResponseAttempts;
-    volatile uint32_t readAttempts, tokenPollCount;
-    volatile uint8_t GotResponse;
+    uint8_t res;
+    uint32_t readResponseAttempts;
+    uint32_t tokenPollCount;
 	uint16_t Crc=0U; 
-	volatile Spi_R1Response resp;
-    uint8_t CardStatus, Dummy[SD_SPI_PRE_CMD_CLOCKS];
-    const uint8_t StartDataToken = SD_DEF_START_DATA_MARKER;
-    volatile static uint8_t Tmp[SD_SECTOR_LENGTH + sizeof(Crc)];
+	Spi_R1Response resp;
+    uint8_t Dummy[SD_SPI_PRE_CMD_CLOCKS];
+    static uint8_t Tmp[SD_SECTOR_LENGTH + sizeof(Crc)];
 
 	res = 0U;
 
@@ -901,10 +899,10 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 static uint8_t SpiAbs_waitTillNotBusy(uint8_t *buffer, uint16_t min_bytes, uint16_t bytes)
 {
     uint32_t readResponseAttempts;
-    volatile uint8_t Buf[64U];
-    volatile uint8_t ReadyTokenReceived;
-    volatile uint32_t BytesRemaining;
-    volatile uint32_t index;
+    uint8_t Buf[64U];
+    uint8_t ReadyTokenReceived;
+    uint32_t BytesRemaining;
+    uint32_t index;
 
     if (min_bytes > sizeof(Buf))
     {
