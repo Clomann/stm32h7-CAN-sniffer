@@ -1049,6 +1049,33 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
 		}
 	}
 
+    if (0 == res)
+    {
+        memset(&address, 0, sizeof(address));
+        SD_Spi_SendCommand(SD_SPI_CMD12, address);
+         
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+        if(resp.byte == 0xFF)
+        {
+            res = SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE;
+        }
+    }
+
+    if (0 == res)
+	{
+		readResponseAttempts = 0;
+		do 
+		{ //Waiting for the end of the state BUSY
+			SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+		} while ( (resp.byte != 0xFF) && (++readResponseAttempts<SD_MAX_READ_RESPONSE_ATTEMPTS * 20U) );
+		
+		if (readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS * 20U)
+		{
+			res = SD_E_CMD_NO_GOING_IDLE;
+		}
+	}
+
     if (0 != res)
     {
         ErrorContext.code = res;
