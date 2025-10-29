@@ -46,13 +46,13 @@ void CanBridgeTask(void *arg)
         while (0 == CanAbs_Receive_Can1(&Frame))
         {
             fdcan_msg_port_receive(&Frame);
-            FrameCountCanBridgeTask++;
+            CanBridgeTask_FrameCount++;
         }
 
         while (0 == CanAbs_Receive_Can2(&Frame))
         {
             fdcan_msg_port_receive(&Frame);
-            FrameCountCanBridgeTask++;
+            CanBridgeTask_FrameCount++;
         }
 
         MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);

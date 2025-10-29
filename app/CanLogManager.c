@@ -21,7 +21,7 @@ typedef struct
     uint32_t crc;
 } CanLogMetaDataType;
 
-extern volatile uint32_t FrameCountCanLogManager;
+extern volatile uint32_t CanLogManager_FrameCount;
 
 static volatile CanLogMetaDataType LogMetaData;
 #if CANLOGAMANGER_PERSIST_METADATA
@@ -891,7 +891,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     while (0 < fdcan_msg_port_read(&NewFrame, 0))
     {
-        FrameCountCanLogManager++;
+        CanLogManager_FrameCount++;
 
         appCanLogStoreToFrameBuffer(&NewFrame, NewFrame.channel);
 

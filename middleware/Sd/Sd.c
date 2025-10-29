@@ -61,7 +61,9 @@
 
 #define SD_SPI_PRE_CMD_CLOCKS 8U
 
-/*! SD card instances buffer*/
+static ErrorContextType ErrorContext = {
+    .file = __FILE_NAME__
+};
 
 /* Buffer used for transmission */
 static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
@@ -777,15 +779,13 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cnt)
 {
-    volatile uint8_t res;
-    volatile uint32_t readResponseAttempts;
-    volatile uint32_t readAttempts, tokenPollCount;
-    volatile uint8_t GotResponse;
+    uint8_t res;
+    uint32_t readResponseAttempts;
+    uint32_t tokenPollCount;
 	uint16_t Crc=0U; 
-	volatile Spi_R1Response resp;
-    uint8_t CardStatus, Dummy[SD_SPI_PRE_CMD_CLOCKS];
-    const uint8_t StartDataToken = SD_DEF_START_DATA_MARKER;
-    volatile static uint8_t Tmp[SD_SECTOR_LENGTH + sizeof(Crc)];
+	Spi_R1Response resp;
+    uint8_t Dummy[SD_SPI_PRE_CMD_CLOCKS];
+    static uint8_t Tmp[SD_SECTOR_LENGTH + sizeof(Crc)];
 
 	res = 0U;
 
@@ -871,7 +871,16 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 
     if (0 != res)
     {
-        Sd_Spi_ErrorHandlerHook();
+        ErrorContext.line = __LINE__;
+        ErrorContext.code = res;
+        snprintf(
+            ErrorContext.function, 
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH, 
+            "%s", 
+            "SD_Spi_readMultiBlock"
+        );
+
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -890,10 +899,10 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 static uint8_t SpiAbs_waitTillNotBusy(uint8_t *buffer, uint16_t min_bytes, uint16_t bytes)
 {
     uint32_t readResponseAttempts;
-    volatile uint8_t Buf[64U];
-    volatile uint8_t ReadyTokenReceived;
-    volatile uint32_t BytesRemaining;
-    volatile uint32_t index;
+    uint8_t Buf[64U];
+    uint8_t ReadyTokenReceived;
+    uint32_t BytesRemaining;
+    uint32_t index;
 
     if (min_bytes > sizeof(Buf))
     {
@@ -1040,9 +1049,45 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
 		}
 	}
 
+    if (0 == res)
+    {
+        memset(&address, 0, sizeof(address));
+        SD_Spi_SendCommand(SD_SPI_CMD12, address);
+         
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+        if(resp.byte == 0xFF)
+        {
+            res = SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE;
+        }
+    }
+
+    if (0 == res)
+	{
+		readResponseAttempts = 0;
+		do 
+		{ //Waiting for the end of the state BUSY
+			SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+		} while ( (resp.byte != 0xFF) && (++readResponseAttempts<SD_MAX_READ_RESPONSE_ATTEMPTS * 20U) );
+		
+		if (readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS * 20U)
+		{
+			res = SD_E_CMD_NO_GOING_IDLE;
+		}
+	}
+
     if (0 != res)
     {
-        Sd_Spi_ErrorHandlerHook();
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function, 
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH, 
+            "%s", 
+             "SD_Spi_writeMultiBlock"
+        );
+        
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);

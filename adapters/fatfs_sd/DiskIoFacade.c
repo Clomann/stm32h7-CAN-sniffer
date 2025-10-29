@@ -14,6 +14,11 @@ PARTITION VolToPart[FF_VOLUMES] = {
     {0, 2}     // "1:" = Physical drive 0, Partition 2
 };
 
+static void MMC_ErrorHandler(void)
+{
+    __asm volatile("nop");
+}
+
 /**
   * @brief  Gets Time from RTC (generated when FS_NORTC==0; see ff.c)
   * @param  None
@@ -32,6 +37,11 @@ uint8_t MMC_disk_status()
 
 	result = 0U;
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 
@@ -40,6 +50,11 @@ uint8_t MMC_disk_initialize()
 	uint8_t result;
 
 	result = MMCAdapter_initialize();
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }
@@ -50,6 +65,11 @@ uint8_t MMC_disk_read(BYTE * buff, LBA_t sector, UINT count)
 
 	result = MMCAdapter_read(buff, sector, count);
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 
@@ -58,6 +78,11 @@ uint8_t MMC_disk_write(const BYTE *buff, LBA_t sector, UINT count)
 	uint8_t result;
 
 	result = MMCAdapter_write(buff, sector, count);
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }
@@ -119,6 +144,12 @@ DRESULT MMC_disk_ioctl(
         result = RES_PARERR; 
         break;
     }
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
     return result;
 }
 
@@ -128,6 +159,11 @@ uint8_t RAM_disk_status()
 
 	result = 0U;
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 
@@ -136,6 +172,11 @@ uint8_t USB_disk_status()
 	uint8_t result;
 
 	result = 0U;
+    
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }
@@ -146,6 +187,11 @@ uint8_t RAM_disk_initialize()
 
 	result = 0U;
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 
@@ -154,6 +200,11 @@ uint8_t USB_disk_initialize()
 	uint8_t result;
 
 	result = 0U;
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }
@@ -164,6 +215,11 @@ uint8_t RAM_disk_read(BYTE * buff, LBA_t sector, UINT count)
 
 	result = 0U;
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 
@@ -172,6 +228,11 @@ uint8_t USB_disk_read(BYTE * buff, LBA_t sector, UINT count)
 	uint8_t result;
 
 	result = 0U;
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }
@@ -182,6 +243,11 @@ uint8_t RAM_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 
 	result = 0U;
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
@@ -190,6 +256,11 @@ uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 	uint8_t result;
 
 	result = 0U;
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }
@@ -203,6 +274,11 @@ DRESULT RAM_disk_ioctl(
 
 	result = 0U;
 
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
+
 	return result;
 }
 
@@ -214,6 +290,11 @@ DRESULT USB_disk_ioctl(
 	DRESULT result;
 
 	result = 0U;
+
+    if (0 != result)
+    {
+        MMC_ErrorHandler();
+    }
 
 	return result;
 }

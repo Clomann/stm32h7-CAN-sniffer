@@ -203,6 +203,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
                 frames_processed++;
 
+                CanAbs_FrameCount++;
             }
         }
     }
@@ -221,6 +222,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
                 frames_processed++;
 
+                CanAbs_FrameCount++;
             }
         }
     }
