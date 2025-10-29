@@ -16,6 +16,9 @@
 
 #define CONCAT(a,b) a#b
 
+#define CANLOGAMANGER_PERSIST_METADATA 0
+#define CANLOGMANAGER_REOPEN_LOG_FILE  0
+
 #define CLUSTER_SIZE                   (32768U) 
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
 #define MAX_LOG_FILE_SIZE              (1U * 1024U * 1024U)
