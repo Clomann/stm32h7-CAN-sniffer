@@ -24,7 +24,9 @@ typedef struct
 extern volatile uint32_t FrameCountCanLogManager;
 
 static volatile CanLogMetaDataType LogMetaData;
+#if CANLOGAMANGER_PERSIST_METADATA
 static uint8_t LogMetaDataOpenRes;
+#endif
 
 static uint8_t EmptyBlock[512] = {0};
 
@@ -161,6 +163,8 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
     return res;
 }
 
+#if CANLOGMANAGER_REOPEN_LOG_FILE
+
 static CanLogResult appCanLogReopenFile(CanLogControlDataType *data)
 {
     CanLogResult res;
@@ -193,6 +197,8 @@ static CanLogResult appCanLogCloseFile(CanLogControlDataType *data)
 
     return res;
 }
+
+#endif
 
 static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 {
@@ -424,6 +430,8 @@ static FRESULT m_preallocate_log_files(void)
     return FR_OK;
 }
 
+#if CANLOGAMANGER_PERSIST_METADATA
+
 static int CanLogManager_ParseMetaData(char *buffer, uint32_t len, CanLogMetaDataType *meta)
 {
     // Variables used in this example.
@@ -496,7 +504,6 @@ static int CanLogManager_ParseMetaData(char *buffer, uint32_t len, CanLogMetaDat
     }
 }
 
-#if CANLOGAMANGER_PERSIST_METADATA
 static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
 {
     FILINFO info;
@@ -825,10 +832,12 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     }
     else if (true == *CanLogCtrlData.runCanTracer)
     {
+#if CANLOGMANAGER_REOPEN_LOG_FILE
         if (CAN_LOG_OK != appCanLogReopenFile(data))
         {
             CanLogFileManager_ErrorHandler();
         }
+#endif
 
         CanAbs_IsStateOff_Can1(&IsOffState);
 
@@ -911,11 +920,13 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             SdBridgeTask_Notify();
         }
 
+#if CANLOGMANAGER_REOPEN_LOG_FILE
         if (CAN_LOG_OK != appCanLogCloseFile(data))
         {
             CanLogFileManager_ErrorHandler();
         }
-        
+#endif
+
         *(CanLogCtrlData.commitLog) = false;
     }
 }

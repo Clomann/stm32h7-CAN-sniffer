@@ -28,26 +28,28 @@ FRESULT FatFS_SD_Unmount()
 
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
 {  
-  FRESULT fr;
-
-  dev->fflags = FA_OPEN_APPEND | FA_WRITE;
-  fr = f_open(&dev->file, name, dev->fflags);
-
-  if (FR_OK == fr)
-  {
-      fr = f_lseek(&dev->file, dev->writeIndex);
-  }
-
-  if (fr == FR_OK)
+    FRESULT fr;
+    
+    dev->fflags = FA_OPEN_APPEND | FA_WRITE;
+    fr = f_open(&dev->file, name, dev->fflags);
+    
+#if FATFS_SEEK_ON_WRITE_APPEND
+    if (FR_OK == fr)
+    {
+        fr = f_lseek(&dev->file, dev->writeIndex);
+    }
+    
+  if (fr != FR_OK)
   {
     fr = f_truncate(&dev->file);
     
     if (fr == FR_OK) 
     {
-      // Reset to beginning but keep allocation
-      fr = f_lseek(&dev->file, dev->writeIndex);
+      // Reset to last valid write pointer and keep allocation
+      fr = f_tell(&dev->file);
     }      
   }
+#endif
 
   return fr;
 }
@@ -75,7 +77,8 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
         fr = f_lseek(&dev->file, 0);
     }
 
-    if (fr == FR_OK)
+#if FATFS_TRUNCATE_ON_SEEK_FAIL
+    if (fr != FR_OK)
     {
         fr = f_truncate(&dev->file);
         if (fr == FR_OK) 
@@ -84,6 +87,7 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
             fr = f_lseek(&dev->file, 0);
         }      
     }
+#endif
 
     return fr;
 }

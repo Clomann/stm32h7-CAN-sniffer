@@ -6,6 +6,9 @@
 #define FILEHANDLER_PARTITION_NO   ""
 #define FILEHANDLER_FORMATTING_REQUEST_FILENAME "formatting_requested.txt"
 
+#define FATFS_SEEK_ON_WRITE_APPEND  0
+#define FATFS_TRUNCATE_ON_SEEK_FAIL 0
+
 FRESULT FatFS_SD_Mount(void);
 FRESULT FatFS_SD_Unmount(void);
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name);
