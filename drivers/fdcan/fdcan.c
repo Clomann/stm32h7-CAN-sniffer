@@ -298,7 +298,11 @@ comm_status_t FDCAN_Send(
 	
 	(void)fdcan_init_tx_header(pMsgCpy, &TxHeader, pMsgCpy->msgBase.length);
 
-	if (HAL_FDCAN_AddMessageToTxFifoQ(&instance->hfdcan, &TxHeader, pData) == HAL_OK)
+    if (HAL_FDCAN_STATE_BUSY != HAL_FDCAN_GetState(&instance->hfdcan))
+    {
+        RetVal = COMM_ERROR;
+    }
+	else if (HAL_FDCAN_AddMessageToTxFifoQ(&instance->hfdcan, &TxHeader, pData) == HAL_OK)
 	{
 		RetVal = COMM_SUCCESS;
 	}
@@ -557,21 +561,21 @@ comm_status_t FDCAN_Ioctl(
             {
                 /* nothing to do */
             }
-            else if (0 != instance->hfdcan.ErrorCode)
-            {
-                res = COMM_ERROR;
-                FDCAN_ErrorHandler();
-            }
-            else if (HAL_FDCAN_Start(&instance->hfdcan) != HAL_OK)
+            else if (HAL_OK != HAL_FDCAN_Start(&instance->hfdcan))
             {
                 /* Start Error */
                 res = COMM_ERROR;
                 FDCAN_ErrorHandler();
             }
-            else
+            else if (HAL_OK == HAL_FDCAN_AbortTxRequest(&instance->hfdcan, 
+                                        FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2))
             {
                 HAL_FDCAN_ActivateNotification(&instance->hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
                 dev->state = DRIVER_STATE_STARTED;
+            }
+            else 
+            {
+                res = COMM_ERROR;
             }
             break;
         case CANABS_IOCTL_CMD_STOP:
