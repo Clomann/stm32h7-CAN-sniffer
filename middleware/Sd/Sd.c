@@ -810,13 +810,11 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
         {
             // wait for a response token (timeout = 100ms)
             tokenPollCount = 0;
-            GotResponse = 0U;
             while(++tokenPollCount < SD_MAX_READ_RESPONSE_ATTEMPTS)
             {
                 SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
                 if(resp.byte != 0xFF)
                 {
-                    GotResponse = 1U;
                     break;
                 }
             }
