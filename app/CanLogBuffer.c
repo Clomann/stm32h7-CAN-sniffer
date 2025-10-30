@@ -8,6 +8,7 @@ static uint8_t EpochCount = 0;
 static uint8_t BlockCount = 0;
 
 extern uint64_t CanLogBuffer_FrameCount1;
+extern uint64_t CanLogBuffer_FrameCount2;
 
 uint8_t CanLogBuffer_Init()
 {
@@ -114,7 +115,7 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
             break;
         }
 
-        CanLogBufferFrameCount2++;
+        CanLogBuffer_FrameCount2++;
         offset += total_len;
     }
     
