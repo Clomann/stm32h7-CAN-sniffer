@@ -3,6 +3,7 @@
 #include "CommTypes.h"
 #include "timer.h"
 #include "CanAbs.h"
+#include <stdint.h>
 
 #define TIMx_TIME_RESOLUTION (1U)
 
@@ -13,6 +14,11 @@ static FDCAN_Message Can1TestMsg1;
 static FDCAN_Message Can1TestMsg2;
 static FDCAN_Message Can2TestMsg1;
 static FDCAN_Message Can2TestMsg2;
+
+uint64_t CANABS_ConvertCountToTimestampHook(uint32_t cnt)
+{
+    return (uint64_t)TIMx_TIME_RESOLUTION * (uint64_t)cnt;
+}
 
 void appFdcanInit(CanCtrlDataType *data)
 {
@@ -163,11 +169,11 @@ uint64_t FDCAN_GetTimestampHook(void)
     return timestamp;
 }
 
-uint32_t FDCAN_GetTimerPeriodHook(void)
+uint64_t FDCAN_GetTimerPeriodHook(void)
 {
     uint16_t Arr;
 
     TIM_GetArrValue(&Arr);
 
-    return (uint16_t)Arr;
+    return ((uint64_t)Arr + (uint64_t)1U)  * (uint64_t)TIMx_TIME_RESOLUTION;
 }
