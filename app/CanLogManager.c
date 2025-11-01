@@ -28,8 +28,6 @@ static volatile CanLogMetaDataType LogMetaData;
 static uint8_t LogMetaDataOpenRes;
 #endif
 
-static uint8_t EmptyBlock[512] = {0};
-
 struct CanLogControlDataType
 {
     struct
@@ -282,6 +280,8 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
     return &CanLogCtrlData;
 }
 
+#if CANLOGMANAGER_CLEAR_ALL_LOGS
+
 static FRESULT delete_all_files(const char* path) {
     DIR dir;
     FILINFO fno;
@@ -315,6 +315,8 @@ static FRESULT delete_all_files(const char* path) {
     return FR_OK;
 }
 
+#endif
+
 static bool m_verify_preallocation(const char* path) {
     FIL fil;
     FRESULT res;
@@ -346,7 +348,6 @@ static FRESULT m_preallocate_log_files(void)
     UINT bytes_written;
     BYTE dummy_byte = 0;
     char full_path[256];
-    volatile uint32_t FileSize;
 
     UnseekableFiles = 0;
 
@@ -913,7 +914,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     if (*(CanLogCtrlData.commitLog))
     {    
-        CanLogBuffer_UsedSlots(&SlotsToWrite);
+        CanLogBuffer_UsedSlots((uint8_t *)&SlotsToWrite);
 
         if (SlotsToWrite > 0)
         {

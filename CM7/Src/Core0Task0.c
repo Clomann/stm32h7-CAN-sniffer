@@ -117,7 +117,7 @@ static void appHandleFormattingRequest(void)
     FatFsDeviceType DevTmp;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
 
-    if (RES_OK == FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName))
+    if (FR_OK == FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName))
     {
         ReformattingRequested = true;
     }
@@ -130,7 +130,7 @@ static void appHandleFormattingRequest(void)
     {
         AppCtrlData.mountRes = 1;
 
-        if (RES_OK == FatFS_SD_Format_Fat32(32U * 1024U))
+        if (FR_OK == FatFS_SD_Format_Fat32(32U * 1024U))
         {
             AppCtrlData.mountRes = FatFS_SD_Mount();
         }

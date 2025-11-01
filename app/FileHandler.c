@@ -6,7 +6,6 @@
 #include "core_json.h"
 
 static FATFS FatFs;		/* FatFs work area needed for each volume */
-static FATFS FatFs2;
 
 FRESULT FatFS_SD_Mount()
 {  
@@ -268,7 +267,7 @@ FRESULT FatFS_SD_Formatting_Request(void)
     FatFsDeviceType File;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
 
-    FatFS_SD_OpenFileForOverWrite(&File, FormatRequestFileName);
+    res = FatFS_SD_OpenFileForOverWrite(&File, FormatRequestFileName);
 
     FatFS_SD_CloseFile(&File);
 

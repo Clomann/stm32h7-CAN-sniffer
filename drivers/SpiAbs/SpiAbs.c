@@ -500,12 +500,13 @@ uint8_t m_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 	uint8_t counter;
 	const uint8_t RetryCount = 10;
 
+    (void) handle;
+
 	counter = 0;
 	NoResponseReceived = 1;
 
 	do
 	{
-		// Spi_readByte(handle, pResponse);
         SpiAbs_readByte(SPIABS_DEVICE_1, pResponse);
 
 		if (0xFF != *pResponse)
