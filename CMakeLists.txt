@@ -59,6 +59,7 @@ if(CORE STREQUAL "CM7" AND NOT CPU_PARAMETERS)
         "NO_SYS=1"
         "USE_STM32H7XX_NUCLEO_144_MB1363"
         "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
+        "TARGET_STM32H7"
     )
 elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
     set(CPU_PARAMETERS
@@ -80,6 +81,7 @@ elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
         "NO_SYS=1"
         "USE_STM32H7XX_NUCLEO_144_MB1363"
         "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
+        "TARGET_STM32H7"
     )
 else()
   message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
@@ -207,7 +209,9 @@ target_link_libraries(${EXECUTABLE}
     PRIVATE 
         lwrb 
         freertos_kernel
-        freertos_config)
+        freertos_config
+        third_party_interface
+)
 
 # Include paths
 target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})

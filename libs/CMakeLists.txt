@@ -373,7 +373,15 @@ list(APPEND include_path_DIRS
 )
 endif()
 
+add_library(third_party_interface INTERFACE)
 
-# Send the final list to the parent scope
-set(sources_SRCS "${sources_SRCS}" PARENT_SCOPE)
-set(include_path_DIRS "${include_path_DIRS}" PARENT_SCOPE)
+target_sources(third_party_interface INTERFACE ${sources_SRCS})
+
+target_include_directories(third_party_interface INTERFACE ${include_path_DIRS})
+
+target_compile_definitions(third_party_interface INTERFACE ${symbols_SYMB})
+
+target_compile_options(third_party_interface INTERFACE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-parameter>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4100>
+)
