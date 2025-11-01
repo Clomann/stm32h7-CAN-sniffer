@@ -38,11 +38,23 @@
                 "DUAL_CORE": "true"
             }
         },
+
         {
-            "name": "Release",
+            "name": "Release_CM7",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "CORE": "CM7",
+                "DUAL_CORE": "true"
+            }
+        },
+        {
+            "name": "Release_CM4",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CORE": "CM4",
+                "DUAL_CORE": "true"
             }
         }
     ],
@@ -66,10 +78,16 @@
             "cleanFirst": true
         },
         { 
-            "name": "release-build", 
-            "configurePreset": "Release", 
+            "name": "release-build-cm7", 
+            "configurePreset": "Release_CM7", 
             "jobs": 4,
-            "cleanFirst": false
+            "cleanFirst": true
+        },
+        { 
+            "name": "release-build-cm4", 
+            "configurePreset": "Release_CM4", 
+            "jobs": 4,
+            "cleanFirst": true
         }
     ],
     "workflowPresets": [
@@ -116,16 +134,30 @@
             ]
         },
         {
-            "description": "Release workflow",
-            "name": "release-all",
+            "description": "Release workflow (CM7)",
+            "name": "release-cm7",
             "steps": [
                 { 
                     "type": "configure",
-                    "name": "Release"
+                    "name": "Release_CM7"
                 },
                 { 
                     "type": "build",
-                    "name": "release-build"
+                    "name": "release-build-cm7"
+                }
+            ]
+        },
+        {
+            "description": "Release workflow (CM4)",
+            "name": "release-cm4",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Release_CM4"
+                },
+                { 
+                    "type": "build",
+                    "name": "release-build-cm4"
                 }
             ]
         }
