@@ -36,6 +36,8 @@ comm_status_t CanAbs_CreateMessage_Standard(
     uint8_t *data, 
     uint32_t length);
 
+uint64_t CANABS_ConvertCountToTimestampHook(uint32_t cnt);
+
 /**
   * @brief  Called by the driver on every rx frame.
   * @note This function runs in the ISR context. 

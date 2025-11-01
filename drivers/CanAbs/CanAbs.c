@@ -2,6 +2,8 @@
 #include "buffers.h"
 #include "fdcan.h"
 
+#include <stdint.h>
+
 /* CAN 1 */
 
 static CommDriver Fdcan1Driver;
@@ -145,32 +147,57 @@ void NotifyConsumerTask(void)
     CanAbs_RxNotificationCallback();
 }
 
-static uint64_t ReconstructFullTimestamp(uint32_t hardware_timestamp, uint64_t global_timestamp)
+/**
+ * @brief Reconstructs a full 64-bit timestamp from a 16-bit hardware timer value.
+ * 
+ * Handles timer wraparound by determining which epoch the hardware timestamp belongs to.
+ * Used in CAN ISR where delay between frame capture and ISR execution may cause wraparound.
+ * 
+ * The algorithm compares the hardware timestamp with the current timer position:
+ * - Large positive difference (> Period/2): Frame from previous epoch (wrapped)
+ * - Large negative difference (< -Period/2): Frame from next epoch (rare edge case)
+ * - Otherwise: Frame from current epoch (normal case)
+ * 
+ * @param[in] hardware_timestamp  16-bit timestamp captured by CAN peripheral at frame arrival
+ * @param[in] global_timestamp    Current system timestamp read in ISR
+ * 
+ * @return Full 64-bit absolute timestamp of frame arrival
+ * 
+ * @note ISR latency must be < Period/2 for correct epoch detection
+ * @note Returns hardware_timestamp unchanged if Period is 0
+ */
+static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t global_timestamp)
 {
-    uint32_t Arr;
-   uint32_t current_timer_value;
-   uint32_t epoch_count;
-   int32_t time_diff;
+    uint64_t Period;
+    uint64_t current_timer_value;
+    uint64_t epoch_count;
+    int64_t time_diff;
+
+    Period = FDCAN_GetTimerPeriodHook();
+    
+    if (Period == 0) 
+    {
+        return hardware_timestamp;
+    }
    
-   Arr = FDCAN_GetTimerPeriodHook();
-   
-   // Extract current timer value and epoch count based on actual timer period
-   current_timer_value = global_timestamp % (Arr + 1);
-   epoch_count = global_timestamp / (Arr + 1);
-   
-   time_diff = (int32_t)(hardware_timestamp - current_timer_value);
-   
-   // Determine if frame arrived in previous epoch
-   if (time_diff > (int32_t)(Arr / 2)) {
-       epoch_count--;
-   }
-   // Handle case where frame might be from next epoch (less common)
-   else if (time_diff < -(int32_t)(Arr / 2)) {
-       epoch_count++;
-   }
-   
-   // Reconstruct and return full timestamp
-   return ((uint64_t)epoch_count * (Arr + 1)) + hardware_timestamp;
+    // Extract current timer value and epoch count based on actual timer period
+    current_timer_value = global_timestamp % Period;
+    epoch_count = global_timestamp / Period;
+
+
+    time_diff = (int64_t)hardware_timestamp - (int64_t)current_timer_value;
+
+    // Determine if frame arrived in previous epoch
+    if (time_diff > (int64_t)(Period / 2)) {
+        epoch_count--;
+    }
+    // Handle case where frame might be from next epoch
+    else if (time_diff < -(int64_t)(Period / 2)) {
+        epoch_count++;
+    }
+
+    // Reconstruct and return full timestamp
+    return ((uint64_t)epoch_count * Period) + hardware_timestamp;
 }
 
 /**
@@ -186,6 +213,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     FDCAN_ClassicFrame NewFrame;
     uint32_t frames_processed = 0;
     uint64_t GlobalTimestamp;
+    uint64_t HardwareTimestamp;
     const uint32_t MAX_FRAMES_PER_ISR = FDCAN_RAM_RX_ELEMENTS / 2U;
 
     if (FDCAN_1 == hfdcan->Instance)
@@ -197,10 +225,14 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             {
                 NewFrame.channel = 1;
                 GlobalTimestamp = FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver);
-                
-                NewFrame.timestamp = ReconstructFullTimestamp(NewFrame.timestamp, GlobalTimestamp);
+                HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
+                NewFrame.timestamp = ReconstructFullTimestamp(HardwareTimestamp, GlobalTimestamp);
 
                 ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
+                if (((RingBuffer *)Fdcan1Driver.RxFrameBuffer)->isFull)
+                {
+                    CanAbs_ErrorHandler();
+                }
                 frames_processed++;
 
                 CanAbs_FrameCount++;
@@ -216,10 +248,14 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             {
                 NewFrame.channel = 2;
                 GlobalTimestamp = FDCAN_GetMostRecentInterruptTimestamp(&Fdcan2Driver);
-                
-                NewFrame.timestamp = ReconstructFullTimestamp(NewFrame.timestamp, GlobalTimestamp);
+                HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
+                NewFrame.timestamp = ReconstructFullTimestamp(HardwareTimestamp, GlobalTimestamp);
 
                 ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
+                if (((RingBuffer *)Fdcan2Driver.RxFrameBuffer)->isFull)
+                {
+                    CanAbs_ErrorHandler();
+                }
                 frames_processed++;
 
                 CanAbs_FrameCount++;

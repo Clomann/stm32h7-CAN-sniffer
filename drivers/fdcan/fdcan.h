@@ -105,6 +105,6 @@ uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev);
 /* shims needed to be implemented by the caller */
 void FDCAN_ErrorHandler(void);
 uint64_t FDCAN_GetTimestampHook(void);
-uint32_t FDCAN_GetTimerPeriodHook(void);
+uint64_t FDCAN_GetTimerPeriodHook(void);
 
 #endif /* COMM_FDCAN_H_ */
