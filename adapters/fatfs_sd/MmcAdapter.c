@@ -41,9 +41,7 @@ uint8_t MMCAdapter_initialize(void)
 
 uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
 {
-	Spi_R1Response resp;
 	uint8_t RetVal = RES_OK;
-	uint8_t RetryCount = 0U;
 
     if (SD_E_OK == SD_Spi_readMultiBlock(sector, buff, count))
     {

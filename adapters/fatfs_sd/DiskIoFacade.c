@@ -31,7 +31,7 @@ static void MMC_ErrorHandler(void)
    /* USER CODE END get_fattime */  
  }
 
-uint8_t MMC_disk_status()
+uint8_t MMC_disk_status(void)
 {
 	uint8_t result;
 
@@ -45,7 +45,7 @@ uint8_t MMC_disk_status()
 	return result;
 }
 
-uint8_t MMC_disk_initialize()
+uint8_t MMC_disk_initialize(void)
 {
 	uint8_t result;
 
@@ -153,7 +153,7 @@ DRESULT MMC_disk_ioctl(
     return result;
 }
 
-uint8_t RAM_disk_status()
+uint8_t RAM_disk_status(void)
 {
 	uint8_t result;
 
@@ -167,7 +167,7 @@ uint8_t RAM_disk_status()
 	return result;
 }
 
-uint8_t USB_disk_status()
+uint8_t USB_disk_status(void)
 {
 	uint8_t result;
 
@@ -181,7 +181,7 @@ uint8_t USB_disk_status()
 	return result;
 }
 
-uint8_t RAM_disk_initialize()
+uint8_t RAM_disk_initialize(void)
 {
 	uint8_t result;
 
@@ -195,7 +195,7 @@ uint8_t RAM_disk_initialize()
 	return result;
 }
 
-uint8_t USB_disk_initialize()
+uint8_t USB_disk_initialize(void)
 {
 	uint8_t result;
 
@@ -215,6 +215,10 @@ uint8_t RAM_disk_read(BYTE * buff, LBA_t sector, UINT count)
 
 	result = 0U;
 
+    (void) buff;
+    (void) sector;
+    (void) count;
+
     if (0 != result)
     {
         MMC_ErrorHandler();
@@ -228,6 +232,10 @@ uint8_t USB_disk_read(BYTE * buff, LBA_t sector, UINT count)
 	uint8_t result;
 
 	result = 0U;
+
+    (void) buff;
+    (void) sector;
+    (void) count;
 
     if (0 != result)
     {
@@ -243,6 +251,10 @@ uint8_t RAM_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 
 	result = 0U;
 
+    (void) buff;
+    (void) sector;
+    (void) count;
+
     if (0 != result)
     {
         MMC_ErrorHandler();
@@ -250,12 +262,16 @@ uint8_t RAM_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 
 	return result;
 }
-uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 
+uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
 {
 	uint8_t result;
 
 	result = 0U;
+
+    (void) buff;
+    (void) sector;
+    (void) count;
 
     if (0 != result)
     {
@@ -274,6 +290,9 @@ DRESULT RAM_disk_ioctl(
 
 	result = 0U;
 
+    (void) cmd;
+    (void) buff;
+
     if (0 != result)
     {
         MMC_ErrorHandler();
@@ -290,6 +309,9 @@ DRESULT USB_disk_ioctl(
 	DRESULT result;
 
 	result = 0U;
+
+    (void) cmd;
+    (void) buff;
 
     if (0 != result)
     {

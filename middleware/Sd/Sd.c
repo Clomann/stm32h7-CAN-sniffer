@@ -5,6 +5,7 @@
  *      Author: cbromann
  */
 
+#include <stdint.h>
 #include <string.h>
 
 #include "stm32h7xx_hal.h"
@@ -664,7 +665,6 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
     uint16_t Crc = 0;
 	Spi_R1Response resp;
 	uint8_t GotResponse;
-	uint8_t i;
 	uint8_t Run = 0U;
 
 	(void) Run;
@@ -825,8 +825,6 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
             }
             else
             {
-                volatile uint8_t force_keep = 1;
-
                 res = SpiAbs_Receive_Spi1_Task0(Tmp, sizeof(Tmp));
 
                 memcpy(&buff[j * SD_SECTOR_LENGTH], Tmp, SD_SECTOR_LENGTH);
@@ -894,7 +892,8 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
   * @param bytes: number of bytes kept after first 
   *               occurence of 0xFF sent from slave.
   */
-static uint8_t SpiAbs_waitTillNotBusy(uint8_t *buffer, uint16_t min_bytes, uint16_t bytes)
+static uint8_t __attribute__((unused))
+SpiAbs_waitTillNotBusy(uint8_t *buffer, uint16_t min_bytes, uint16_t bytes)
 {
     uint32_t readResponseAttempts;
     uint8_t Buf[64U];
@@ -964,11 +963,18 @@ uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t c
 	Spi_R1Response resp;
     const uint8_t StartDataToken = SD_DEF_MULTI_BLOCK_START_TOKEN;
     const uint8_t StopDataToken = SD_DEF_MULTI_BLOCK_STOP_TOKEN;
-    volatile static uint8_t Tmp[sizeof(StartDataToken) + SD_SECTOR_LENGTH + sizeof(Crc)];
+    uint8_t Tmp[sizeof(StartDataToken) + SD_SECTOR_LENGTH + sizeof(Crc)];
 
 	res = 0U;
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+    // // Add pre-erase notification
+    // SD_Spi_SendCommand(SD_SPI_CMD55, 0);  // APP_CMD
+    // SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+    
+    // SD_Spi_SendCommand(SD_SPI_ACMD23, cnt);  // SET_WR_BLK_ERASE_COUNT
+    // SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
 
 	SD_Spi_SendCommand(SD_SPI_CMD25, address);
 

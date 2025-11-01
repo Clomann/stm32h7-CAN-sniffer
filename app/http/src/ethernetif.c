@@ -418,6 +418,8 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
   err_t errval = ERR_OK;
   ETH_BufferTypeDef Txbuffer[ETH_TX_DESC_CNT];
 
+  (void) netif;
+
   memset(Txbuffer, 0 , ETH_TX_DESC_CNT*sizeof(ETH_BufferTypeDef));
 
   for(q = p; q != NULL; q = q->next)
@@ -476,6 +478,7 @@ static struct pbuf * low_level_input(struct netif *netif)
   status = HAL_ERROR;
 
   (void) status;
+  (void) netif;
 
   if(RxAllocStatus == RX_ALLOC_OK)
   {

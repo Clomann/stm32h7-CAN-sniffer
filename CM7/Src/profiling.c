@@ -40,7 +40,7 @@ void update_task_stats(void)
 {
     UBaseType_t num_tasks = uxTaskGetNumberOfTasks();
     
-    if (task_array != NULL && num_tasks <= MAX_TASKS) {
+    if (num_tasks <= MAX_TASKS) {
         uint32_t total_runtime;
         g_num_tasks = uxTaskGetSystemState(task_array, num_tasks, &total_runtime);
         
