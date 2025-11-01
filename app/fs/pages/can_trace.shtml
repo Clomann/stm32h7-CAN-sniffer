@@ -51,11 +51,34 @@
     <br/>
     <br/>
     <input type="file" id="logfile" accept=".bin" />
+    <div id="pagination" style="margin-top: 5px; text-align: left;">
+        <span style="margin-left: 0px;">
+            Show 
+            <select id="pageSizeSelect" >
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+                <option value="5000">5000</option>
+            </select>
+            entries per page
+        </span>
+        <br/>
+        <button id="firstPage">First</button>
+        <button id="prevPage">Previous</button>
+        <span style="margin: 0 10px;">
+            Page <input type="number" id="pageInput" min="1" style="width: 60px;"> of <span id="totalPages">0</span>
+        </span>
+        <button id="nextPage">Next</button>
+        <button id="lastPage">Last</button>
+        <span style="margin-left: 20px;">Showing <span id="entryRange"></span> of <span id="totalEntries">0</span> entries</span>
+    </div>
     <table id="logTable" style="display:none">
       <thead>
         <tr>
           <th>#</th>
-          <th>Timestamp [us]</th>
+          <th>Timestamp [s]</th>
           <th>CAN ID</th>
           <th>Channel</th>
           <th>DLC</th>
@@ -66,6 +89,10 @@
     </table>
 
     <script type="text/javascript">
+    let currentEntries = [];
+    let currentPage = 1;
+    let currentPageSize = 100;
+
     (function () {
         const btn  = document.getElementById('btn');
         const log  = document.getElementById('log');
@@ -85,51 +112,72 @@
         btn.onclick = async () => {
             btn.disabled = true;
             log.textContent = '';
-
             try {
                 const {head, tail, capacity} = await loadMeta();
-                print(`* head(newest)=${head}  tail(oldest)=${tail}  capacity=${capacity}`);
-
+                print(`* head(newest)=${head} tail(oldest)=${tail} capacity=${capacity}`);
+                
                 const idxList = [];
                 for (let i = tail; i !== head; i = (i + 1) % capacity)
-                    idxList.push(i);
-
+                idxList.push(i);
+                idxList.push(head);
+                
                 const totalFiles = idxList.length;
-                let total = 0;
                 const parts = [];
-
+                
                 for (let done = 0; done < totalFiles; done++) {
-                    const i = idxList[done];
-                    const url = `/logs/CAN.LOG${i}`;
+                const i = idxList[done];
+                const url = `/logs/CAN.LOG${i}`;
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    const buffer = await response.arrayBuffer();
+                    const data = new Uint8Array(buffer);
+                    
+                    console.log(`File ${i}: size=${data.length}, first bytes:`, Array.from(data.slice(0, 9)));
+                    console.log(`File ${i}: last bytes:`, Array.from(data.slice(-12))); // ← ADD THIS LINE
 
-                    try {
-                        const data = await fetchBin(url);
-                        parts.push(data);
-                        total += data.length;
-                    } catch (e) {
-                        print(`! Error reading ${url}: ${e.message}`);
-                    }
-
-                    const progress = Math.round(((done + 1) / totalFiles) * 20);
-                    const bar = '[' + '='.repeat(progress) + ' '.repeat(20 - progress) + ']';
-                    log.textContent = bar + '\n';
+                    // Store both the data and metadata for debugging
+                    parts.push({
+                    index: i,
+                    data: data,
+                    size: data.length
+                    });
+                } catch (e) {
+                    console.warn(`! Error reading ${url}: ${e.message}`);
                 }
-
+                
+                const progress = Math.round(((done + 1) / totalFiles) * 20);
+                const bar = '[' + '='.repeat(progress) + ' '.repeat(20 - progress) + ']';
+                log.textContent = bar + '\n';
+                }
+                
+                // Calculate total size
+                const total = parts.reduce((sum, p) => sum + p.size, 0);
+                console.log(`Total parts: ${parts.length}, total size: ${total} bytes`);
+                
+                // Concatenate
                 const joined = new Uint8Array(total);
                 let off = 0;
-                for (const p of parts) { joined.set(p, off); off += p.length; }
-
+                for (const p of parts) {
+                console.log(`Copying part ${p.index}: ${p.size} bytes at offset ${off}`);
+                joined.set(p.data, off);
+                off += p.size;
+                }
+                
                 const blob = new Blob([joined], {type:'application/octet-stream'});
                 const href = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = href; a.download = 'CAN-TRACE.BIN'; a.click();
-                setTimeout(()=>URL.revokeObjectURL(href), 1000);
-
+                a.href = href;
+                a.download = 'CAN-TRACE.BIN';
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(href), 1000);
+                
                 print('* finished - file ready');
             } catch (e) {
                 print('! ' + e.message);
+                console.error(e);
             }
-
             btn.disabled = false;
         };
     })();
@@ -137,91 +185,170 @@
 
     function parseCanLog(arrayBuffer) {
       const view = new DataView(arrayBuffer);
-      const entries = [];
+      let entries = [];
       let offset = 0;
+      let block_cnt = 0;
+      let block_cnt_prev = 0;
+      let blockSize_prev = 0;
+      let progress = 0;
+      let epochCountPrev = 0;
+      let blockCountPrev = 0;
 
+      // iterate over blocks
       while (offset + 8 <= arrayBuffer.byteLength) {
         // --- Parse block header ---
         const version = view.getUint8(offset);
         const headerSize = view.getUint8(offset + 1);
         const blockSize = view.getUint16(offset + 2, true);
         const blockFill = view.getUint16(offset + 4, true);
+        const epochCount = view.getUint8(offset + 6, true);
+        const blockCount = view.getUint8(offset + 7, true);
+        const blockNumber = offset / blockSize;
+        block_cnt = view.getUint8(offset + 7);
+        progress = offset / arrayBuffer.byteLength;
 
         // Safety checks
-        if (blockSize === 0 || blockFill > blockSize || offset + blockSize > arrayBuffer.byteLength) {
-          console.warn("Invalid or incomplete block header at offset", offset);
-          break;
+        if (offset + blockSize > arrayBuffer.byteLength)
+        {
+            console.log("End of data at offset ", offset);
+            break;
         }
+        else if (blockSize === 0 || blockFill > blockSize) {
+            console.warn("Invalid or incomplete block header at offset ", offset);
+            offset += blockSize_prev; // move to the next block
+            break;
+        }
+
+        if (epochCountPrev > 0 && epochCount !== epochCountPrev)
+        {
+            console.warn("End of valid data reached at ", offset);
+            break;
+        }
+
+        epochCountPrev = epochCount;
+
+        // if (block_cnt > 0 && (block_cnt_prev < block_cnt) ) {
+        //     console.warn("Block sequence error between blocks ", block_cnt_prev, block_cnt, " at offset ", offset);
+        //     offset += blockSize_prev; // move to the next block
+        //     break;
+        // }
 
         let recordOffset = offset + headerSize;
         const endOfValidData = offset + blockFill;
 
+        // if (blockNumber > 2)
+        // {
+        //     console.log(`Aborting at offset ${recordOffset}`);   
+        //     break;
+        // }
+
+        // iterate over entries in block
         while (recordOffset + 4 <= endOfValidData) {
-          const type = view.getUint8(recordOffset);
-          const header_len = view.getUint8(recordOffset + 1);
-          const total_len = view.getUint16(recordOffset + 2, true);
+            const type = view.getUint8(recordOffset);
+            const header_len = view.getUint8(recordOffset + 1);
+            const total_len = view.getUint16(recordOffset + 2, true);
+            const entry_number = (recordOffset - headerSize - offset)  / total_len;
 
-          if (recordOffset + total_len > endOfValidData) break;
+            if (recordOffset + total_len > endOfValidData) break;
 
-          const timestamp = view.getBigUint64(recordOffset + 4, true);
-          const can_id = view.getUint32(recordOffset + 12, true);
-          const channel = view.getUint8(recordOffset + 16);
-          const dlc = view.getUint8(recordOffset + 17);
-          const flags = view.getUint8(recordOffset + 18);
-          const bus_id = view.getUint8(recordOffset + 19);
-          const timestampSeconds = Number(timestamp) / 1_000_000;
+            const timestamp = view.getBigUint64(recordOffset + 4, true);
+            const can_id = view.getUint32(recordOffset + 12, true);
+            const channel = view.getUint8(recordOffset + 16);
+            const dlc = view.getUint8(recordOffset + 17);
+            const flags = view.getUint8(recordOffset + 18);
+            const bus_id = view.getUint8(recordOffset + 19);
+            const timestampSeconds = Number(timestamp) / 1_000_000;
 
-          const data = [];
-          if (type === 1) { // CANLOG_CLASSIC_TYPE
-            for (let i = 0; i < 8; i++) {
-              data.push(view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0'));
-            }
+            const data = [];
+            
+            if (type === 1) { // CANLOG_CLASSIC_TYPE
+                const data = new Array(8);
+                for (let i = 0; i < 8; i++) {
+                    data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
+                }
 
-            entries.push({
-              type: "Classic",
-              timestamp: timestampSeconds.toFixed(6),
-              can_id,
-              channel,
-              dlc,
-              flags,
-              bus_id,
-              data
-            });
+                entries.push({
+                    type: "Classic",
+                    timestamp: timestampSeconds.toFixed(6),
+                    can_id,
+                    channel,
+                    dlc,
+                    flags,
+                    bus_id,
+                    data
+                });
 
-          } else if (type === 2) { // CANLOG_FD_TYPE
+                if (entries[entries.length - 1].timestamp > timestampSeconds.toFixed(6))
+                {
+                    console.log(`Implausible timestamp sequence from ${entries[entries.length - 1].timestamp} to ${timestampSeconds.toFixed(6)}`);
+                }
+
+            } else if (type === 2) { // CANLOG_FD_TYPE
+            const data = new Array(64);
             for (let i = 0; i < 64; i++) {
-              data.push(view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0'));
+                data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
             }
 
             entries.push({
-              type: "FD",
-              timestamp: timestampSeconds.toFixed(6),
-              can_id,
-              channel,
-              dlc,
-              flags,
-              bus_id,
-              data
+                type: "FD",
+                timestamp: timestampSeconds.toFixed(6),
+                can_id,
+                channel,
+                dlc,
+                flags,
+                bus_id,
+                data
             });
 
-          } else {
-            console.warn("Unsupported frame type at offset", recordOffset, "type =", type);
-          }
+            } else {
+                console.warn("Unsupported frame type at offset", recordOffset, "type =", type);
+                console.log(`-> Entry number ${entry_number} at ${recordOffset}`);
+                console.log(`.   Entry type ${type}`);
+                console.log(`.   Entry header length ${header_len}`);
+                console.log(`.   Entry total length ${total_len}`);
+            }
 
-          recordOffset += total_len;
+            recordOffset += total_len;
         }
 
+        block_cnt_prev = block_cnt;
+        blockSize_prev = blockSize;
         offset += blockSize; // move to the next block
       }
 
-      return entries;
-    }
 
-    function displayEntries(entries) {
+        console.log(`${(progress * 100).toFixed(2)} % of file processed: Parsing done.`);
+        // console.log(`.   header size: ${headerSize}`);
+        // console.log(`.   Block size: ${blockSize}`);
+        // console.log(`.   End of valid data: ${endOfValidData}`);
+        
+        entries = entries.sort((a, b) => {
+            const timeDiff = a.timestamp - b.timestamp;
+            if (timeDiff !== 0) return timeDiff;
+            
+            // If timestamps are equal, sort by CAN ID as tiebreaker
+            return a.can_id - b.can_id;
+        });
+
+        return entries;
+    }
+    function displayEntries(entries, page = 1, pageSize = 100) {
+        currentEntries = entries;
+        currentPage = page;
+        currentPageSize = pageSize;
+
         const table = document.getElementById("logTable");
         const tbody = table.querySelector("tbody");
         tbody.innerHTML = "";
-        entries.forEach((entry, index) => {
+
+        // Calculate pagination
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, entries.length);
+        const pageEntries = entries.slice(startIndex, endIndex);
+        
+        const fragment = document.createDocumentFragment();
+
+        pageEntries.forEach((entry, index) => {
             const row = document.createElement("tr");
             row.innerHTML = `
             <td>${index + 1}</td>
@@ -232,20 +359,109 @@
             <td>${entry.data.join(' ')}</td>
             <td>${entry.type}</td>
             `;
-            tbody.appendChild(row);
+            fragment.appendChild(row);
         });
+
+        tbody.appendChild(fragment);
         table.style.display = "table";
+
+        displayPaginationControls(entries.length, page, pageSize);
+    }
+
+    function displayPaginationControls(totalEntries, currentPage, pageSize) {
+        const totalPages = Math.ceil(totalEntries / pageSize);
+        const startIndex = (currentPage - 1) * pageSize + 1;
+        const endIndex = Math.min(currentPage * pageSize, totalEntries);
+        
+        // Update pagination display
+        document.getElementById('pagination').style.display = 'block';
+        document.getElementById('totalPages').textContent = totalPages;
+        document.getElementById('pageInput').value = currentPage;
+        document.getElementById('pageInput').max = totalPages;
+        document.getElementById('totalEntries').textContent = totalEntries;
+        document.getElementById('entryRange').textContent = `${startIndex}-${endIndex}`;
+        document.getElementById('pageSizeSelect').value = pageSize;
+        
+        // Enable/disable buttons based on current page
+        document.getElementById('firstPage').disabled = currentPage === 1;
+        document.getElementById('prevPage').disabled = currentPage === 1;
+        document.getElementById('nextPage').disabled = currentPage === totalPages;
+        document.getElementById('lastPage').disabled = currentPage === totalPages;
+    }
+
+    function goToPage(page) {
+        const totalPages = Math.ceil(currentEntries.length / currentPageSize);
+        
+        // Validate page number
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        
+        displayEntries(currentEntries, page, currentPageSize);
+    }
+
+    function changePageSize(newPageSize) {
+        // Try to keep the user viewing around the same data
+        // Calculate what entry index they're currently viewing
+        const currentFirstEntry = (currentPage - 1) * currentPageSize + 1;
+        
+        // Calculate what page that entry would be on with the new page size
+        const newPage = Math.ceil(currentFirstEntry / newPageSize);
+        
+        displayEntries(currentEntries, newPage, newPageSize);
     }
 
     document.getElementById("logfile").addEventListener("change", async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
+        const file = event.target.files[0];
+        if (!file) return;
 
-      const buffer = await file.arrayBuffer();
-      const entries = parseCanLog(buffer);
-      displayEntries(entries);
+        const buffer = await file.arrayBuffer();
+        const entries = parseCanLog(buffer);
+        displayEntries(entries);
+        });
+        
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('firstPage').addEventListener('click', () => {
+            goToPage(1);
+        });
+        
+        document.getElementById('prevPage').addEventListener('click', () => {
+            goToPage(currentPage - 1);
+        });
+        
+        document.getElementById('nextPage').addEventListener('click', () => {
+            goToPage(currentPage + 1);
+        });
+        
+        document.getElementById('lastPage').addEventListener('click', () => {
+            const totalPages = Math.ceil(currentEntries.length / currentPageSize);
+            goToPage(totalPages);
+        });
+        
+        document.getElementById('pageInput').addEventListener('change', (e) => {
+            const page = parseInt(e.target.value);
+            if (!isNaN(page)) {
+                goToPage(page);
+            }
+        });
+        
+        // Allow pressing Enter in the page input
+        document.getElementById('pageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const page = parseInt(e.target.value);
+                if (!isNaN(page)) {
+                    goToPage(page);
+                }
+            }
+        });
+        
+        // Handle page size change
+        document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+            const newPageSize = parseInt(e.target.value);
+            if (!isNaN(newPageSize)) {
+                changePageSize(newPageSize);
+            }
+        });
     });
-    
     </script>
 </body>
 </html>

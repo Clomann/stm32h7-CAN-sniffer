@@ -190,7 +190,7 @@
     </table>
     <br>
     Here you can change (re)format the SD card in case any issues occured 
-    (e. g. file system corruption due to brown out or performance degradation).
+    (e. g. file system corruption due to brown out).
     <br/>
     To do so, click the button below. A format request will be stored on the card 
     and the formatting will be done on the next restart of the system.
@@ -198,9 +198,10 @@
     <br>
   
     <!-- APPLY FORM (via JS, adds `action=format`) -->
-    <form method="POST" action="/can.cgi" id="format-form">
-        <input type="hidden" name="action" value="format">
-        <button type="submit" id="format-button">Format</button>
+    <form method="get" action="/cancontrol.cgi">
+        <big style="font-weight: bold;">
+            <input type="submit" name="action" value="Format" id="format-button">
+        </big>
     </form>
 
     <h3>
@@ -290,7 +291,10 @@
                 .addEventListener("submit", updateHiddenFields);
 
         document.getElementById("format-form")
-                .addEventListener("submit", updateHiddenFields);
+            .addEventListener("submit", async (e) => {
+            // let the browser submit as normal, then…
+            setTimeout(pollSnifferState, 200);  // refresh quickly
+        });
 
         document.getElementById("ctrl-form")
             .addEventListener("submit", async (e) => {

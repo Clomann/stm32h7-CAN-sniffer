@@ -113,11 +113,11 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
         if (HeadIndex >= TailIndex)
         {
-            Progression = HeadIndex - TailIndex;
+            Progression = HeadIndex - TailIndex + 1;
         }
         else if (HeadIndex < TailIndex)
         {
-            Progression = Capacity - TailIndex + HeadIndex;
+            Progression = Capacity + (HeadIndex - TailIndex + 1) ;
         }
 
         if (Progression < 2)
