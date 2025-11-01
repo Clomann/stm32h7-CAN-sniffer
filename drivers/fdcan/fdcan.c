@@ -8,6 +8,7 @@
 #include "fdcan.h"
 #include "fdcan_utils.h"
 #include "nvic_irg_config.h"
+#include <stdint.h>
 
 #define FDCAN_1_NBR        COMM_DEVICE_NUMBER_1
 #define FDCAN_2_NBR        COMM_DEVICE_NUMBER_2
@@ -543,6 +544,7 @@ comm_status_t FDCAN_Ioctl(
     int cmd, 
     void *argument)
 {
+    int HalRes = 0;
     comm_status_t res = 0;
     FdcanInstanceType * instance;
 
@@ -571,6 +573,10 @@ comm_status_t FDCAN_Ioctl(
                                         FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2))
             {
                 HAL_FDCAN_ActivateNotification(&instance->hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+            }
+
+            if (COMM_SUCCESS == res)
+            {
                 dev->state = DRIVER_STATE_STARTED;
             }
             else 
@@ -584,9 +590,7 @@ comm_status_t FDCAN_Ioctl(
                 /* nothing to do */
             }
             else if ( (HAL_FDCAN_DeactivateNotification(&instance->hfdcan, 
-                        FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != HAL_OK )
-                    || ( HAL_FDCAN_AbortTxRequest(&instance->hfdcan, 
-                        FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2) != HAL_OK) )
+                        FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != HAL_OK ) )
             {
                 /* Start Error */
                 res = COMM_ERROR;
@@ -598,9 +602,21 @@ comm_status_t FDCAN_Ioctl(
                 res = COMM_ERROR;
                 FDCAN_ErrorHandler();
             }
+            else if ((HalRes = HAL_FDCAN_AbortTxRequest(&instance->hfdcan, 
+                        FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2)) != HAL_OK)
+            {
+                /* Start Error */
+                res = COMM_ERROR;
+                (void) (HalRes);
+                FDCAN_ErrorHandler();
+            }
             else 
             {
                 __HAL_FDCAN_CLEAR_IT(&instance->hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE);
+            }
+
+            if (COMM_SUCCESS == res || (instance->hfdcan.ErrorCode & HAL_FDCAN_ERROR_NOT_STARTED) )
+            {
                 dev->state = DRIVER_STATE_STOPPED;
             }
             break;
