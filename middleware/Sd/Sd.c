@@ -676,7 +676,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);	
 
-    SpiAbs_Receive_Spi1_Task0(&Dummy, sizeof(Dummy));
+    SpiAbs_Receive_Spi1_Task0(Dummy, sizeof(Dummy));
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
@@ -704,7 +704,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 
 	SpiAbs_CsDisable(SPIABS_DEVICE_1);	
 
-    SpiAbs_Receive_Spi1_Task0(&Dummy, sizeof(Dummy));
+    SpiAbs_Receive_Spi1_Task0(Dummy, sizeof(Dummy));
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
@@ -791,7 +791,7 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);	
 
-    SpiAbs_Receive_Spi1_Task0(&Dummy, sizeof(Dummy));
+    SpiAbs_Receive_Spi1_Task0(Dummy, sizeof(Dummy));
 
 	SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
