@@ -16,11 +16,11 @@ typedef struct {
 } task_runtime_info_t;
 
 // Global variable you can inspect in GDB
-volatile task_runtime_info_t g_task_stats[MAX_TASKS];
-volatile uint32_t g_num_tasks = 0;
-volatile uint64_t g_total_runtime_us = 0;
+task_runtime_info_t g_task_stats[MAX_TASKS];
+uint32_t g_num_tasks = 0;
+uint64_t g_total_runtime_us = 0;
 
-volatile TaskStatus_t task_array[MAX_TASKS];
+TaskStatus_t task_array[MAX_TASKS];
 
 __attribute__((used))
 uint64_t Profiling_GetTimestamp(void)
@@ -41,7 +41,7 @@ void update_task_stats(void)
     UBaseType_t num_tasks = uxTaskGetNumberOfTasks();
     
     if (num_tasks <= MAX_TASKS) {
-        uint32_t total_runtime;
+        uint64_t total_runtime;
         g_num_tasks = uxTaskGetSystemState(task_array, num_tasks, &total_runtime);
         
         g_total_runtime_us = total_runtime;
