@@ -5,9 +5,14 @@ doxygen/output
 build/*
 _bin/
 .DS_Store
+.cache
 _deps/
 tests/_deps
 tests/build/
 
-cmake_install.cmake
+CMakeCache.txt
+*.cmake
 CMakeFiles/*
+*/CMakeFiles/*
+
+*/Testing/Temporary/*
