@@ -120,4 +120,4 @@ def convert_all_md_files(root_dir='.', output_format='svg'):
     print("="*50)
 
 if __name__ == '__main__':
-    convert_all_md_files('/Users/clemens/Documents/code/SPI_FullDuplex_ComDMA/doc/images', output_format='svg')
+    convert_all_md_files('../../doc/images', output_format='svg')
