@@ -1,6 +1,6 @@
 ```mermaid
 ---
-title: CanLogFdcanCanEntryType structure
+title: CanLogBlockHeaderType structure
 ---
 packet-beta
     0-7: "Version"
