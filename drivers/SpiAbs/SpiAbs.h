@@ -2,6 +2,12 @@
 
 #include <stdint.h>
 
+#define SPIABS_E_OK                0U
+#define SPIABS_E_NOT_OK            1U
+#define SPIABS_E_INVALID_PARAMETER 2U
+
+typedef uint8_t SpiAbsErrorType;
+
 enum SPIABS_DEVICE {
     SPIABS_DEVICE_1,
     SPIABS_DEVICE_2,
