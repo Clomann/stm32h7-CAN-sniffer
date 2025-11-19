@@ -967,7 +967,7 @@ comm_status_t get_fdcan_config(
     instance->hfdcan.Init.RxBuffersNbr = 0;
     instance->hfdcan.Init.TxEventsNbr = 0;
     instance->hfdcan.Init.TxBuffersNbr = 0;
-    instance->hfdcan.Init.TxFifoQueueElmtsNbr = 4;
+    instance->hfdcan.Init.TxFifoQueueElmtsNbr = FDCAN_RAM_TX_ELEMENTS;
     instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
     instance->hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
     
