@@ -2,6 +2,7 @@
 #include "Spi_Cmds.h"
 #include "spi.h"
 #include "TasksHooks.h"
+#include <stdint.h>
 
 #define SPI_RX_SLOT_REQUIRED_SIZE   (515) /* max payload: token + sector + crc = 1 + 512 + 2 = 515 */
 #define SPI_TX_SLOT_REQUIRED_SIZE   (515)
@@ -177,12 +178,36 @@ uint8_t SpiAbs_Init_Spi1()
 
 uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t * resp)
 {    
-    return SpiAbs_Receive_Spi1_Task0(resp, 1); 
+    uint8_t res;
+
+    switch (dev)
+    {
+        case SPIABS_DEVICE_1:
+            res = (uint8_t)SpiAbs_Receive_Spi1_Task0(resp, 1); 
+            break;
+        case SPIABS_DEVICE_2:
+        default:
+            res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
+    }
+
+    return res;
 }
 
 uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 {
-    return SpiAbs_Send_Spi1_Task0(data, 1); 
+    uint8_t res;
+
+    switch (dev)
+    {
+        case SPIABS_DEVICE_1:
+            res = (uint8_t)SpiAbs_Send_Spi1_Task0(data, 1); 
+            break;
+        case SPIABS_DEVICE_2:
+        default:
+            res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
+    }
+
+    return res;
 }
 
 uint8_t SpiAbs_SendWithCallback(
@@ -555,32 +580,53 @@ uint8_t SpiAbs_PwrOn(enum SPIABS_DEVICE dev)
 
 uint8_t SpiAbs_PwrOff(enum SPIABS_DEVICE dev)
 {
-    if (SPIABS_DEVICE_1 == dev)
+    uint8_t res;
+
+    switch (dev)
     {
-        return Spi_PwrOff();
+        case SPIABS_DEVICE_1:
+            res = (uint8_t)Spi_PwrOff();
+            break;
+        case SPIABS_DEVICE_2:
+        default:
+            res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
     }
 
-    return HAL_ERROR;
+    return res;
 }
 
 uint8_t SpiAbs_CsEnable(enum SPIABS_DEVICE dev)
 {
-    if (SPIABS_DEVICE_1 == dev)
+    uint8_t res;
+
+    switch (dev)
     {
-        return Spi_CsEnable();
+        case SPIABS_DEVICE_1:
+            res = (uint8_t)Spi_CsEnable();
+            break;
+        case SPIABS_DEVICE_2:
+        default:
+            res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
     }
 
-    return HAL_ERROR;
+    return res;
 }
 
 uint8_t SpiAbs_CsDisable(enum SPIABS_DEVICE dev)
 {
-    if (SPIABS_DEVICE_1 == dev)
+    uint8_t res;
+
+    switch (dev)
     {
-        return Spi_CsDisable();
+        case SPIABS_DEVICE_1:
+            res = (uint8_t)Spi_CsDisable();
+            break;
+        case SPIABS_DEVICE_2:
+        default:
+            res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
     }
 
-    return HAL_ERROR;
+    return res;
 }
 
 int SpiAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t *rx)
