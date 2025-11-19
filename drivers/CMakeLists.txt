@@ -7,7 +7,6 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/SpiAbs/SpiAbs.c
     ${CMAKE_CURRENT_LIST_DIR}/SpiAbs/SpiAbsHooks.c
     ${CMAKE_CURRENT_LIST_DIR}/CanAbs/CanAbs.c 
-    ${CMAKE_CURRENT_LIST_DIR}/comm/CommHandle/CommHandle.c 
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommManager/CommManager.c 
     ${CMAKE_CURRENT_LIST_DIR}/comm/CommManager/CommFactory.c 
     ${CMAKE_CURRENT_LIST_DIR}/fdcan/fdcan.c
