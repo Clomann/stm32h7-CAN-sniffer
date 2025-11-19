@@ -143,6 +143,15 @@
 #define MEMP_NUM_PARALLEL_HTTPD_SSI_CONNS 8U
 #define LWIP_HTTPD_POST_MANUAL_WND  0U
 
+// mDNS to use .local hostname
+#define LWIP_NETIF_STATUS_CALLBACK  1  /* Enable the callback */
+#define LWIP_MDNS_RESPONDER         1  /* Enable mDNS */
+#define LWIP_IGMP                   1  /* For multicast support */
+#define LWIP_UDP                    1 
+#define LWIP_NETIF_HOSTNAME         1  /* For hostname in DHCP/netif */
+#define LWIP_NUM_NETIF_CLIENT_DATA  (LWIP_MDNS_RESPONDER + LWIP_IGMP)  /* Client data */
+#define MEMP_NUM_IGMP_GROUP         8 /* Max multicast groups */
+
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
 /* ETH_CODE: first 2 macros solve errno issue with GCC 10 and ST LwIP
