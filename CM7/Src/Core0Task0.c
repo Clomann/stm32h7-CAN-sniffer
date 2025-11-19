@@ -8,6 +8,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
+#include "main.h"
 #include "profiling.h"
 
 #include "nvic_irg_config.h"
@@ -113,11 +114,14 @@ void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
 
 static void appHandleFormattingRequest(void)
 {
+    FRESULT res;
     _Bool ReformattingRequested;
     FatFsDeviceType DevTmp;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
 
-    if (FR_OK == FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName))
+    res = FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName);
+
+    if (FR_OK == res)
     {
         ReformattingRequested = true;
     }
@@ -125,12 +129,19 @@ static void appHandleFormattingRequest(void)
     {
         ReformattingRequested = false;
     }
-
-    if (ReformattingRequested && 0 == FatFS_SD_Unmount())
+    
+    if (ReformattingRequested)
     {
-        AppCtrlData.mountRes = 1;
+        res = FatFS_SD_Unmount();
 
-        if (FR_OK == FatFS_SD_Format_Fat32(32U * 1024U))
+        if (FR_OK == res)
+        {
+            AppCtrlData.mountRes = 1;
+    
+            res = FatFS_SD_Format_Fat32(32U * 1024U);
+        }
+
+        if (FR_OK == res)
         {
             AppCtrlData.mountRes = FatFS_SD_Mount();
         }
@@ -175,6 +186,11 @@ static void Core0Task0Main( void * parameters )
         AppCtrlData.mountRes = FatFS_SD_Mount();
     }
     
+    if (FR_OK != AppCtrlData.mountRes)
+    {
+        Error_Handler();
+    }
+
     appHandleFormattingRequest();
 
     AppCtrlData.Log = CanLogHandler_Init(
