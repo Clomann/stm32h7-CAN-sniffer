@@ -22,10 +22,12 @@
 #include "lwip.h"
 #include "lwip/init.h"
 #include "lwip/netif.h"
+
 #if defined ( __CC_ARM )  /* MDK ARM Compiler */
 #include "lwip/sio.h"
 #endif /* MDK ARM Compiler */
 #include "ethernetif.h"
+#include "app_mdns.h"
 #include <string.h>
 
 /* USER CODE BEGIN 0 */
@@ -66,6 +68,25 @@ static inline void tcpip_init_wrap(tcpip_init_done_fn tcpip_init_done, void *arg
 
 #endif
 /* USER CODE END 2 */
+
+#if LWIP_MDNS_RESPONDER
+static uint8_t mdns_initialized = 0;
+#endif
+
+static void netif_status_callback(struct netif *netif)
+{
+    volatile int breakpoint_here = 0;  // Set breakpoint on this line
+    (void)breakpoint_here;
+
+#if LWIP_MDNS_RESPONDER
+    if (netif_is_up(netif) && !ip4_addr_isany_val(*netif_ip4_addr(netif)) && !mdns_initialized)
+    {
+        // Network interface is up and has an IP address
+        app_mdns_init(netif);
+        mdns_initialized = 1;
+    }
+#endif
+}
 
 /**
   * LwIP initialization function
@@ -111,6 +132,9 @@ struct netif * MX_LWIP_Init(void)
 #else
   res = netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &netif_input);
 #endif
+#if LWIP_IGMP
+    netif_set_flags(&gnetif, NETIF_FLAG_IGMP);
+#endif
 
   /* Registers the default network interface */
   netif_set_default(&gnetif);
@@ -119,6 +143,9 @@ struct netif * MX_LWIP_Init(void)
   {
     /* When the netif is fully configured this function must be called */
     netif_set_up(&gnetif);
+
+    /* Start IGMP for multicast/mDNS support */
+    igmp_start(&gnetif);
 
     volatile err_t restmp;
     restmp = dhcp_start(&gnetif);
@@ -132,6 +159,8 @@ struct netif * MX_LWIP_Init(void)
 
   /* Set the link callback function, this function is called on change of link status*/
   netif_set_link_callback(&gnetif, ethernet_link_status_updated);
+
+  netif_set_status_callback(&gnetif, netif_status_callback);
 
   /* Create the Ethernet link handler thread */
 /* USER CODE BEGIN H7_OS_THREAD_NEW_CMSIS_RTOS_V2 */
@@ -168,6 +197,8 @@ static void ethernet_link_status_updated(struct netif *netif)
   if (netif_is_up(netif))
   {
 /* USER CODE BEGIN 5 */
+    /* Start IGMP for multicast/mDNS support */
+    igmp_start(&gnetif);
 /* USER CODE END 5 */
   }
   else /* netif is down */

@@ -2,6 +2,6 @@
 
 
 
-void http_init();
+void http_init(void);
 
-void http_poll();
+void http_poll(void);

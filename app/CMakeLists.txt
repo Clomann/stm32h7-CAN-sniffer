@@ -8,6 +8,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/ConfigManager.c
     ${CMAKE_CURRENT_SOURCE_DIR}/WebInterface.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/app_ethernet.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/http/src/app_mdns.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/ethernetif.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/fs_custom.c
     ${CMAKE_CURRENT_SOURCE_DIR}/http/src/httpd_cgi_ssi.c
