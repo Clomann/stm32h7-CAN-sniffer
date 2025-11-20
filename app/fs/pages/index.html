@@ -39,6 +39,14 @@
             padding: 2rem 0;
             margin-bottom: 1rem;
             border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 2rem;
+        }
+
+        .header-content {
+            flex: 1;
         }
 
         .header h1 {
@@ -51,6 +59,17 @@
         .header .subtitle {
             font-size: 0.9rem;
             color: var(--text-secondary);
+        }
+
+        .logo {
+            height: 80px;
+            flex-shrink: 0;
+        }
+
+        .logo img {
+            height: 100%;
+            width: auto;
+            display: block;
         }
 
         /* Navigation */
@@ -156,6 +175,14 @@
 
             .header {
                 padding: 1.5rem 0;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .logo {
+                height: 50px;
+                align-self: flex-end;
             }
 
             .header h1 {
@@ -185,8 +212,13 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>STM32H7 CAN Sniffer</h1>
-            <div class="subtitle">STM32H743I - Real-time CAN Bus Monitoring & Configuration</div>
+            <div class="header-content">
+                <h1>STM32H7 CAN Sniffer</h1>
+                <div class="subtitle">STM32H743I - Real-time CAN Bus Monitoring & Configuration</div>
+            </div>
+            <a href="/index.html" class="logo">
+                <img src="files/logo.png" alt="Logo">
+            </a>
         </div>
 
         <!-- Navigation -->
