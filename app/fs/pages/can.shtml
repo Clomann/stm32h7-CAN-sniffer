@@ -1,227 +1,429 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>STM32H7 CAN sniffer</title>
-
-    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
-    <meta content="MSHTML 6.00.2800.1561" name="GENERATOR">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32H7 CAN Sniffer</title>
     <style>
-        body {
-            font-family: Verdana;
-            font-weight: normal;
+        :root {
+            --primary-color: #334155;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --accent-color: #3b82f6;
         }
-    </style>    
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            padding: 2rem 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            color: var(--text-primary);
+        }
+
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Navigation */
+        .nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-link {
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            font-size: 0.9rem;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        button, input[type="submit"] {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        button:hover:not(:disabled), input[type="submit"]:hover:not(:disabled) {
+            background-color: var(--bg-color);
+            border-color: var(--primary-color);
+        }
+
+        button:disabled, input[type="submit"]:disabled {
+            opacity: 1;
+            cursor: not-allowed;
+            background-color: var(--bg-color) !important;
+            color: var(--text-secondary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .btn-success {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background-color: #475569;
+            border-color: #475569;
+        }
+
+        .btn-danger {
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background-color: #fee;
+            border-color: #dc2626;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #475569;
+            border-color: #475569;
+        }
+
+        .btn-warning {
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background-color: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        /* Configuration Table */
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .config-table th {
+            padding: 0.875rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .config-table td {
+            padding: 0.875rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .config-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Form Elements */
+        select {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            font-family: inherit;
+            min-width: 150px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        select:hover {
+            border-color: var(--primary-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 1.5rem 0;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .nav {
+                flex-wrap: wrap;
+            }
+
+            .nav-link {
+                padding: 0.625rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .card {
+                padding: 1.25rem;
+            }
+
+            .config-table {
+                font-size: 0.85rem;
+            }
+
+            .config-table th,
+            .config-table td {
+                padding: 0.625rem 0.5rem;
+            }
+
+            button, input[type="submit"] {
+                width: 100%;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h4>
-        <big style="font-weight: bold;">
-            <strong style="color: rgb(0, 0, 0);">
-                <span style="font-style: italic;">STM32H7 CAN sniffer</span>
-            </strong>
-        </big>
-    </h4>
-    <table style="width: 961px; height: 30px;" border="0" cellpadding="2" cellspacing="2">
-        <tbody>
-            <tr>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/index.html">
-                        <span style="color: rgb(0, 0, 0);">Home
-                        page</span>
-                    </a>
-                </td>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/can.shtml">
-                        <span style="color: rgb(0, 0, 0);">CAN setup
-                        </span>
-                    </a>
-                </td>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/can_trace.shtml">
-                        <span style="color: rgb(0, 0, 0);">CAN trace
-                        </span>
-                    </a>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <br>
-    <small>
-        <span style="font-family: Verdana;">Here you can change the CAN channel configuration. 
-            Change the settings and click "Save" to persist the changes.
-            You have to re-initilaize the CAN moudule manually (e. g. restart the device).
-        </span>
-    </small>
-    <small>
-        <span style="font-family: Verdana;">STM32H743I</span>
-    </small>
-    <br>
-    <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
-        <tbody>
-            <tr>
-                <td class="tabtitle" style="height: 15px; background-color: rgb(255, 255, 255);">
-                        <strong>CAN sniffer control</strong>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>STM32H7 CAN Sniffer</h1>
+            <div class="subtitle">STM32H743I - Real-time CAN Bus Monitoring & Configuration</div>
+        </div>
 
-    <br>
-    Here you can start and stop the CAN sniffer activity.
-    <br>
-    <br>
-    <form method="get" action="/cancontrol.cgi">
-        <big style="font-weight: bold;">
-            <input type="submit" name="action" value="Start" id="start-button">
-            <input type="submit" name="action" value="Stop" id="stop-button">
-        </big>
-    </form>
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="/index.html" class="nav-link">Home</a>
+            <a href="/can.shtml" class="nav-link">CAN Setup</a>
+            <a href="/can_trace.shtml" class="nav-link">CAN Trace</a>
+        </nav>
 
-    <br>
-    <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
-        <tbody>
-            <tr>
-                <td class="tabtitle" style="height: 15px; background-color: rgb(255, 255, 255);">
-                        <strong>CAN sniffer CAN configuration setup</strong>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <br>
-    Here you can change the CAN sniffer configuration. 
-    To apply the current values you have to stop and the 
-    CAN sniffer before clicking on "Apply". Clicking "Save" persists
-    the configuration on the SD card and read on a device restart.
-    <br>
-    <br>
-    <form method="get" action="/can.cgi" id="ctrl-form">
-        <table style="color: #000000; width: 961px; height: 38px; width: 50%;" border="0" cellspacing="0" cellpadding="3">
-            <tbody>
-                <tr>
-                    <th style="width: 33.333333%; text-align: left;">Setting</th>
-                    <th style="width: 33.333333%; text-align: left;">Current value</th>
-                    <th style="width: 33.333333%; text-align: left;">New value</th>
-                </tr>
-                <tr>
-                    <td style="width: 33.333333%;">CAN1: Baudrate</td>
-                    <td style="width: 33.333333%;"><!--#baud1--></td>
-                    <td style="width: 33.333333%;">
-                        <select name="baudrate1" id="baudrate1-select">
-                        <option value="0">-</option>
-                        <option value="250000">250 kbit/s</option>
-                        <option value="500000">500 kbit/s</option>
-                        <option value="1000000">1 Mbit/s</option>
-                    </select></td>
-                </tr>
-                <tr>
-                    <td style="width: 33.333333%;">CAN1: Operating mode</td>
-                    <td style="width: 33.333333%;"><!--#mode1--></td>
-                    <td style="width: 33.333333%;">
-                        <select name="mode1" id="mode1-select">
-                            <option value="0">-</option>
-                            <option value="1">normal</option>
-                            <option value="2">listen only</option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="width: 33.333333%;">CAN2: Baudrate</td>
-                    <td style="width: 33.333333%;"><!--#baud2--></td>
-                    <td style="width: 33.333333%;">
-                        <select name="baudrate2" id="baudrate2-select">
-                        <option value="0">-</option>
-                        <option value="250000">250 kbit/s</option>
-                        <option value="500000">500 kbit/s</option>
-                        <option value="1000000">1 Mbit/s</option>
-                    </select></td>
-                </tr>
-                <tr>
-                    <td style="width: 33.333333%;">CAN2: Operating mode</td>
-                    <td style="width: 33.333333%;"><!--#mode2--></td>
-                    <td style="width: 33.333333%;">
-                        <select name="mode2" id="mode2-select">
-                            <option value="0">-</option>
-                            <option value="1">normal</option>
-                            <option value="2">listen only</option>
-                        </select>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <br>
-        <br>
-    </form>
+        <!-- Sniffer Control Card -->
+        <div class="card">
+            <div class="card-header">CAN Sniffer Control</div>
+            <div class="card-description">
+                Start or stop the CAN sniffer activity. Ensure configuration is applied before starting.
+            </div>
+            <form method="get" action="/cancontrol.cgi" style="display: inline;">
+                <div class="btn-group">
+                    <button type="submit" name="action" value="Start" id="start-button" class="btn-primary">Start</button>
+                    <button type="submit" name="action" value="Stop" id="stop-button" class="btn-primary">Stop</button>
+                </div>
+            </form>
+        </div>
 
-    <table>
-        <tbody>
-            <tr>
-                <!-- APPLY FORM (via JS, adds `action=apply`) -->
-                <form method="POST" action="/can.cgi" id="apply-form">
-                    <input type="hidden" name="baud1" id="apply-baudrate1">
-                    <input type="hidden" name="mode1" id="apply-mode1">
-                    <input type="hidden" name="baud2" id="apply-baudrate2">
-                    <input type="hidden" name="mode2" id="apply-mode2">
-                    <input type="hidden" name="action" value="apply">
-                    <button type="submit" id="apply-button">Apply</button>
-                </form>
-            </tr>
-            <tr>
-                <!-- SAVE FORM (via JS, adds `action=save`) -->
-                <form method="POST" action="/can.cgi" id="save-form">
-                    <input type="hidden" name="baud1" id="save-baudrate1">
-                    <input type="hidden" name="mode1" id="save-mode1">
-                    <input type="hidden" name="baud2" id="save-baudrate2">
-                    <input type="hidden" name="mode2" id="save-mode2">
-                    <input type="hidden" name="action" value="save">
-                    <button type="submit" id="save-button">Save</button>
-                </form>
-            </tr>
-        </tbody>
-    </table>
+        <!-- Configuration Card -->
+        <div class="card">
+            <div class="card-header">CAN Configuration</div>
+            <div class="card-description">
+                Configure CAN channel settings. Stop the sniffer before applying changes. 
+                Click <strong>Apply</strong> to use the new settings immediately, or <strong>Save</strong> to persist them to the SD card for use after restart.
+            </div>
 
-    <br>
-    <table style="color: rgb(0, 0, 0); width: 961px; height: 38px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
-        <tbody>
-            <tr>
-                <td class="tabtitle" style="height: 15px; background-color: rgb(255, 255, 255);">
-                        <strong>SD card file system functions</strong>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <br>
-    Here you can change (re)format the SD card in case any issues occured 
-    (e. g. file system corruption due to brown out).
-    <br/>
-    To do so, click the button below. A format request will be stored on the card 
-    and the formatting will be done on the next restart of the system.
-    <br>
-    <br>
-  
-    <!-- APPLY FORM (via JS, adds `action=format`) -->
-    <form method="get" action="/cancontrol.cgi">
-        <big style="font-weight: bold;">
-            <input type="submit" name="action" value="Format" id="format-button">
-        </big>
-    </form>
+            <form method="get" action="/can.cgi" id="ctrl-form">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Setting</th>
+                            <th>Current Value</th>
+                            <th>New Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>CAN1: Baudrate</td>
+                            <td><!--#baud1--></td>
+                            <td>
+                                <select name="baudrate1" id="baudrate1-select">
+                                    <option value="0">-</option>
+                                    <option value="250000">250 kbit/s</option>
+                                    <option value="500000">500 kbit/s</option>
+                                    <option value="1000000">1 Mbit/s</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>CAN1: Operating Mode</td>
+                            <td><!--#mode1--></td>
+                            <td>
+                                <select name="mode1" id="mode1-select">
+                                    <option value="0">-</option>
+                                    <option value="1">Normal</option>
+                                    <option value="2">Listen Only</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>CAN2: Baudrate</td>
+                            <td><!--#baud2--></td>
+                            <td>
+                                <select name="baudrate2" id="baudrate2-select">
+                                    <option value="0">-</option>
+                                    <option value="250000">250 kbit/s</option>
+                                    <option value="500000">500 kbit/s</option>
+                                    <option value="1000000">1 Mbit/s</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>CAN2: Operating Mode</td>
+                            <td><!--#mode2--></td>
+                            <td>
+                                <select name="mode2" id="mode2-select">
+                                    <option value="0">-</option>
+                                    <option value="1">Normal</option>
+                                    <option value="2">Listen Only</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </form>
 
-    <h3>
-        <font size="-1">
-            <span style="color: black;"></span>
-        </font>
-    </h3>
-    <h3 style="font-weight: normal; font-family: Verdana;">
-        <font size="-1">
-            <br>
-        </font>
-    </h3>
-    <!-- ------------- JavaScript ---------------- -->
+            <div style="margin-top: 1.5rem;">
+                <div class="btn-group">
+                    <!-- Apply Form -->
+                    <form method="POST" action="/can.cgi" id="apply-form" style="display: inline;">
+                        <input type="hidden" name="baud1" id="apply-baudrate1">
+                        <input type="hidden" name="mode1" id="apply-mode1">
+                        <input type="hidden" name="baud2" id="apply-baudrate2">
+                        <input type="hidden" name="mode2" id="apply-mode2">
+                        <input type="hidden" name="action" value="apply">
+                        <button type="submit" id="apply-button" class="btn-primary">Apply Configuration</button>
+                    </form>
+
+                    <!-- Save Form -->
+                    <form method="POST" action="/can.cgi" id="save-form" style="display: inline;">
+                        <input type="hidden" name="baud1" id="save-baudrate1">
+                        <input type="hidden" name="mode1" id="save-mode1">
+                        <input type="hidden" name="baud2" id="save-baudrate2">
+                        <input type="hidden" name="mode2" id="save-mode2">
+                        <input type="hidden" name="action" value="save">
+                        <button type="submit" id="save-button" class="btn-primary">Save to SD Card</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- SD Card Management Card -->
+        <div class="card">
+            <div class="card-header">SD Card Management</div>
+            <div class="card-description">
+                Format the SD card to recover from file system corruption or other issues. 
+                The format request will be queued and executed on the next system restart.
+                <br/>
+                <strong>Warning:</strong> This will erase all data on the SD card.
+            </div>
+            <form method="get" action="/cancontrol.cgi">
+                <button type="submit" name="action" value="Format" id="format-button" class="btn-primary">Format</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
     <script>
     document.addEventListener("DOMContentLoaded", () => {
     
         /* ---------- configuration ---------- */
-        const STATUS_URL   = "/logger/status";   // ← your CGI/REST endpoint
-        const POLL_MS      = 1000;                    // how often to refresh (ms)
+        const STATUS_URL   = "/logger/status";
+        const POLL_MS      = 1000;
         const btnApply     = document.getElementById("apply-button");
+        const btnSave     = document.getElementById("save-button");
         const btnStart     = document.getElementById("start-button");
         const btnStop      = document.getElementById("stop-button");
         const btnFormat    = document.getElementById("format-button");
@@ -232,20 +434,24 @@
             try {
                 const resp = await fetch(STATUS_URL, {cache: "no-store"});
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const {active} = await resp.json();   // {active: true|false}
+                const {active} = await resp.json();
     
                 if (active) {
                     btnApply.disabled = true;
                     btnApply.title    = "Stop the sniffer first.";
+                    btnSave.disabled = true;
+                    btnSave.title    = "Stop the sniffer first.";
                     btnStart.disabled = true;
-                    btnStart.title    = "Stop the sniffer first.";
+                    btnStart.title    = "Sniffer is already running.";
                     btnStop.disabled = false;
-                    btnStop.title    = "Stop the sniffer first.";
+                    btnStop.title    = "";
                     btnFormat.disabled = true;
                     btnFormat.title    = "Stop the sniffer first.";
                 } else {
                     btnApply.disabled = false;
                     btnApply.title    = "";
+                    btnSave.disabled = false;
+                    btnSave.title    = "";
                     btnStart.disabled = false;
                     btnStart.title    = "";
                     btnStop.disabled = true;
@@ -257,6 +463,14 @@
                 console.error("Status poll failed:", e);
                 btnApply.disabled = true;
                 btnApply.title    = "Sniffer status unknown.";
+                btnSave.disabled = true;
+                btnSave.title    = "Sniffer status unknown.";
+                btnStart.disabled = true;
+                btnStart.title    = "Sniffer status unknown.";
+                btnStop.disabled = true;
+                btnStop.title    = "Sniffer status unknown.";
+                btnFormat.disabled = true;
+                btnFormat.title    = "Sniffer status unknown.";
             }
         }
         pollSnifferState();
@@ -278,7 +492,7 @@
                 .forEach(i => i.value = baud1);
             [ ...document.querySelectorAll("#apply-mode1,#save-mode1") ]
                 .forEach(i => i.value = mode1);
-                [ ...document.querySelectorAll("#apply-baudrate2,#save-baudrate2") ]
+            [ ...document.querySelectorAll("#apply-baudrate2,#save-baudrate2") ]
                 .forEach(i => i.value = baud2);
             [ ...document.querySelectorAll("#apply-mode2,#save-mode2") ]
                 .forEach(i => i.value = mode2);
@@ -290,19 +504,27 @@
         document.getElementById("save-form")
                 .addEventListener("submit", updateHiddenFields);
 
-        document.getElementById("format-form")
-            .addEventListener("submit", async (e) => {
-            // let the browser submit as normal, then…
-            setTimeout(pollSnifferState, 200);  // refresh quickly
-        });
-
         document.getElementById("ctrl-form")
             .addEventListener("submit", async (e) => {
-            // let the browser submit as normal, then…
-            setTimeout(pollSnifferState, 200);  // refresh quickly
+            setTimeout(pollSnifferState, 200);
+        });
+
+        /* -------- highlight current page in nav -------- */
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            const linkPath = new URL(link.href).pathname;
+            
+            // Direct match
+            if (currentPath === linkPath) {
+                link.classList.add('active');
+            }
+            // CGI pages should highlight their related nav item
+            else if (linkPath === '/can.shtml' && (currentPath === '/cancontrol.cgi' || currentPath === '/can.cgi')) {
+                link.classList.add('active');
+            }
         });
     });
-    </script>        
-    
+    </script>
 </body>
 </html>
