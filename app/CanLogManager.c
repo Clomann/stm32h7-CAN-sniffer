@@ -13,6 +13,9 @@
 #include "SdBridgeTask.h"
 #include "core_json.h"
 
+void CanLogManager_InstrumentationFlushStartHook(void);
+void CanLogManager_InstrumentationFlushEndHook(void);
+
 typedef struct
 {
     uint32_t epoch;
@@ -47,6 +50,18 @@ struct CanLogControlDataType
     bool runCanTracerOld;
     bool *commitLog;
 };
+
+/**
+ * @brief Hook called before flushing a CAN log block to storage.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanLogManager_InstrumentationFlushStartHook(void) {}
+
+/**
+ * @brief Hook called after flushing a CAN log block to storage.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanLogManager_InstrumentationFlushEndHook(void) {}
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
@@ -805,7 +820,9 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
 
     if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(Data, &DataLength))
     {
+        CanLogManager_InstrumentationFlushStartHook();
         res = appCanLogStoreToSd(dev, (char *)Data, DataLength);
+        CanLogManager_InstrumentationFlushEndHook();
     }
     else
     {

@@ -10,6 +10,7 @@
 #include <queue.h>
 #include "main.h"
 #include "profiling.h"
+#include "instrumentation.h"
 
 #include "nvic_irg_config.h"
 
@@ -214,6 +215,8 @@ static void Core0Task0Main( void * parameters )
     }
 
     GPIO_Mco1_Init();
+
+    Instrumentation_Init();
 
     appCanCtrlDataSetter(
         &CanCtrlData, 
