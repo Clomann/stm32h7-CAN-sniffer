@@ -27,7 +27,6 @@
 #include "lwip/sio.h"
 #endif /* MDK ARM Compiler */
 #include "ethernetif.h"
-#include "app_mdns.h"
 #include <string.h>
 
 /* USER CODE BEGIN 0 */
@@ -71,6 +70,7 @@ static inline void tcpip_init_wrap(tcpip_init_done_fn tcpip_init_done, void *arg
 
 #if LWIP_MDNS_RESPONDER
 static uint8_t mdns_initialized = 0;
+static ip4_addr_t mdns_last_ip;
 #endif
 
 static void netif_status_callback(struct netif *netif)
@@ -79,11 +79,21 @@ static void netif_status_callback(struct netif *netif)
     (void)breakpoint_here;
 
 #if LWIP_MDNS_RESPONDER
-    if (netif_is_up(netif) && !ip4_addr_isany_val(*netif_ip4_addr(netif)) && !mdns_initialized)
-    {
-        // Network interface is up and has an IP address
-        app_mdns_init(netif);
-        mdns_initialized = 1;
+    if (netif_is_up(netif) && !ip4_addr_isany_val(*netif_ip4_addr(netif))) {
+        /* Network interface is up and has an IP address */
+        if (!mdns_initialized) {
+            app_mdns_init(netif);
+            mdns_last_ip = *netif_ip4_addr(netif);
+            mdns_initialized = 1;
+        } else if (!ip4_addr_cmp(netif_ip4_addr(netif), &mdns_last_ip)) {
+            /* DHCP/Link change: restart probing/announcements so the hostname stays valid */
+            mdns_last_ip = *netif_ip4_addr(netif);
+            mdns_resp_restart(netif);
+        }
+    } else if (mdns_initialized && !netif_is_up(netif)) {
+        /* Drop mDNS when the link goes down so it can be cleanly re-added */
+        mdns_resp_remove_netif(netif);
+        mdns_initialized = 0;
     }
 #endif
 }
@@ -280,4 +290,3 @@ u32_t sio_tryread(sio_fd_t fd, u8_t *data, u32_t len)
   return recved_bytes;
 }
 #endif /* MDK ARM Compiler */
-
