@@ -4,6 +4,18 @@
 
 #include <stdint.h>
 
+/**
+ * @brief Hook called at CAN ISR entry for measurement instrumentation.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanAbs_InstrumentationIsrStartHook(void) {}
+
+/**
+ * @brief Hook called at CAN ISR exit for measurement instrumentation.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanAbs_InstrumentationIsrEndHook(void) {}
+
 /* CAN 1 */
 
 static CommDriver Fdcan1Driver;
@@ -216,6 +228,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     uint64_t HardwareTimestamp;
     const uint32_t MAX_FRAMES_PER_ISR = FDCAN_RAM_RX_ELEMENTS / 2U;
 
+    CanAbs_InstrumentationIsrStartHook();
+
     if (FDCAN_1 == hfdcan->Instance)
     {
         while ( (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) > 0) && 
@@ -266,6 +280,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     if (frames_processed > 0) {
         NotifyConsumerTask();
     }
+
+    CanAbs_InstrumentationIsrEndHook();
 }
 
 /* Public functions ================================================== */
