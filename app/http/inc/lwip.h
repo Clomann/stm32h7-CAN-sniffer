@@ -34,6 +34,7 @@
 #include "lwip/netif.h"
 #include "lwip/timeouts.h"
 #include "ethernetif.h"
+#include "app_mdns.h"
 
 /* Includes for RTOS ---------------------------------------------------------*/
 #if WITH_RTOS

@@ -46,4 +46,6 @@ void http_poll(void)
 #if LWIP_DHCP
     DHCP_Periodic_Handle(netif);
 #endif
+
+    app_mdns_poll(netif);
 }

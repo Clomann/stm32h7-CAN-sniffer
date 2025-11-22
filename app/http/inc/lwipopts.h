@@ -144,13 +144,16 @@
 #define LWIP_HTTPD_POST_MANUAL_WND  0U
 
 // mDNS to use .local hostname
+
 #define LWIP_NETIF_STATUS_CALLBACK  1  /* Enable the callback */
+#define LWIP_NETIF_EXT_STATUS_CALLBACK 1
 #define LWIP_MDNS_RESPONDER         1  /* Enable mDNS */
 #define LWIP_IGMP                   1  /* For multicast support */
 #define LWIP_UDP                    1 
 #define LWIP_NETIF_HOSTNAME         1  /* For hostname in DHCP/netif */
 #define LWIP_NUM_NETIF_CLIENT_DATA  (LWIP_MDNS_RESPONDER + LWIP_IGMP)  /* Client data */
 #define MEMP_NUM_IGMP_GROUP         8 /* Max multicast groups */
+#define MDNS_RESP_USENETIF_EXTCALLBACK 1
 
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
