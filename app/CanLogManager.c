@@ -366,7 +366,7 @@ static FRESULT m_preallocate_log_files(void)
 
     UnseekableFiles = 0;
 
-    for (uint32_t i = 0; i < MAX_LOG_INDEX; i++)
+    for (uint32_t i = 0; i < MAX_LOG_FILE_COUNT; i++)
     {
         snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
         
