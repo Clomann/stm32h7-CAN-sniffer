@@ -6,6 +6,7 @@
 #include "CanAbs.h"
 #include "fdcan_msg_port.h"
 #include "TasksHooks.h"
+#include "RuntimeChecks.h"
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 
