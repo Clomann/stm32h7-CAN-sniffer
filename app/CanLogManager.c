@@ -12,6 +12,7 @@
 #include "fdcan_msg_port.h"
 #include "SdBridgeTask.h"
 #include "core_json.h"
+#include "RuntimeChecks.h"
 
 void CanLogManager_InstrumentationFlushStartHook(void);
 void CanLogManager_InstrumentationFlushEndHook(void);
@@ -23,8 +24,6 @@ typedef struct
     uint32_t byteOffset;
     uint32_t crc;
 } CanLogMetaDataType;
-
-extern volatile uint32_t CanLogManager_FrameCount;
 
 static volatile CanLogMetaDataType LogMetaData;
 #if CANLOGAMANGER_PERSIST_METADATA
@@ -823,6 +822,11 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         CanLogManager_InstrumentationFlushStartHook();
         res = appCanLogStoreToSd(dev, (char *)Data, DataLength);
         CanLogManager_InstrumentationFlushEndHook();
+
+        if (COMM_SUCCESS == res)
+        {
+            CanLogBuffer_BlockCount++;
+        }
     }
     else
     {

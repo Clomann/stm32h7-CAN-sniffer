@@ -3,6 +3,7 @@
 #include "fdcan.h"
 
 #include <stdint.h>
+#include "RuntimeChecks.h"
 
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
@@ -245,6 +246,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
                 if (((RingBuffer *)Fdcan1Driver.RxFrameBuffer)->isFull)
                 {
+                    CanAbs_FrameDropCount++;
                     CanAbs_ErrorHandler();
                 }
                 frames_processed++;
@@ -268,6 +270,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
                 if (((RingBuffer *)Fdcan2Driver.RxFrameBuffer)->isFull)
                 {
+                    CanAbs_FrameDropCount++;
                     CanAbs_ErrorHandler();
                 }
                 frames_processed++;

@@ -1,14 +1,12 @@
 #include "CanLogBuffer.h"
 #include "lwrb/lwrb.h"
+#include "RuntimeChecks.h"
 
 __attribute__((section(".ram_d2")))
 static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
 static lwrb_t Rb1;
 static uint8_t EpochCount = 0;
 static uint8_t BlockCount = 0;
-
-extern uint64_t CanLogBuffer_FrameCount1;
-extern uint64_t CanLogBuffer_FrameCount2;
 
 uint8_t CanLogBuffer_Init()
 {
@@ -36,6 +34,8 @@ uint8_t CanLogBuffer_AddFdCanEntry(const CanLogFdcanCanEntryType * entry)
 {
     if (sizeof(CanLogFdcanCanEntryType) == lwrb_write(&Rb1, entry, sizeof(CanLogFdcanCanEntryType)))
     {
+        CanLogBuffer_FrameCount1++;
+        
         return 0;
     }
     
@@ -76,6 +76,7 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
     uint16_t total_len;
     uint8_t entry_type;
     uint32_t offset;
+    uint32_t frame_count = 0;
     CanLogBlockHeaderType BlockHeader;
     CanLogEntryHeaderType EntryHeader;
 
@@ -116,6 +117,7 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
         }
 
         CanLogBuffer_FrameCount2++;
+        frame_count++;
         offset += total_len;
     }
     
@@ -131,6 +133,9 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len)
         BlockHeader.version = CANLOG_VERSION;
         BlockHeader.cnt = BlockCount++;
         BlockHeader.epoch = EpochCount;
+
+        BlockHeader.ingress_frames = CanLogBuffer_FrameCount1;
+        BlockHeader.frame_count = frame_count;
 
         memcpy(data, &BlockHeader, sizeof(BlockHeader));
     }

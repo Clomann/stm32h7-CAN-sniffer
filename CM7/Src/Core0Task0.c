@@ -33,12 +33,7 @@
 #include "CanLogManager.h"
 #include "CanCtrl.h"
 #include "WebInterface.h"
-
-volatile uint32_t CanAbs_FrameCount = 0;
-volatile uint32_t CanBridgeTask_FrameCount = 0;
-volatile uint32_t CanLogManager_FrameCount = 0;
-volatile uint32_t CanLogBuffer_FrameCount1 = 0;
-volatile uint32_t CanLogBuffer_FrameCount2 = 0;
+#include "RuntimeChecks.h"
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -279,6 +274,8 @@ static void Core0Task0Main( void * parameters )
         }
 
         update_task_stats();
+
+        RuntimeChecks_CheckFrameCounts(NULL);
     }
 
     appCanLogHandlerDeInit(AppCtrlData.Log);
