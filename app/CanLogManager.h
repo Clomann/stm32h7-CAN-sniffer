@@ -21,8 +21,9 @@
 
 #define CLUSTER_SIZE                   (32768U) 
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
-#define MAX_LOG_FILE_SIZE              (1U * 1024U * 1024U)
-#define MAX_LOG_INDEX                  (32U - 1U)
+#define MAX_LOG_FILE_COUNT             640U
+#define MAX_LOG_FILE_SIZE              (10U * 1024U * 1024U)
+#define MAX_LOG_INDEX                  (MAX_LOG_FILE_COUNT - 1U)
 
 #define CAN_LOG_MAX_FILE_SIZE_KB 16U
 #define CAN_LOG_MAX_FILE_SIZE    (CAN_LOG_MAX_FILE_SIZE_KB * 1024U)
