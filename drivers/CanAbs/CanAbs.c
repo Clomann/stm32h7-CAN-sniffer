@@ -3,6 +3,7 @@
 #include "fdcan.h"
 
 #include <stdint.h>
+#include "RuntimeChecks.h"
 
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
