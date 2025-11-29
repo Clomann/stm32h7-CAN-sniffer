@@ -58,6 +58,8 @@ typedef struct {
     uint16_t block_fill;    // indicates the block fill level to determine padding byte count
     uint8_t epoch; /*!< Epoch counter */
     uint8_t cnt;   /*!< Block sequence counter */
+    uint32_t ingress_frames; /*!< ingress frame count of staging buffer */
+    uint32_t frame_count; /*!< number of frames in this block */
 } __attribute__((packed)) CanLogBlockHeaderType;
 
 uint8_t CanLogBuffer_Init(void);
