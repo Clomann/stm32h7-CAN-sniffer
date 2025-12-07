@@ -224,17 +224,24 @@ static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t g
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
     FDCAN_ClassicFrame NewFrame;
-    uint32_t frames_processed = 0;
+    volatile uint32_t frames_processed = 0;
+    volatile uint32_t fill_level = 0;
     uint64_t GlobalTimestamp;
     uint64_t HardwareTimestamp;
-    const uint32_t MAX_FRAMES_PER_ISR = FDCAN_RAM_RX_ELEMENTS / 2U;
+    FDCAN_HandleTypeDef *hfdcantmp;
+    RingBufferErrorType res;
 
     CanAbs_InstrumentationIsrStartHook();
 
+#if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+    hfdcantmp = hfdcan;
+    
     if (FDCAN_1 == hfdcan->Instance)
+#else
+    (void) fdcan_get_can(&Fdcan1Driver, &hfdcantmp);
+#endif
     {
-        while ( (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) > 0) && 
-               (frames_processed < MAX_FRAMES_PER_ISR) )
+        while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)))
         {
             if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
             {
@@ -243,8 +250,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
                 NewFrame.timestamp = ReconstructFullTimestamp(HardwareTimestamp, GlobalTimestamp);
 
-                ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
-                if (((RingBuffer *)Fdcan1Driver.RxFrameBuffer)->isFull)
+                res = ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
+                if (RB_E_OK != res)
                 {
                     CanAbs_FrameDropCount++;
                     CanAbs_ErrorHandler();
@@ -255,10 +262,13 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             }
         }
     }
-    else if (FDCAN_2 == hfdcan->Instance)
+#if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+    else if ( FDCAN_2 == hfdcan->Instance)
+#else
+    (void) fdcan_get_can(&Fdcan2Driver, &hfdcantmp);
+#endif
     {
-        while ( (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) > 0) && 
-               (frames_processed < MAX_FRAMES_PER_ISR) )
+        while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)) )
         {
             if (Fdcan2Driver.interface->read(&Fdcan2Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
             {
@@ -267,8 +277,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
                 NewFrame.timestamp = ReconstructFullTimestamp(HardwareTimestamp, GlobalTimestamp);
 
-                ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
-                if (((RingBuffer *)Fdcan2Driver.RxFrameBuffer)->isFull)
+                res = ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
+                if (RB_E_OK != res)
                 {
                     CanAbs_FrameDropCount++;
                     CanAbs_ErrorHandler();
