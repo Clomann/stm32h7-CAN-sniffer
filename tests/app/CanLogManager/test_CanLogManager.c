@@ -13,6 +13,7 @@
 static CanLogControlDataType *testCtrlData;
 static uint8_t mockMountRes;
 static bool mockRunCanTracer;
+static bool mockCommit;
 static FDCAN_ClassicFrame testFrame;
 
 void reset_fs_stubs(void);
@@ -41,6 +42,7 @@ void test_CanLogManager_setUp(void)
 
     mockMountRes     = RES_OK;
     mockRunCanTracer = false;
+    mockCommit = false;
 
     testFrame.id        = 0x123;
     testFrame.dlc       = 8;
@@ -49,7 +51,7 @@ void test_CanLogManager_setUp(void)
     memset(testFrame.data, 0xAA, sizeof(testFrame.data));
 
     CanLogBuffer_Init();
-    testCtrlData = CanLogHandler_Init(&mockMountRes, &mockRunCanTracer);
+    testCtrlData = CanLogHandler_Init(&mockMountRes, &mockRunCanTracer, &mockCommit);
 }
 
 void test_CanLogManager_tearDown(void)
@@ -85,18 +87,18 @@ void test_CanLogHandler_Init(void)
  */
 void test_CanLogBuffer_AddEntry(void)
 {
-    CanLogClassicCanEntryType entry;
+    CanLogEntryAccessorType entry;
     memset(&entry, 0, sizeof(entry));
-    entry.header.header_len = sizeof(entry.header);
-    entry.header.type       = CANLOG_CLASSIC_TYPE;
-    entry.header.total_len  = sizeof(CanLogClassicCanEntryType);
-    entry.timestamp         = 12345;
-    entry.channel           = 1;
-    entry.dlc               = 8;
-    entry.can_id            = 0x123;
-    memset(entry.data, 0xBB, sizeof(entry.data));
+    entry.accessor.header.header_len = sizeof(entry.accessor.header);
+    entry.accessor.header.type       = CANLOG_CLASSIC_TYPE;
+    entry.accessor.dlc               = 8;
+    entry.accessor.header.total_len  = sizeof(CanLogEntryType) + entry.accessor.dlc;
+    entry.accessor.timestamp         = 12345;
+    entry.accessor.channel           = 1;
+    entry.accessor.can_id            = 0x123;
+    memset(entry.accessor.data, 0xBB, entry.accessor.dlc);
 
-    uint8_t result = CanLogBuffer_AddClassicCanEntry(&entry);
+    uint8_t result = CanLogBuffer_AddClassicCanEntry(&entry.accessor);
     TEST_ASSERT_EQUAL(0, result);
 }
 
@@ -106,21 +108,21 @@ void test_CanLogBuffer_AddEntry(void)
  */
 void test_CanLogBuffer_BlockReady(void)
 {
-    CanLogClassicCanEntryType entry;
+    CanLogEntryAccessorType entry;
     memset(&entry, 0, sizeof(entry));
-    entry.header.header_len = sizeof(entry.header);
-    entry.header.type       = CANLOG_CLASSIC_TYPE;
-    entry.header.total_len  = sizeof(CanLogClassicCanEntryType);
-    entry.dlc               = 8;
+    entry.accessor.header.header_len = sizeof(entry.accessor.header);
+    entry.accessor.header.type       = CANLOG_CLASSIC_TYPE;
+    entry.accessor.dlc               = 8;
+    entry.accessor.header.total_len  = sizeof(CanLogEntryType) + entry.accessor.dlc;
 
-    int entriesNeeded = (BLOCK_SIZE / sizeof(CanLogClassicCanEntryType)) + 1;
+    int entriesNeeded = (BLOCK_SIZE / entry.accessor.header.total_len) + 1;
     for (int i = 0; i < entriesNeeded; i++)
     {
-        entry.timestamp = 1000 + i;
-        entry.can_id    = 0x200 + i;
-        entry.channel   = (i % 2) + 1;
+        entry.accessor.timestamp = 1000 + i;
+        entry.accessor.can_id    = 0x200 + i;
+        entry.accessor.channel   = (i % 2) + 1;
 
-        uint8_t result = CanLogBuffer_AddClassicCanEntry(&entry);
+        uint8_t result = CanLogBuffer_AddClassicCanEntry(&entry.accessor);
         TEST_ASSERT_EQUAL(0, result);
     }
 
@@ -135,28 +137,29 @@ void test_CanLogBuffer_BlockReady(void)
  */
 void test_CanLogBuffer_ReadBlock(void)
 {
-    CanLogClassicCanEntryType entry;
+    CanLogEntryAccessorType entry;
     memset(&entry, 0, sizeof(entry));
-    entry.header.header_len = sizeof(entry.header);
-    entry.header.type       = CANLOG_CLASSIC_TYPE;
-    entry.header.total_len  = sizeof(CanLogClassicCanEntryType);
-    entry.timestamp         = 5000;
-    entry.channel           = 2;
-    entry.dlc               = 8;
-    entry.can_id            = 0x456;
-    memset(entry.data, 0xCC, sizeof(entry.data));
+    entry.accessor.header.header_len = sizeof(entry.accessor.header);
+    entry.accessor.header.type       = CANLOG_CLASSIC_TYPE;
+    entry.accessor.dlc               = 8;
+    entry.accessor.header.total_len  = sizeof(CanLogEntryType) + entry.accessor.dlc;
+    entry.accessor.timestamp         = 5000;
+    entry.accessor.channel           = 2;
+    entry.accessor.can_id            = 0x456;
+    memset(entry.accessor.data, 0xCC, entry.accessor.dlc);
 
-    int entriesNeeded = (BLOCK_SIZE / sizeof(CanLogClassicCanEntryType)) + 1;
+    int entriesNeeded = (BLOCK_SIZE / entry.accessor.header.total_len) + 1;
     for (int i = 0; i < entriesNeeded; i++)
     {
-        entry.timestamp = 5000 + i;
-        entry.can_id    = 0x456 + i;
-        CanLogBuffer_AddClassicCanEntry(&entry);
+        entry.accessor.timestamp = 5000 + i;
+        entry.accessor.can_id    = 0x456 + i;
+        CanLogBuffer_AddClassicCanEntry(&entry.accessor);
     }
 
-    uint8_t blockData[BLOCK_SIZE];
+    uint8_t *blockData;
     uint32_t blockLength;
-    uint8_t readResult = CanLogBuffer_ReadNextBlock(blockData, &blockLength);
+    uint32_t frameCount;
+    uint8_t readResult = CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount);
 
     TEST_ASSERT_EQUAL(CANLOG_E_OK, readResult);
     TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
@@ -164,6 +167,8 @@ void test_CanLogBuffer_ReadBlock(void)
     CanLogBlockHeaderType *header = (CanLogBlockHeaderType *)blockData;
     TEST_ASSERT_EQUAL(CANLOG_VERSION, header->version);
     TEST_ASSERT_EQUAL(BLOCK_SIZE, header->block_size);
+
+    CanLogBuffer_Consume(blockLength, frameCount);
 }
 
 /**
