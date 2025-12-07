@@ -533,6 +533,7 @@
 
 
     function parseCanLog(arrayBuffer) {
+      const HEX = new Array(256).fill(0).map((_, i) => i.toString(16).padStart(2, '0'));
       const view = new DataView(arrayBuffer);
       let entries = [];
       let offset = 0;
@@ -598,10 +599,13 @@
 
             const data = [];
             
+            const payloadOffset = recordOffset + 20; // header + fixed fields
+            const payloadLen = Math.min(type === 1 ? 8 : 64, Math.max(0, total_len - (payloadOffset - recordOffset)));
+
             if (type === 1) { // CANLOG_CLASSIC_TYPE
-                const data = new Array(8);
-                for (let i = 0; i < 8; i++) {
-                    data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
+                const data = new Array(payloadLen);
+                for (let i = 0; i < payloadLen; i++) {
+                    data[i] = HEX[view.getUint8(payloadOffset + i)];
                 }
 
                 entries.push({
@@ -621,9 +625,9 @@
                 }
 
             } else if (type === 2) { // CANLOG_FD_TYPE
-            const data = new Array(64);
-            for (let i = 0; i < 64; i++) {
-                data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
+            const data = new Array(payloadLen);
+            for (let i = 0; i < payloadLen; i++) {
+                data[i] = HEX[view.getUint8(payloadOffset + i)];
             }
 
             entries.push({

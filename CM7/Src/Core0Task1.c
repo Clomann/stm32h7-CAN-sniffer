@@ -1,6 +1,8 @@
 #include "Core0Task1.h"
 #include "Core0TasksCfg.h"
 
+#include "profiling.h"
+
 TASK_VARIABLES(CORE0_TASK3_FUNCTION, CORE0_TASK3_STACK_SIZE)
 
 static void Core0Task1Main( void * parameters )
@@ -13,6 +15,7 @@ static void Core0Task1Main( void * parameters )
     while (1)
     {
         vTaskDelayUntil(&xLastWakeTime, xCycleTime);
+        update_task_stats();
     }
 }
 

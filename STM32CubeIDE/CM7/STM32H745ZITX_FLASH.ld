@@ -35,11 +35,14 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-PROVIDE(_estack = 0x24020000);    /* end of RAM (Compatible with H743's 128KB RAM_D1) */
+/* PROVIDE(_estack = 0x24020000); /*    /* end of RAM (Compatible with H743's 128KB RAM_D1) */
+PROVIDE(_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1));  /* 0x24080000 on H745 */
 
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200 ;      /* required amount of heap  */
 _Min_Stack_Size = 0x400 ; /* required amount of stack */
+
+_Lwip_Heap_Size = LWIP_HEAP_SIZE ; /* required amount of heap for LwIP stack */
 
 /* Specify the memory areas */
 MEMORY
@@ -123,6 +126,12 @@ SECTIONS
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
+  .dtcram (NOLOAD): {
+    . = ALIGN(4);
+    *(.dtcram)
+    . = ALIGN(4);
+  } >DTCMRAM
+
   /* Initialized data sections goes into RAM_D1, load LMA copy after code */
   .data : 
   {
@@ -155,6 +164,12 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM_D1
 
+  .ram_d1 (NOLOAD): {
+    . = ALIGN(4);
+    *(.ram_d1)
+    . = ALIGN(4);
+  } >RAM_D1
+
   /* User_heap_stack section, used to check that there is enough RAM_D1 left */
   ._user_heap_stack :
   {
@@ -177,9 +192,17 @@ SECTIONS
     
     . = ABSOLUTE(0x30000400);
     *(.Rx_PoolSection) 
-
+    
+    . = ALIGN(4);
+    __lwip_heap_start__ = .;
+    . = . + _Lwip_Heap_Size;
+    __lwip_heap_end__ = .;
+    
     __lwip_sec_end__ = .;
   } >RAM_D2
+
+  PROVIDE(__lwip_heap_start = __lwip_heap_start__);
+  PROVIDE(__lwip_heap_end   = __lwip_heap_end__);
 
   .ram_d2 (NOLOAD): {
     . = ALIGN(4);

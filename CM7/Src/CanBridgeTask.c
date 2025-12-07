@@ -1,4 +1,5 @@
 #include <FreeRTOS.h>
+#include <stdint.h>
 #include <task.h>
 #include <queue.h>
 
@@ -32,6 +33,7 @@ void CanBridgeTask(void *arg)
 {
     FDCAN_ClassicFrame Frame;
     static UBaseType_t MinUnusedStack;
+    volatile uint32_t NotificationCount = 0;
 
     (void)MinUnusedStack;
     (void) (arg);
@@ -40,7 +42,12 @@ void CanBridgeTask(void *arg)
 
     for (;;)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        NotificationCount = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        if (NotificationCount > 1U)
+        {
+            (void) NotificationCount;
+        }
 
         __asm volatile("nop");
 
@@ -72,10 +79,15 @@ void DEFERRED_IRQHandler(void)
     HAL_NVIC_ClearPendingIRQ(DEFERRED_IRQn);
 
     /* “Give” one notification to the bridge task */
-    vTaskNotifyGiveFromISR(
-        CanBridgeTaskHdl,
-        &xHigherPriorityTaskWoken
-    ); /* may set it to pdTRUE */
+    // vTaskNotifyGiveFromISR(
+    //     CanBridgeTaskHdl,
+    //     &xHigherPriorityTaskWoken
+    // ); /* may set it to pdTRUE */
+    xTaskNotifyFromISR(
+        CanBridgeTaskHdl, 
+        1, 
+        eSetValueWithOverwrite, 
+        &xHigherPriorityTaskWoken);
 
     /* If the bridge task has a higher priority, switch to it
        immediately after exiting the ISR.  The macro name is

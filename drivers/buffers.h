@@ -14,7 +14,8 @@
 typedef enum
 {
     RB_E_OK,
-    RB_E_NOT_OK
+    RB_E_NOT_OK,
+    RB_E_FULL,
 } RingBufferErrorType;
 
 typedef struct
@@ -140,13 +141,21 @@ static inline void *ring_buffer_reserve(RingBuffer *pBuffer)
     return element;
 }
 
-static inline void ring_buffer_put(RingBuffer *pBuffer, const void *pElement)
+void CanAbs_InstrumentationIsrStartHook(void);
+void CanAbs_InstrumentationIsrEndHook(void);
+
+static inline RingBufferErrorType ring_buffer_put(RingBuffer *pBuffer, const void *pElement)
 {
+    RingBufferErrorType res = RB_E_OK;
     void *FreeElement;
+
+    CanAbs_InstrumentationIsrStartHook();
+    CanAbs_InstrumentationIsrEndHook();
 
     if (pBuffer->isFull)
     {
-        return;
+        res = RB_E_FULL;
+        return res;
     }
 
     FreeElement = ring_buffer_peek(pBuffer);
@@ -163,6 +172,8 @@ static inline void ring_buffer_put(RingBuffer *pBuffer, const void *pElement)
     {
         pBuffer->isFull = 1;
     }
+
+    return res;
 }
 
 static inline void *ring_buffer_pop_ptr(RingBuffer *rb)
@@ -195,7 +206,7 @@ static inline void *ring_buffer_pop_ptr(RingBuffer *rb)
 static inline uint32_t ring_buffer_pop(RingBuffer *pBuffer, void *pElement)
 {
     uint32_t SwBufferIndex;
-
+    
     if (pBuffer->elementCount == 0)
     {
         return 1;
@@ -219,10 +230,10 @@ static inline uint32_t ring_buffer_pop(RingBuffer *pBuffer, void *pElement)
     pBuffer->elementCount--;
 
     pBuffer->tail =
-        ring_buffer_wrap_index(pBuffer->tail, pBuffer->bufferLength);
+    ring_buffer_wrap_index(pBuffer->tail, pBuffer->bufferLength);
 
     pBuffer->isFull = 0;
-
+    
     return RB_E_OK;
 }
 

@@ -12,10 +12,26 @@
         "commtypes.h": "c",
         "commmessages.h": "c",
         "utils_mpu.h": "c",
-        "stm32h7xx_hal.h": "c"
+        "stm32h7xx_hal.h": "c",
+        "ios": "c",
+        "fdcan_msg_port.h": "c",
+        "gpio.h": "c",
+        "sdbridgetask.h": "c",
+        "cansendtask.h": "c",
+        "freertos.h": "c",
+        "filehandlertypes.h": "c",
+        "mmcadapter.h": "c",
+        "test_definitions.h": "c",
+        "sd.h": "c",
+        "diskio.h": "c",
+        "http_cgi_ssi.h": "c",
+        "canlogmanager.h": "c",
+        "settingshandler.h": "c",
+        "errorcontext.h": "c"
     },
     "cortex-debug.openocdPath": "/usr/local/bin/openocd",
     "cortex-debug.gdbPath": "/opt/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb", 
     "makefile.extensionOutputFolder": "./.vscode",
-    "cortex-debug.variableUseNaturalFormat": false
+    "cortex-debug.variableUseNaturalFormat": true,
+    "chatgpt.commentCodeLensEnabled": false
 }

@@ -142,6 +142,7 @@ target_include_directories(app PUBLIC
     ${REPO_ROOT}/tests/app/CanLogManager
     ${REPO_ROOT}/tests/app
     ${REPO_ROOT}/app
+    ${REPO_ROOT}/Common/Inc
     ${REPO_ROOT}/libs/ff15a/source
     ${REPO_ROOT}/drivers
     ${REPO_ROOT}/drivers/CanAbs

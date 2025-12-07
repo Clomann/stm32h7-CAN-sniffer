@@ -1,0 +1,6 @@
+# taken from: 
+# https://doctoolchain.org/docToolchain/v2.0.x/020_tutorial/170_kroki-configuration.html
+
+docker run -d --name kroki -p 8000:8000 yuzutech/kroki
+
+curl http://localhost:8000/health

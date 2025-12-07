@@ -22,9 +22,9 @@ This project implements the software for a device that logs CAN traffic on two C
 
 # Quick start
 
-The project consists of the source code written to run on a NUCLE 144 STM32H745ZI discovery board. It uses GPIO to interface to:
+The project consists of the source code written to run on a NUCLEO-144 STM32H745ZI discovery board. It uses GPIO to interface to:
 - SD card
-- CAN tranceiver
+- CAN transceiver
 - the on board ETH interface
 
 It is built using cmake and make based on the gcc toolchain.
@@ -228,4 +228,3 @@ flowchart TD
     SPI1_MISO --- |MISO| SPI4_MISO
 
 ```
-
