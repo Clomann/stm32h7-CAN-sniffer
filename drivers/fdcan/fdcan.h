@@ -100,6 +100,8 @@ comm_status_t FDCAN_Read(
     uint8_t, 
     uint32_t);
 
+comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan);
+
 uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev);
 
 /* shims needed to be implemented by the caller */
