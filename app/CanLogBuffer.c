@@ -2,7 +2,7 @@
 #include "lwrb/lwrb.h"
 #include "RuntimeChecks.h"
 
-__attribute__((section(".ram_d2")))
+__attribute__((section(".ram_d1")))
 static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
 static lwrb_t Rb1;
 static uint8_t EpochCount = 0;

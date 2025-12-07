@@ -37,6 +37,10 @@
  extern "C" 
 #endif
 
+/* linker symbols defined in STM32H745ZITX_FLASH.ld */
+extern uint8_t __lwip_heap_start[];
+extern uint8_t __lwip_heap_end[];
+
 /* STM32CubeMX Specific Parameters (not defined in opt.h) ---------------------*/
 /* Parameters set in STM32CubeMX LwIP Configuration GUI -*/
 /*----- WITH_RTOS enabled (Since FREERTOS is set) -----*/
@@ -59,9 +63,10 @@
 /*----- Value in opt.h for MEM_ALIGNMENT: 1 -----*/
 #define MEM_ALIGNMENT 4
 /*----- Default Value for MEM_SIZE: 1600 ---*/
-#define MEM_SIZE 131048
+/* lwipopts.h */
+#define MEM_SIZE LWIP_HEAP_SIZE
 /*----- Default Value for H7 devices: 0x30044000 -----*/
-#define LWIP_RAM_HEAP_POINTER 0x30020000
+#define LWIP_RAM_HEAP_POINTER ((void *)__lwip_heap_start)
 /*----- Value supported for H7 devices: 1 -----*/
 #define LWIP_SUPPORT_CUSTOM_PBUF 1
 /*----- Value in opt.h for LWIP_ETHERNET: LWIP_ARP || PPPOE_SUPPORT -*/
