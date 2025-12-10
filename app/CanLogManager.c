@@ -10,6 +10,7 @@
 #include "fs_custom.h"
 #include "CanLogBuffer.h"
 #include "CanAbs.h"
+#include "CanCtrl.h"
 #include "fdcan_msg_port.h"
 #include "SdBridgeTask.h"
 #include "core_json.h"
@@ -20,6 +21,12 @@
 #include "CommTypes.h"
 #include "FileHandler.h"
 #endif
+
+#define CLM_ABS_TIME_TO_TIMSTAMP(x)   (uint32_t)(x)
+#define CLM_ABS_TIME_TO_ABS_HIGH(x)   ((uint32_t)((x) >> 32U))
+#define CLM_SYNC_EMIT_INTERVAL_US     (30ULL * 60ULL * 1000000ULL)
+
+extern uint64_t FDCAN_GetTimestampHook(void);
 
 void CanLogManager_InstrumentationFlushStartHook(void);
 void CanLogManager_InstrumentationFlushEndHook(void);
@@ -55,8 +62,9 @@ struct CanLogControlDataType
     } CanLog;
     uint8_t *mountRes;
     bool *runCanTracer;
-    bool runCanTracerOld;
     bool *commitLog;
+    bool runCanTracerOld;
+    bool emitSyncEntry;
 };
 
 /**
@@ -97,7 +105,7 @@ static void appCanLogFillEntry(
     uint8_t channel
 );
 static comm_status_t
-appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel);
+appCanLogStoreToFrameBuffer(void *entry);
 static comm_status_t
 appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length);
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
@@ -793,8 +801,9 @@ static void appCanLogFillEntry(
     entry->header.total_len  = sizeof(CanLogEntryType) + frame->dlc;
     entry->timestamp         = timestamp;
     entry->channel           = channel;
-    entry->dlc               = frame->dlc;
-    entry->can_id = frame->id;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(frame->dlc, 0);
+    entry->data_len          = frame->dlc;
+    entry->can_id            = frame->id;
     memcpy(entry->data, frame->data, frame->dlc);
 }
 
@@ -824,20 +833,14 @@ static InstrErrorType appPersistInstrumentationData(void)
 #endif
 
 static comm_status_t
-appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel)
+appCanLogStoreToFrameBuffer(void *entry)
 {
     comm_status_t res = COMM_SUCCESS;
-    CanLogEntryStackBufferType EntryBuffer;
-    CanLogEntryType *entry = (CanLogEntryType *)(&EntryBuffer);
+    CanLogEntryHeaderType *pHeader;
 
-    appCanLogFillEntry(
-        entry,
-        frame,
-        frame->timestamp,
-        channel
-    );
-
-    CanLogBuffer_AddEntry(entry);
+    pHeader = (CanLogEntryHeaderType *)entry;
+    
+    CanLogBuffer_AddEntry(entry, pHeader->total_len);
 
     return res;
 }
@@ -897,6 +900,24 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     return res;
 }
 
+static comm_status_t CanLogManager_EmitSyncEntry(
+    CanLogSyncType *sync,
+    uint64_t absTime,
+    uint32_t frameTimestamp
+)
+{
+    /* Keep the 32-bit timestamp aligned with the originating frame to avoid
+     * offsets when the absolute 64-bit timer wraps. */
+    sync->timestamp = CLM_ABS_TIME_TO_TIMSTAMP(frameTimestamp);
+    sync->abs_time_high  = CLM_ABS_TIME_TO_ABS_HIGH(absTime);
+
+    sync->header.header_len = sizeof(sync->header);
+    sync->header.type       = CLB_ENTRY_TYPE_SYNC;
+    sync->header.total_len  = sizeof(CanLogSyncType);
+
+    return appCanLogStoreToFrameBuffer((void *)sync);
+}
+
 void SdBridgeTask_ActionHook()
 {
     appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
@@ -909,7 +930,14 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     uint8_t BlockIsReady;
     uint32_t SlotsToWrite = 0;
     FDCAN_ClassicFrame NewFrame;
+    uint64_t AbsTime = 0;
+    CanLogSyncType SyncEntry;
+    CanLogEntryStackBufferType EntryBuffer;
+    CanLogEntryType *pFrameEntry = (CanLogEntryType *)(&EntryBuffer);
     volatile uint32_t LocalFrameCount;
+    static uint64_t NextPeriodicSyncAbsTime = 0;
+    static uint32_t LastFrameTimestamp = 0;
+    static bool LastFrameTimestampValid = false;
 
     if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
     {
@@ -953,6 +981,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
 
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
+
+        CanLogCtrlData.emitSyncEntry = true;
+        AbsTime = FDCAN_GetTimestampHook();
+        NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        LastFrameTimestampValid = false;
     }
     else
     {
@@ -975,12 +1008,51 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     (void) LocalFrameCount;
     LocalFrameCount = 0;
+
+    AbsTime = FDCAN_GetTimestampHook();
+
+    if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
+    {
+        CanLogCtrlData.emitSyncEntry = true;
+        NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+    }
+
     while (0 < fdcan_msg_port_read(&NewFrame, 2))
     {
         CanLogManager_DrainPortStartHook();
         CanLogManager_FrameCount++;
         LocalFrameCount++;
-        appCanLogStoreToFrameBuffer(&NewFrame, NewFrame.channel);
+
+        AbsTime = FDCAN_GetTimestampHook();
+
+        if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
+        {
+            CanLogCtrlData.emitSyncEntry = true;
+            NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        }
+
+        if (true == CanLogCtrlData.emitSyncEntry)
+        {
+            CanLogCtrlData.emitSyncEntry = false;
+            if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
+                        &SyncEntry,
+                        AbsTime,
+                        NewFrame.timestamp))
+            {
+                CanLogFileManager_ErrorHandler();
+            }
+        }
+
+        appCanLogFillEntry(
+            pFrameEntry,
+            &NewFrame,
+            NewFrame.timestamp,
+            NewFrame.channel
+        );
+
+        appCanLogStoreToFrameBuffer((void *)pFrameEntry);
+        LastFrameTimestamp = NewFrame.timestamp;
+        LastFrameTimestampValid = true;
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
         
@@ -999,6 +1071,21 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogManager_DrainPortEndHook();
     }
 
+    if (true == CanLogCtrlData.emitSyncEntry)
+    {
+        uint32_t timestamp32 = LastFrameTimestampValid
+            ? LastFrameTimestamp
+            : CLM_ABS_TIME_TO_TIMSTAMP(AbsTime);
+
+        CanLogCtrlData.emitSyncEntry = false;
+        if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
+                    &SyncEntry,
+                    AbsTime,
+                    timestamp32))
+        {
+            CanLogFileManager_ErrorHandler();
+        }
+    }
 
     if (*(CanLogCtrlData.commitLog))
     {    
