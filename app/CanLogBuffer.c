@@ -27,12 +27,9 @@ void CanLogBuffer_SetEpochCount(uint8_t epoch)
     EpochCount = epoch;
 }
 
-uint8_t CanLogBuffer_AddEntry(const CanLogEntryType * entry)
+uint8_t CanLogBuffer_AddEntry(const void * entry, uint32_t entryTotalSize)
 {
-    uint32_t EntryTotalSize;
     lwrb_sz_t free_space;
-
-    EntryTotalSize = entry->header.total_len;
 
     while (1)
     {
@@ -58,7 +55,7 @@ uint8_t CanLogBuffer_AddEntry(const CanLogEntryType * entry)
         }
 
         /* If entry would cross the block boundary, pad to the end of this block */
-        if (EntryTotalSize > space_in_block)
+        if (entryTotalSize > space_in_block)
         {
             uint32_t padding_to_next = space_in_block;
 
@@ -82,12 +79,12 @@ uint8_t CanLogBuffer_AddEntry(const CanLogEntryType * entry)
             continue; /* start again at next block (header will be reserved) */
         }
 
-        if (EntryTotalSize > free_space)
+        if (entryTotalSize > free_space)
         {
             return 1;
         }
 
-        if (EntryTotalSize == lwrb_write(&Rb1, entry, EntryTotalSize))
+        if (entryTotalSize == lwrb_write(&Rb1, entry, entryTotalSize))
         {
             CanLogBuffer_FrameCount1++;
             return 0;
