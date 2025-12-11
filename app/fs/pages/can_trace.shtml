@@ -249,6 +249,33 @@
             font-size: 0.9rem;
         }
 
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .filters label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .filters input,
+        .filters select {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: white;
+            font-family: inherit;
+            width: 120px;
+        }
+
         /* Table */
         #logTable {
             width: 100%;
@@ -387,6 +414,26 @@
             </div>
             <input type="file" id="logfile" accept=".bin" />
 
+            <!-- Filters -->
+            <div class="filters">
+                <label>CAN ID
+                    <input id="filterId" placeholder="e.g. 1A3" />
+                </label>
+                <label>Channel
+                    <input id="filterChannel" type="number" min="0" />
+                </label>
+                <label>Type
+                    <select id="filterType">
+                        <option value="">Any</option>
+                        <option value="Classic">Classic</option>
+                        <option value="FD">FD</option>
+                    </select>
+                </label>
+                <label>Search
+                    <input id="filterText" placeholder="data or flags" />
+                </label>
+            </div>
+
             <!-- Pagination Controls -->
             <div id="pagination" class="pagination" style="display: none;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -439,8 +486,10 @@
 
     <script type="text/javascript">
     let currentEntries = [];
+    let filteredEntries = [];
     let currentPage = 1;
     let currentPageSize = 100;
+    const filters = { id: "", channel: "", type: "", text: "" };
 
     (function () {
         const btn  = document.getElementById('btn');
@@ -533,45 +582,41 @@
 
 
     function parseCanLog(arrayBuffer) {
+      const HEX = new Array(256).fill(0).map((_, i) => i.toString(16).padStart(2, "0"));
       const view = new DataView(arrayBuffer);
-      let entries = [];
+      const entries = [];
+      const BLOCK_HEADER_MIN_SIZE = 20; // CanLogBlockHeaderType
+      const FRAME_MIN_SIZE = 14; // entry header + fixed frame fields
       let offset = 0;
-      let block_cnt = 0;
-      let block_cnt_prev = 0;
-      let blockSize_prev = 0;
+      let epochCountPrev = null;
+      let block_cnt_prev = null;
       let progress = 0;
-      let epochCountPrev = 0;
-      let blockCountPrev = 0;
+      let lastSyncHigh = null;
+      let lastSyncLow = null;
 
-      // iterate over blocks
-      while (offset + 8 <= arrayBuffer.byteLength) {
-        // --- Parse block header ---
+      while (offset + BLOCK_HEADER_MIN_SIZE <= arrayBuffer.byteLength) {
         const version = view.getUint8(offset);
         const headerSize = view.getUint8(offset + 1);
-        const blockSize = view.getUint16(offset + 2, true);
-        const blockFill = view.getUint16(offset + 4, true);
-        const epochCount = view.getUint8(offset + 6, true);
-        const blockCount = view.getUint8(offset + 7, true);
-        const blockNumber = offset / blockSize;
-        block_cnt = view.getUint8(offset + 7);
+        const epochCount = view.getUint8(offset + 2);
+        const blockCount = view.getUint8(offset + 3);
+        const blockSize = view.getUint32(offset + 4, true);
+        const blockFill = view.getUint32(offset + 8, true);
+        // ingress_frames at +12, frame_count at +16 (not used here)
         progress = offset / arrayBuffer.byteLength;
 
-        // Safety checks
-        if (offset + blockSize > arrayBuffer.byteLength)
-        {
-            console.log("End of data at offset ", offset);
-            break;
-        }
-        else if (blockSize === 0 || blockFill > blockSize) {
-            console.warn("Invalid or incomplete block header at offset ", offset);
-            offset += blockSize_prev; // move to the next block
-            break;
+        if (headerSize < BLOCK_HEADER_MIN_SIZE) {
+          console.warn("Invalid header size at offset", offset, "size =", headerSize);
+          break;
         }
 
-        if (epochCountPrev > 0 && epochCount !== epochCountPrev)
-        {
-            console.warn("End of valid data reached at ", offset);
-            break;
+        if (blockSize === 0 || blockFill > blockSize || offset + blockSize > arrayBuffer.byteLength) {
+          console.warn("Invalid or incomplete block header at offset", offset);
+          break;
+        }
+
+        if (epochCountPrev !== null && epochCount !== epochCountPrev) {
+          console.warn("End of valid data reached at", offset, "(epoch change)");
+          break;
         }
 
         epochCountPrev = epochCount;
@@ -579,92 +624,102 @@
         let recordOffset = offset + headerSize;
         const endOfValidData = offset + blockFill;
 
-        // iterate over entries in block
-        while (recordOffset + 4 <= endOfValidData) {
-            const type = view.getUint8(recordOffset);
-            const header_len = view.getUint8(recordOffset + 1);
-            const total_len = view.getUint16(recordOffset + 2, true);
-            const entry_number = (recordOffset - headerSize - offset)  / total_len;
+        while (recordOffset + 3 <= endOfValidData) {
+          const type = view.getUint8(recordOffset);
+          const header_len = view.getUint8(recordOffset + 1);
+          const total_len = view.getUint8(recordOffset + 2);
 
-            if (recordOffset + total_len > endOfValidData) break;
+          if (total_len === 0 || recordOffset + total_len > endOfValidData) {
+            break;
+          }
 
-            const timestamp = view.getBigUint64(recordOffset + 4, true);
-            const can_id = view.getUint32(recordOffset + 12, true);
-            const channel = view.getUint8(recordOffset + 16);
-            const dlc = view.getUint8(recordOffset + 17);
-            const flags = view.getUint8(recordOffset + 18);
-            const bus_id = view.getUint8(recordOffset + 19);
-            const timestampSeconds = Number(timestamp) / 1_000_000;
-
-            const data = [];
-            
-            if (type === 1) { // CANLOG_CLASSIC_TYPE
-                const data = new Array(8);
-                for (let i = 0; i < 8; i++) {
-                    data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
-                }
-
-                entries.push({
-                    type: "Classic",
-                    timestamp: timestampSeconds.toFixed(6),
-                    can_id,
-                    channel,
-                    dlc,
-                    flags,
-                    bus_id,
-                    data
-                });
-
-                if (entries[entries.length - 1].timestamp > timestampSeconds.toFixed(6))
-                {
-                    console.log(`Implausible timestamp sequence from ${entries[entries.length - 1].timestamp} to ${timestampSeconds.toFixed(6)}`);
-                }
-
-            } else if (type === 2) { // CANLOG_FD_TYPE
-            const data = new Array(64);
-            for (let i = 0; i < 64; i++) {
-                data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
+          if (type === 1) { // CLB_ENTRY_TYPE_FRAME
+            if (total_len < FRAME_MIN_SIZE) {
+              console.warn("Frame entry too small at", recordOffset, "len", total_len);
+              break;
             }
+
+            const tsLow = view.getUint32(recordOffset + 3, true);
+            const can_id = view.getUint32(recordOffset + 7, true);
+            const channel = view.getUint8(recordOffset + 11);
+            const dlc_flags = view.getUint8(recordOffset + 12);
+            const data_len = view.getUint8(recordOffset + 13);
+
+            const dlc = dlc_flags & 0x0f;
+            const flags = dlc_flags & 0xf0;
+
+            const payloadOffset = recordOffset + 14;
+            const payloadLen = Math.max(0, Math.min(data_len, 64, total_len - (payloadOffset - recordOffset)));
+            const data = new Array(payloadLen);
+            for (let i = 0; i < payloadLen; i++) {
+              data[i] = HEX[view.getUint8(payloadOffset + i)];
+            }
+
+            let timestamp64 = BigInt(tsLow);
+            if (lastSyncHigh !== null) {
+              timestamp64 = (BigInt(lastSyncHigh) << 32n) | BigInt(tsLow);
+              if (lastSyncLow !== null && tsLow < lastSyncLow) {
+                // If the 32-bit counter wrapped after the last sync, bump the high part.
+                timestamp64 = ((BigInt(lastSyncHigh) + 1n) << 32n) | BigInt(tsLow);
+              }
+            }
+            const timestampSeconds = Number(timestamp64) / 1_000_000;
 
             entries.push({
-                type: "FD",
-                timestamp: timestampSeconds.toFixed(6),
-                can_id,
-                channel,
-                dlc,
-                flags,
-                bus_id,
-                data
+              type: (flags & 0x20) ? "FD" : "Classic",
+              timestamp: timestampSeconds.toFixed(6),
+              can_id,
+              channel,
+              dlc,
+              flags,
+              data,
+              timestamp_us: timestamp64
             });
-
+          } else if (type === 2) { // CLB_ENTRY_TYPE_SYNC
+            if (total_len < 11) {
+              console.warn("Sync entry too small at", recordOffset, "len", total_len);
             } else {
-                console.warn("Unsupported frame type at offset", recordOffset, "type =", type);
-                console.log(`-> Entry number ${entry_number} at ${recordOffset}`);
-                console.log(`.   Entry type ${type}`);
-                console.log(`.   Entry header length ${header_len}`);
-                console.log(`.   Entry total length ${total_len}`);
+              lastSyncLow = view.getUint32(recordOffset + 3, true);
+              lastSyncHigh = view.getUint32(recordOffset + 7, true);
             }
+          } else if (type === 3) { // CLB_ENTRY_TYPE_MARKER
+            // Marker entry not displayed; skip.
+          } else {
+            console.warn("Unsupported entry type at offset", recordOffset, "type =", type);
+          }
 
-            recordOffset += total_len;
+          recordOffset += total_len;
         }
 
-        block_cnt_prev = block_cnt;
-        blockSize_prev = blockSize;
-        offset += blockSize; // move to the next block
+        block_cnt_prev = blockCount;
+        offset += blockSize;
       }
 
+      console.log(`${(progress * 100).toFixed(2)} % of file processed: Parsing done.`);
 
-        console.log(`${(progress * 100).toFixed(2)} % of file processed: Parsing done.`);
-        
-        entries = entries.sort((a, b) => {
-            const timeDiff = a.timestamp - b.timestamp;
-            if (timeDiff !== 0) return timeDiff;
-            
-            // If timestamps are equal, sort by CAN ID as tiebreaker
-            return a.can_id - b.can_id;
+      entries.sort((a, b) => {
+        const timeDiff = Number(a.timestamp_us) - Number(b.timestamp_us);
+        if (timeDiff !== 0) return timeDiff;
+        return a.can_id - b.can_id;
+      });
+
+      return entries;
+    }
+
+    function applyFilters(entries) {
+        const idFilter = filters.id.trim().toLowerCase();
+        const channelFilter = filters.channel.trim();
+        const typeFilter = filters.type;
+        const textFilter = filters.text.trim().toLowerCase();
+
+        return entries.filter(entry => {
+            const idMatch = !idFilter || entry.can_id.toString(16).toLowerCase().startsWith(idFilter);
+            const channelMatch = !channelFilter || entry.channel.toString() === channelFilter;
+            const typeMatch = !typeFilter || entry.type === typeFilter;
+            const haystack = `${entry.type} ${entry.data.join(" ")} ${entry.timestamp}`;
+            const textMatch = !textFilter || haystack.toLowerCase().includes(textFilter);
+            return idMatch && channelMatch && typeMatch && textMatch;
         });
-
-        return entries;
     }
 
     function displayEntries(entries, page = 1, pageSize = 100) {
@@ -672,14 +727,15 @@
         currentPage = page;
         currentPageSize = pageSize;
 
+        filteredEntries = applyFilters(entries);
+
         const table = document.getElementById("logTable");
         const tbody = table.querySelector("tbody");
         tbody.innerHTML = "";
 
-        // Calculate pagination
         const startIndex = (page - 1) * pageSize;
-        const endIndex = Math.min(startIndex + pageSize, entries.length);
-        const pageEntries = entries.slice(startIndex, endIndex);
+        const endIndex = Math.min(startIndex + pageSize, filteredEntries.length);
+        const pageEntries = filteredEntries.slice(startIndex, endIndex);
         
         const fragment = document.createDocumentFragment();
 
@@ -700,7 +756,7 @@
         tbody.appendChild(fragment);
         table.style.display = "table";
 
-        displayPaginationControls(entries.length, page, pageSize);
+        displayPaginationControls(filteredEntries.length, page, pageSize);
     }
 
     function displayPaginationControls(totalEntries, currentPage, pageSize) {
@@ -725,7 +781,7 @@
     }
 
     function goToPage(page) {
-        const totalPages = Math.ceil(currentEntries.length / currentPageSize);
+        const totalPages = Math.ceil(filteredEntries.length / currentPageSize);
         
         // Validate page number
         if (page < 1) page = 1;
@@ -755,6 +811,24 @@
     });
         
     document.addEventListener('DOMContentLoaded', () => {
+        // Filter handlers
+        document.getElementById("filterId").addEventListener("input", (e) => {
+            filters.id = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+        document.getElementById("filterChannel").addEventListener("input", (e) => {
+            filters.channel = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+        document.getElementById("filterType").addEventListener("change", (e) => {
+            filters.type = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+        document.getElementById("filterText").addEventListener("input", (e) => {
+            filters.text = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+
         document.getElementById('firstPage').addEventListener('click', () => {
             goToPage(1);
         });
@@ -768,7 +842,7 @@
         });
         
         document.getElementById('lastPage').addEventListener('click', () => {
-            const totalPages = Math.ceil(currentEntries.length / currentPageSize);
+            const totalPages = Math.ceil(filteredEntries.length / currentPageSize);
             goToPage(totalPages);
         });
         
