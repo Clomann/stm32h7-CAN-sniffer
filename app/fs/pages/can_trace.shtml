@@ -1,97 +1,495 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>STM32H7 CAN sniffer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32H7 CAN Sniffer - Trace</title>
+    <style>
+        :root {
+            --primary-color: #334155;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --accent-color: #3b82f6;
+        }
 
-    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
-    <meta content="MSHTML 6.00.2800.1561" name="GENERATOR">
-    <style ="font-weight: normal; font-family: Verdana;"></style>
-    
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            padding: 2rem 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 2rem;
+        }
+
+        .header-content {
+            flex: 1;
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            color: var(--text-primary);
+        }
+
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .logo {
+            height: 80px;
+            flex-shrink: 0;
+        }
+
+        .logo img {
+            height: 100%;
+            width: auto;
+            display: block;
+        }
+
+        /* Navigation */
+        .nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-link {
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            font-size: 0.9rem;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button, input[type="submit"] {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        button:hover:not(:disabled), input[type="submit"]:hover:not(:disabled) {
+            background-color: var(--bg-color);
+            border-color: var(--primary-color);
+        }
+
+        button:disabled, input[type="submit"]:disabled {
+            opacity: 1;
+            cursor: not-allowed;
+            background-color: var(--bg-color) !important;
+            color: var(--text-secondary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #475569;
+            border-color: #475569;
+        }
+
+        /* File Input */
+        input[type="file"] {
+            padding: 0.625rem;
+            font-size: 0.9rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--card-bg);
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        input[type="file"]:hover {
+            border-color: var(--primary-color);
+        }
+
+        /* Log Output */
+        pre {
+            background-color: var(--bg-color);
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin-top: 1rem;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: var(--bg-color);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .pagination select {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .pagination select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .pagination input[type="number"] {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: 70px;
+            font-family: inherit;
+        }
+
+        .pagination input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .pagination button {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .pagination-info {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .filters label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .filters input,
+        .filters select {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: white;
+            font-family: inherit;
+            width: 120px;
+        }
+
+        /* Table */
+        #logTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #logTable th {
+            padding: 0.875rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        #logTable td {
+            padding: 0.75rem 0.875rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #logTable tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        #logTable tbody tr:hover {
+            background-color: var(--bg-color);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 1.5rem 0;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .logo {
+                height: 50px;
+                align-self: flex-end;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .nav {
+                flex-wrap: wrap;
+            }
+
+            .nav-link {
+                padding: 0.625rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .card {
+                padding: 1.25rem;
+            }
+
+            button, input[type="submit"] {
+                width: 100%;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .pagination {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .pagination button {
+                width: 100%;
+            }
+
+            #logTable {
+                font-size: 0.75rem;
+            }
+
+            #logTable th,
+            #logTable td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h4>
-        <big style="font-weight: bold;">
-            <strong style="color: rgb(0, 0, 0);">
-                <span style="font-style: italic;">STM32H7 CAN sniffer</span>
-            </strong>
-        </big>
-    </h4>
-    <table style="width: 961px; height: 30px;" border="0" cellpadding="2" cellspacing="2">
-        <tbody>
-            <tr>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/index.html">
-                        <span style="color: rgb(0, 0, 0);">Home
-                        page</span>
-                    </a>
-                </td>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/can.shtml">
-                        <span style="color: rgb(0, 0, 0);">CAN setup
-                        </span>
-                    </a>
-                </td>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/can_trace.shtml">
-                        <span style="color: rgb(0, 0, 0);">CAN trace
-                        </span>
-                    </a>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <br>
-    The sniffer stores the CAN log on the SD card and you can retrieve it here:
-    <br/>
-    <br/>
-    <button id="btn">Download CAN log</button>
-    <pre id="log"></pre>
-    <br>
-    Select a file you downloaded to parse it's HEX content and display it here in a table:
-    <br/>
-    <br/>
-    <input type="file" id="logfile" accept=".bin" />
-    <div id="pagination" style="margin-top: 5px; text-align: left;">
-        <span style="margin-left: 0px;">
-            Show 
-            <select id="pageSizeSelect" >
-                <option value="50">50</option>
-                <option value="100" selected>100</option>
-                <option value="200">200</option>
-                <option value="500">500</option>
-                <option value="1000">1000</option>
-                <option value="5000">5000</option>
-            </select>
-            entries per page
-        </span>
-        <br/>
-        <button id="firstPage">First</button>
-        <button id="prevPage">Previous</button>
-        <span style="margin: 0 10px;">
-            Page <input type="number" id="pageInput" min="1" style="width: 60px;"> of <span id="totalPages">0</span>
-        </span>
-        <button id="nextPage">Next</button>
-        <button id="lastPage">Last</button>
-        <span style="margin-left: 20px;">Showing <span id="entryRange"></span> of <span id="totalEntries">0</span> entries</span>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <h1>STM32H7 CAN Sniffer</h1>
+                <div class="subtitle">STM32H743I - Real-time CAN Bus Monitoring & Configuration</div>
+            </div>
+            <a href="/index.html" class="logo">
+                <img src="files/logo.png" alt="Logo">
+            </a>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="/index.html" class="nav-link">Home</a>
+            <a href="/can.shtml" class="nav-link">CAN Setup</a>
+            <a href="/can_trace.shtml" class="nav-link">CAN Trace</a>
+        </nav>
+
+        <!-- Download Card -->
+        <div class="card">
+            <div class="card-header">Download CAN Log</div>
+            <div class="card-description">
+                The sniffer stores the CAN log on the SD card. Click the button below to download the complete log file.
+            </div>
+            <button id="btn" class="btn-primary">Download CAN Log</button>
+            <pre id="log"></pre>
+        </div>
+
+        <!-- Parse Card -->
+        <div class="card">
+            <div class="card-header">Parse and Display Log</div>
+            <div class="card-description">
+                Select a downloaded log file to parse its content and display it in a table format.
+            </div>
+            <input type="file" id="logfile" accept=".bin" />
+
+            <!-- Filters -->
+            <div class="filters">
+                <label>CAN ID
+                    <input id="filterId" placeholder="e.g. 1A3" />
+                </label>
+                <label>Channel
+                    <input id="filterChannel" type="number" min="0" />
+                </label>
+                <label>Type
+                    <select id="filterType">
+                        <option value="">Any</option>
+                        <option value="Classic">Classic</option>
+                        <option value="FD">FD</option>
+                    </select>
+                </label>
+                <label>Search
+                    <input id="filterText" placeholder="data or flags" />
+                </label>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div id="pagination" class="pagination" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span>Show</span>
+                    <select id="pageSizeSelect">
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                        <option value="5000">5000</option>
+                    </select>
+                    <span>entries per page</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button id="firstPage">First</button>
+                    <button id="prevPage">Previous</button>
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                        Page
+                        <input type="number" id="pageInput" min="1">
+                        of <span id="totalPages">0</span>
+                    </span>
+                    <button id="nextPage">Next</button>
+                    <button id="lastPage">Last</button>
+                </div>
+
+                <div class="pagination-info">
+                    Showing <span id="entryRange"></span> of <span id="totalEntries">0</span> entries
+                </div>
+            </div>
+
+            <!-- Log Table -->
+            <table id="logTable" style="display:none">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Timestamp [s]</th>
+                        <th>CAN ID</th>
+                        <th>Channel</th>
+                        <th>DLC</th>
+                        <th>Data</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-    <table id="logTable" style="display:none">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Timestamp [s]</th>
-          <th>CAN ID</th>
-          <th>Channel</th>
-          <th>DLC</th>
-          <th>Data</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
 
     <script type="text/javascript">
     let currentEntries = [];
+    let filteredEntries = [];
     let currentPage = 1;
     let currentPageSize = 100;
+    const filters = { id: "", channel: "", type: "", text: "" };
 
     (function () {
         const btn  = document.getElementById('btn');
@@ -135,7 +533,7 @@
                     const data = new Uint8Array(buffer);
                     
                     console.log(`File ${i}: size=${data.length}, first bytes:`, Array.from(data.slice(0, 9)));
-                    console.log(`File ${i}: last bytes:`, Array.from(data.slice(-12))); // ← ADD THIS LINE
+                    console.log(`File ${i}: last bytes:`, Array.from(data.slice(-12)));
 
                     // Store both the data and metadata for debugging
                     parts.push({
@@ -184,174 +582,167 @@
 
 
     function parseCanLog(arrayBuffer) {
+      const HEX = new Array(256).fill(0).map((_, i) => i.toString(16).padStart(2, "0"));
       const view = new DataView(arrayBuffer);
-      let entries = [];
+      const entries = [];
+      const BLOCK_HEADER_MIN_SIZE = 20; // CanLogBlockHeaderType
+      const FRAME_MIN_SIZE = 14; // entry header + fixed frame fields
       let offset = 0;
-      let block_cnt = 0;
-      let block_cnt_prev = 0;
-      let blockSize_prev = 0;
+      let epochCountPrev = null;
+      let block_cnt_prev = null;
       let progress = 0;
-      let epochCountPrev = 0;
-      let blockCountPrev = 0;
+      let lastSyncHigh = null;
+      let lastSyncLow = null;
 
-      // iterate over blocks
-      while (offset + 8 <= arrayBuffer.byteLength) {
-        // --- Parse block header ---
+      while (offset + BLOCK_HEADER_MIN_SIZE <= arrayBuffer.byteLength) {
         const version = view.getUint8(offset);
         const headerSize = view.getUint8(offset + 1);
-        const blockSize = view.getUint16(offset + 2, true);
-        const blockFill = view.getUint16(offset + 4, true);
-        const epochCount = view.getUint8(offset + 6, true);
-        const blockCount = view.getUint8(offset + 7, true);
-        const blockNumber = offset / blockSize;
-        block_cnt = view.getUint8(offset + 7);
+        const epochCount = view.getUint8(offset + 2);
+        const blockCount = view.getUint8(offset + 3);
+        const blockSize = view.getUint32(offset + 4, true);
+        const blockFill = view.getUint32(offset + 8, true);
+        // ingress_frames at +12, frame_count at +16 (not used here)
         progress = offset / arrayBuffer.byteLength;
 
-        // Safety checks
-        if (offset + blockSize > arrayBuffer.byteLength)
-        {
-            console.log("End of data at offset ", offset);
-            break;
-        }
-        else if (blockSize === 0 || blockFill > blockSize) {
-            console.warn("Invalid or incomplete block header at offset ", offset);
-            offset += blockSize_prev; // move to the next block
-            break;
+        if (headerSize < BLOCK_HEADER_MIN_SIZE) {
+          console.warn("Invalid header size at offset", offset, "size =", headerSize);
+          break;
         }
 
-        if (epochCountPrev > 0 && epochCount !== epochCountPrev)
-        {
-            console.warn("End of valid data reached at ", offset);
-            break;
+        if (blockSize === 0 || blockFill > blockSize || offset + blockSize > arrayBuffer.byteLength) {
+          console.warn("Invalid or incomplete block header at offset", offset);
+          break;
+        }
+
+        if (epochCountPrev !== null && epochCount !== epochCountPrev) {
+          console.warn("End of valid data reached at", offset, "(epoch change)");
+          break;
         }
 
         epochCountPrev = epochCount;
 
-        // if (block_cnt > 0 && (block_cnt_prev < block_cnt) ) {
-        //     console.warn("Block sequence error between blocks ", block_cnt_prev, block_cnt, " at offset ", offset);
-        //     offset += blockSize_prev; // move to the next block
-        //     break;
-        // }
-
         let recordOffset = offset + headerSize;
         const endOfValidData = offset + blockFill;
 
-        // if (blockNumber > 2)
-        // {
-        //     console.log(`Aborting at offset ${recordOffset}`);   
-        //     break;
-        // }
+        while (recordOffset + 3 <= endOfValidData) {
+          const type = view.getUint8(recordOffset);
+          const header_len = view.getUint8(recordOffset + 1);
+          const total_len = view.getUint8(recordOffset + 2);
 
-        // iterate over entries in block
-        while (recordOffset + 4 <= endOfValidData) {
-            const type = view.getUint8(recordOffset);
-            const header_len = view.getUint8(recordOffset + 1);
-            const total_len = view.getUint16(recordOffset + 2, true);
-            const entry_number = (recordOffset - headerSize - offset)  / total_len;
+          if (total_len === 0 || recordOffset + total_len > endOfValidData) {
+            break;
+          }
 
-            if (recordOffset + total_len > endOfValidData) break;
-
-            const timestamp = view.getBigUint64(recordOffset + 4, true);
-            const can_id = view.getUint32(recordOffset + 12, true);
-            const channel = view.getUint8(recordOffset + 16);
-            const dlc = view.getUint8(recordOffset + 17);
-            const flags = view.getUint8(recordOffset + 18);
-            const bus_id = view.getUint8(recordOffset + 19);
-            const timestampSeconds = Number(timestamp) / 1_000_000;
-
-            const data = [];
-            
-            if (type === 1) { // CANLOG_CLASSIC_TYPE
-                const data = new Array(8);
-                for (let i = 0; i < 8; i++) {
-                    data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
-                }
-
-                entries.push({
-                    type: "Classic",
-                    timestamp: timestampSeconds.toFixed(6),
-                    can_id,
-                    channel,
-                    dlc,
-                    flags,
-                    bus_id,
-                    data
-                });
-
-                if (entries[entries.length - 1].timestamp > timestampSeconds.toFixed(6))
-                {
-                    console.log(`Implausible timestamp sequence from ${entries[entries.length - 1].timestamp} to ${timestampSeconds.toFixed(6)}`);
-                }
-
-            } else if (type === 2) { // CANLOG_FD_TYPE
-            const data = new Array(64);
-            for (let i = 0; i < 64; i++) {
-                data[i] = view.getUint8(recordOffset + 20 + i).toString(16).padStart(2, '0');
+          if (type === 1) { // CLB_ENTRY_TYPE_FRAME
+            if (total_len < FRAME_MIN_SIZE) {
+              console.warn("Frame entry too small at", recordOffset, "len", total_len);
+              break;
             }
+
+            const tsLow = view.getUint32(recordOffset + 3, true);
+            const can_id = view.getUint32(recordOffset + 7, true);
+            const channel = view.getUint8(recordOffset + 11);
+            const dlc_flags = view.getUint8(recordOffset + 12);
+            const data_len = view.getUint8(recordOffset + 13);
+
+            const dlc = dlc_flags & 0x0f;
+            const flags = dlc_flags & 0xf0;
+
+            const payloadOffset = recordOffset + 14;
+            const payloadLen = Math.max(0, Math.min(data_len, 64, total_len - (payloadOffset - recordOffset)));
+            const data = new Array(payloadLen);
+            for (let i = 0; i < payloadLen; i++) {
+              data[i] = HEX[view.getUint8(payloadOffset + i)];
+            }
+
+            let timestamp64 = BigInt(tsLow);
+            if (lastSyncHigh !== null) {
+              timestamp64 = (BigInt(lastSyncHigh) << 32n) | BigInt(tsLow);
+              if (lastSyncLow !== null && tsLow < lastSyncLow) {
+                // If the 32-bit counter wrapped after the last sync, bump the high part.
+                timestamp64 = ((BigInt(lastSyncHigh) + 1n) << 32n) | BigInt(tsLow);
+              }
+            }
+            const timestampSeconds = Number(timestamp64) / 1_000_000;
 
             entries.push({
-                type: "FD",
-                timestamp: timestampSeconds.toFixed(6),
-                can_id,
-                channel,
-                dlc,
-                flags,
-                bus_id,
-                data
+              type: (flags & 0x20) ? "FD" : "Classic",
+              timestamp: timestampSeconds.toFixed(6),
+              can_id,
+              channel,
+              dlc,
+              flags,
+              data,
+              timestamp_us: timestamp64
             });
-
+          } else if (type === 2) { // CLB_ENTRY_TYPE_SYNC
+            if (total_len < 11) {
+              console.warn("Sync entry too small at", recordOffset, "len", total_len);
             } else {
-                console.warn("Unsupported frame type at offset", recordOffset, "type =", type);
-                console.log(`-> Entry number ${entry_number} at ${recordOffset}`);
-                console.log(`.   Entry type ${type}`);
-                console.log(`.   Entry header length ${header_len}`);
-                console.log(`.   Entry total length ${total_len}`);
+              lastSyncLow = view.getUint32(recordOffset + 3, true);
+              lastSyncHigh = view.getUint32(recordOffset + 7, true);
             }
+          } else if (type === 3) { // CLB_ENTRY_TYPE_MARKER
+            // Marker entry not displayed; skip.
+          } else {
+            console.warn("Unsupported entry type at offset", recordOffset, "type =", type);
+          }
 
-            recordOffset += total_len;
+          recordOffset += total_len;
         }
 
-        block_cnt_prev = block_cnt;
-        blockSize_prev = blockSize;
-        offset += blockSize; // move to the next block
+        block_cnt_prev = blockCount;
+        offset += blockSize;
       }
 
+      console.log(`${(progress * 100).toFixed(2)} % of file processed: Parsing done.`);
 
-        console.log(`${(progress * 100).toFixed(2)} % of file processed: Parsing done.`);
-        // console.log(`.   header size: ${headerSize}`);
-        // console.log(`.   Block size: ${blockSize}`);
-        // console.log(`.   End of valid data: ${endOfValidData}`);
-        
-        entries = entries.sort((a, b) => {
-            const timeDiff = a.timestamp - b.timestamp;
-            if (timeDiff !== 0) return timeDiff;
-            
-            // If timestamps are equal, sort by CAN ID as tiebreaker
-            return a.can_id - b.can_id;
-        });
+      entries.sort((a, b) => {
+        const timeDiff = Number(a.timestamp_us) - Number(b.timestamp_us);
+        if (timeDiff !== 0) return timeDiff;
+        return a.can_id - b.can_id;
+      });
 
-        return entries;
+      return entries;
     }
+
+    function applyFilters(entries) {
+        const idFilter = filters.id.trim().toLowerCase();
+        const channelFilter = filters.channel.trim();
+        const typeFilter = filters.type;
+        const textFilter = filters.text.trim().toLowerCase();
+
+        return entries.filter(entry => {
+            const idMatch = !idFilter || entry.can_id.toString(16).toLowerCase().startsWith(idFilter);
+            const channelMatch = !channelFilter || entry.channel.toString() === channelFilter;
+            const typeMatch = !typeFilter || entry.type === typeFilter;
+            const haystack = `${entry.type} ${entry.data.join(" ")} ${entry.timestamp}`;
+            const textMatch = !textFilter || haystack.toLowerCase().includes(textFilter);
+            return idMatch && channelMatch && typeMatch && textMatch;
+        });
+    }
+
     function displayEntries(entries, page = 1, pageSize = 100) {
         currentEntries = entries;
         currentPage = page;
         currentPageSize = pageSize;
 
+        filteredEntries = applyFilters(entries);
+
         const table = document.getElementById("logTable");
         const tbody = table.querySelector("tbody");
         tbody.innerHTML = "";
 
-        // Calculate pagination
         const startIndex = (page - 1) * pageSize;
-        const endIndex = Math.min(startIndex + pageSize, entries.length);
-        const pageEntries = entries.slice(startIndex, endIndex);
+        const endIndex = Math.min(startIndex + pageSize, filteredEntries.length);
+        const pageEntries = filteredEntries.slice(startIndex, endIndex);
         
         const fragment = document.createDocumentFragment();
 
         pageEntries.forEach((entry, index) => {
             const row = document.createElement("tr");
             row.innerHTML = `
-            <td>${index + 1}</td>
+            <td>${startIndex + index + 1}</td>
             <td>${entry.timestamp}</td>
             <td>0x${entry.can_id.toString(16).toUpperCase()}</td>
             <td>${entry.channel}</td>
@@ -365,7 +756,7 @@
         tbody.appendChild(fragment);
         table.style.display = "table";
 
-        displayPaginationControls(entries.length, page, pageSize);
+        displayPaginationControls(filteredEntries.length, page, pageSize);
     }
 
     function displayPaginationControls(totalEntries, currentPage, pageSize) {
@@ -374,7 +765,7 @@
         const endIndex = Math.min(currentPage * pageSize, totalEntries);
         
         // Update pagination display
-        document.getElementById('pagination').style.display = 'block';
+        document.getElementById('pagination').style.display = 'flex';
         document.getElementById('totalPages').textContent = totalPages;
         document.getElementById('pageInput').value = currentPage;
         document.getElementById('pageInput').max = totalPages;
@@ -390,7 +781,7 @@
     }
 
     function goToPage(page) {
-        const totalPages = Math.ceil(currentEntries.length / currentPageSize);
+        const totalPages = Math.ceil(filteredEntries.length / currentPageSize);
         
         // Validate page number
         if (page < 1) page = 1;
@@ -417,9 +808,27 @@
         const buffer = await file.arrayBuffer();
         const entries = parseCanLog(buffer);
         displayEntries(entries);
-        });
+    });
         
     document.addEventListener('DOMContentLoaded', () => {
+        // Filter handlers
+        document.getElementById("filterId").addEventListener("input", (e) => {
+            filters.id = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+        document.getElementById("filterChannel").addEventListener("input", (e) => {
+            filters.channel = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+        document.getElementById("filterType").addEventListener("change", (e) => {
+            filters.type = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+        document.getElementById("filterText").addEventListener("input", (e) => {
+            filters.text = e.target.value;
+            displayEntries(currentEntries, 1, currentPageSize);
+        });
+
         document.getElementById('firstPage').addEventListener('click', () => {
             goToPage(1);
         });
@@ -433,7 +842,7 @@
         });
         
         document.getElementById('lastPage').addEventListener('click', () => {
-            const totalPages = Math.ceil(currentEntries.length / currentPageSize);
+            const totalPages = Math.ceil(filteredEntries.length / currentPageSize);
             goToPage(totalPages);
         });
         
@@ -461,6 +870,23 @@
                 changePageSize(newPageSize);
             }
         });
+
+        /* -------- highlight current page in nav -------- */
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            const linkPath = new URL(link.href).pathname;
+            
+            // Direct match
+            if (currentPath === linkPath) {
+                link.classList.add('active');
+            }
+            // CGI pages should highlight their related nav item
+            else if (linkPath === '/can.shtml' && (currentPath === '/cancontrol.cgi' || currentPath === '/can.cgi')) {
+                link.classList.add('active');
+            }
+        });
+        /* ----------------------------------------------- */
     });
     </script>
 </body>

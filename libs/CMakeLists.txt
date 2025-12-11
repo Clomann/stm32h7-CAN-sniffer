@@ -30,6 +30,7 @@ list(APPEND sources_SRCS
 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/lwiperf/lwiperf.c
     # ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/http/fsdata.c
+    ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/mdns/mdns.c
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/http/httpd.c
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/apps/http/fs.c
 

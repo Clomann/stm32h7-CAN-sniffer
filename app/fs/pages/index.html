@@ -1,79 +1,279 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>STM32H7 CAN sniffer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32H7 CAN Sniffer</title>
+    <style>
+        :root {
+            --primary-color: #334155;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --accent-color: #3b82f6;
+        }
 
-    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
-    <meta content="MSHTML 6.00.2800.1561" name="GENERATOR">
-    <style ="font-weight: normal; font-family: Verdana;"></style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            padding: 2rem 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 2rem;
+        }
+
+        .header-content {
+            flex: 1;
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            color: var(--text-primary);
+        }
+
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .logo {
+            height: 80px;
+            flex-shrink: 0;
+        }
+
+        .logo img {
+            height: 100%;
+            width: auto;
+            display: block;
+        }
+
+        /* Navigation */
+        .nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-link {
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            font-size: 0.9rem;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+
+        .card-content {
+            color: var(--text-primary);
+            line-height: 1.7;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+            text-decoration: none;
+            display: block;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .feature-card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 1.5rem 0;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .logo {
+                height: 50px;
+                align-self: flex-end;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .nav {
+                flex-wrap: wrap;
+            }
+
+            .nav-link {
+                padding: 0.625rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .card {
+                padding: 1.25rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h4>
-        <big style="font-weight: bold;">
-            <strong style="color: rgb(0, 0, 0);">
-                <span style="font-style: italic;">STM32H7 CAN sniffer</span>
-            </strong>
-        </big>
-    </h4>
-    <table style="width: 961px; height: 30px;" border="0" cellpadding="2" cellspacing="2">
-        <tbody>
-            <tr>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/index.html">
-                        <span style="color: rgb(0, 0, 0);">Home
-                        page</span>
-                    </a>
-                </td>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/can.shtml">
-                        <span style="color: rgb(0, 0, 0);">CAN setup
-                        </span>
-                    </a>
-                </td>
-                <td style="font-family: Verdana; font-weight: bold; font-style: italic; background-color: rgb(255, 255, 255); text-align: center;">
-                    <a href="/can_trace.shtml">
-                        <span style="color: rgb(0, 0, 0);">CAN trace
-                        </span>
-                    </a>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <br>
-    <small>
-        <span style="font-family: Verdana;">Here you can check and configure the STM32H7 CAN sniffer remotely.
-        </span>
-    </small>
-    <h3>
-        <font size="-1">
-            <span style="color: black;"></span>
-        </font>
-    </h3>
-    <h3 style="font-weight: normal; font-family: Verdana;">
-        <font size="-1">
-            <br>
-        </font>
-    </h3>
-    <span style="font-family: Verdana;"></span>
-    <font size="-1">
-        <a style="font-family: Verdana;" href="/STM32H7x7.html">
-            <big>
-                <span style="font-weight: bold;"></span>
-            </big>
-        </a>
-    </font>
-    <font class="footmsg">
-        &nbsp;
-        &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-        &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-        &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
-        &nbsp; &nbsp; &nbsp; &nbsp;
-        <comment title="#config timefmt=&quot;%Y&quot; " xmlns="http://disruptive-innovations.com/zoo/nvu">
-            <!--#config timefmt="%Y" -->
-        </comment>
-        <comment title="#echo var=&quot;DATE_GMT&quot; " xmlns="http://disruptive-innovations.com/zoo/nvu">
-            <!--#echo var="DATE_GMT" -->
-        </comment>
-    </font>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <h1>STM32H7 CAN Sniffer</h1>
+                <div class="subtitle">STM32H743I - Real-time CAN Bus Monitoring & Configuration</div>
+            </div>
+            <a href="/index.html" class="logo">
+                <img src="files/logo.png" alt="Logo">
+            </a>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="nav">
+            <a href="/index.html" class="nav-link">Home</a>
+            <a href="/can.shtml" class="nav-link">CAN Setup</a>
+            <a href="/can_trace.shtml" class="nav-link">CAN Trace</a>
+        </nav>
+
+        <!-- Welcome Card -->
+        <div class="card">
+            <div class="card-header">Welcome</div>
+            <div class="card-content">
+                Here you can check and configure the STM32H7 CAN sniffer remotely. Use the navigation menu above to access different functions.
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="feature-grid">
+            <a href="/can.shtml" class="feature-card">
+                <h3>CAN Setup</h3>
+                <p>Configure CAN channels, set baudrates, and control the sniffer operation. Apply changes or save them to SD card.</p>
+            </a>
+
+            <a href="/can_trace.shtml" class="feature-card">
+                <h3>CAN Trace</h3>
+                <p>Download captured CAN logs and parse them for analysis. View data in an organized table with pagination support.</p>
+            </a>
+
+            <a href="/can.shtml" class="feature-card">
+                <h3>Remote Access</h3>
+                <p>Control and monitor your CAN sniffer from anywhere through this web interface.</p>
+            </a>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        /* -------- highlight current page in nav -------- */
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            const linkPath = new URL(link.href).pathname;
+            
+            // Direct match
+            if (currentPath === linkPath) {
+                link.classList.add('active');
+            }
+            // CGI pages should highlight their related nav item
+            else if (linkPath === '/can.shtml' && (currentPath === '/cancontrol.cgi' || currentPath === '/can.cgi')) {
+                link.classList.add('active');
+            }
+        });
+        /* ----------------------------------------------- */
+    });
+    </script>
 </body>
 </html>

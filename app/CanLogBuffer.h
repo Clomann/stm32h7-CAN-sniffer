@@ -11,8 +11,10 @@
 #define CANLOG_E_FILE_READ      5U
 #define CANLOG_E_FILE_WRITE     6U
 
+#define CANLOG_ENTRY_MAX_DATA_LENGTH 64U
+
 #define CANLOG_VERSION      1U
-#define BLOCK_SIZE          (32U * 1024U)
+#define BLOCK_SIZE          (64U * 1024U)
 #define LOG_BUFFER_SIZE     (3U * BLOCK_SIZE)
 
 typedef enum {
@@ -23,49 +25,67 @@ typedef enum {
     CANLOG_CUSTOM_TYPE
 } CanLogFrameTypeType;
 
+#define CLB_ENTRY_TYPE_NONE   0
+#define CLB_ENTRY_TYPE_FRAME  1
+#define CLB_ENTRY_TYPE_SYNC   2
+#define CLB_ENTRY_TYPE_MARKER 3
+
+typedef uint8_t ClbEntryTypeType;
+
+#define CAN_DLC_MASK        0x0F
+#define CAN_FLAG_IDE        (1U << 4U)
+#define CAN_FLAG_RTR_FDF    (1U << 5U)  // RTR for classic, FDF for CAN FD
+#define CAN_FLAG_BRS        (1U << 6U)
+#define CAN_FLAG_ESI        (1U << 7U)
+
+typedef uint8_t ClbDlcFlagsType;
+
+#define GET_DLC(dlc_flags)         ((dlc_flags) & CAN_DLC_MASK)
+#define GET_FLAGS(dlc_flags)       ((dlc_flags) & 0xF0)
+#define MAKE_DLC_FLAGS(dlc, flags) (((dlc) & 0x0F) | ((flags) & 0xF0))
+
 typedef struct {
-    uint8_t  type;       // e.g., 0 = None, 1 = Classic, 2 = CAN FD, 3 = Marker
+    ClbEntryTypeType  type;       // e.g., 0 = None, 1 = CAN (FD) frame, 2 = SYNC, 3 = Marker
     uint8_t  header_len; // Length of header (excluding type and length)
-    uint16_t total_len;  // Full length including header + payload
+    uint8_t total_len;   // Full length including header + payload
 } __attribute__((packed)) CanLogEntryHeaderType;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     CanLogEntryHeaderType header;
-    uint64_t timestamp; /*!< timestamp in us */
+    uint32_t timestamp; /*!< timestamp in us */
     uint32_t can_id;
     uint8_t channel;
-    uint8_t dlc;
-    uint8_t flags;     // IDE/RTR
-    uint8_t bus_id;
-    uint8_t data[8];
-} __attribute__((packed)) CanLogClassicCanEntryType;
+    ClbDlcFlagsType dlc_flags;
+    uint8_t data_len;     
+    uint8_t  data[];
+} CanLogEntryType;
 
 typedef struct {
+    _Alignas(CanLogEntryType) uint8_t raw[sizeof(CanLogEntryType) + CANLOG_ENTRY_MAX_DATA_LENGTH];
+} CanLogEntryStackBufferType;
+
+typedef struct __attribute__((packed)) {
     CanLogEntryHeaderType header;
-    uint64_t timestamp; /*!< timestamp in us */
-    uint32_t can_id;
-    uint8_t channel;
-    uint8_t  dlc;
-    uint8_t  flags;     // IDE, BRS, ESI, etc.
-    uint8_t  bus_id;
-    uint8_t  data[64];
-} __attribute__((packed)) CanLogFdcanCanEntryType;
+    uint32_t timestamp; /*!< timestamp in us */
+    uint32_t abs_time_high;  /*!< most significant 32 bit of absolute timestamp in us */
+} CanLogSyncType;
 
 typedef struct {
     uint8_t version;
     uint8_t header_size;    // e.g., 64
-    uint16_t block_size;     // indicates block size (e.g. 512)
-    uint16_t block_fill;    // indicates the block fill level to determine padding byte count
     uint8_t epoch; /*!< Epoch counter */
     uint8_t cnt;   /*!< Block sequence counter */
+    uint32_t block_size;     // indicates block size (e.g. 512)
+    uint32_t block_fill;    // indicates the block fill level to determine padding byte count
+    uint32_t ingress_frames; /*!< ingress frame count of staging buffer */
+    uint32_t frame_count; /*!< number of frames in this block */
 } __attribute__((packed)) CanLogBlockHeaderType;
 
 uint8_t CanLogBuffer_Init(void);
 
 void CanLogBuffer_SetEpochCount(uint8_t epoch);
 
-uint8_t CanLogBuffer_AddClassicCanEntry(const CanLogClassicCanEntryType* entry);
-uint8_t CanLogBuffer_AddFdCanEntry(const CanLogFdcanCanEntryType* entry);
+uint8_t CanLogBuffer_AddEntry(const void* entry, uint32_t entryTotalSize);
 
 uint8_t CanLogBuffer_IsBlockReady(uint8_t*rdy);
 
@@ -73,4 +93,5 @@ uint8_t CanLogBuffer_UsedSlots(uint8_t *slots);
 
 uint8_t CanLogBuffer_GetCurrentBlockIndex(uint32_t *index);
 
-uint8_t CanLogBuffer_ReadNextBlock(uint8_t *data, uint32_t *len);
+uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count);
+uint8_t CanLogBuffer_Consume(uint32_t len, uint32_t frame_count);

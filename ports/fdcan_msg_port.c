@@ -7,7 +7,7 @@
 
 static MessageBufferHandle_t CanFrameBuffer;
 #define CAN_FRAME_BUFFER_SIZE (1000U * sizeof(FDCAN_ClassicFrame))
-__attribute__((section(".ram_d3"))) 
+__attribute__((section(".dtcram"))) 
 uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE];
 static StaticMessageBuffer_t MessageBuffer;
 static volatile uint32_t FrameDropCount_FcdanMsgPort = 0;

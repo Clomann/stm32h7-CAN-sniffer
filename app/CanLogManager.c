@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -9,9 +10,28 @@
 #include "fs_custom.h"
 #include "CanLogBuffer.h"
 #include "CanAbs.h"
+#include "CanCtrl.h"
 #include "fdcan_msg_port.h"
 #include "SdBridgeTask.h"
 #include "core_json.h"
+#include "RuntimeChecks.h"
+
+#include "instrumentation.h"
+#if INSTR_ENABLED
+#include "CommTypes.h"
+#include "FileHandler.h"
+#endif
+
+#define CLM_ABS_TIME_TO_TIMSTAMP(x)   (uint32_t)(x)
+#define CLM_ABS_TIME_TO_ABS_HIGH(x)   ((uint32_t)((x) >> 32U))
+#define CLM_SYNC_EMIT_INTERVAL_US     (30ULL * 60ULL * 1000000ULL)
+
+extern uint64_t FDCAN_GetTimestampHook(void);
+
+void CanLogManager_InstrumentationFlushStartHook(void);
+void CanLogManager_InstrumentationFlushEndHook(void);
+void CanLogManager_DrainPortStartHook(void);
+void CanLogManager_DrainPortEndHook(void);
 
 typedef struct
 {
@@ -20,8 +40,6 @@ typedef struct
     uint32_t byteOffset;
     uint32_t crc;
 } CanLogMetaDataType;
-
-extern volatile uint32_t CanLogManager_FrameCount;
 
 static volatile CanLogMetaDataType LogMetaData;
 #if CANLOGAMANGER_PERSIST_METADATA
@@ -44,9 +62,34 @@ struct CanLogControlDataType
     } CanLog;
     uint8_t *mountRes;
     bool *runCanTracer;
-    bool runCanTracerOld;
     bool *commitLog;
+    bool runCanTracerOld;
+    bool emitSyncEntry;
 };
+
+/**
+ * @brief Hook called before flushing a CAN log block to storage.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanLogManager_InstrumentationFlushStartHook(void) {}
+
+/**
+ * @brief Hook called after flushing a CAN log block to storage.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanLogManager_InstrumentationFlushEndHook(void) {}
+
+/**
+ * @brief  Hook called before reading all available frames in the fdcan port buffer.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanLogManager_DrainPortStartHook(void) {}
+
+/**
+ * @brief Hook called after reading all available frames in the fdcan port buffer.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void CanLogManager_DrainPortEndHook(void) {}
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
@@ -56,13 +99,13 @@ find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
 static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data);
 static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data);
 static void appCanLogFillEntry(
-    CanLogClassicCanEntryType *entry,
+    CanLogEntryType *entry,
     FDCAN_ClassicFrame *frame,
     uint64_t timestamp,
     uint8_t channel
 );
 static comm_status_t
-appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel);
+appCanLogStoreToFrameBuffer(void *entry);
 static comm_status_t
 appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length);
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
@@ -321,22 +364,24 @@ static bool m_verify_preallocation(const char* path) {
     FIL fil;
     FRESULT res;
     UINT bytes_read;
-    BYTE dummy_byte = 0;
+    UINT bytes_to_read;
+    BYTE dummy_bytes[1U] ={0};
     bool can_seek;
     bool verified;
     
-    res = f_open(&fil, path, FA_WRITE);
+    res = f_open(&fil, path, FA_READ);
     if (res != FR_OK) return false;
     
     // Try seeking to near the expected pre-allocated size
-    res = f_lseek(&fil, MAX_LOG_FILE_SIZE - 512U);
+    res = f_lseek(&fil, MAX_LOG_FILE_SIZE - sizeof(dummy_bytes));
     can_seek = (res == FR_OK);
 
-    res = f_read(&fil, &dummy_byte, 1, &bytes_read);
-    verified = (res == FR_OK && bytes_read == 1);
+    bytes_to_read = sizeof(dummy_bytes);
+    res = f_read(&fil, dummy_bytes, bytes_to_read, &bytes_read);
+    verified = (res == FR_OK && bytes_read > 0U);
     
     f_close(&fil);
-    return can_seek && verified;
+    return can_seek;
 }
 
 volatile static uint32_t UnseekableFiles = 0;
@@ -351,66 +396,75 @@ static FRESULT m_preallocate_log_files(void)
 
     UnseekableFiles = 0;
 
-    for (uint32_t i = 0; i < MAX_LOG_INDEX; i++)
+    snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)MAX_LOG_INDEX);
+
+    if (1U != m_verify_preallocation(full_path))
     {
-        snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
-        
-        // Check if file already exists and is properly sized
-        if (1U == m_verify_preallocation(full_path)) {
-            // File exists and is properly sized - skip
-            continue;
-        }
-
-        UnseekableFiles++;
-
-        // File doesn't exist or is too small - create/resize it
-        res = f_open(&logfile, full_path, FA_WRITE | FA_CREATE_NEW);
-        if (res == FR_EXIST) {
-            // File exists but is too small - open for expansion
-            res = f_open(&logfile, full_path, FA_WRITE);
-        }
-        
-        if (res != FR_OK) {
-            continue;
-        }
-        
-        if (res == FR_OK) {
-            res = f_expand(&logfile, MAX_LOG_FILE_SIZE, 0);
-
-            if (res == FR_OK) 
-            {
-                
-                res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 512U);
-                if (res != FR_OK) 
-                {
-                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 1024U);
-                }
-                if (res != FR_OK) 
-                {
-                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 3U*512U);
-                }
-                if (res != FR_OK) 
-                {
-                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 4U*512U);
-                }
-                if (res != FR_OK) 
-                {
-                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 5U*512U);
-                }
+        for (uint32_t i = 0; i < MAX_LOG_FILE_COUNT; i++)
+        {
+            snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
+            
+            // Check if file already exists and is properly sized
+            if (1U == m_verify_preallocation(full_path)) {
+                // File exists and is properly sized - skip
+                continue;
             }
-
-            if (res == FR_OK) 
-            {
-                res = f_write(&logfile, &dummy_byte, 1, &bytes_written);
+    
+            UnseekableFiles++;
+    
+            // File doesn't exist or is too small - create/resize it
+            res = f_open(&logfile, full_path, FA_WRITE | FA_CREATE_NEW);
+            if (res == FR_EXIST) {
+                // File exists but is too small - open for expansion
+                res = f_open(&logfile, full_path, FA_WRITE);
             }
             
-            if (res == FR_OK && bytes_written == 1) 
-            {
-                res = f_lseek(&logfile, 0);
+            if (res != FR_OK) {
+                continue;
             }
+            
+            if (res == FR_OK) {
+                res = f_expand(&logfile, MAX_LOG_FILE_SIZE, 0);
+    
+                if (res == FR_OK) 
+                {
+                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 1U);
+                    
+                    if (res != FR_OK) 
+                    {
+                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 512U);
+                    }
+                    if (res != FR_OK) 
+                    {
+                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 1024U);
+                    }
+                    if (res != FR_OK) 
+                    {
+                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 3U*512U);
+                    }
+                    if (res != FR_OK) 
+                    {
+                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 4U*512U);
+                    }
+                    if (res != FR_OK) 
+                    {
+                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 5U*512U);
+                    }
+                }
+    
+                if (res == FR_OK) 
+                {
+                    res = f_write(&logfile, &dummy_byte, 1U, &bytes_written);
+                }
+                
+                if (res == FR_OK && bytes_written == 1) 
+                {
+                    res = f_lseek(&logfile, 0);
+                }
+            }
+            
+            f_close(&logfile);
         }
-        
-        f_close(&logfile);
     }
 
     CanLogCtrlData.CanLog.fileHeadIndex = 0;
@@ -736,7 +790,7 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 }
 
 static void appCanLogFillEntry(
-    CanLogClassicCanEntryType *entry,
+    CanLogEntryType *entry,
     FDCAN_ClassicFrame *frame,
     uint64_t timestamp,
     uint8_t channel
@@ -744,28 +798,49 @@ static void appCanLogFillEntry(
 {
     entry->header.header_len = sizeof(entry->header);
     entry->header.type       = CANLOG_CLASSIC_TYPE;
-    entry->header.total_len  = sizeof(CanLogClassicCanEntryType);
+    entry->header.total_len  = sizeof(CanLogEntryType) + frame->dlc;
     entry->timestamp         = timestamp;
     entry->channel           = channel;
-    entry->dlc               = frame->dlc;
-    entry->can_id = frame->id;
-    memcpy(entry->data, frame->data, sizeof(entry->data));
+    entry->dlc_flags         = MAKE_DLC_FLAGS(frame->dlc, 0);
+    entry->data_len          = frame->dlc;
+    entry->can_id            = frame->id;
+    memcpy(entry->data, frame->data, frame->dlc);
 }
 
+#if INSTR_ENABLED
+#if INSTR_PERSIST_ACTIVE
+static InstrErrorType appPersistInstrumentationData(void)
+{
+    FRESULT res;
+    FatFsDeviceType File;
+    uint32_t BytesToWrite = 0;
+    uint8_t * Data;
+    const char FileName[] = "InstrumentationData.bin";
+
+    res = FatFS_SD_OpenFileForOverWrite(&File, FileName);
+    
+    if (FR_OK == res)
+    {
+        Instrumentation_SerializeHook(Data, &BytesToWrite);
+        FatFS_SD_WriteFile(&File, (const char *)Data, BytesToWrite);
+    }
+
+    FatFS_SD_CloseFile(&File);
+
+    return res;
+}
+#endif
+#endif
+
 static comm_status_t
-appCanLogStoreToFrameBuffer(FDCAN_ClassicFrame *frame, uint8_t channel)
+appCanLogStoreToFrameBuffer(void *entry)
 {
     comm_status_t res = COMM_SUCCESS;
-    CanLogClassicCanEntryType NewEntry;
+    CanLogEntryHeaderType *pHeader;
 
-    appCanLogFillEntry(
-        &NewEntry,
-        frame,
-        frame->timestamp,
-        channel
-    );
-
-    CanLogBuffer_AddClassicCanEntry(&NewEntry);
+    pHeader = (CanLogEntryHeaderType *)entry;
+    
+    CanLogBuffer_AddEntry(entry, pHeader->total_len);
 
     return res;
 }
@@ -800,12 +875,22 @@ appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
 {
     uint32_t DataLength;
-    comm_status_t res               = COMM_SUCCESS;
-    volatile static uint8_t Data[BLOCK_SIZE] = {0};
+    uint32_t FrameCount;
+    uint8_t *DataPtr;
+    comm_status_t res = COMM_SUCCESS;
 
-    if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(Data, &DataLength))
+    if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
     {
-        res = appCanLogStoreToSd(dev, (char *)Data, DataLength);
+        CanLogManager_InstrumentationFlushStartHook();
+        res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
+        CanLogManager_InstrumentationFlushEndHook();
+
+        CanLogBuffer_Consume(DataLength, FrameCount);
+
+        if (COMM_SUCCESS == res)
+        {
+            CanLogBuffer_BlockCount++;
+        }
     }
     else
     {
@@ -813,6 +898,24 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     }
     
     return res;
+}
+
+static comm_status_t CanLogManager_EmitSyncEntry(
+    CanLogSyncType *sync,
+    uint64_t absTime,
+    uint32_t frameTimestamp
+)
+{
+    /* Keep the 32-bit timestamp aligned with the originating frame to avoid
+     * offsets when the absolute 64-bit timer wraps. */
+    sync->timestamp = CLM_ABS_TIME_TO_TIMSTAMP(frameTimestamp);
+    sync->abs_time_high  = CLM_ABS_TIME_TO_ABS_HIGH(absTime);
+
+    sync->header.header_len = sizeof(sync->header);
+    sync->header.type       = CLB_ENTRY_TYPE_SYNC;
+    sync->header.total_len  = sizeof(CanLogSyncType);
+
+    return appCanLogStoreToFrameBuffer((void *)sync);
 }
 
 void SdBridgeTask_ActionHook()
@@ -827,6 +930,14 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     uint8_t BlockIsReady;
     uint32_t SlotsToWrite = 0;
     FDCAN_ClassicFrame NewFrame;
+    uint64_t AbsTime = 0;
+    CanLogSyncType SyncEntry;
+    CanLogEntryStackBufferType EntryBuffer;
+    CanLogEntryType *pFrameEntry = (CanLogEntryType *)(&EntryBuffer);
+    volatile uint32_t LocalFrameCount;
+    static uint64_t NextPeriodicSyncAbsTime = 0;
+    static uint32_t LastFrameTimestamp = 0;
+    static bool LastFrameTimestampValid = false;
 
     if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
     {
@@ -870,6 +981,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
 
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
+
+        CanLogCtrlData.emitSyncEntry = true;
+        AbsTime = FDCAN_GetTimestampHook();
+        NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        LastFrameTimestampValid = false;
     }
     else
     {
@@ -890,11 +1006,53 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     appCanLogCheckNewFileOpen(data);
 
-    while (0 < fdcan_msg_port_read(&NewFrame, 0))
-    {
-        CanLogManager_FrameCount++;
+    (void) LocalFrameCount;
+    LocalFrameCount = 0;
 
-        appCanLogStoreToFrameBuffer(&NewFrame, NewFrame.channel);
+    AbsTime = FDCAN_GetTimestampHook();
+
+    if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
+    {
+        CanLogCtrlData.emitSyncEntry = true;
+        NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+    }
+
+    while (0 < fdcan_msg_port_read(&NewFrame, 2))
+    {
+        CanLogManager_DrainPortStartHook();
+        CanLogManager_FrameCount++;
+        LocalFrameCount++;
+
+        AbsTime = FDCAN_GetTimestampHook();
+
+        if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
+        {
+            CanLogCtrlData.emitSyncEntry = true;
+            NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        }
+
+        if (true == CanLogCtrlData.emitSyncEntry)
+        {
+            CanLogCtrlData.emitSyncEntry = false;
+            if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
+                        &SyncEntry,
+                        AbsTime,
+                        NewFrame.timestamp))
+            {
+                CanLogFileManager_ErrorHandler();
+            }
+        }
+
+        appCanLogFillEntry(
+            pFrameEntry,
+            &NewFrame,
+            NewFrame.timestamp,
+            NewFrame.channel
+        );
+
+        appCanLogStoreToFrameBuffer((void *)pFrameEntry);
+        LastFrameTimestamp = NewFrame.timestamp;
+        LastFrameTimestampValid = true;
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
         
@@ -909,6 +1067,23 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
         else
         {
+        }
+        CanLogManager_DrainPortEndHook();
+    }
+
+    if (true == CanLogCtrlData.emitSyncEntry)
+    {
+        uint32_t timestamp32 = LastFrameTimestampValid
+            ? LastFrameTimestamp
+            : CLM_ABS_TIME_TO_TIMSTAMP(AbsTime);
+
+        CanLogCtrlData.emitSyncEntry = false;
+        if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
+                    &SyncEntry,
+                    AbsTime,
+                    timestamp32))
+        {
+            CanLogFileManager_ErrorHandler();
         }
     }
 
@@ -926,6 +1101,12 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         {
             CanLogFileManager_ErrorHandler();
         }
+#endif
+
+#if INSTR_ENABLED
+#if INSTR_PERSIST_ACTIVE
+        appPersistInstrumentationData();
+#endif
 #endif
 
         *(CanLogCtrlData.commitLog) = false;

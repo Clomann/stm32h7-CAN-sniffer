@@ -27,6 +27,8 @@ set(STM32_HAL_PATH                  ${CMAKE_CURRENT_SOURCE_DIR}/libs/STM32_HAL/S
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJ_PATH}/_bin/${CMAKE_BUILD_TYPE})
 
+set(LWIP_HEAP_SIZE 0x1ffe8)
+
 message("Build type: "              ${CMAKE_BUILD_TYPE})
 
 #
@@ -60,7 +62,9 @@ if(CORE STREQUAL "CM7" AND NOT CPU_PARAMETERS)
         "USE_STM32H7XX_NUCLEO_144_MB1363"
         "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
         "TARGET_STM32H7"
+        "LWIP_HEAP_SIZE=${LWIP_HEAP_SIZE}"
     )
+
 elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
     set(CPU_PARAMETERS
         -mthumb
@@ -149,6 +153,7 @@ if(CORE STREQUAL "CM7")
         ${PROJ_PATH}/CM7/Src/utils_mpu.c
 
         ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/Common/Src/instrumentation.c
 
         ${PROJ_PATH}/middleware/freertos/freertos_interface.c
 
@@ -238,6 +243,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
 target_link_options(${EXECUTABLE} PRIVATE
     -T${linker_script_SRC}
     ${CPU_PARAMETERS}
+    -Wl,--defsym=LWIP_HEAP_SIZE=${LWIP_HEAP_SIZE}
     -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_PROJECT_NAME}.map
     --specs=nosys.specs
     -u _printf_float                # STDIO float formatting support

@@ -17,8 +17,8 @@
 #error "FDCAN_MODE_DEFAULT is not defined! You can select: e.g. FDCAN_MODE_NORMAL)" 
 #endif 
 
-#define SW_RX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
-#define SW_TX_FRAME_BUFFER_SIZE 128 /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
+#define SW_RX_FRAME_BUFFER_SIZE (2U * FDCAN_RAM_RX_ELEMENTS) /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
+#define SW_TX_FRAME_BUFFER_SIZE (FDCAN_RAM_TX_ELEMENTS)      /* software Tx frame buffer size in number of FDCAN_ClassicFrame elements */
 
 typedef enum {
     CANABS_IOCTL_CMD_SET_BAUDRATE,
@@ -99,6 +99,8 @@ comm_status_t FDCAN_Read(
     void*, 
     uint8_t, 
     uint32_t);
+
+comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan);
 
 uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev);
 

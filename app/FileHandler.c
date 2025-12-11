@@ -7,12 +7,24 @@
 
 static FATFS FatFs;		/* FatFs work area needed for each volume */
 
-FRESULT FatFS_SD_Mount()
+/**
+ * @brief Hook called before a FatFS write to allow measurement instrumentation.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void FileHandler_InstrumentationWriteStartHook(void) {}
+
+/**
+ * @brief Hook called after a FatFS write to allow measurement instrumentation.
+ * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
+ */
+__attribute__((weak)) void FileHandler_InstrumentationWriteEndHook(void) {}
+
+FRESULT FatFS_SD_Mount(void)
 {  
     FRESULT res;
     res =  f_mount(&FatFs, FILEHANDLER_PARTITION_NO, 1U);
     
-    if (FR_OK == res)
+    if (FR_OK != res)
     {
         res = f_mount(&FatFs, FILEHANDLER_PARTITION_NO, 1U);
     }
@@ -20,9 +32,9 @@ FRESULT FatFS_SD_Mount()
     return res;
 }
 
-FRESULT FatFS_SD_Unmount()
+FRESULT FatFS_SD_Unmount(void)
 {  
-  return f_mount(NULL, FILEHANDLER_PARTITION_NO, 1U);
+    return f_mount(NULL, FILEHANDLER_PARTITION_NO, 0U);
 }
 
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
@@ -142,7 +154,9 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
 
     if (FR_OK == res)
     {
+        FileHandler_InstrumentationWriteStartHook();
         res = f_write(&dev->file, content, len, &BytesWritten);
+        FileHandler_InstrumentationWriteEndHook();
     }
 
     if (FR_OK == res && BytesWritten != len) {

@@ -12,13 +12,13 @@
 
 static struct netif * gnetif;
 
-void http_init()
+void http_init(void)
 {
-    /* init code for LWIP */
-    gnetif = MX_LWIP_Init();
-  
     /* Initialize the LwIP stack */
     lwip_init();
+
+    /* init code for LWIP */
+    gnetif = MX_LWIP_Init();
 
     /* TCP echo server Init */
     tcp_echoserver_init();
@@ -26,7 +26,7 @@ void http_init()
     http_server_init();
 }
 
-void http_poll()
+void http_poll(void)
 {
     static struct netif * netif;
 
@@ -46,4 +46,6 @@ void http_poll()
 #if LWIP_DHCP
     DHCP_Periodic_Handle(netif);
 #endif
+
+    app_mdns_poll(netif);
 }
