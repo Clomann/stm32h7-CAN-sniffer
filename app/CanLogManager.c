@@ -1093,6 +1093,10 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         if (SlotsToWrite > 0)
         {
+            if (CANLOG_E_OK != CanLogBuffer_FillBlockWithPadding())
+            {
+                CanLogFileManager_ErrorHandler();
+            }
             SdBridgeTask_Notify();
         }
 
