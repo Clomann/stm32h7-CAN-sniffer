@@ -13,7 +13,7 @@
 
 #define CANLOG_ENTRY_MAX_DATA_LENGTH 64U
 
-#define CANLOG_VERSION      1U
+#define CANLOG_VERSION      2U
 #define BLOCK_SIZE          (64U * 1024U)
 #define LOG_BUFFER_SIZE     (3U * BLOCK_SIZE)
 
@@ -86,6 +86,7 @@ uint8_t CanLogBuffer_Init(void);
 void CanLogBuffer_SetEpochCount(uint8_t epoch);
 
 uint8_t CanLogBuffer_AddEntry(const void* entry, uint32_t entryTotalSize);
+uint8_t CanLogBuffer_FillBlockWithPadding(void);
 
 uint8_t CanLogBuffer_IsBlockReady(uint8_t*rdy);
 
