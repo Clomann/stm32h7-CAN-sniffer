@@ -224,8 +224,9 @@ static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t g
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
     FDCAN_ClassicFrame NewFrame;
-    volatile uint32_t frames_processed = 0;
-    volatile uint32_t fill_level = 0;
+    uint32_t frames_processed = 0;
+    uint32_t fill_level = 0;
+    FDCAN_ErrorCountersTypeDef RxErrorCount;
     uint64_t GlobalTimestamp;
     uint64_t HardwareTimestamp;
     FDCAN_HandleTypeDef *hfdcantmp;
@@ -236,11 +237,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 #if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
     hfdcantmp = hfdcan;
     
-    if (FDCAN_1 == hfdcan->Instance)
+    if (FDCAN_1 == hfdcantmp->Instance)
 #else
     (void) fdcan_get_can(&Fdcan1Driver, &hfdcantmp);
 #endif
     {
+        (void) HAL_FDCAN_GetErrorCounters(hfdcantmp, &RxErrorCount);
+
+        CanAbs_CAN1_Rx_FrameDropCount += RxErrorCount.RxErrorCnt;
+
         while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)))
         {
             if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
@@ -263,11 +268,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         }
     }
 #if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
-    else if ( FDCAN_2 == hfdcan->Instance)
+    else if ( FDCAN_2 == hfdcantmp->Instance)
 #else
     (void) fdcan_get_can(&Fdcan2Driver, &hfdcantmp);
 #endif
     {
+        (void) HAL_FDCAN_GetErrorCounters(hfdcantmp, &RxErrorCount);
+
+        CanAbs_CAN2_Rx_FrameDropCount += RxErrorCount.RxErrorCnt;
+
         while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)) )
         {
             if (Fdcan2Driver.interface->read(&Fdcan2Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
