@@ -7,6 +7,10 @@ volatile uint64_t CanAbs_FrameCount = 0;
 /** Number of dropped frames read from harware buffer */
 volatile uint64_t CanAbs_FrameDropCount = 0;
 
+volatile uint64_t CanAbs_CAN1_Rx_FrameDropCount = 0;
+
+volatile uint64_t CanAbs_CAN2_Rx_FrameDropCount = 0;
+
 /** Number of frames written to FDCAN msg port */
 volatile uint64_t CanBridgeTask_FrameCount = 0;
 
@@ -28,6 +32,8 @@ void RuntimeChecks_Init(void)
 {
     CanAbs_FrameCount = 0;
     CanAbs_FrameDropCount = 0;
+    CanAbs_CAN1_Rx_FrameDropCount = 0;
+    CanAbs_CAN2_Rx_FrameDropCount = 0;
     CanBridgeTask_FrameCount = 0;
     CanLogManager_FrameCount = 0;
     CanLogBuffer_FrameCount1 = 0;
@@ -45,6 +51,14 @@ static RuntimeChecksErrorType CheckDropCounts(void)
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
     else if (0 != CanAbs_FrameDropCount) 
+    {
+        err = RUNTIMECHECKS_E_FRAMES_DROPPED;
+    }
+    else if (0 != CanAbs_CAN1_Rx_FrameDropCount) 
+    {
+        err = RUNTIMECHECKS_E_FRAMES_DROPPED;
+    }
+    else if (0 != CanAbs_CAN2_Rx_FrameDropCount) 
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }

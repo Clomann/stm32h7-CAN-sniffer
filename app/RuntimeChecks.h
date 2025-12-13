@@ -18,6 +18,10 @@ extern volatile uint64_t CanAbs_FrameCount;
 
 extern volatile uint64_t CanAbs_FrameDropCount;
 
+extern volatile uint64_t CanAbs_CAN1_Rx_FrameDropCount;
+
+extern volatile uint64_t CanAbs_CAN2_Rx_FrameDropCount;
+
 /** Number of frames written to FDCAN msg port */
 extern volatile uint64_t CanBridgeTask_FrameCount;
 
