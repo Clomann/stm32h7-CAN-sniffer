@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include "RuntimeChecks.h"
+#include "stm32h745xx.h"
 
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
@@ -226,7 +227,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     FDCAN_ClassicFrame NewFrame;
     uint32_t frames_processed = 0;
     uint32_t fill_level = 0;
-    FDCAN_ErrorCountersTypeDef RxErrorCount;
     uint64_t GlobalTimestamp;
     uint64_t HardwareTimestamp;
     FDCAN_HandleTypeDef *hfdcantmp;
@@ -242,9 +242,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     (void) fdcan_get_can(&Fdcan1Driver, &hfdcantmp);
 #endif
     {
-        (void) HAL_FDCAN_GetErrorCounters(hfdcantmp, &RxErrorCount);
-
-        CanAbs_CAN1_Rx_FrameDropCount += RxErrorCount.RxErrorCnt;
+        CanAbs_CAN1_Rx_FrameDropCount += (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L_Msk) >> FDCAN_RXF0S_RF0L_Pos;
 
         while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)))
         {
@@ -273,9 +271,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     (void) fdcan_get_can(&Fdcan2Driver, &hfdcantmp);
 #endif
     {
-        (void) HAL_FDCAN_GetErrorCounters(hfdcantmp, &RxErrorCount);
-
-        CanAbs_CAN2_Rx_FrameDropCount += RxErrorCount.RxErrorCnt;
+        CanAbs_CAN2_Rx_FrameDropCount += (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L_Msk) >> FDCAN_RXF0S_RF0L_Pos;
 
         while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)) )
         {

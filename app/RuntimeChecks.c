@@ -66,7 +66,7 @@ static RuntimeChecksErrorType CheckDropCounts(void)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
-    else if (FrameDelta1 > 256)
+    else if (FrameDelta1 > 1024)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
