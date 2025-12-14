@@ -242,7 +242,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     (void) fdcan_get_can(&Fdcan1Driver, &hfdcantmp);
 #endif
     {
-        CanAbs_CAN1_Rx_FrameDropCount += (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L_Msk) >> FDCAN_RXF0S_RF0L_Pos;
+        if (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L)
+        {
+            hfdcantmp->Instance->IR = FDCAN_IR_RF0L;
+            CanAbs_CAN1_Rx_FrameDropCount++; 
+        }
 
         while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)))
         {
@@ -263,6 +267,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
                 CanAbs_FrameCount++;
             }
+            else
+            {
+                CanAbs_FrameDropCount++;
+                CanAbs_ErrorHandler();
+                break;
+            }
         }
     }
 #if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
@@ -271,7 +281,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     (void) fdcan_get_can(&Fdcan2Driver, &hfdcantmp);
 #endif
     {
-        CanAbs_CAN2_Rx_FrameDropCount += (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L_Msk) >> FDCAN_RXF0S_RF0L_Pos;
+        if (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L)
+        {
+            hfdcantmp->Instance->IR = FDCAN_IR_RF0L;
+            CanAbs_CAN2_Rx_FrameDropCount++; 
+        }
 
         while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)) )
         {
@@ -291,6 +305,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 frames_processed++;
 
                 CanAbs_FrameCount++;
+            }
+            else 
+            {
+                CanAbs_FrameDropCount++;
+                CanAbs_ErrorHandler();
+                break;
             }
         }
     }
