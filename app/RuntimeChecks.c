@@ -28,6 +28,8 @@ volatile uint64_t CanLogBuffer_BlockCount = 0;
 
 volatile uint64_t FcdanMsgPort_FrameDropCount = 0;
 
+volatile uint64_t FrameDelta1 = 0;
+
 void RuntimeChecks_Init(void)
 {
     CanAbs_FrameCount = 0;
@@ -46,6 +48,8 @@ static RuntimeChecksErrorType CheckDropCounts(void)
 {
     RuntimeChecksErrorType err = RUNTIMECHECKS_E_OK;
 
+    FrameDelta1 = CanBridgeTask_FrameCount - CanLogManager_FrameCount;
+
     if (0 != FcdanMsgPort_FrameDropCount)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
@@ -59,6 +63,10 @@ static RuntimeChecksErrorType CheckDropCounts(void)
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
     else if (0 != CanAbs_CAN2_Rx_FrameDropCount) 
+    {
+        err = RUNTIMECHECKS_E_FRAMES_DROPPED;
+    }
+    else if (FrameDelta1 > 256)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
