@@ -391,7 +391,7 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *fram
             break;
         }
 
-        if (CANLOG_UNDEFINED_TYPE == entry_type)
+        if (CLB_ENTRY_TYPE_NONE == entry_type)
         {
             break;
         }

@@ -25,8 +25,8 @@ static CommDriverConfigType Fdcan1Config = {
     .config = DRIVER_CFG2,
     .devNbr = COMM_DEVICE_NUMBER_1
 };
-static FDCAN_ClassicFrame Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
-static FDCAN_ClassicFrame Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan1RxRingBuffer = {
     .startAddress = &Fdcan1RxFrameBuffer[0],
     .head = 0,
@@ -54,8 +54,8 @@ static CommDriverConfigType Fdcan2Config = {
     .config = DRIVER_CFG2,
     .devNbr = COMM_DEVICE_NUMBER_2
 };
-static FDCAN_ClassicFrame Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
-static FDCAN_ClassicFrame Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan2RxRingBuffer = {
     .startAddress = &Fdcan2RxFrameBuffer[0],
     .head = 0,
@@ -101,7 +101,7 @@ int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t
     return res;
 }
 
-int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrame *frame)
+int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrameType *frame)
 {
     return ring_buffer_pop((RingBuffer *)dev->RxFrameBuffer, (void*)frame);
 }
@@ -224,7 +224,7 @@ static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t g
   */
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
-    FDCAN_ClassicFrame NewFrame;
+    FDCAN_ClassicFrameType NewFrame;
     uint32_t frames_processed = 0;
     uint32_t fill_level = 0;
     uint64_t GlobalTimestamp;
@@ -244,7 +244,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     {
         if (hfdcantmp->Instance->RXF0S & FDCAN_RXF0S_RF0L)
         {
-            hfdcantmp->Instance->IR = FDCAN_IR_RF0L;
+            hfdcantmp->Instance->IR = FDCAN_IR_RF0L; 
             CanAbs_CAN1_Rx_FrameDropCount++; 
         }
 
@@ -344,7 +344,7 @@ comm_status_t CanAbs_Send_Can1(FDCAN_Message *msg)
     return CanAbs_Send(&Fdcan1Driver, msg);
 }
 
-comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrame *frame)
+comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrameType *frame)
 {
     return CanAbs_Receive(&Fdcan1Driver, frame);
 }
@@ -396,7 +396,7 @@ comm_status_t CanAbs_Send_Can2(FDCAN_Message *msg)
     return CanAbs_Send(&Fdcan2Driver, msg);
 }
 
-comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrame *frame)
+comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrameType *frame)
 {
     return CanAbs_Receive(&Fdcan2Driver, frame);
 }

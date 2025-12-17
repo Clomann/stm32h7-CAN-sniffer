@@ -30,7 +30,7 @@ void CanBridgeTaskInit()
 
 void CanBridgeTask(void *arg)
 {
-    FDCAN_ClassicFrame Frame;
+    FDCAN_ClassicFrameType Frame;
     static UBaseType_t MinUnusedStack;
 
     (void)MinUnusedStack;

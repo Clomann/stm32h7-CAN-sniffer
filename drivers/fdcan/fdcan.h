@@ -66,8 +66,8 @@ typedef struct {
     uint32_t txBufferFillLevel;
     uint32_t rxBufferLength;
     uint32_t txBufferLength;
-    FDCAN_ClassicFrame * rxBuffer;
-    FDCAN_ClassicFrame * txBuffer;
+    FDCAN_ClassicFrameType * rxBuffer;
+    FDCAN_ClassicFrameType * txBuffer;
 } FdcanDataType;
 
 typedef struct {
