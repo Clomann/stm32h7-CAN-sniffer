@@ -17,14 +17,6 @@
 #define BLOCK_SIZE          (64U * 1024U)
 #define LOG_BUFFER_SIZE     (3U * BLOCK_SIZE)
 
-typedef enum {
-    CANLOG_UNDEFINED_TYPE,
-    CANLOG_CLASSIC_TYPE,
-    CANLOG_FD_TYPE,
-    CANLOG_MARKER_TYPE,
-    CANLOG_CUSTOM_TYPE
-} CanLogFrameTypeType;
-
 #define CLB_ENTRY_TYPE_NONE   0
 #define CLB_ENTRY_TYPE_FRAME  1
 #define CLB_ENTRY_TYPE_SYNC   2
@@ -32,11 +24,15 @@ typedef enum {
 
 typedef uint8_t ClbEntryTypeType;
 
-#define CAN_DLC_MASK        0x0F
-#define CAN_FLAG_IDE        (1U << 4U)
-#define CAN_FLAG_RTR_FDF    (1U << 5U)  // RTR for classic, FDF for CAN FD
-#define CAN_FLAG_BRS        (1U << 6U)
-#define CAN_FLAG_ESI        (1U << 7U)
+#define CAN_DLC_MASK         0x0F
+#define CAN_FLAG_IDE_Pos     4U
+#define CAN_FLAG_IDE         (1U << CAN_FLAG_IDE_Pos)
+#define CAN_FLAG_RTR_FDF_Pos 5U
+#define CAN_FLAG_RTR_FDF     (1U << CAN_FLAG_RTR_FDF_Pos)  // RTR for classic, FDF for CAN FD
+#define CAN_FLAG_BRS_Pos     6U
+#define CAN_FLAG_BRS         (1U << CAN_FLAG_BRS_Pos)
+#define CAN_FLAG_ESI_Pos     7U
+#define CAN_FLAG_ESI         (1U << CAN_FLAG_ESI_Pos)
 
 typedef uint8_t ClbDlcFlagsType;
 

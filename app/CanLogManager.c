@@ -100,7 +100,7 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data);
 static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data);
 static void appCanLogFillEntry(
     CanLogEntryType *entry,
-    FDCAN_ClassicFrame *frame,
+    FDCAN_ClassicFrameType *frame,
     uint64_t timestamp,
     uint8_t channel
 );
@@ -791,20 +791,32 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 
 static void appCanLogFillEntry(
     CanLogEntryType *entry,
-    FDCAN_ClassicFrame *frame,
+    FDCAN_ClassicFrameType *frame,
     uint64_t timestamp,
     uint8_t channel
 )
 {
+    ClbDlcFlagsType Flags = 0;
+    uint8_t Dlc;
+    uint8_t DataLen;
+
+    Dlc = FDCAN_GET_DLC(frame);
+    Flags = FDCAN_GET_BRS(frame) << CAN_FLAG_BRS_Pos
+        | FDCAN_GET_ESI(frame) << CAN_FLAG_ESI_Pos
+        | FDCAN_GET_FDF(frame) << CAN_FLAG_RTR_FDF_Pos
+        | FDCAN_GET_IDE(frame) << CAN_FLAG_IDE_Pos;
+    DataLen = FDCAN_GET_DATA_LEN(frame);
+
     entry->header.header_len = sizeof(entry->header);
-    entry->header.type       = CANLOG_CLASSIC_TYPE;
-    entry->header.total_len  = sizeof(CanLogEntryType) + frame->dlc;
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->header.total_len  = sizeof(CanLogEntryType) + DataLen;
     entry->timestamp         = timestamp;
     entry->channel           = channel;
-    entry->dlc_flags         = MAKE_DLC_FLAGS(frame->dlc, 0);
-    entry->data_len          = frame->dlc;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(Dlc, Flags);
+    entry->data_len          = DataLen;
     entry->can_id            = frame->id;
-    memcpy(entry->data, frame->data, frame->dlc);
+
+    memcpy(entry->data, frame->data, DataLen);
 }
 
 #if INSTR_ENABLED
@@ -936,7 +948,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     bool IsOffState;
     uint8_t BlockIsReady;
     uint32_t SlotsToWrite = 0;
-    FDCAN_ClassicFrame NewFrame;
+    FDCAN_ClassicFrameType NewFrame;
     uint64_t AbsTime = 0;
     CanLogSyncType SyncEntry;
     CanLogEntryStackBufferType EntryBuffer;
