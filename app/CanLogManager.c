@@ -840,7 +840,10 @@ appCanLogStoreToFrameBuffer(void *entry)
 
     pHeader = (CanLogEntryHeaderType *)entry;
     
-    CanLogBuffer_AddEntry(entry, pHeader->total_len);
+    if (0 != CanLogBuffer_AddEntry(entry, pHeader->total_len))
+    {
+        CanLogManager_FrameDropCount1++;
+    }
 
     return res;
 }
@@ -890,6 +893,10 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         if (COMM_SUCCESS == res)
         {
             CanLogBuffer_BlockCount++;
+        }
+        else
+        {
+            CanLogManager_FrameDropCount2 += FrameCount;
         }
     }
     else
