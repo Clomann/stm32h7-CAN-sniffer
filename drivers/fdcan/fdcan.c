@@ -12,6 +12,7 @@
 #include "stm32h7xx_hal_fdcan.h"
 #include "stm32h7xx_hal_rcc_ex.h"
 #include <stdint.h>
+#include <string.h>
 
 #define FDCAN_1_NBR        COMM_DEVICE_NUMBER_1
 #define FDCAN_2_NBR        COMM_DEVICE_NUMBER_2
@@ -342,9 +343,15 @@ comm_status_t FDCAN_Read(
     uint32_t RxFifo0ITs)
 {
   comm_status_t RetVal;
-  uint8_t Data[8];
+  uint8_t Data[64];
   FDCAN_ClassicFrameType *pNewFrame;
   FdcanInstanceType * instance;
+  FDCAN_RxHeaderTypeDef rxheader;
+  uint8_t PayloadLen = 0;
+  uint32_t Brs;
+  uint32_t Esi;
+  uint32_t Ide;
+  uint32_t FdFormat;
 
   RetVal = COMM_SUCCESS;
   instance = (FdcanInstanceType *) dev->instance;
@@ -352,58 +359,35 @@ comm_status_t FDCAN_Read(
 
   if((RxFifo0ITs & FDCAN_IRQ_NOTIFICATION) != RESET)
   {
+    memset(&rxheader, 0, sizeof(rxheader));
+
     /* Retreive Rx messages from RX FIFO0 */
-    if (HAL_FDCAN_GetRxMessage(&instance->hfdcan, FDCAN_RX_FIFO0, &instance->rxheader, Data) != HAL_OK)
+    if (HAL_FDCAN_GetRxMessage(&instance->hfdcan, FDCAN_RX_FIFO0, &rxheader, Data) != HAL_OK)
     {
     	/* Reception Error */
     	RetVal = COMM_ERROR;
     }
 
-    switch (instance->rxheader.BitRateSwitch)
+    if (RetVal != COMM_SUCCESS)
     {
-        case FDCAN_BRS_ON:
-            FDCAN_SET_BRS(pNewFrame, 1U);
-            break;
-        case FDCAN_BRS_OFF:
-        default:
-            FDCAN_SET_BRS(pNewFrame, 0U);
-            break;
+        return RetVal;
     }
 
-    switch (instance->rxheader.ErrorStateIndicator)
-    {
-        case FDCAN_ESI_ACTIVE:
-            FDCAN_SET_ESI(pNewFrame, 1U);
-            break;
-        case FDCAN_ESI_PASSIVE:
-        default:
-            FDCAN_SET_ESI(pNewFrame, 0U);
-            break;
-    }
+    pNewFrame->dlc_dl_flags = 0U;
 
-    switch (instance->rxheader.IdType)
-    {
-        case FDCAN_EXTENDED_ID:
-            FDCAN_SET_IDE(pNewFrame, 1U);
-            break;
-        case FDCAN_STANDARD_ID:
-        default:
-            FDCAN_SET_IDE(pNewFrame, 0U);
-            break;
-    }
+    Brs = (rxheader.BitRateSwitch & FDCAN_BRS_ON) ? 1U : 0U;
+    FDCAN_SET_BRS(pNewFrame, Brs);
+    
+    Esi = (rxheader.ErrorStateIndicator & FDCAN_ESI_PASSIVE) ? 1U : 0U;
+    FDCAN_SET_ESI(pNewFrame, Esi);
 
-    switch (instance->rxheader.FDFormat)
-    {
-        case FDCAN_FD_CAN:
-            FDCAN_SET_FDF(pNewFrame, 1U);
-            break;
-        case FDCAN_CLASSIC_CAN:
-        default:
-            FDCAN_SET_FDF(pNewFrame, 0U);
-            break;
-    }
+    Ide = (rxheader.IdType & FDCAN_EXTENDED_ID) ? 1U : 0U;
+    FDCAN_SET_IDE(pNewFrame, Ide);
 
-    switch (instance->rxheader.DataLength)
+    FdFormat = (rxheader.FDFormat & FDCAN_FD_CAN) ? 1U : 0U;
+    FDCAN_SET_FDF(pNewFrame, FdFormat);
+    
+    switch (rxheader.DataLength)
     {
 		case FDCAN_DLC_BYTES_0:
             FDCAN_SET_DLC(pNewFrame, 0);
@@ -474,10 +458,15 @@ comm_status_t FDCAN_Read(
             FDCAN_SET_DATA_LEN(pNewFrame,  0);
     };
 
-    pNewFrame->id = instance->rxheader.Identifier;
-    pNewFrame->timestamp = instance->rxheader.RxTimestamp;
-
-    memcpy(pNewFrame->data, &Data, FDCAN_GET_DLC(pNewFrame));
+    pNewFrame->id = rxheader.Identifier;
+    pNewFrame->timestamp = rxheader.RxTimestamp;
+    
+    PayloadLen = FDCAN_GET_DATA_LEN(pNewFrame);
+    if (PayloadLen > sizeof(Data))
+    {
+        PayloadLen = sizeof(Data);
+    }
+    memcpy(pNewFrame->data, &Data[0], PayloadLen);
 
     if (HAL_FDCAN_ActivateNotification(&instance->hfdcan, FDCAN_IRQ_NOTIFICATION, 0) != HAL_OK)
     {
