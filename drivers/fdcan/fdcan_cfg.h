@@ -14,7 +14,7 @@
 #define FDCAN_RAM_RX_ELEMENTS       (64U)
 #define FDCAN_RAM_TX_ELEMENTS       (4U)
 #define FDCAN_IRQ_NOTIFICATION      FDCAN_IT_RX_FIFO0_WATERMARK
-#define FDCAN_IRQ_RX_WATERMARK      (16U)
+#define FDCAN_IRQ_RX_WATERMARK      (54U)
 
 /* User can use this section to tailor FDCANx instance used and associated
    resources */
