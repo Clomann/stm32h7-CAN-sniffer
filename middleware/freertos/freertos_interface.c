@@ -23,4 +23,11 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, uint32_
       *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
 }
 
+#if defined(__ICCARM__) || defined(__CC_ARM) || defined(__GNUC__)
+void vGenerateCore2Interrupt( void * xUpdatedMessageBuffer )
+{
+    (void) xUpdatedMessageBuffer;
+}
+#endif
+
 #endif
