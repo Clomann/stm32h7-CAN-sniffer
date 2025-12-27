@@ -948,7 +948,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     bool IsOffState;
     uint8_t BlockIsReady;
     uint32_t SlotsToWrite = 0;
-    FDCAN_ClassicFrameType NewFrame;
+    FDCAN_ClassicFrameType *pNewFrame;
     uint64_t AbsTime = 0;
     CanLogSyncType SyncEntry;
     CanLogEntryStackBufferType EntryBuffer;
@@ -1021,6 +1021,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
 
         *(CanLogCtrlData.commitLog) = true;
+
+        fdcan_msg_port_flush();
     }
 
     appCanLogCheckNewFileOpen(data);
@@ -1036,7 +1038,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
     }
 
-    while (0 < fdcan_msg_port_read(&NewFrame, 2))
+    while (0 < fdcan_msg_port_read(&pNewFrame, 2))
     {
         CanLogManager_DrainPortStartHook();
         CanLogManager_FrameCount++;
@@ -1056,7 +1058,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
                         &SyncEntry,
                         AbsTime,
-                        NewFrame.timestamp))
+                        pNewFrame->timestamp))
             {
                 CanLogFileManager_ErrorHandler();
             }
@@ -1064,13 +1066,13 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         appCanLogFillEntry(
             pFrameEntry,
-            &NewFrame,
-            NewFrame.timestamp,
-            NewFrame.channel
+            pNewFrame,
+            pNewFrame->timestamp,
+            pNewFrame->channel
         );
 
         appCanLogStoreToFrameBuffer((void *)pFrameEntry);
-        LastFrameTimestamp = NewFrame.timestamp;
+        LastFrameTimestamp = pNewFrame->timestamp;
         LastFrameTimestampValid = true;
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
