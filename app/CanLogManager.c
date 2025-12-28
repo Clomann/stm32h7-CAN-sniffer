@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "CanLogManager.h"
 
@@ -561,7 +562,6 @@ static int CanLogManager_ParseMetaData(char *buffer, uint32_t len, CanLogMetaDat
 
 static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
 {
-    FILINFO info;
     FRESULT res;
     FILINFO fno;
     FatFsDeviceType Dev;
@@ -580,8 +580,8 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
         break;
     case FR_NO_FILE:
     case FR_NO_PATH:
-        break;
     default:
+        break;
     }
 
     if (FR_OK == res)
@@ -642,10 +642,10 @@ static uint8_t m_MetaDataToJSonString(CanLogMetaDataType *data, char *json, uint
     // Create the JSON string
     snprintf(json, maxLength,
         "{\n"
-        "    \"epoch\":%d,\n"
-        "    \"index\":%d,\n"
-        "    \"offset\":%d,\n"
-        "    \"crc\":%d\n"
+        "    \"epoch\":%" PRIu32 ",\n"
+        "    \"index\":%" PRIu32 ",\n"
+        "    \"offset\":%" PRIu32 ",\n"
+        "    \"crc\":%" PRIu32 "\n"
         "}\n",
         data->epoch,
         data->fileIndex,
@@ -659,12 +659,10 @@ static uint8_t m_MetaDataToJSonString(CanLogMetaDataType *data, char *json, uint
 
 static FRESULT m_MetaDataStore(CanLogMetaDataType *data)
 {
-    FILINFO info;
     FRESULT res;
     FatFsDeviceType Dev;
     char Content[128];
     uint32_t BufferSize;
-    uint32_t BytesWritten;
     uint32_t StringSize;
     uint32_t WriteSize;
 
@@ -826,7 +824,7 @@ static InstrErrorType appPersistInstrumentationData(void)
     FRESULT res;
     FatFsDeviceType File;
     uint32_t BytesToWrite = 0;
-    uint8_t * Data;
+    uint8_t * Data = NULL;
     const char FileName[] = "InstrumentationData.bin";
 
     res = FatFS_SD_OpenFileForOverWrite(&File, FileName);
