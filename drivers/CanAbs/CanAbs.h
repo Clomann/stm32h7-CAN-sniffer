@@ -26,6 +26,11 @@ comm_status_t CanAbs_IsStateOff_Can2(bool * isOff);
 void  CanAbs_ErrorHandler(void);
 
 /**
+ * @brief Drain pending Rx frames from all CAN peripherals and notify consumer.
+ */
+void CanAbs_Drain(void);
+
+/**
   * @brief  Create a Tx CAN message with standard ID.
   * @param  msg: pointer to an FDCAN_Message structure that is the message
   *              to be craeted.
