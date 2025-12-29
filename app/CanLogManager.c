@@ -1020,6 +1020,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         *(CanLogCtrlData.commitLog) = true;
 
+        CanAbs_Drain();
+
         fdcan_msg_port_flush();
     }
 
