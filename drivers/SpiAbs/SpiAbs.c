@@ -523,7 +523,7 @@ uint8_t m_PollForResponse(SPI_HandleTypeDef * handle, uint8_t * pResponse)
 	uint8_t NoResponseReceived;
 	uint8_t RetVal;
 	uint8_t counter;
-	const uint8_t RetryCount = 10;
+	const uint8_t RetryCount = 20;
 
     (void) handle;
 
