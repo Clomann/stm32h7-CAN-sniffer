@@ -11,10 +11,10 @@ volatile uint64_t CanLogManager_FrameDropCount1 = 0;
 volatile uint64_t CanLogManager_FrameDropCount2 = 0;
 volatile uint64_t CanLogBuffer_FrameCount1 = 0;
 volatile uint64_t CanLogBuffer_FrameCount2 = 0;
+volatile uint64_t CanLogBuffer_FrameDropCount = 0;
 volatile uint64_t CanLogBuffer_BlockCount = 0;
 volatile uint64_t FcdanMsgPort_FrameDropCount = 0;
 volatile uint64_t FrameDelta1 = 0;
-volatile uint64_t FrameDelta2 = 0;
 volatile uint64_t ErrorHandlerCalls = 0;
 
 static void RuntimeChecks_ErrorHandler(void)
@@ -34,6 +34,7 @@ void RuntimeChecks_Init(void)
     CanLogManager_FrameDropCount2 = 0;
     CanLogBuffer_FrameCount1 = 0;
     CanLogBuffer_FrameCount2 = 0;
+    CanLogBuffer_FrameDropCount = 0;
     CanLogBuffer_BlockCount = 0;
     FcdanMsgPort_FrameDropCount = 0;
     ErrorHandlerCalls = 0;
@@ -44,7 +45,6 @@ static RuntimeChecksErrorType CheckDropCounts(void)
     RuntimeChecksErrorType err = RUNTIMECHECKS_E_OK;
 
     FrameDelta1 = CanBridgeTask_FrameCount - CanLogManager_FrameCount;
-    FrameDelta2 = CanLogBuffer_FrameCount1 - CanLogBuffer_FrameCount2;
 
     if (0 != FcdanMsgPort_FrameDropCount)
     {
@@ -62,11 +62,11 @@ static RuntimeChecksErrorType CheckDropCounts(void)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
-    else if (FrameDelta1 > 1024)
+    else if (FrameDelta1 > 1024U)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
-    else if (FrameDelta2 > 1024)
+    else if (CanLogBuffer_FrameDropCount > 1024U)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
@@ -85,7 +85,6 @@ static RuntimeChecksErrorType CheckDropCounts(void)
 void RuntimeChecks_CheckFrameCounts(RuntimeChecksContextType *context)
 {
     RuntimeChecksErrorType err;
-
     
     err = CheckDropCounts();
     

@@ -40,6 +40,9 @@ extern volatile uint64_t CanLogBuffer_FrameCount1;
 /** Number of frames read from SD card staging buffer */
 extern volatile uint64_t CanLogBuffer_FrameCount2;
 
+/** Number of frames dropped between writing to and reading from buffer of CanLogBuffer */
+extern volatile uint64_t CanLogBuffer_FrameDropCount;
+
 /** Number of blocks sucessfully written to SD card (no SPI op error) */
 extern volatile uint64_t CanLogBuffer_BlockCount;
 
