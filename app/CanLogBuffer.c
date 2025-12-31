@@ -3,9 +3,9 @@
 #include "RuntimeChecks.h"
 #include <stdint.h>
 #include <string.h>
+#include "memory_sections.h"
 
-__attribute__((section(".ram_d1")))
-static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
+static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] RAM_D1_SECTION;
 static lwrb_t Rb1;
 static uint8_t EpochCount = 0;
 static uint8_t BlockCount = 0;

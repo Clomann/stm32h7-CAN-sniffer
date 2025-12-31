@@ -20,6 +20,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "memory_sections.h"
 #include "lwip/opt.h"
 #include "lwip/timeouts.h"
 #include "netif/ethernet.h"
@@ -124,8 +125,8 @@ __attribute__((at(0x30040100))) ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
 
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDecripSection"))); /* Ethernet Rx DMA Descriptors */
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecripSection")));   /* Ethernet Tx DMA Descriptors */
+ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] ETH_RX_DESC; /* Ethernet Rx DMA Descriptors */
+ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] ETH_TX_DESC;   /* Ethernet Tx DMA Descriptors */
 
 #endif
 
@@ -155,7 +156,7 @@ extern u8_t memp_memory_RX_POOL_base[];
 __attribute__((at(0x30040200)) extern u8_t memp_memory_RX_POOL_base[];
 
 #elif defined ( __GNUC__ ) /* GNU Compiler */
-__attribute__((section(".Rx_PoolSection"))) extern u8_t memp_memory_RX_POOL_base[];
+extern u8_t memp_memory_RX_POOL_base[] ETH_RX_POOL;
 #endif
 /* USER CODE END 2 */
 

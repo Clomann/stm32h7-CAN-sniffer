@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
 #include "message_buffer.h"
+#include "memory_sections.h"
 
 #include "gpio.h"
 #include "RuntimeChecks.h"
@@ -26,8 +27,7 @@ typedef struct {
 
 static MessageBufferHandle_t CanFrameBuffer;
 static StaticMessageBuffer_t MessageBuffer;
-__attribute__((section(".dtcram"))) 
-uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE];
+uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE] RAM_DTC_SECTION;
 
 /**
  * @brief CAN frame page buffer shared between ISR and task context

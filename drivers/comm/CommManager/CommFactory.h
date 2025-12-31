@@ -7,16 +7,15 @@
 #pragma once
 
 #include "CommManager.h"        /* CommDriver definition  */
+#include "memory_sections.h"
 
 /* GCC/Clang syntax – adjust for your tool-chain            */
-#define COMM_FACTORY_USED_ATTR  __attribute__(( used))
-#define COMM_FACTORY_SECTION  __attribute__((section(".comm_factory"), used))
-
+#define COMM_FACTORY_USED_ATTR  __attribute__((used))
 
 #if !defined(UNIT_TEST)
 #define COMM_REGISTER_DRIVER(proto, fn)                          \
     static const CommFactoryEntry __comm_factory_##proto     \
-    COMM_FACTORY_SECTION = { (proto), (fn) }
+    COMM_FACTORY_SECTION COMM_FACTORY_USED_ATTR = { (proto), (fn) }
 #else
 #define COMM_REGISTER_DRIVER(proto, fn) 
 #endif
