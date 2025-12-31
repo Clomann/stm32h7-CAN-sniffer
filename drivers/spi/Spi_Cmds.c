@@ -11,6 +11,7 @@
 #include "stm32h745xx.h"
 #include "stm32h7xx_hal_rcc_ex.h"
 #include "spi_utils.h"
+#include "memory_sections.h"
 
 /* Private define ------------------------------------------------------------*/
 enum {
@@ -23,15 +24,15 @@ enum {
 static SPI_HandleTypeDef *pSpiHandle1;
 
 /* Buffer used for transmission */
-ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aTxBuffer[]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
-ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxSpiDummy[1024U]);
-ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxSpiSink[1024U]);
+ALIGN_32BYTES(uint8_t DMA_BUFFER aTxBuffer[]) = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
+ALIGN_32BYTES(uint8_t DMA_BUFFER aRxSpiDummy[1024U]);
+ALIGN_32BYTES(uint8_t DMA_BUFFER aRxSpiSink[1024U]);
 
 /* Buffer used for reception */
 /* Size of buffer */
 #define BUFFERSIZE              (COUNTOF(aTxBuffer) - 1)
 #define BUFFER_ALIGNED_SIZE 	(((BUFFERSIZE+31)/32)*32)
-ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))) aRxBuffer[BUFFER_ALIGNED_SIZE]);
+ALIGN_32BYTES(uint8_t DMA_BUFFER aRxBuffer[BUFFER_ALIGNED_SIZE]);
 
 uint8_t Spi_PollTillIdle(SPI_HandleTypeDef * handle, uint8_t *);
 uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
