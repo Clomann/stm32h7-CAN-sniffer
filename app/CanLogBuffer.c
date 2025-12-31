@@ -433,8 +433,21 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *fram
 
 uint8_t CanLogBuffer_Consume(uint32_t len, uint32_t frame_count)
 {
+    static uint64_t backlog = 0;
+
     lwrb_skip(&Rb1, len);
     CanLogBuffer_FrameCount2 += frame_count;
+
+    if (CanLogBuffer_FrameCount1 > CanLogBuffer_FrameCount2)
+    {
+        backlog = CanLogBuffer_FrameCount1 - CanLogBuffer_FrameCount2;
+    }
+
+    if (backlog > BLOCK_SIZE) {
+        CanLogBuffer_FrameDropCount = backlog - BLOCK_SIZE;
+    } else {
+        CanLogBuffer_FrameDropCount = 0;
+    }
 
     /* After a partial flush the read pointer may sit mid-block. If the buffer
      * is now empty, reset the ring to realign r/w pointers to block start. */
