@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "fs_custom.h"
 #include "FileHandler.h"
@@ -32,7 +33,7 @@ static const char redirect_reply[] =
 
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
-#define CANLOG_MAX_STATUS_SIZE    32U
+#define CANLOG_MAX_STATUS_SIZE    80U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
 #define CANLOG_STATUS_PATH        "/logger/status"
@@ -42,7 +43,7 @@ static const char redirect_reply[] =
     "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}"
 
 #define CANLOG_STATUS_STRING \
-    "{ \"active\": %s }"
+    "{ \"active\":%s,\"frames_lost\":%s,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f}"
 
 typedef struct {
     uint8_t stage;
@@ -147,16 +148,27 @@ int fs_open_custom(struct fs_file *file, const char *name)
     }
     else if (0 == strncmp(name, CANLOG_STATUS_PATH, sizeof(CANLOG_STATUS_PATH) - 1)) {
         uint8_t IsTracerRunning = 1;
+        float BusLoadCan1 = 0.0;
+        float BusLoadCan2 = 0.0;
+        _Bool AnyFrameLost = false;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
             IsTracerRunning =  1;
         }
 
+        AnyFrameLost = FsCustom_IsAnyFrameLostFlag();
+        FsCustom_GetBusloadCan1(&BusLoadCan1);
+        FsCustom_GetBusloadCan2(&BusLoadCan2);
+
         int n = snprintf(StatusData,
             sizeof(StatusData),
             CANLOG_STATUS_STRING,
-            IsTracerRunning ? "true" : "false");
+            IsTracerRunning ? "true" : "false",
+            AnyFrameLost ? "true" : "false",
+            BusLoadCan1,
+            BusLoadCan2
+        );
     
         file->data           = StatusData;
         file->len            = n;

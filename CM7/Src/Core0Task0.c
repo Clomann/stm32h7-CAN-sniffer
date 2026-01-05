@@ -205,6 +205,11 @@ static void Core0Task0Main( void * parameters )
             AppConfig.can2.baudrate = 0;
             AppConfig.can2.mode = 0;
         }
+        else 
+        {
+            appCanLogSetParam(CLM_PARAMETER_ID_CAN1_BAUDRATE, AppConfig.can1.baudrate);
+            appCanLogSetParam(CLM_PARAMETER_ID_CAN2_BAUDRATE, AppConfig.can2.baudrate);
+        }
 
         SettingsHandler_Init(&AppConfig);
     }
@@ -233,6 +238,11 @@ static void Core0Task0Main( void * parameters )
         if (SettingsHandler_Poll(&AppConfig)) 
         {
             if (ConfigManager_UpdateConfig(&AppCtrlData.Config, &AppConfig, true) == CONFIG_OK) 
+            {
+                appCanLogSetParam(CLM_PARAMETER_ID_CAN1_BAUDRATE, AppConfig.can1.baudrate);
+                appCanLogSetParam(CLM_PARAMETER_ID_CAN2_BAUDRATE, AppConfig.can2.baudrate);
+            }
+            else
             {
                 Error_Handler();
             }
