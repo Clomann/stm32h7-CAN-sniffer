@@ -25,6 +25,7 @@
 typedef uint8_t ClbEntryTypeType;
 
 #define CAN_DLC_MASK         0x0F
+#define CAN_DLC_MASK_Pos     0U
 #define CAN_FLAG_IDE_Pos     4U
 #define CAN_FLAG_IDE         (1U << CAN_FLAG_IDE_Pos)
 #define CAN_FLAG_RTR_FDF_Pos 5U
