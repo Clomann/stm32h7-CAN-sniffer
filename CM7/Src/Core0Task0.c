@@ -264,12 +264,6 @@ static void Core0Task0Main( void * parameters )
             appCanCtrlSetBaudrate(&CanCtrlData);
             appCanCtrlSetMode(&CanCtrlData);
             AppCtrlData.applyConfig = 0;
-
-            CanAbs_FrameCount = 0;
-            CanBridgeTask_FrameCount = 0;
-            CanLogManager_FrameCount = 0;
-            CanLogBuffer_FrameCount1 = 0;
-            CanLogBuffer_FrameCount2 = 0;
         }
         else
         {
@@ -284,8 +278,6 @@ static void Core0Task0Main( void * parameters )
         }
 
         update_task_stats();
-
-        RuntimeChecks_CheckFrameCounts(NULL);
     }
 
     appCanLogHandlerDeInit(AppCtrlData.Log);
