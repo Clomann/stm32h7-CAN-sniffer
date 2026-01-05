@@ -3,6 +3,7 @@
 #include "CommTypes.h"
 #include "timer.h"
 #include "CanAbs.h"
+#include "fdcan.h"
 #include <stdint.h>
 
 #define TIMx_TIME_RESOLUTION (1U)
@@ -133,13 +134,16 @@ void appCanCtrlSetMode(CanCtrlDataType *data)
     }
 }
 
-void TIM_InterruptCallback()
+void TIM_InterruptCallback(void)
 {
-    uint64_t Arr = 0;
+    uint64_t Period = 0U;
+
+    Period = FDCAN_GetTimerPeriodHook();
 
     /* add one full timer period to timer */
-    TIM_GetArrValue((uint16_t *)&Arr);
-    Time += Arr * TIMx_TIME_RESOLUTION;
+    Time += Period;
+
+    CANABS_CheckIsrPollPeriod(Time, Period);
 }
 
 void TIM_HAL_InterruptCallback()
@@ -155,16 +159,22 @@ uint64_t FDCAN_GetTimestampHook(void)
 {
     uint64_t timestamp;
     uint64_t time_snapshot1, time_snapshot2;
-    uint16_t cnt;
+    uint32_t cnt;
+    uint32_t uif;
 
     do
     {
         time_snapshot1 = Time;
-        TIM_GetCounterValue(&cnt);
+        TIM_GetCounterValueAndUpdateInterruptFlag(&cnt, &uif);
         time_snapshot2 = Time;
     } while (time_snapshot1 != time_snapshot2);
 
     timestamp = time_snapshot1 + (uint64_t)(cnt * TIMx_TIME_RESOLUTION);
+
+    if (uif)
+    {
+        timestamp += FDCAN_GetTimerPeriodHook();
+    }
 
     return timestamp;
 }

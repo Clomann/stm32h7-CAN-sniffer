@@ -77,6 +77,14 @@ typedef struct {
 
 extern const CommInterface FDCAN_Interface;
 
+/**
+ * @brief Retrieves the timestamp captured at the last FDCAN interrupt for this driver.
+ * @param[in]  dev       FDCAN driver handle.
+ * @param[out] timestamp Absolute timestamp in microseconds.
+ * @return A comm_status_t value (e.g. COMM_SUCCESS or COMM_NULL_POINTER).
+ */
+comm_status_t FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp);
+
 comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 
     const void *cfg, 
