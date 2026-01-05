@@ -64,6 +64,11 @@ comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan)
 {
     FdcanInstanceType * instance;
 
+    if (NULL == dev || NULL == dev->instance)
+    {
+        return COMM_NULL_POINTER;    
+    }
+
     instance = (FdcanInstanceType *) dev->instance;
 
     *fdcan = &instance->hfdcan;
@@ -98,6 +103,29 @@ comm_status_t fdcan_init_tx_header(
     const void *,
     FDCAN_TxHeaderTypeDef *,
     uint32_t);
+
+comm_status_t FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp)
+{
+    comm_status_t res = 0;
+    FdcanInstanceType * instance;
+
+    if (NULL == dev || NULL == dev->instance || NULL == timestamp)
+    {
+        res = COMM_NULL_POINTER;
+        return res;
+    }
+
+    instance = (FdcanInstanceType *)dev->instance;
+
+    if (COMM_SUCCESS != res)
+    {
+        FDCAN_ErrorHandler();
+        return res;
+    }
+
+    *timestamp = instance->mostRecentInterrupTimestamp;
+    return res;
+}
 
 uint64_t  SampleTime(void);
 

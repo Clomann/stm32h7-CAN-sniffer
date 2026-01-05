@@ -23,7 +23,13 @@
  */
 uint8_t TIMx_Init(uint32_t resolution);
 void TIMx_IRQHandler(void);
-void TIM_GetCounterValue(uint16_t *cnt);
+
+/**
+ * @brief Reads the timer counter and UIFCPY flag from a single CNT sample.
+ * @param[out] cnt    Counter value with UIFCPY masked out.
+ * @param[out] uifcpy Update interrupt flag (UIF) copy flag indicating a pending update event.
+ */
+void TIM_GetCounterValueAndUpdateInterruptFlag(uint32_t *cnt, uint32_t *uifcpy);
 void TIM_GetArrValue(uint16_t *arr);
 
 /**

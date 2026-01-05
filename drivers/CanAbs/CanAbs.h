@@ -41,6 +41,8 @@ comm_status_t CanAbs_CreateMessage_Standard(
     uint8_t *data, 
     uint32_t length);
 
+void CANABS_CheckIsrPollPeriod(uint64_t timestamp, uint64_t timerPeriod);
+
 uint64_t CANABS_ConvertCountToTimestampHook(uint32_t cnt);
 
 /**

@@ -1,5 +1,7 @@
 #include "timer.h"
 #include "nvic_irg_config.h"
+#include "stm32h7xx_hal_tim.h"
+#include <stdint.h>
 
 #define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL)  // = 10_000_000_000
 
@@ -161,6 +163,8 @@ uint8_t TIMx_Init(uint32_t resolution)
         res = 1;
     }
 
+    __HAL_TIM_UIFREMAP_ENABLE(&TimHandle);
+
     /*##-2- Start the TIM Base generation in interrupt mode ####################*/
     /* Start Channel1 */
     if (HAL_TIM_Base_Start_IT(&TimHandle) != HAL_OK)
@@ -231,9 +235,21 @@ void TIMx_IRQHandler(void)
     HAL_TIM_IRQHandler(&TimHandle);
 }
 
-void TIM_GetCounterValue(uint16_t *cnt)
+void TIM_GetCounterValueAndUpdateInterruptFlag(uint32_t *cnt, uint32_t *uifcpy)
 {
-    *cnt = __HAL_TIM_GetCounter(&TimHandle);
+    uint32_t CntRaw;
+    
+    *uifcpy = 0;
+
+    CntRaw = __HAL_TIM_GetCounter(&TimHandle);
+    
+    if (TimHandle.Instance->CR1 & TIM_CR1_UIFREMAP)
+    {
+        *uifcpy = __HAL_TIM_GET_UIFCPY(CntRaw);
+        CntRaw &= ~TIM_CNT_UIFCPY;
+    }
+
+    *cnt = CntRaw;
 }
 
 void TIM_GetArrValue(uint16_t *arr)
