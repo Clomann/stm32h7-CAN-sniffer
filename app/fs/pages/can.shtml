@@ -259,6 +259,42 @@
             color: #374151;
         }
 
+        .log-space {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .log-space-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .log-space-value {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .log-space-bar {
+            height: 10px;
+            background-color: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .log-space-fill {
+            height: 100%;
+            width: 0%;
+            background-color: #facc15;
+            border-radius: inherit;
+            transition: width 0.2s ease;
+        }
+
         /* Configuration Table */
         .config-table {
             width: 100%;
@@ -309,6 +345,39 @@
             border-color: var(--primary-color);
         }
 
+        input[type="number"] {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background-color: white;
+            font-family: inherit;
+            width: 140px;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .param-hint {
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.3;
+        }
+
+        .input-with-unit {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-unit {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             body {
@@ -351,6 +420,14 @@
             .config-table th,
             .config-table td {
                 padding: 0.625rem 0.5rem;
+            }
+
+            input[type="number"] {
+                width: 100%;
+            }
+
+            .input-with-unit {
+                width: 100%;
             }
 
             button, input[type="submit"] {
@@ -411,6 +488,16 @@
                         <span class="status-chip status-neutral" id="status-bus1">CAN1: not reported</span>
                         <span class="status-chip status-neutral" id="status-bus2">CAN2: not reported</span>
                     </div>
+                </div>
+            </div>
+
+            <div class="log-space" aria-live="polite">
+                <div class="log-space-header">
+                    <span>Log memory</span>
+                    <span class="log-space-value" id="log-space-value">Checking…</span>
+                </div>
+                <div class="log-space-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                    <div class="log-space-fill" id="log-space-fill" style="width: 0%;"></div>
                 </div>
             </div>
         </div>
@@ -512,13 +599,62 @@
         <div class="card">
             <div class="card-header">SD Card Management</div>
             <div class="card-description">
-                Format the SD card to recover from file system corruption or other issues. 
+                Format the SD card to recover from file system corruption or to apply new logging parameters.
                 The format request will be queued and executed on the next system restart.
                 <br/>
-                <strong>Warning:</strong> This will erase all data on the SD card.
+                <strong>Warning:</strong> This will erase all data on the SD card and reset the log ring.
+                <br/>
+                <strong>Note:</strong> CAN logs are stored using file rotation.
+                <br/>
+                <strong>Tip:</strong> If the SD card becomes unresponsive during long runs, a full reformat on a computer usually fixes it. Do this before an important logging session.
             </div>
-            <form method="get" action="/cancontrol.cgi">
-                <button type="submit" name="action" value="Format" id="format-button" class="btn-primary">Format</button>
+            <form method="get" action="/cancontrol.cgi" id="sd-format-form">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Setting</th>
+                            <th>Current Value</th>
+                            <th>New Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Cluster size</td>
+                            <td>32 KiB</td>
+                            <td>
+                                <div class="input-with-unit">
+                                    <input type="number" name="cluster_kb" id="cluster-kb" min="4" step="4" value="32">
+                                    <span class="input-unit">KiB</span>
+                                </div>
+                                <div class="param-hint">Larger clusters improve write speed but waste more space for small files.</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Log file size</td>
+                            <td>10 MiB</td>
+                            <td>
+                                <div class="input-with-unit">
+                                    <input type="number" name="file_size_mb" id="file-size-mb" min="1" step="1" value="10">
+                                    <span class="input-unit">MiB</span>
+                                </div>
+                                <div class="param-hint">Size of each CAN log file; larger sizes mean fewer rotations.</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Log file count</td>
+                            <td>640 files</td>
+                            <td>
+                                <input type="number" name="file_count" id="file-count" min="1" step="1" value="640">
+                                <div class="param-hint">Number of log files kept in the ring buffer.</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 1.5rem;">
+                    <div class="btn-group">
+                        <button type="submit" name="action" value="Format" id="format-button" class="btn-primary">Format</button>
+                    </div>
+                </div>
             </form>
         </div>
     </div>
@@ -529,7 +665,9 @@
     
         /* ---------- configuration ---------- */
         const STATUS_URL   = "/logger/status";
+        const META_URL     = "/logs/meta";
         const POLL_MS      = 1000;
+        const DEFAULT_LOG_FILE_SIZE = 10 * 1024 * 1024;
         const btnApply     = document.getElementById("apply-button");
         const btnSave      = document.getElementById("save-button");
         const btnStart     = document.getElementById("start-button");
@@ -540,6 +678,8 @@
         const chipFrames   = document.getElementById("status-frames");
         const chipBus1     = document.getElementById("status-bus1");
         const chipBus2     = document.getElementById("status-bus2");
+        const logSpaceValue = document.getElementById("log-space-value");
+        const logSpaceFill  = document.getElementById("log-space-fill");
         /* ----------------------------------- */
 
         function setChip(el, text, className) {
@@ -569,6 +709,88 @@
                 setChip(el, `${label}: ${formatted} (${BUS_LOAD_ACCURACY})`, "status-ok");
             } else {
                 setChip(el, `${label}: not reported`, "status-neutral");
+            }
+        }
+
+        function parseMetaNumber(value) {
+            const numberValue = Number(value);
+            return Number.isFinite(numberValue) ? numberValue : null;
+        }
+
+        function calcUsedFiles(head, tail, capacity) {
+            if (!Number.isFinite(head) || !Number.isFinite(tail) || !Number.isFinite(capacity) || capacity <= 0) {
+                return null;
+            }
+
+            let used;
+            if (head >= tail) {
+                used = head - tail;
+            } else {
+                used = capacity + (head - tail);
+            }
+
+            if (used < 0) {
+                used = 0;
+            }
+            
+            used = Math.min(used, capacity);
+            return used;
+        }
+
+        function formatBytes(bytes) {
+            if (!Number.isFinite(bytes)) {
+                return null;
+            }
+
+            if (bytes < 1024) {
+                return `${Math.round(bytes)} B`;
+            }
+
+            if (bytes < (1024 * 1024)) {
+                return `${(bytes / 1024).toFixed(1)} kB`;
+            }
+
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        function updateLogSpaceBar(percentUsed) {
+            const clamped = Math.max(0, Math.min(100, percentUsed));
+            logSpaceFill.style.width = `${clamped}%`;
+            logSpaceFill.setAttribute("aria-valuenow", `${clamped}`);
+        }
+
+        async function pollLogSpace() {
+            try {
+                const resp = await fetch(META_URL, {cache: "no-store"});
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const meta = await resp.json();
+
+                const head = parseMetaNumber(meta.head);
+                const tail = parseMetaNumber(meta.tail);
+                const capacity = parseMetaNumber(meta.capacity);
+                const fileSize = parseMetaNumber(meta.file_size) ?? DEFAULT_LOG_FILE_SIZE;
+
+                const usedFiles = calcUsedFiles(head, tail, capacity);
+                if (usedFiles === null) throw new Error("Invalid meta");
+
+                const usedBytes = usedFiles * fileSize;
+                const totalBytes = capacity * fileSize;
+                const usedLabel = formatBytes(usedBytes);
+                const totalLabel = formatBytes(totalBytes);
+
+                if (!usedLabel || !totalLabel || totalBytes <= 0) {
+                    throw new Error("Invalid file size");
+                }
+
+                const percentUsed = Math.round((usedBytes / totalBytes) * 100);
+                logSpaceValue.textContent = `${percentUsed}% used · ${usedLabel} / ${totalLabel}`;
+                logSpaceValue.title = `${usedLabel} used of ${totalLabel}`;
+                updateLogSpaceBar(percentUsed);
+            } catch (e) {
+                console.error("Meta poll failed:", e);
+                logSpaceValue.textContent = "Not reported";
+                logSpaceFill.style.width = "0%";
+                logSpaceFill.setAttribute("aria-valuenow", "0");
             }
         }
     
@@ -628,7 +850,9 @@
             }
         }
         pollSnifferState();
+        pollLogSpace();
         setInterval(pollSnifferState, POLL_MS);
+        setInterval(pollLogSpace, POLL_MS);
         /* --------------------------------------- */
     
         /* -------- form helpers  ---------------- */

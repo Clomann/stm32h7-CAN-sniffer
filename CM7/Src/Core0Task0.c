@@ -22,6 +22,7 @@
 #include "timer.h"
 #include "gpio.h"
 #include "httpd_post.h"
+#include "core_json.h"
 
 #include "CanBridgeTask.h"
 #include "CanSendTask.h"
@@ -123,12 +124,104 @@ static void appHandleFormattingRequest(void)
     _Bool ReformattingRequested;
     FatFsDeviceType DevTmp;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
+    uint32_t cluster_size = CLUSTER_SIZE;
+    uint32_t log_file_size = MAX_LOG_FILE_SIZE;
+    uint32_t log_file_count = MAX_LOG_FILE_COUNT;
 
     res = FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName);
 
     if (FR_OK == res)
     {
         ReformattingRequested = true;
+
+        do
+        {
+            uint32_t fileSize = 0U;
+            char buffer[128];
+            uint32_t readSize = 0U;
+            JSONStatus_t result;
+            char *value = NULL;
+            size_t valueLength = 0U;
+            char tmp[32];
+            uint32_t parsed = 0U;
+
+            res = FatFS_SD_GetFileSize(&DevTmp, &fileSize);
+            if (FR_OK != res || fileSize == 0U)
+            {
+                break;
+            }
+
+            readSize = (fileSize < (sizeof(buffer) - 1U)) ? fileSize : (sizeof(buffer) - 1U);
+            res = FatFS_SD_ReadFile(&DevTmp, buffer, readSize);
+            if (FR_OK != res)
+            {
+                break;
+            }
+
+            buffer[readSize] = '\0';
+
+            result = JSON_Validate(buffer, readSize);
+            if (JSONSuccess != result)
+            {
+                break;
+            }
+
+            result = FileHandler_GetValue(
+                buffer,
+                readSize,
+                "cluster_size",
+                sizeof("cluster_size") - 1U,
+                &value,
+                &valueLength
+            );
+            if (JSONSuccess == result && valueLength < sizeof(tmp))
+            {
+                memcpy(tmp, value, valueLength);
+                tmp[valueLength] = '\0';
+                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
+                {
+                    cluster_size = parsed;
+                }
+            }
+
+            result = FileHandler_GetValue(
+                buffer,
+                readSize,
+                "log_file_size",
+                sizeof("log_file_size") - 1U,
+                &value,
+                &valueLength
+            );
+            if (JSONSuccess == result && valueLength < sizeof(tmp))
+            {
+                memcpy(tmp, value, valueLength);
+                tmp[valueLength] = '\0';
+                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
+                {
+                    log_file_size = parsed;
+                }
+            }
+
+            result = FileHandler_GetValue(
+                buffer,
+                readSize,
+                "log_file_count",
+                sizeof("log_file_count") - 1U,
+                &value,
+                &valueLength
+            );
+            if (JSONSuccess == result && valueLength < sizeof(tmp))
+            {
+                memcpy(tmp, value, valueLength);
+                tmp[valueLength] = '\0';
+                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
+                {
+                    log_file_count = parsed;
+                }
+            }
+        } while (0);
+
+        (void)FatFS_SD_CloseFile(&DevTmp);
     }
     else
     {
@@ -143,7 +236,7 @@ static void appHandleFormattingRequest(void)
         {
             AppCtrlData.mountRes = 1;
     
-            res = FatFS_SD_Format_Fat32(32U * 1024U);
+            res = FatFS_SD_Format_Fat32(cluster_size);
         }
 
         if (FR_OK == res)
@@ -151,6 +244,9 @@ static void appHandleFormattingRequest(void)
             AppCtrlData.mountRes = FatFS_SD_Mount();
         }
     }
+
+    (void)log_file_size;
+    (void)log_file_count;
 }
 
 static void appCanCtrlDataSetter(
@@ -349,7 +445,11 @@ void WebInterface_GetActionHook(uint8_t action)
     AppCtrlData.runCanTracer = action;
 }
 
-void WebInterface_RequestFormattingHook(void)
+void WebInterface_RequestFormattingHook(
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
 {
-    FatFS_SD_Formatting_Request();
+    FatFS_SD_Formatting_Request(cluster_size, log_file_size, log_file_count);
 }
