@@ -8,6 +8,7 @@
 
 #include "fs_custom.h"
 #include "FileHandler.h"
+#include "CanLogManager.h"
 
 struct fs_custom_data {
     FILE *f;
@@ -40,7 +41,7 @@ static const char redirect_reply[] =
 #define CANLOG_POST_REDIRECT_PATH "/postredir"
 
 #define CANLOG_META_DATA_STRING \
-    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}"
+    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\",\"file_size\":\"%lu\"}"
 
 #define CANLOG_STATUS_STRING \
     "{ \"active\":%s,\"frames_lost\":%s,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f}"
@@ -133,7 +134,8 @@ int fs_open_custom(struct fs_file *file, const char *name)
             (unsigned long int)HeadIndex, 
             (unsigned long int)TailIndex, 
             (unsigned long int)Capacity, 
-            (unsigned long int)((HeadIndex + Capacity - 1) % Capacity)
+            (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
+            (unsigned long int)(MAX_LOG_FILE_SIZE)
         );
     
         if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData)) {
