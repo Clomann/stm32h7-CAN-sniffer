@@ -75,6 +75,19 @@ FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *data, uint32_t length)
     return FR_OK;
 }
 
+FRESULT FatFS_SD_Formatting_Request(
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
+{
+    (void)cluster_size;
+    (void)log_file_size;
+    (void)log_file_count;
+
+    return FR_OK;
+}
+
 FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
 {
     (void)dev;
