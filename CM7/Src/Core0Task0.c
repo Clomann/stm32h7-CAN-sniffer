@@ -18,6 +18,7 @@
 #include "HttpAbs.h"
 #include "SettingsHandler.h"
 #include "CanAbs.h"
+#include "fdcan.h"
 #include "fs_custom.h"
 #include "timer.h"
 #include "gpio.h"
@@ -262,6 +263,14 @@ static void appCanCtrlDataSetter(
     data->can2.mode = appConfig->can2.mode;
 }
 
+static void appConfigSetDefaults(AppConfigType *config)
+{
+    config->can1.baudrate = FDCAN_BAUDRATE_250000;
+    config->can1.mode = FDCAN_MODE_2;
+    config->can2.baudrate = FDCAN_BAUDRATE_250000;
+    config->can2.mode = FDCAN_MODE_2;
+}
+
 static void Core0Task0Main( void * parameters )
 {
     static UBaseType_t MinUnusedStack;
@@ -301,34 +310,37 @@ static void Core0Task0Main( void * parameters )
         &AppCtrlData.commitLog);
     appCanLogHandlerInit(AppCtrlData.Log);
     Core0Task1_SetCanLogHandle(AppCtrlData.Log);
-    ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
-    if (ConfigManager_Initialize(&AppCtrlData.Config) == CONFIG_OK)
-    {
-        if (ConfigManager_LoadConfig(&AppCtrlData.Config, &AppConfig) != CONFIG_OK) 
-        {
-            AppConfig.can1.baudrate = 0;
-            AppConfig.can1.mode = 0;
-            AppConfig.can2.baudrate = 0;
-            AppConfig.can2.mode = 0;
-        }
-        else 
-        {
-            appCanLogSetParam(CLM_PARAMETER_ID_CAN1_BAUDRATE, AppConfig.can1.baudrate);
-            appCanLogSetParam(CLM_PARAMETER_ID_CAN2_BAUDRATE, AppConfig.can2.baudrate);
-        }
 
-        SettingsHandler_Init(&AppConfig);
-    }
-
-    GPIO_Mco1_Init();
-
-    Instrumentation_Init();
+    appConfigSetDefaults(&AppConfig);
 
     appCanCtrlDataSetter(
         &CanCtrlData, 
         (const AppControlDataType *)&AppCtrlData, 
         (const AppConfigType *)&AppConfig);    
     appFdcanInit(&CanCtrlData);
+
+    ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
+    if (ConfigManager_Initialize(&AppCtrlData.Config) == CONFIG_OK)
+    {
+        if (ConfigManager_LoadConfig(&AppCtrlData.Config, &AppConfig) != CONFIG_OK) 
+        {
+            appConfigSetDefaults(&AppConfig);
+        }
+        else 
+        {
+            appCanCtrlDataSetter(
+                &CanCtrlData, 
+                (const AppControlDataType *)&AppCtrlData, 
+                (const AppConfigType *)&AppConfig);
+            appCanCtrlSetBaudrate(&CanCtrlData);
+            appCanCtrlSetMode(&CanCtrlData);
+            
+            appCanLogSetParam(CLM_PARAMETER_ID_CAN1_BAUDRATE, AppConfig.can1.baudrate);
+            appCanLogSetParam(CLM_PARAMETER_ID_CAN2_BAUDRATE, AppConfig.can2.baudrate);
+        }
+
+        SettingsHandler_Init(&AppConfig);
+    }
 
     /* Release CanSendTask */
     CanSendTask_Notify();
@@ -356,10 +368,7 @@ static void Core0Task0Main( void * parameters )
 
         CanSendTask_SetSendingActive(AppCtrlData.runCanTracer);
 
-        if (0 == AppCtrlData.applyConfig)
-        {
-        }
-        else if (0 == AppCtrlData.runCanTracer)
+        if (0 != AppCtrlData.applyConfig && 0 == AppCtrlData.runCanTracer)
         {
             appCanCtrlDataSetter(
                 &CanCtrlData, 
