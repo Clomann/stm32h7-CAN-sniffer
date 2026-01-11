@@ -26,6 +26,7 @@
 
 #include "CanBridgeTask.h"
 #include "CanSendTask.h"
+#include "Core0Task1.h"
 #include "SpiTask.h"
 #include "SdBridgeTask.h"
 
@@ -299,7 +300,7 @@ static void Core0Task0Main( void * parameters )
         &AppCtrlData.runCanTracer, 
         &AppCtrlData.commitLog);
     appCanLogHandlerInit(AppCtrlData.Log);
-    
+    Core0Task1_SetCanLogHandle(AppCtrlData.Log);
     ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
     if (ConfigManager_Initialize(&AppCtrlData.Config) == CONFIG_OK)
     {
@@ -337,8 +338,6 @@ static void Core0Task0Main( void * parameters )
     while (run)
     {
         http_poll();
-
-        appCanLogHandlerPoll(AppCtrlData.Log);
 
         if (SettingsHandler_Poll(&AppConfig)) 
         {
