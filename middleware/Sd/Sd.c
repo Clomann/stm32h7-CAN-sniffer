@@ -67,6 +67,13 @@ static ErrorContextType ErrorContext = {
     .file = __FILE_NAME__
 };
 
+/**
+ * @brief Debug-only counter of SD hot-reset calls.
+ *
+ * Used during GDB debugging and may later be surfaced in logging.
+ */
+static volatile uint32_t HotResetCallCount = 0U;
+
 /* Buffer used for transmission */
 static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
 
@@ -778,7 +785,7 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response * pResponse)
 	return RetVal;
 }
 
-uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cnt)
+uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint32_t cnt)
 {
     uint8_t res;
     uint32_t readResponseAttempts;
@@ -787,8 +794,10 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 	Spi_R1Response resp;
     uint8_t Dummy[SD_SPI_PRE_CMD_CLOCKS];
     static uint8_t Tmp[SD_SECTOR_LENGTH + sizeof(Crc)];
+    bool stopTransmission;
 
 	res = 0U;
+    stopTransmission = false;
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);	
 
@@ -804,6 +813,10 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
     {
         res = 2U;
     }
+    else
+    {
+        stopTransmission = true;
+    }
 
     if (0 == res)
 	{
@@ -814,7 +827,7 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
             while(++tokenPollCount < SD_MAX_READ_RESPONSE_ATTEMPTS)
             {
                 SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
-                if(resp.byte != 0xFF)
+                if (resp.byte == SD_DEF_START_DATA_MARKER)
                 {
                     break;
                 }
@@ -830,17 +843,6 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 
                 memcpy(&buff[j * SD_SECTOR_LENGTH], Tmp, SD_SECTOR_LENGTH);
                 memcpy(&Crc, &Tmp[SD_SECTOR_LENGTH], sizeof(Crc));
-
-                readResponseAttempts = 0;
-                do 
-                { //Waiting for the end of the state BUSY
-                    SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-                } while ( (resp.byte != 0xFF) && (++readResponseAttempts<SD_MAX_READ_RESPONSE_ATTEMPTS) );
-                
-                if (readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS)
-                {
-                    res = SD_E_CMD_NO_GOING_IDLE;
-                }
             }
 
             if (0 != res)
@@ -849,10 +851,13 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
             }
         }
 
-        SD_Spi_SendCommand(SD_SPI_CMD12, address);
+        if (stopTransmission)
+        {
+            SD_Spi_SendCommand(SD_SPI_CMD12, address);
+        }
     }
 
-    if (0 == res)
+    if (stopTransmission)
 	{
 		readResponseAttempts = 0;
 		do 
@@ -860,7 +865,7 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
 			SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
 		} while ( (resp.byte != 0xFF) && (++readResponseAttempts<SD_MAX_READ_RESPONSE_ATTEMPTS) );
 		
-		if (readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS)
+		if ((readResponseAttempts>=SD_MAX_READ_RESPONSE_ATTEMPTS) && (0 == res))
 		{
 			res = SD_E_CMD_NO_GOING_IDLE;
 		}
@@ -881,6 +886,52 @@ uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cn
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+    return res;
+}
+
+DRESULT SD_Spi_hotReset(void)
+{
+    uint8_t res;
+    uint32_t readResponseAttempts;
+    Spi_R1Response resp;
+    uint8_t dummy[8];
+
+    HotResetCallCount++;
+
+    memset(dummy, SD_SPI_CMD_DUMMY_DATA, sizeof(dummy));
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+    SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+    SD_Spi_SendCommand(SD_SPI_CMD12, 0U);
+
+    SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte); // discard stuff byte
+    SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+    if (0xFF == resp.byte)
+    {
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        return RES_NOTRDY;
+    }
+
+    readResponseAttempts = 0;
+    do
+    { // wait for card to go idle
+        SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+    } while ((resp.byte != 0xFF) && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+    if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+    {
+        res = RES_NOTRDY;
+    }
+    else
+    {
+        res = RES_OK;
+    }
 
     return res;
 }
@@ -956,7 +1007,7 @@ SpiAbs_waitTillNotBusy(uint8_t *buffer, uint16_t min_bytes, uint16_t bytes)
     return (uint8_t)( 1 != ReadyTokenReceived );
 }
 
-uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t cnt)
+uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint32_t cnt)
 {
     uint8_t res;
     uint32_t readResponseAttempts;

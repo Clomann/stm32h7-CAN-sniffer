@@ -20,7 +20,13 @@
 /*!< Sector lemngth in bytes (512 bytes) */
 #define SD_SECTOR_LENGTH              0x000000200
 #define SD_SECTOR_COUNT               (SD_TOTAL_SIZE / SD_BLOCK_LENGTH)
-#define SD_MAX_READ_RESPONSE_ATTEMPTS (1563U)
+/**
+ * @brief Max poll iterations while waiting for a read response token.
+ *
+ * The value (15625U) targets a ~100 ms timeout at the current SPI polling
+ * cadence; adjust if SPI timing or polling changes.
+ */
+#define SD_MAX_READ_RESPONSE_ATTEMPTS (15625U)
 
 /*!The sector is the smallest individual reference-able regions on a disk.*/
 #define SD_SDHC_SECTOR_SIZE 512U
@@ -132,10 +138,11 @@ uint8_t SD_Spi_SendOpCond(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadOCR(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadRes7(uint8_t *pRxBuffer);
 uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response *pResponse);
-uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint8_t cnt);
+uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint32_t cnt);
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
-uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint8_t cnt);
+uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint32_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
+DRESULT SD_Spi_hotReset(void);
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff);
 
