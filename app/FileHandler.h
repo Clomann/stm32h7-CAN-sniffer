@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ErrorContext.h"
 #include "FileHandlerTypes.h"
 #include "MmcAdapter.h"
 
@@ -47,3 +48,5 @@ int FileHandler_GetValue(
     size_t *valLen
 );
 int FileHandler_ConvertToInteger(char *data, uint32_t *val, uint8_t base);
+
+void FileHandler_ErrorHandler(ErrorContextType *context);

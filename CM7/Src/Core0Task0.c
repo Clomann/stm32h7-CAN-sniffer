@@ -97,6 +97,11 @@ void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
     Error_Handler();
 }
 
+void FileHandler_ErrorHandler(ErrorContextType *context)
+{
+    Error_Handler();
+}
+
 #if INSTR_ENABLED
 void Instrumentation_ErrorHandlerHook(ErrorContextType *context)
 {

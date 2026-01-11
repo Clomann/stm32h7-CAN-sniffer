@@ -1,12 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "ErrorContext.h"
 #include "FileHandler.h"
 #include "ff.h"
 
 #include "core_json.h"
 
 static FATFS FatFs;		/* FatFs work area needed for each volume */
+static ErrorContextType ErrorContext;
 
 /**
  * @brief Hook called before a FatFS write to allow measurement instrumentation.
@@ -19,6 +21,11 @@ __attribute__((weak)) void FileHandler_InstrumentationWriteStartHook(void) {}
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
  */
 __attribute__((weak)) void FileHandler_InstrumentationWriteEndHook(void) {}
+
+__attribute__((weak)) void FileHandler_ErrorHandler(ErrorContextType *context)
+{
+    __asm volatile("nop");
+}
 
 FRESULT FatFS_SD_Mount(void)
 {  
@@ -151,17 +158,34 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
         {
             res = f_lseek(&dev->file, f_tell(&dev->file));
         }
+        else 
+        {
+            ErrorContext.code = res;
+            ErrorContext.line = __LINE__;
+        }
     }
 
     if (FR_OK == res)
     {
         FileHandler_InstrumentationWriteStartHook();
         res = f_write(&dev->file, content, len, &BytesWritten);
+        if (FR_OK != res)
+        {
+            ErrorContext.code = res;
+            ErrorContext.line = __LINE__;
+        }
         FileHandler_InstrumentationWriteEndHook();
     }
 
     if (FR_OK == res && BytesWritten != len) {
         res = FR_DISK_ERR;  // Partial write = error
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+    }
+
+    if (res != FR_OK)
+    {
+        FileHandler_ErrorHandler(&ErrorContext);
     }
 
     return res;
