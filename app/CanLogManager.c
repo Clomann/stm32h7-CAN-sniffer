@@ -109,6 +109,7 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void) {}
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
+static uint32_t Rb1BytesHighWater = 0U;
 
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
@@ -125,6 +126,19 @@ appCanLogStoreToFrameBuffer(void *entry);
 static comm_status_t
 appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length);
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
+
+static void CanLogManager_UpdateRb1BytesHighWater(void)
+{
+    uint32_t used = 0U;
+
+    if (CANLOG_E_OK == CanLogBuffer_UsedBytes(&used))
+    {
+        if (used > Rb1BytesHighWater)
+        {
+            Rb1BytesHighWater = used;
+        }
+    }
+}
 
 void __attribute__((weak)) CanLogFileManager_ErrorHandler()
 {
@@ -173,6 +187,12 @@ uint8_t FsCustom_GetBusloadCan1(float *busload)
 uint8_t FsCustom_GetBusloadCan2(float *busload)
 {
     *busload = CanLogCtrlData.Can2.busLoad;
+    return 0U;
+}
+
+uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes)
+{
+    *bytes = Rb1BytesHighWater;
     return 0U;
 }
 
@@ -379,6 +399,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 {
     memset(&CanLogCtrlData, 0x0, sizeof(CanLogCtrlData));
+    Rb1BytesHighWater = 0U;
 
     CanLogCtrlData.CanLog.filename    = CanLogFileName;
     CanLogCtrlData.CanLog.fnamemaxlen = sizeof(CanLogFileName);
@@ -934,6 +955,8 @@ appCanLogStoreToFrameBuffer(void *entry)
         CanLogManager_FrameDropCount1++;
     }
 
+    CanLogManager_UpdateRb1BytesHighWater();
+
     return res;
 }
 
@@ -973,6 +996,7 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
 
     if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
     {
+        CanLogManager_UpdateRb1BytesHighWater();
         CanLogManager_InstrumentationFlushStartHook();
         res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
         CanLogManager_InstrumentationFlushEndHook();
@@ -1014,7 +1038,7 @@ static comm_status_t CanLogManager_EmitSyncEntry(
     return appCanLogStoreToFrameBuffer((void *)sync);
 }
 
-void SdBridgeTask_ActionHook()
+void SdBridgeTask_ActionHook(void)
 {
     appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
 }
@@ -1211,6 +1235,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     }
     else if (true == *CanLogCtrlData.runCanTracer)
     {
+        Rb1BytesHighWater = 0U;
 #if CANLOGMANAGER_REOPEN_LOG_FILE
         if (CAN_LOG_OK != appCanLogReopenFile(data))
         {
@@ -1391,6 +1416,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             {
                 CanLogFileManager_ErrorHandler();
             }
+            CanLogManager_UpdateRb1BytesHighWater();
             SdBridgeTask_Notify();
         }
 

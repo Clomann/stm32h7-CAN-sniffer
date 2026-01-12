@@ -284,6 +284,17 @@ uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
     return 0;
 }
 
+uint8_t CanLogBuffer_UsedBytes(uint32_t *bytes)
+{
+    if (bytes == NULL)
+    {
+        return CANLOG_E_NOT_OK;
+    }
+
+    *bytes = (uint32_t)lwrb_get_full(&Rb1);
+    return CANLOG_E_OK;
+}
+
 uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
 {
     volatile uint8_t res;
