@@ -507,7 +507,7 @@
             <div class="card-header">CAN Configuration</div>
             <div class="card-description">
                 Configure CAN channel settings. Stop the sniffer before applying changes. 
-                Click <strong>Apply</strong> to use the new settings immediately, or <strong>Save</strong> to persist them to the SD card for use after restart.
+                Click <strong>Apply</strong> to use the new settings immediately and persist them to the SD card for use after restart.
             </div>
 
             <form method="get" action="/can.cgi" id="ctrl-form">
@@ -581,16 +581,6 @@
                         <input type="hidden" name="action" value="apply">
                         <button type="submit" id="apply-button" class="btn-primary">Apply Configuration</button>
                     </form>
-
-                    <!-- Save Form -->
-                    <form method="POST" action="/can.cgi" id="save-form" style="display: inline;">
-                        <input type="hidden" name="baud1" id="save-baudrate1">
-                        <input type="hidden" name="mode1" id="save-mode1">
-                        <input type="hidden" name="baud2" id="save-baudrate2">
-                        <input type="hidden" name="mode2" id="save-mode2">
-                        <input type="hidden" name="action" value="save">
-                        <button type="submit" id="save-button" class="btn-primary">Save to SD Card</button>
-                    </form>
                 </div>
             </div>
         </div>
@@ -606,7 +596,6 @@
                 <br/>
                 <strong>Note:</strong> CAN logs are stored using file rotation.
                 <br/>
-                <strong>Tip:</strong> If the SD card becomes unresponsive during long runs, a full reformat on a computer usually fixes it. Do this before an important logging session.
             </div>
             <form method="get" action="/cancontrol.cgi" id="sd-format-form">
                 <table class="config-table">
@@ -669,7 +658,6 @@
         const POLL_MS      = 1000;
         const DEFAULT_LOG_FILE_SIZE = 10 * 1024 * 1024;
         const btnApply     = document.getElementById("apply-button");
-        const btnSave      = document.getElementById("save-button");
         const btnStart     = document.getElementById("start-button");
         const btnStop      = document.getElementById("stop-button");
         const btnFormat    = document.getElementById("format-button");
@@ -805,8 +793,6 @@
                 if (active) {
                     btnApply.disabled = true;
                     btnApply.title    = "Stop the sniffer first.";
-                    btnSave.disabled  = true;
-                    btnSave.title     = "Stop the sniffer first.";
                     btnStart.disabled = true;
                     btnStart.title    = "Sniffer is already running.";
                     btnStop.disabled = false;
@@ -817,8 +803,6 @@
                 } else {
                     btnApply.disabled = false;
                     btnApply.title    = "";
-                    btnSave.disabled  = false;
-                    btnSave.title     = "";
                     btnStart.disabled = false;
                     btnStart.title    = "";
                     btnStop.disabled = true;
@@ -835,8 +819,6 @@
                 console.error("Status poll failed:", e);
                 btnApply.disabled = true;
                 btnApply.title    = "Sniffer status unknown.";
-                btnSave.disabled  = true;
-                btnSave.title     = "Sniffer status unknown.";
                 btnStart.disabled = true;
                 btnStart.title    = "Sniffer status unknown.";
                 btnStop.disabled = true;
@@ -866,20 +848,13 @@
             const mode1 = selMode1.value;
             const baud2 = selBaud2.value;
             const mode2 = selMode2.value;
-            [ ...document.querySelectorAll("#apply-baudrate1,#save-baudrate1") ]
-                .forEach(i => i.value = baud1);
-            [ ...document.querySelectorAll("#apply-mode1,#save-mode1") ]
-                .forEach(i => i.value = mode1);
-            [ ...document.querySelectorAll("#apply-baudrate2,#save-baudrate2") ]
-                .forEach(i => i.value = baud2);
-            [ ...document.querySelectorAll("#apply-mode2,#save-mode2") ]
-                .forEach(i => i.value = mode2);
+            document.getElementById("apply-baudrate1").value = baud1;
+            document.getElementById("apply-mode1").value = mode1;
+            document.getElementById("apply-baudrate2").value = baud2;
+            document.getElementById("apply-mode2").value = mode2;
         }
     
         document.getElementById("apply-form")
-                .addEventListener("submit", updateHiddenFields);
-    
-        document.getElementById("save-form")
                 .addEventListener("submit", updateHiddenFields);
 
         document.getElementById("ctrl-form")
