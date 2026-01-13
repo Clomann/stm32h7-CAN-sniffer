@@ -475,8 +475,9 @@
                         <th>CAN ID</th>
                         <th>Channel</th>
                         <th>DLC</th>
-                        <th>Data</th>
                         <th>Type</th>
+                        <th>Flags</th>
+                        <th>Data</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -583,6 +584,12 @@
 
     function parseCanLog(arrayBuffer) {
       const HEX = new Array(256).fill(0).map((_, i) => i.toString(16).padStart(2, "0"));
+      const FLAG = {
+        IDE: 0x10,
+        RTR_FDF: 0x20,
+        BRS: 0x40,
+        ESI: 0x80,
+      };
       const view = new DataView(arrayBuffer);
       const entries = [];
       const BLOCK_HEADER_MIN_SIZE = 20; // CanLogBlockHeaderType
@@ -647,6 +654,12 @@
 
             const dlc = dlc_flags & 0x0f;
             const flags = dlc_flags & 0xf0;
+            const rawRtrFdf = (flags & FLAG.RTR_FDF) !== 0;
+            const hasBrs = (flags & FLAG.BRS) !== 0;
+            const hasEsi = (flags & FLAG.ESI) !== 0;
+            const isExtendedId = (flags & FLAG.IDE) !== 0;
+            // FD only when FDF bit is set, BRS is set, or payload exceeds classic size
+            const isFdFrame = rawRtrFdf || hasBrs || data_len > 8;
 
             const payloadOffset = recordOffset + 14;
             const payloadLen = Math.max(0, Math.min(data_len, 64, total_len - (payloadOffset - recordOffset)));
@@ -654,6 +667,17 @@
             for (let i = 0; i < payloadLen; i++) {
               data[i] = HEX[view.getUint8(payloadOffset + i)];
             }
+
+            const flagParts = [];
+            if (rawRtrFdf) {
+              flagParts.push(isFdFrame ? "FDF" : "RTR");
+            }
+            if (hasBrs) flagParts.push("BRS");
+            if (hasEsi) flagParts.push("ESI");
+            const flagsText = flagParts.join(" ");
+
+            const typeBase = isFdFrame ? "FD" : "Classic";
+            const typeDisplay = isFdFrame ? "FD" : (rawRtrFdf ? "Classic RTR" : "Classic");
 
             let timestamp64 = BigInt(tsLow);
             if (lastSyncHigh !== null) {
@@ -666,12 +690,15 @@
             const timestampSeconds = Number(timestamp64) / 1_000_000;
 
             entries.push({
-              type: (flags & 0x20) ? "FD" : "Classic",
+              type: typeBase,
+              typeDisplay,
               timestamp: timestampSeconds.toFixed(6),
               can_id,
               channel,
               dlc,
               flags,
+              is_extended: isExtendedId,
+              flagsText,
               data,
               timestamp_us: timestamp64
             });
@@ -716,7 +743,7 @@
             const idMatch = !idFilter || entry.can_id.toString(16).toLowerCase().startsWith(idFilter);
             const channelMatch = !channelFilter || entry.channel.toString() === channelFilter;
             const typeMatch = !typeFilter || entry.type === typeFilter;
-            const haystack = `${entry.type} ${entry.data.join(" ")} ${entry.timestamp}`;
+            const haystack = `${entry.typeDisplay} ${entry.flagsText} ${entry.data.join(" ")} ${entry.timestamp}`;
             const textMatch = !textFilter || haystack.toLowerCase().includes(textFilter);
             return idMatch && channelMatch && typeMatch && textMatch;
         });
@@ -744,11 +771,12 @@
             row.innerHTML = `
             <td>${startIndex + index + 1}</td>
             <td>${entry.timestamp}</td>
-            <td>0x${entry.can_id.toString(16).toUpperCase()}</td>
+            <td>0x${entry.can_id.toString(16).toUpperCase()}${entry.is_extended ? "x" : ""}</td>
             <td>${entry.channel}</td>
             <td>${entry.dlc}</td>
+            <td>${entry.typeDisplay}</td>
+            <td>${entry.flagsText || "-"}</td>
             <td>${entry.data.join(' ')}</td>
-            <td>${entry.type}</td>
             `;
             fragment.appendChild(row);
         });

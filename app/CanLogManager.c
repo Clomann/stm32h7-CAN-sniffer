@@ -1,11 +1,14 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "CanLogManager.h"
 
 #include "CanLogManagerTypes.h"
 #include "ErrorContext.h"
+#include "SettingsHandler.h"
 #include "ff.h"
 #include "fs_custom.h"
 #include "CanLogBuffer.h"
@@ -46,6 +49,16 @@ static volatile CanLogMetaDataType LogMetaData;
 static uint8_t LogMetaDataOpenRes;
 #endif
 
+typedef struct 
+{
+    uint64_t receivedFrames;
+    uint32_t prevTimestamp;
+    uint32_t baudrate;
+    float busLoad;
+    uint32_t accumulatedBits;
+    uint32_t accumulatedTime;
+} CanStatusDataType;
+
 struct CanLogControlDataType
 {
     struct
@@ -60,10 +73,13 @@ struct CanLogControlDataType
         bool fileIndexWrapped;
         FatFsDeviceType writeFileDevice;
     } CanLog;
+    CanStatusDataType Can1;
+    CanStatusDataType Can2;
     uint8_t *mountRes;
     bool *runCanTracer;
     bool *commitLog;
     bool runCanTracerOld;
+    bool framesLost;
     bool emitSyncEntry;
 };
 
@@ -93,6 +109,7 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void) {}
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
+static uint32_t Rb1BytesHighWater = 0U;
 
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
@@ -100,7 +117,7 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data);
 static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data);
 static void appCanLogFillEntry(
     CanLogEntryType *entry,
-    FDCAN_ClassicFrame *frame,
+    FDCAN_ClassicFrameType *frame,
     uint64_t timestamp,
     uint8_t channel
 );
@@ -109,6 +126,19 @@ appCanLogStoreToFrameBuffer(void *entry);
 static comm_status_t
 appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length);
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
+
+static void CanLogManager_UpdateRb1BytesHighWater(void)
+{
+    uint32_t used = 0U;
+
+    if (CANLOG_E_OK == CanLogBuffer_UsedBytes(&used))
+    {
+        if (used > Rb1BytesHighWater)
+        {
+            Rb1BytesHighWater = used;
+        }
+    }
+}
 
 void __attribute__((weak)) CanLogFileManager_ErrorHandler()
 {
@@ -119,6 +149,11 @@ uint8_t FsCustom_GetCanLogHeadIndex(uint32_t *index)
 {
     *index = CanLogCtrlData.CanLog.fileHeadIndex;
     return 0U;
+}
+
+_Bool FsCustom_IsAnyFrameLostFlag(void)
+{
+    return CanLogCtrlData.framesLost;
 }
 
 uint8_t FsCustom_GetCanLogTailIndex(uint32_t *index)
@@ -139,6 +174,59 @@ uint8_t FsCustom_IsTracerRunning(uint8_t *running)
 
     res      = 0;
     *running = *CanLogCtrlData.runCanTracer;
+
+    return res;
+}
+
+uint8_t FsCustom_GetBusloadCan1(float *busload)
+{
+    *busload = CanLogCtrlData.Can1.busLoad;
+    return 0U;
+}
+
+uint8_t FsCustom_GetBusloadCan2(float *busload)
+{
+    *busload = CanLogCtrlData.Can2.busLoad;
+    return 0U;
+}
+
+uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes)
+{
+    *bytes = Rb1BytesHighWater;
+    return 0U;
+}
+
+static bool appCanLogIsValidBaudrate(uint32_t value)
+{
+    return (value == 250000U) || (value == 500000U) || (value == 1000000U);
+}
+
+CanLogResult appCanLogSetParam(ClmParameterIdType id, uint32_t value)
+{
+    CanLogResult res = CAN_LOG_OK;
+
+    switch (id)
+    {
+        case CLM_PARAMETER_ID_CAN1_BAUDRATE:
+            if (!appCanLogIsValidBaudrate(value))
+            {
+                res = CAN_LOG_ERR_INVALID_PARAM;
+                break;
+            }
+            CanLogCtrlData.Can1.baudrate = value;
+            break;
+        case CLM_PARAMETER_ID_CAN2_BAUDRATE:
+            if (!appCanLogIsValidBaudrate(value))
+            {
+                res = CAN_LOG_ERR_INVALID_PARAM;
+                break;
+            }
+            CanLogCtrlData.Can2.baudrate = value;
+            break;
+        default:
+            res = CAN_LOG_ERR_INVALID_PARAM;
+            break;
+    }
 
     return res;
 }
@@ -311,6 +399,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 {
     memset(&CanLogCtrlData, 0x0, sizeof(CanLogCtrlData));
+    Rb1BytesHighWater = 0U;
 
     CanLogCtrlData.CanLog.filename    = CanLogFileName;
     CanLogCtrlData.CanLog.fnamemaxlen = sizeof(CanLogFileName);
@@ -319,6 +408,18 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
     CanLogCtrlData.mountRes     = mount_res;
     CanLogCtrlData.runCanTracer = run;
     CanLogCtrlData.commitLog = commit;
+
+    CanLogCtrlData.Can1.busLoad = 0.0;
+    CanLogCtrlData.Can1.prevTimestamp = 0;
+    CanLogCtrlData.Can1.accumulatedBits = 0;
+    CanLogCtrlData.Can1.accumulatedTime = 0;
+
+    CanLogCtrlData.Can2.busLoad = 0.0;
+    CanLogCtrlData.Can2.prevTimestamp = 0;
+    CanLogCtrlData.Can2.accumulatedBits = 0;
+    CanLogCtrlData.Can2.accumulatedTime = 0;
+
+    RuntimeChecks_Init();
 
     return &CanLogCtrlData;
 }
@@ -561,7 +662,6 @@ static int CanLogManager_ParseMetaData(char *buffer, uint32_t len, CanLogMetaDat
 
 static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
 {
-    FILINFO info;
     FRESULT res;
     FILINFO fno;
     FatFsDeviceType Dev;
@@ -580,8 +680,8 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
         break;
     case FR_NO_FILE:
     case FR_NO_PATH:
-        break;
     default:
+        break;
     }
 
     if (FR_OK == res)
@@ -642,10 +742,10 @@ static uint8_t m_MetaDataToJSonString(CanLogMetaDataType *data, char *json, uint
     // Create the JSON string
     snprintf(json, maxLength,
         "{\n"
-        "    \"epoch\":%d,\n"
-        "    \"index\":%d,\n"
-        "    \"offset\":%d,\n"
-        "    \"crc\":%d\n"
+        "    \"epoch\":%" PRIu32 ",\n"
+        "    \"index\":%" PRIu32 ",\n"
+        "    \"offset\":%" PRIu32 ",\n"
+        "    \"crc\":%" PRIu32 "\n"
         "}\n",
         data->epoch,
         data->fileIndex,
@@ -659,12 +759,10 @@ static uint8_t m_MetaDataToJSonString(CanLogMetaDataType *data, char *json, uint
 
 static FRESULT m_MetaDataStore(CanLogMetaDataType *data)
 {
-    FILINFO info;
     FRESULT res;
     FatFsDeviceType Dev;
     char Content[128];
     uint32_t BufferSize;
-    uint32_t BytesWritten;
     uint32_t StringSize;
     uint32_t WriteSize;
 
@@ -791,20 +889,32 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 
 static void appCanLogFillEntry(
     CanLogEntryType *entry,
-    FDCAN_ClassicFrame *frame,
+    FDCAN_ClassicFrameType *frame,
     uint64_t timestamp,
     uint8_t channel
 )
 {
+    ClbDlcFlagsType Flags = 0;
+    uint8_t Dlc;
+    uint8_t DataLen;
+
+    Dlc = FDCAN_GET_DLC(frame);
+    Flags = FDCAN_GET_BRS(frame) << CAN_FLAG_BRS_Pos
+        | FDCAN_GET_ESI(frame) << CAN_FLAG_ESI_Pos
+        | FDCAN_GET_FDF(frame) << CAN_FLAG_RTR_FDF_Pos
+        | FDCAN_GET_IDE(frame) << CAN_FLAG_IDE_Pos;
+    DataLen = FDCAN_GET_DATA_LEN(frame);
+
     entry->header.header_len = sizeof(entry->header);
-    entry->header.type       = CANLOG_CLASSIC_TYPE;
-    entry->header.total_len  = sizeof(CanLogEntryType) + frame->dlc;
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->header.total_len  = sizeof(CanLogEntryType) + DataLen;
     entry->timestamp         = timestamp;
     entry->channel           = channel;
-    entry->dlc_flags         = MAKE_DLC_FLAGS(frame->dlc, 0);
-    entry->data_len          = frame->dlc;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(Dlc, Flags);
+    entry->data_len          = DataLen;
     entry->can_id            = frame->id;
-    memcpy(entry->data, frame->data, frame->dlc);
+
+    memcpy(entry->data, frame->data, DataLen);
 }
 
 #if INSTR_ENABLED
@@ -814,7 +924,7 @@ static InstrErrorType appPersistInstrumentationData(void)
     FRESULT res;
     FatFsDeviceType File;
     uint32_t BytesToWrite = 0;
-    uint8_t * Data;
+    uint8_t * Data = NULL;
     const char FileName[] = "InstrumentationData.bin";
 
     res = FatFS_SD_OpenFileForOverWrite(&File, FileName);
@@ -840,7 +950,12 @@ appCanLogStoreToFrameBuffer(void *entry)
 
     pHeader = (CanLogEntryHeaderType *)entry;
     
-    CanLogBuffer_AddEntry(entry, pHeader->total_len);
+    if (0 != CanLogBuffer_AddEntry(entry, pHeader->total_len))
+    {
+        CanLogManager_FrameDropCount1++;
+    }
+
+    CanLogManager_UpdateRb1BytesHighWater();
 
     return res;
 }
@@ -881,6 +996,7 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
 
     if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
     {
+        CanLogManager_UpdateRb1BytesHighWater();
         CanLogManager_InstrumentationFlushStartHook();
         res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
         CanLogManager_InstrumentationFlushEndHook();
@@ -890,6 +1006,10 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         if (COMM_SUCCESS == res)
         {
             CanLogBuffer_BlockCount++;
+        }
+        else
+        {
+            CanLogManager_FrameDropCount2 += FrameCount;
         }
     }
     else
@@ -918,9 +1038,172 @@ static comm_status_t CanLogManager_EmitSyncEntry(
     return appCanLogStoreToFrameBuffer((void *)sync);
 }
 
-void SdBridgeTask_ActionHook()
+void SdBridgeTask_ActionHook(void)
 {
     appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
+}
+
+CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
+{
+    CanLogResult res = CAN_LOG_OK;
+    uint8_t Dlc;
+    uint32_t FrameBits = 0;
+    bool IsCanfd;
+    bool IsExtended;
+
+    Dlc = GET_DLC(frame->dlc_flags) >> CAN_DLC_MASK_Pos;
+
+    switch (Dlc)
+    {
+        case  9: Dlc = 12; break;
+        case 10: Dlc = 16; break;
+        case 11: Dlc = 20; break;
+        case 12: Dlc = 24; break;
+        case 13: Dlc = 32; break;
+        case 14: Dlc = 48; break;
+        case 15: Dlc = 64; break;
+        default: 
+            break;
+    }
+
+    IsCanfd = (frame->dlc_flags & CAN_FLAG_RTR_FDF);
+    IsExtended = (frame->dlc_flags & CAN_FLAG_IDE);
+
+    if (IsCanfd) {
+        // CAN FD frame structure
+        if (IsExtended) {
+            // Extended ID: 1 + 32 + 2 + 1 + 1 + 4 + data + CRC + 2 + 7 + 3 = 53 + data + CRC
+            FrameBits = 53 + (Dlc * 8);
+            // CRC: 17 bits for ≤16 bytes, 21 bits for >16 bytes
+            FrameBits += (Dlc <= 16) ? 17 : 21;
+        } else {
+            // Standard ID: 1 + 12 + 2 + 1 + 1 + 4 + data + CRC + 2 + 7 + 3 = 33 + data + CRC
+            FrameBits = 33 + (Dlc * 8);
+            FrameBits += (Dlc <= 16) ? 17 : 21;
+        }
+    } else {
+        // Classic CAN frame structure
+        if (IsExtended) {
+            // Extended: 1 + 32 + 6 + data + 15 + 1 + 2 + 7 + 3 = 67 + data
+            FrameBits = 67 + (Dlc * 8);
+        } else {
+            // Standard: 1 + 11 + 6 + data + 15 + 1 + 2 + 7 + 3 = 47 + data
+            FrameBits = 47 + (Dlc * 8);
+        }
+    }
+    
+    *bits = FrameBits;
+
+    return res;
+}
+
+CanLogResult m_ComputeBusLoad(
+    CanStatusDataType *can,
+    CanLogEntryType *frame
+)
+{
+    CanLogResult res = CAN_LOG_OK;
+    float Period = 0.0f; // in seconds
+    uint32_t FrameBits = 0;
+    uint32_t TimeDiff = 0;
+    uint32_t ts;
+    uint32_t prev;
+    uint32_t diff;
+
+    if (NULL == can || NULL == frame)
+    {
+        res = CAN_LOG_ERR_INVALID_POINTER;
+        return res;
+    }
+    else if (can->baudrate == 0)
+    {
+        res = CAN_LOG_ERR_INVALID_PARAM;
+        return res;
+    }
+
+    if (can->prevTimestamp == 0) {
+        can->prevTimestamp = frame->timestamp;
+        return res;
+    }
+
+    ts   = frame->timestamp;
+    prev = can->prevTimestamp;
+    diff = 0U;
+
+    if (ts >= prev)
+    {
+        diff = ts - prev;
+        can->prevTimestamp = ts;
+    }
+    else // prev > ts 
+    {
+        if ((prev > UINT32_MAX/2U) && (ts < UINT32_MAX/2U))
+        {
+            diff = (UINT32_MAX - prev) + ts + 1U;
+            can->prevTimestamp = ts;
+        }
+    }
+
+    TimeDiff = diff;
+
+    m_ComputeFrameBits(frame, &FrameBits);
+
+    can->accumulatedBits += FrameBits;
+    can->accumulatedTime += TimeDiff;
+
+    // Update every 1 second
+    if (can->accumulatedTime >= 1000000U) {
+        Period = can->accumulatedTime / 1000000.0f;
+        can->busLoad = ((can->accumulatedBits * 1.1f) / (can->baudrate * Period)) * 100.0f;
+
+        if (can->busLoad > 0.0f && can->busLoad < 0.01f)
+        {
+            can->busLoad = 0.01f;
+        }
+
+        can->accumulatedBits = 0;
+        can->accumulatedTime = 0;
+    }
+
+    return res;
+}
+
+CanLogResult m_ComputeBusLoad1(
+    CanStatusDataType *can, 
+    CanLogEntryType *frame
+)
+{
+    return m_ComputeBusLoad(can, frame);
+}
+
+CanLogResult m_ComputeBusLoad2(
+    CanStatusDataType *can, 
+    CanLogEntryType *frame
+)
+{
+    return m_ComputeBusLoad(can, frame);
+}
+
+void m_DecayBusLoad(CanStatusDataType * can, uint32_t currentTime)
+{
+    int64_t TimeDiff;
+
+    TimeDiff = currentTime - can->prevTimestamp;
+
+    if (TimeDiff < 0)
+    {
+        TimeDiff = (uint32_t)((int64_t)UINT32_MAX + TimeDiff) + 1U;
+    }
+
+    if (TimeDiff > 1000000)
+    {
+        can->busLoad *= 0.75f;
+        if (can->busLoad < 0.01f) {
+            can->busLoad = 0.0f;
+        }
+        can->accumulatedBits = 0;
+        can->accumulatedTime = 0; 
+    }
 }
 
 void appCanLogHandlerPoll(CanLogControlDataType *data)
@@ -929,8 +1212,9 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     bool IsOffState;
     uint8_t BlockIsReady;
     uint32_t SlotsToWrite = 0;
-    FDCAN_ClassicFrame NewFrame;
-    uint64_t AbsTime = 0;
+    FDCAN_ClassicFrameType *pNewFrame;
+    volatile uint64_t AbsTime = 0;
+    RuntimeChecksContextType ErrorContext;
     CanLogSyncType SyncEntry;
     CanLogEntryStackBufferType EntryBuffer;
     CanLogEntryType *pFrameEntry = (CanLogEntryType *)(&EntryBuffer);
@@ -939,11 +1223,19 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     static uint32_t LastFrameTimestamp = 0;
     static bool LastFrameTimestampValid = false;
 
+    RuntimeChecks_CheckFrameCounts(&ErrorContext);
+
+    if (RUNTIMECHECKS_E_FRAMES_DROPPED == ErrorContext.err)
+    {
+        CanLogCtrlData.framesLost = true;
+    }
+
     if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
     {
     }
     else if (true == *CanLogCtrlData.runCanTracer)
     {
+        Rb1BytesHighWater = 0U;
 #if CANLOGMANAGER_REOPEN_LOG_FILE
         if (CAN_LOG_OK != appCanLogReopenFile(data))
         {
@@ -986,6 +1278,9 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         AbsTime = FDCAN_GetTimestampHook();
         NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
         LastFrameTimestampValid = false;
+
+        CanLogCtrlData.framesLost = false;
+        RuntimeChecks_Init();
     }
     else
     {
@@ -1002,6 +1297,10 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
 
         *(CanLogCtrlData.commitLog) = true;
+
+        CanAbs_Drain();
+
+        fdcan_msg_port_flush();
     }
 
     appCanLogCheckNewFileOpen(data);
@@ -1011,13 +1310,16 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     AbsTime = FDCAN_GetTimestampHook();
 
+    m_DecayBusLoad(&CanLogCtrlData.Can1, CLM_ABS_TIME_TO_TIMSTAMP(AbsTime));
+    m_DecayBusLoad(&CanLogCtrlData.Can2, CLM_ABS_TIME_TO_TIMSTAMP(AbsTime));
+
     if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
     {
         CanLogCtrlData.emitSyncEntry = true;
         NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
     }
 
-    while (0 < fdcan_msg_port_read(&NewFrame, 2))
+    while (0 < fdcan_msg_port_read(&pNewFrame, 2))
     {
         CanLogManager_DrainPortStartHook();
         CanLogManager_FrameCount++;
@@ -1037,7 +1339,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
             if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
                         &SyncEntry,
                         AbsTime,
-                        NewFrame.timestamp))
+                        pNewFrame->timestamp))
             {
                 CanLogFileManager_ErrorHandler();
             }
@@ -1045,13 +1347,30 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         appCanLogFillEntry(
             pFrameEntry,
-            &NewFrame,
-            NewFrame.timestamp,
-            NewFrame.channel
+            pNewFrame,
+            pNewFrame->timestamp,
+            pNewFrame->channel
         );
 
+        if (pFrameEntry->channel == 1)
+        {
+            CanLogCtrlData.Can1.receivedFrames++;
+            m_ComputeBusLoad1(
+                &CanLogCtrlData.Can1,
+                pFrameEntry
+            );
+        }
+        else if (pFrameEntry->channel == 2)
+        {
+            CanLogCtrlData.Can2.receivedFrames++;
+            m_ComputeBusLoad2(
+                &CanLogCtrlData.Can2,
+                pFrameEntry
+            );
+        }
+
         appCanLogStoreToFrameBuffer((void *)pFrameEntry);
-        LastFrameTimestamp = NewFrame.timestamp;
+        LastFrameTimestamp = pNewFrame->timestamp;
         LastFrameTimestampValid = true;
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
@@ -1070,7 +1389,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
         CanLogManager_DrainPortEndHook();
     }
-
+    
     if (true == CanLogCtrlData.emitSyncEntry)
     {
         uint32_t timestamp32 = LastFrameTimestampValid
@@ -1093,6 +1412,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         if (SlotsToWrite > 0)
         {
+            if (CANLOG_E_OK != CanLogBuffer_FillBlockWithPadding())
+            {
+                CanLogFileManager_ErrorHandler();
+            }
+            CanLogManager_UpdateRb1BytesHighWater();
             SdBridgeTask_Notify();
         }
 

@@ -16,7 +16,7 @@
 
 #define CONCAT(a,b) a#b
 
-#define CANLOGAMANGER_PERSIST_METADATA 0
+#define CANLOGAMANGER_PERSIST_METADATA 1
 #define CANLOGMANAGER_REOPEN_LOG_FILE  0
 
 #define CLUSTER_SIZE                   (32768U) 
@@ -36,6 +36,19 @@
 #define PREALLOCATE_LOG_FILES         1U
 
 FRESULT appCanLogHandlerInit(CanLogControlDataType *data);
+
+/**
+ * @brief Set runtime parameters for the CAN log manager.
+ *
+ * Currently supported parameters are CAN1/CAN2 baud rates.
+ *
+ * @param id Parameter selector (e.g. CLM_PARAMETER_ID_CAN1_BAUDRATE).
+ * @param value New value for the selected parameter.
+ * @return CAN_LOG_OK on success, CAN_LOG_ERR_INVALID_PARAM for unknown ids.
+ *
+ * @note Valid baudrates are 250000, 500000, and 1000000 (bit/s).
+ */
+CanLogResult appCanLogSetParam(ClmParameterIdType id, uint32_t value);
 void appCanLogHandlerPoll(CanLogControlDataType *data);
 void appCanLogHandlerDeInit(CanLogControlDataType *data);
 

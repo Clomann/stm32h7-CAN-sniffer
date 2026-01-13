@@ -21,4 +21,8 @@ void WebInterface_GetActionHook(uint8_t action);
  * @note This function must be implemented in the main application to define the
  *       formatting behavior.
  */
-void WebInterface_RequestFormattingHook(void);
+void WebInterface_RequestFormattingHook(
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+);

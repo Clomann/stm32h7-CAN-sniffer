@@ -18,13 +18,16 @@
 #include "HttpAbs.h"
 #include "SettingsHandler.h"
 #include "CanAbs.h"
+#include "fdcan.h"
 #include "fs_custom.h"
 #include "timer.h"
 #include "gpio.h"
 #include "httpd_post.h"
+#include "core_json.h"
 
 #include "CanBridgeTask.h"
 #include "CanSendTask.h"
+#include "Core0Task1.h"
 #include "SpiTask.h"
 #include "SdBridgeTask.h"
 
@@ -94,6 +97,20 @@ void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
     Error_Handler();
 }
 
+void FileHandler_ErrorHandler(ErrorContextType *context)
+{
+    Error_Handler();
+}
+
+#if INSTR_ENABLED
+void Instrumentation_ErrorHandlerHook(ErrorContextType *context)
+{
+    (void) context;
+
+    Error_Handler();
+}
+#endif 
+
 void SettingsHandler_ApplyRequestCallback()
 {
     AppCtrlData.applyConfig = 1;
@@ -114,12 +131,104 @@ static void appHandleFormattingRequest(void)
     _Bool ReformattingRequested;
     FatFsDeviceType DevTmp;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
+    uint32_t cluster_size = CLUSTER_SIZE;
+    uint32_t log_file_size = MAX_LOG_FILE_SIZE;
+    uint32_t log_file_count = MAX_LOG_FILE_COUNT;
 
     res = FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName);
 
     if (FR_OK == res)
     {
         ReformattingRequested = true;
+
+        do
+        {
+            uint32_t fileSize = 0U;
+            char buffer[128];
+            uint32_t readSize = 0U;
+            JSONStatus_t result;
+            char *value = NULL;
+            size_t valueLength = 0U;
+            char tmp[32];
+            uint32_t parsed = 0U;
+
+            res = FatFS_SD_GetFileSize(&DevTmp, &fileSize);
+            if (FR_OK != res || fileSize == 0U)
+            {
+                break;
+            }
+
+            readSize = (fileSize < (sizeof(buffer) - 1U)) ? fileSize : (sizeof(buffer) - 1U);
+            res = FatFS_SD_ReadFile(&DevTmp, buffer, readSize);
+            if (FR_OK != res)
+            {
+                break;
+            }
+
+            buffer[readSize] = '\0';
+
+            result = JSON_Validate(buffer, readSize);
+            if (JSONSuccess != result)
+            {
+                break;
+            }
+
+            result = FileHandler_GetValue(
+                buffer,
+                readSize,
+                "cluster_size",
+                sizeof("cluster_size") - 1U,
+                &value,
+                &valueLength
+            );
+            if (JSONSuccess == result && valueLength < sizeof(tmp))
+            {
+                memcpy(tmp, value, valueLength);
+                tmp[valueLength] = '\0';
+                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
+                {
+                    cluster_size = parsed;
+                }
+            }
+
+            result = FileHandler_GetValue(
+                buffer,
+                readSize,
+                "log_file_size",
+                sizeof("log_file_size") - 1U,
+                &value,
+                &valueLength
+            );
+            if (JSONSuccess == result && valueLength < sizeof(tmp))
+            {
+                memcpy(tmp, value, valueLength);
+                tmp[valueLength] = '\0';
+                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
+                {
+                    log_file_size = parsed;
+                }
+            }
+
+            result = FileHandler_GetValue(
+                buffer,
+                readSize,
+                "log_file_count",
+                sizeof("log_file_count") - 1U,
+                &value,
+                &valueLength
+            );
+            if (JSONSuccess == result && valueLength < sizeof(tmp))
+            {
+                memcpy(tmp, value, valueLength);
+                tmp[valueLength] = '\0';
+                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
+                {
+                    log_file_count = parsed;
+                }
+            }
+        } while (0);
+
+        (void)FatFS_SD_CloseFile(&DevTmp);
     }
     else
     {
@@ -134,7 +243,7 @@ static void appHandleFormattingRequest(void)
         {
             AppCtrlData.mountRes = 1;
     
-            res = FatFS_SD_Format_Fat32(32U * 1024U);
+            res = FatFS_SD_Format_Fat32(cluster_size);
         }
 
         if (FR_OK == res)
@@ -142,6 +251,9 @@ static void appHandleFormattingRequest(void)
             AppCtrlData.mountRes = FatFS_SD_Mount();
         }
     }
+
+    (void)log_file_size;
+    (void)log_file_count;
 }
 
 static void appCanCtrlDataSetter(
@@ -154,6 +266,14 @@ static void appCanCtrlDataSetter(
     data->can1.mode = appConfig->can1.mode;
     data->can2.baudrate = appConfig->can2.baudrate;
     data->can2.mode = appConfig->can2.mode;
+}
+
+static void appConfigSetDefaults(AppConfigType *config)
+{
+    config->can1.baudrate = FDCAN_BAUDRATE_250000;
+    config->can1.mode = FDCAN_MODE_2;
+    config->can2.baudrate = FDCAN_BAUDRATE_250000;
+    config->can2.mode = FDCAN_MODE_2;
 }
 
 static void Core0Task0Main( void * parameters )
@@ -194,30 +314,38 @@ static void Core0Task0Main( void * parameters )
         &AppCtrlData.runCanTracer, 
         &AppCtrlData.commitLog);
     appCanLogHandlerInit(AppCtrlData.Log);
-    
-    ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
-    if (ConfigManager_Initialize(&AppCtrlData.Config) == CONFIG_OK)
-    {
-        if (ConfigManager_LoadConfig(&AppCtrlData.Config, &AppConfig) != CONFIG_OK) 
-        {
-            AppConfig.can1.baudrate = 0;
-            AppConfig.can1.mode = 0;
-            AppConfig.can2.baudrate = 0;
-            AppConfig.can2.mode = 0;
-        }
+    Core0Task1_SetCanLogHandle(AppCtrlData.Log);
 
-        SettingsHandler_Init(&AppConfig);
-    }
-
-    GPIO_Mco1_Init();
-
-    Instrumentation_Init();
+    appConfigSetDefaults(&AppConfig);
 
     appCanCtrlDataSetter(
         &CanCtrlData, 
         (const AppControlDataType *)&AppCtrlData, 
         (const AppConfigType *)&AppConfig);    
     appFdcanInit(&CanCtrlData);
+
+    ConfigManager_Init(&AppCtrlData.Config, "CONF.TXT", &AppCtrlData.mountRes);
+    if (ConfigManager_Initialize(&AppCtrlData.Config) == CONFIG_OK)
+    {
+        if (ConfigManager_LoadConfig(&AppCtrlData.Config, &AppConfig) != CONFIG_OK) 
+        {
+            appConfigSetDefaults(&AppConfig);
+        }
+        else 
+        {
+            appCanCtrlDataSetter(
+                &CanCtrlData, 
+                (const AppControlDataType *)&AppCtrlData, 
+                (const AppConfigType *)&AppConfig);
+            appCanCtrlSetBaudrate(&CanCtrlData);
+            appCanCtrlSetMode(&CanCtrlData);
+            
+            appCanLogSetParam(CLM_PARAMETER_ID_CAN1_BAUDRATE, AppConfig.can1.baudrate);
+            appCanLogSetParam(CLM_PARAMETER_ID_CAN2_BAUDRATE, AppConfig.can2.baudrate);
+        }
+
+        SettingsHandler_Init(&AppConfig);
+    }
 
     /* Release CanSendTask */
     CanSendTask_Notify();
@@ -228,11 +356,14 @@ static void Core0Task0Main( void * parameters )
     {
         http_poll();
 
-        appCanLogHandlerPoll(AppCtrlData.Log);
-
         if (SettingsHandler_Poll(&AppConfig)) 
         {
             if (ConfigManager_UpdateConfig(&AppCtrlData.Config, &AppConfig, true) == CONFIG_OK) 
+            {
+                appCanLogSetParam(CLM_PARAMETER_ID_CAN1_BAUDRATE, AppConfig.can1.baudrate);
+                appCanLogSetParam(CLM_PARAMETER_ID_CAN2_BAUDRATE, AppConfig.can2.baudrate);
+            }
+            else
             {
                 Error_Handler();
             }
@@ -242,10 +373,7 @@ static void Core0Task0Main( void * parameters )
 
         CanSendTask_SetSendingActive(AppCtrlData.runCanTracer);
 
-        if (0 == AppCtrlData.applyConfig)
-        {
-        }
-        else if (0 == AppCtrlData.runCanTracer)
+        if (0 != AppCtrlData.applyConfig && 0 == AppCtrlData.runCanTracer)
         {
             appCanCtrlDataSetter(
                 &CanCtrlData, 
@@ -254,12 +382,6 @@ static void Core0Task0Main( void * parameters )
             appCanCtrlSetBaudrate(&CanCtrlData);
             appCanCtrlSetMode(&CanCtrlData);
             AppCtrlData.applyConfig = 0;
-
-            CanAbs_FrameCount = 0;
-            CanBridgeTask_FrameCount = 0;
-            CanLogManager_FrameCount = 0;
-            CanLogBuffer_FrameCount1 = 0;
-            CanLogBuffer_FrameCount2 = 0;
         }
         else
         {
@@ -274,8 +396,6 @@ static void Core0Task0Main( void * parameters )
         }
 
         update_task_stats();
-
-        RuntimeChecks_CheckFrameCounts(NULL);
     }
 
     appCanLogHandlerDeInit(AppCtrlData.Log);
@@ -338,7 +458,11 @@ void WebInterface_GetActionHook(uint8_t action)
     AppCtrlData.runCanTracer = action;
 }
 
-void WebInterface_RequestFormattingHook(void)
+void WebInterface_RequestFormattingHook(
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
 {
-    FatFS_SD_Formatting_Request();
+    FatFS_SD_Formatting_Request(cluster_size, log_file_size, log_file_count);
 }

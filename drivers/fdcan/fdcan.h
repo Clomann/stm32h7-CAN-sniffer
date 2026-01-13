@@ -17,8 +17,8 @@
 #error "FDCAN_MODE_DEFAULT is not defined! You can select: e.g. FDCAN_MODE_NORMAL)" 
 #endif 
 
-#define SW_RX_FRAME_BUFFER_SIZE (2U * FDCAN_RAM_RX_ELEMENTS) /* software Rx frame buffer size in number of FDCAN_ClassicFrame elements */
-#define SW_TX_FRAME_BUFFER_SIZE (FDCAN_RAM_TX_ELEMENTS)      /* software Tx frame buffer size in number of FDCAN_ClassicFrame elements */
+#define SW_RX_FRAME_BUFFER_SIZE (10U * FDCAN_RAM_RX_ELEMENTS) /* software Rx frame buffer size in number of FDCAN_ClassicFrameType elements */
+#define SW_TX_FRAME_BUFFER_SIZE (FDCAN_RAM_TX_ELEMENTS)      /* software Tx frame buffer size in number of FDCAN_ClassicFrameType elements */
 
 typedef enum {
     CANABS_IOCTL_CMD_SET_BAUDRATE,
@@ -66,8 +66,8 @@ typedef struct {
     uint32_t txBufferFillLevel;
     uint32_t rxBufferLength;
     uint32_t txBufferLength;
-    FDCAN_ClassicFrame * rxBuffer;
-    FDCAN_ClassicFrame * txBuffer;
+    FDCAN_ClassicFrameType * rxBuffer;
+    FDCAN_ClassicFrameType * txBuffer;
 } FdcanDataType;
 
 typedef struct {
@@ -76,6 +76,14 @@ typedef struct {
 } FdcanDeviceType;
 
 extern const CommInterface FDCAN_Interface;
+
+/**
+ * @brief Retrieves the timestamp captured at the last FDCAN interrupt for this driver.
+ * @param[in]  dev       FDCAN driver handle.
+ * @param[out] timestamp Absolute timestamp in microseconds.
+ * @return A comm_status_t value (e.g. COMM_SUCCESS or COMM_NULL_POINTER).
+ */
+comm_status_t FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp);
 
 comm_status_t FDCAN_CreateDriver(
     CommDriver *pDriver, 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ErrorContext.h"
 #include "FileHandlerTypes.h"
 #include "MmcAdapter.h"
 
@@ -27,7 +28,11 @@ FRESULT FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t len);
 FRESULT FatFS_SD_GetFileSize(FatFsDeviceType *dev, uint32_t *size);
 FRESULT FatFS_SD_GetBufferedFileSize(FatFsDeviceType *dev, uint32_t *size);
 FRESULT FatFS_SD_CloseFile(FatFsDeviceType *dev);
-FRESULT FatFS_SD_Formatting_Request(void);
+FRESULT FatFS_SD_Formatting_Request(
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+);
 FRESULT FatFS_SD_Format_Fat32(uint32_t cluster_size);
 
 FRESULT FatFS_SD_FileIterator_Open(FatFS_FileIterator *it, const char *dirPath, const char *prefix);
@@ -43,3 +48,5 @@ int FileHandler_GetValue(
     size_t *valLen
 );
 int FileHandler_ConvertToInteger(char *data, uint32_t *val, uint8_t base);
+
+void FileHandler_ErrorHandler(ErrorContextType *context);

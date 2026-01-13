@@ -18,17 +18,30 @@ extern volatile uint64_t CanAbs_FrameCount;
 
 extern volatile uint64_t CanAbs_FrameDropCount;
 
+extern volatile uint64_t CanAbs_CAN1_Rx_FrameDropCount;
+
+extern volatile uint64_t CanAbs_CAN2_Rx_FrameDropCount;
+
 /** Number of frames written to FDCAN msg port */
 extern volatile uint64_t CanBridgeTask_FrameCount;
 
 /** Number of frames read from FDCAN msg port */
 extern volatile uint64_t CanLogManager_FrameCount;
 
+/** Number of frames dropped trying to add to the buffer in CanLogManager */
+extern volatile uint64_t CanLogManager_FrameDropCount1;
+
+/** Number of frames dropped trying to write to SD card in CanLogManager */
+extern volatile uint64_t CanLogManager_FrameDropCount2;
+
 /** Number of frames written to SD card staging buffer */
 extern volatile uint64_t CanLogBuffer_FrameCount1;
 
 /** Number of frames read from SD card staging buffer */
 extern volatile uint64_t CanLogBuffer_FrameCount2;
+
+/** Number of frames dropped between writing to and reading from buffer of CanLogBuffer */
+extern volatile uint64_t CanLogBuffer_FrameDropCount;
 
 /** Number of blocks sucessfully written to SD card (no SPI op error) */
 extern volatile uint64_t CanLogBuffer_BlockCount;

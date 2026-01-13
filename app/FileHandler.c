@@ -1,11 +1,14 @@
 #include <stdlib.h>
+#include <stdio.h>
 
+#include "ErrorContext.h"
 #include "FileHandler.h"
 #include "ff.h"
 
 #include "core_json.h"
 
 static FATFS FatFs;		/* FatFs work area needed for each volume */
+static ErrorContextType ErrorContext;
 
 /**
  * @brief Hook called before a FatFS write to allow measurement instrumentation.
@@ -18,6 +21,11 @@ __attribute__((weak)) void FileHandler_InstrumentationWriteStartHook(void) {}
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
  */
 __attribute__((weak)) void FileHandler_InstrumentationWriteEndHook(void) {}
+
+__attribute__((weak)) void FileHandler_ErrorHandler(ErrorContextType *context)
+{
+    __asm volatile("nop");
+}
 
 FRESULT FatFS_SD_Mount(void)
 {  
@@ -150,17 +158,34 @@ FRESULT FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *content, const uint
         {
             res = f_lseek(&dev->file, f_tell(&dev->file));
         }
+        else 
+        {
+            ErrorContext.code = res;
+            ErrorContext.line = __LINE__;
+        }
     }
 
     if (FR_OK == res)
     {
         FileHandler_InstrumentationWriteStartHook();
         res = f_write(&dev->file, content, len, &BytesWritten);
+        if (FR_OK != res)
+        {
+            ErrorContext.code = res;
+            ErrorContext.line = __LINE__;
+        }
         FileHandler_InstrumentationWriteEndHook();
     }
 
     if (FR_OK == res && BytesWritten != len) {
         res = FR_DISK_ERR;  // Partial write = error
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+    }
+
+    if (res != FR_OK)
+    {
+        FileHandler_ErrorHandler(&ErrorContext);
     }
 
     return res;
@@ -275,15 +300,43 @@ FRESULT FatFS_SD_FileIterator_Close(FatFS_FileIterator *it)
     return f_closedir(&it->dir);
 }
 
-FRESULT FatFS_SD_Formatting_Request(void)
+FRESULT FatFS_SD_Formatting_Request(
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
 {
     FRESULT res;
     FatFsDeviceType File;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
+    char content[128];
+    int length;
 
     res = FatFS_SD_OpenFileForOverWrite(&File, FormatRequestFileName);
 
-    FatFS_SD_CloseFile(&File);
+    if (res != FR_OK)
+    {
+        return res;
+    }
+
+    length = snprintf(
+        content,
+        sizeof(content),
+        "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}",
+        (unsigned long)cluster_size,
+        (unsigned long)log_file_size,
+        (unsigned long)log_file_count
+    );
+
+    if (length < 0 || (size_t)length >= sizeof(content))
+    {
+        (void)FatFS_SD_CloseFile(&File);
+        return FR_INVALID_PARAMETER;
+    }
+
+    res = FatFS_SD_WriteFile(&File, content, (uint32_t)length);
+
+    (void)FatFS_SD_CloseFile(&File);
 
     return res;
 }

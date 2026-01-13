@@ -9,6 +9,8 @@
 #include <string.h>
 
 #include "MmcAdapter.h"
+#include "diskio.h"
+#include "ff.h"
 
 static volatile SdCsdRegisterType Csd_Sd1 = {0};
 
@@ -41,31 +43,57 @@ uint8_t MMCAdapter_initialize(void)
 
 uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t RetVal = RES_OK;
+    DRESULT res;
 
     if (SD_E_OK == SD_Spi_readMultiBlock(sector, buff, count))
     {
-        return RES_OK;
+        res = RES_OK;
     }
     else
     {
-        return RES_ERROR;
+        res = SD_Spi_hotReset();
+
+        if (RES_OK == res)
+        {
+            res = (SD_E_OK == SD_Spi_readMultiBlock(sector, buff, count)) ? RES_OK : RES_ERROR;
+        }
+        else
+        {
+            res = RES_NOTRDY;
+        }
     }
 
-	return RetVal;
+    return (uint8_t) res;
 }
 
 uint8_t MMCAdapter_write(const BYTE *buff, LBA_t sector, UINT count)
 {
-	if (SD_E_OK == SD_Spi_writeMultiBlock(sector, buff, count))
+    DRESULT res;
+
+    if (SD_E_OK == SD_Spi_writeMultiBlock(sector, buff, count))
     {
-        return RES_OK;
+        res = RES_OK;
     }
     else
     {
-        return RES_ERROR;
+        res = SD_Spi_hotReset();
+
+        if (RES_OK != res)
+        {  
+            res = RES_NOTRDY;
+        }
+        else 
+        {
+            res = SD_Spi_writeMultiBlock(sector, buff, count);
+            
+            if (SD_E_OK != res) 
+            {
+                res = RES_ERROR;
+            }
+        }
     }
 
+    return (uint8_t) res;
 }
 
 uint8_t MMCAdapter_CtrlSync(void)

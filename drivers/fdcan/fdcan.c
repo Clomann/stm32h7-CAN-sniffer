@@ -6,10 +6,13 @@
  */
 
 #include "fdcan.h"
+#include "CommTypes.h"
 #include "fdcan_utils.h"
 #include "nvic_irg_config.h"
 #include "stm32h7xx_hal_fdcan.h"
+#include "stm32h7xx_hal_rcc_ex.h"
 #include <stdint.h>
+#include <string.h>
 
 #define FDCAN_1_NBR        COMM_DEVICE_NUMBER_1
 #define FDCAN_2_NBR        COMM_DEVICE_NUMBER_2
@@ -61,6 +64,11 @@ comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan)
 {
     FdcanInstanceType * instance;
 
+    if (NULL == dev || NULL == dev->instance)
+    {
+        return COMM_NULL_POINTER;    
+    }
+
     instance = (FdcanInstanceType *) dev->instance;
 
     *fdcan = &instance->hfdcan;
@@ -95,6 +103,29 @@ comm_status_t fdcan_init_tx_header(
     const void *,
     FDCAN_TxHeaderTypeDef *,
     uint32_t);
+
+comm_status_t FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp)
+{
+    comm_status_t res = 0;
+    FdcanInstanceType * instance;
+
+    if (NULL == dev || NULL == dev->instance || NULL == timestamp)
+    {
+        res = COMM_NULL_POINTER;
+        return res;
+    }
+
+    instance = (FdcanInstanceType *)dev->instance;
+
+    if (COMM_SUCCESS != res)
+    {
+        FDCAN_ErrorHandler();
+        return res;
+    }
+
+    *timestamp = instance->mostRecentInterrupTimestamp;
+    return res;
+}
 
 uint64_t  SampleTime(void);
 
@@ -340,67 +371,130 @@ comm_status_t FDCAN_Read(
     uint32_t RxFifo0ITs)
 {
   comm_status_t RetVal;
-  uint8_t Data[8];
-  FDCAN_ClassicFrame *pNewFrame;
+  uint8_t Data[64];
+  FDCAN_ClassicFrameType *pNewFrame;
   FdcanInstanceType * instance;
+  FDCAN_RxHeaderTypeDef rxheader;
+  uint8_t PayloadLen = 0;
+  uint32_t Brs;
+  uint32_t Esi;
+  uint32_t Ide;
+  uint32_t FdFormat;
 
   RetVal = COMM_SUCCESS;
   instance = (FdcanInstanceType *) dev->instance;
-  pNewFrame = (FDCAN_ClassicFrame*)pFrame;
+  pNewFrame = (FDCAN_ClassicFrameType*)pFrame;
 
   if((RxFifo0ITs & FDCAN_IRQ_NOTIFICATION) != RESET)
   {
+    memset(&rxheader, 0, sizeof(rxheader));
+
     /* Retreive Rx messages from RX FIFO0 */
-    if (HAL_FDCAN_GetRxMessage(&instance->hfdcan, FDCAN_RX_FIFO0, &instance->rxheader, Data) != HAL_OK)
+    if (HAL_FDCAN_GetRxMessage(&instance->hfdcan, FDCAN_RX_FIFO0, &rxheader, Data) != HAL_OK)
     {
     	/* Reception Error */
     	RetVal = COMM_ERROR;
     }
 
-    /* Display LEDx */
-    if ((instance->rxheader.Identifier == 0x321) && (instance->rxheader.IdType == FDCAN_STANDARD_ID) && (instance->rxheader.DataLength == FDCAN_DLC_BYTES_2))
+    if (RetVal != COMM_SUCCESS)
     {
-
+        return RetVal;
     }
 
-    switch (instance->rxheader.DataLength)
+    pNewFrame->dlc_dl_flags = 0U;
+
+    Brs = (rxheader.BitRateSwitch & FDCAN_BRS_ON) ? 1U : 0U;
+    FDCAN_SET_BRS(pNewFrame, Brs);
+    
+    Esi = (rxheader.ErrorStateIndicator & FDCAN_ESI_PASSIVE) ? 1U : 0U;
+    FDCAN_SET_ESI(pNewFrame, Esi);
+
+    Ide = (rxheader.IdType & FDCAN_EXTENDED_ID) ? 1U : 0U;
+    FDCAN_SET_IDE(pNewFrame, Ide);
+
+    FdFormat = (rxheader.FDFormat & FDCAN_FD_CAN) ? 1U : 0U;
+    FDCAN_SET_FDF(pNewFrame, FdFormat);
+    
+    switch (rxheader.DataLength)
     {
 		case FDCAN_DLC_BYTES_0:
-			pNewFrame->dlc = 0;
+            FDCAN_SET_DLC(pNewFrame, 0);
+            FDCAN_SET_DATA_LEN(pNewFrame, 0);
 			break;
 		case FDCAN_DLC_BYTES_1:
-			pNewFrame->dlc = 1;
+			FDCAN_SET_DLC(pNewFrame, 1);
+            FDCAN_SET_DATA_LEN(pNewFrame, 1);
 			break;
 		case FDCAN_DLC_BYTES_2:
-			pNewFrame->dlc = 2;
+			FDCAN_SET_DLC(pNewFrame, 2);
+            FDCAN_SET_DATA_LEN(pNewFrame, 2);
 			break;
 		case FDCAN_DLC_BYTES_3:
-			pNewFrame->dlc = 3;
+			FDCAN_SET_DLC(pNewFrame, 3);
+			FDCAN_SET_DATA_LEN(pNewFrame, 3);
 			break;
 		case FDCAN_DLC_BYTES_4:
-			pNewFrame->dlc = 4;
+			FDCAN_SET_DLC(pNewFrame, 4);
+			FDCAN_SET_DATA_LEN(pNewFrame, 4);
 			break;
 		case FDCAN_DLC_BYTES_5:
-			pNewFrame->dlc = 5;
+			FDCAN_SET_DLC(pNewFrame, 5);
+			FDCAN_SET_DATA_LEN(pNewFrame, 5);
 			break;
 		case FDCAN_DLC_BYTES_6:
-			pNewFrame->dlc = 6;
+			FDCAN_SET_DLC(pNewFrame, 6);
+			FDCAN_SET_DATA_LEN(pNewFrame, 6);
 			break;
 		case FDCAN_DLC_BYTES_7:
-			pNewFrame->dlc = 7;
+			FDCAN_SET_DLC(pNewFrame, 7);
+			FDCAN_SET_DATA_LEN(pNewFrame, 7);
 			break;
 		case FDCAN_DLC_BYTES_8:
-			pNewFrame->dlc = 8;
+			FDCAN_SET_DLC(pNewFrame, 8);
+			FDCAN_SET_DATA_LEN(pNewFrame, 8);
 			break;
+        case FDCAN_DLC_BYTES_12:
+            FDCAN_SET_DLC(pNewFrame, 9);
+            FDCAN_SET_DATA_LEN(pNewFrame, 12);
+            break;
+        case FDCAN_DLC_BYTES_16:
+            FDCAN_SET_DLC(pNewFrame, 10);
+            FDCAN_SET_DATA_LEN(pNewFrame, 16);
+            break;
+        case FDCAN_DLC_BYTES_20:
+            FDCAN_SET_DLC(pNewFrame, 11);
+            FDCAN_SET_DATA_LEN(pNewFrame, 20);
+            break;
+        case FDCAN_DLC_BYTES_24:
+            FDCAN_SET_DLC(pNewFrame, 12);
+            FDCAN_SET_DATA_LEN(pNewFrame, 24);
+            break;
+        case FDCAN_DLC_BYTES_32:
+            FDCAN_SET_DLC(pNewFrame, 13);
+            FDCAN_SET_DATA_LEN(pNewFrame, 32);
+            break;
+        case FDCAN_DLC_BYTES_48:
+            FDCAN_SET_DLC(pNewFrame, 14);
+            FDCAN_SET_DATA_LEN(pNewFrame, 48);
+            break;
+        case FDCAN_DLC_BYTES_64:
+            FDCAN_SET_DLC(pNewFrame, 15);
+            FDCAN_SET_DATA_LEN(pNewFrame, 64);
+            break;
 		default:
-			pNewFrame->dlc =  0;
+			FDCAN_SET_DLC(pNewFrame,  0);
+            FDCAN_SET_DATA_LEN(pNewFrame,  0);
     };
 
-
-    pNewFrame->id = instance->rxheader.Identifier;
-    pNewFrame->timestamp = instance->rxheader.RxTimestamp;
-
-    memcpy(pNewFrame->data, &Data, pNewFrame->dlc);
+    pNewFrame->id = rxheader.Identifier;
+    pNewFrame->timestamp = rxheader.RxTimestamp;
+    
+    PayloadLen = FDCAN_GET_DATA_LEN(pNewFrame);
+    if (PayloadLen > sizeof(Data))
+    {
+        PayloadLen = sizeof(Data);
+    }
+    memcpy(pNewFrame->data, &Data[0], PayloadLen);
 
     if (HAL_FDCAN_ActivateNotification(&instance->hfdcan, FDCAN_IRQ_NOTIFICATION, 0) != HAL_OK)
     {
@@ -993,7 +1087,7 @@ comm_status_t get_fdcan_config(
     pFilterConfig->FilterIndex = 0;
     pFilterConfig->FilterType = FDCAN_FILTER_MASK;
     pFilterConfig->FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-    pFilterConfig->FilterID1 = 0x321;
+    pFilterConfig->FilterID1 = 0x0;
     pFilterConfig->FilterID2 = 0x7FF;
 
     RetVal = COMM_SUCCESS;

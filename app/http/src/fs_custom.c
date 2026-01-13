@@ -4,9 +4,12 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "fs_custom.h"
 #include "FileHandler.h"
+#include "CanLogManager.h"
+#include "CanLogBuffer.h"
 
 struct fs_custom_data {
     FILE *f;
@@ -32,17 +35,17 @@ static const char redirect_reply[] =
 
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
-#define CANLOG_MAX_STATUS_SIZE    32U
+#define CANLOG_MAX_STATUS_SIZE    128U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
 #define CANLOG_STATUS_PATH        "/logger/status"
 #define CANLOG_POST_REDIRECT_PATH "/postredir"
 
 #define CANLOG_META_DATA_STRING \
-    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\"}"
+    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\",\"file_size\":\"%lu\"}"
 
 #define CANLOG_STATUS_STRING \
-    "{ \"active\": %s }"
+    "{ \"active\":%s,\"frames_lost\":%s,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
 
 typedef struct {
     uint8_t stage;
@@ -132,7 +135,8 @@ int fs_open_custom(struct fs_file *file, const char *name)
             (unsigned long int)HeadIndex, 
             (unsigned long int)TailIndex, 
             (unsigned long int)Capacity, 
-            (unsigned long int)((HeadIndex + Capacity - 1) % Capacity)
+            (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
+            (unsigned long int)(MAX_LOG_FILE_SIZE)
         );
     
         if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData)) {
@@ -147,16 +151,39 @@ int fs_open_custom(struct fs_file *file, const char *name)
     }
     else if (0 == strncmp(name, CANLOG_STATUS_PATH, sizeof(CANLOG_STATUS_PATH) - 1)) {
         uint8_t IsTracerRunning = 1;
+        float BusLoadCan1 = 0.0;
+        float BusLoadCan2 = 0.0;
+        _Bool AnyFrameLost = false;
+        uint32_t Rb1BytesHighWater = 0U;
+        float Rb1BytesHighWaterPct = 0.0f;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
             IsTracerRunning =  1;
         }
 
+        AnyFrameLost = FsCustom_IsAnyFrameLostFlag();
+        FsCustom_GetBusloadCan1(&BusLoadCan1);
+        FsCustom_GetBusloadCan2(&BusLoadCan2);
+        if (0U != FsCustom_GetRb1BytesHighWater(&Rb1BytesHighWater))
+        {
+            Rb1BytesHighWater = 0U;
+        }
+
+        if (LOG_BUFFER_SIZE > 0U)
+        {
+            Rb1BytesHighWaterPct = (float)Rb1BytesHighWater * 100.0f / (float)LOG_BUFFER_SIZE;
+        }
+
         int n = snprintf(StatusData,
             sizeof(StatusData),
             CANLOG_STATUS_STRING,
-            IsTracerRunning ? "true" : "false");
+            IsTracerRunning ? "true" : "false",
+            AnyFrameLost ? "true" : "false",
+            BusLoadCan1,
+            BusLoadCan2,
+            Rb1BytesHighWaterPct
+        );
     
         file->data           = StatusData;
         file->len            = n;

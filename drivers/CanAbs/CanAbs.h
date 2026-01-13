@@ -7,7 +7,7 @@
 
 comm_status_t CanAbs_Init_Can1(uint32_t baudrate);
 comm_status_t CanAbs_Send_Can1(FDCAN_Message *msg);
-comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrame *frame);
+comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrameType *frame);
 comm_status_t CanAbs_Start_Can1(void);
 comm_status_t CanAbs_Stop_Can1(void);
 comm_status_t CanAbs_SetBaudrate_Can1(uint32_t baudrate);
@@ -16,7 +16,7 @@ comm_status_t CanAbs_IsStateOff_Can1(bool * isOff);
 
 comm_status_t CanAbs_Init_Can2(uint32_t baudrate);
 comm_status_t CanAbs_Send_Can2(FDCAN_Message *msg);
-comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrame *frame);
+comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrameType *frame);
 comm_status_t CanAbs_Start_Can2(void);
 comm_status_t CanAbs_Stop_Can2(void);
 comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate);
@@ -24,6 +24,11 @@ comm_status_t CanAbs_SetMode_Can2(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can2(bool * isOff);
 
 void  CanAbs_ErrorHandler(void);
+
+/**
+ * @brief Drain pending Rx frames from all CAN peripherals and notify consumer.
+ */
+void CanAbs_Drain(void);
 
 /**
   * @brief  Create a Tx CAN message with standard ID.
@@ -35,6 +40,8 @@ comm_status_t CanAbs_CreateMessage_Standard(
     uint32_t id, 
     uint8_t *data, 
     uint32_t length);
+
+void CANABS_CheckIsrPollPeriod(uint64_t timestamp, uint64_t timerPeriod);
 
 uint64_t CANABS_ConvertCountToTimestampHook(uint32_t cnt);
 

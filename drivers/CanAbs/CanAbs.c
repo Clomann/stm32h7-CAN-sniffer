@@ -1,9 +1,11 @@
 #include "CanAbs.h"
+#include "CommTypes.h"
 #include "buffers.h"
 #include "fdcan.h"
 
 #include <stdint.h>
 #include "RuntimeChecks.h"
+#include "stm32h745xx.h"
 
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
@@ -18,14 +20,15 @@ __attribute__((weak)) void CanAbs_InstrumentationIsrStartHook(void) {}
 __attribute__((weak)) void CanAbs_InstrumentationIsrEndHook(void) {}
 
 /* CAN 1 */
+static uint64_t LastHardwareTimestampCan1 = 0;
 
 static CommDriver Fdcan1Driver;
 static CommDriverConfigType Fdcan1Config = {
     .config = DRIVER_CFG2,
     .devNbr = COMM_DEVICE_NUMBER_1
 };
-static FDCAN_ClassicFrame Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
-static FDCAN_ClassicFrame Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan1RxRingBuffer = {
     .startAddress = &Fdcan1RxFrameBuffer[0],
     .head = 0,
@@ -47,14 +50,15 @@ static RingBuffer Fdcan1TxRingBuffer = {
 };
 
 /* CAN 2 */
+static uint64_t LastHardwareTimestampCan2 = 0;
 
 static CommDriver Fdcan2Driver;
 static CommDriverConfigType Fdcan2Config = {
     .config = DRIVER_CFG2,
     .devNbr = COMM_DEVICE_NUMBER_2
 };
-static FDCAN_ClassicFrame Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
-static FDCAN_ClassicFrame Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0};
+static FDCAN_ClassicFrameType Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0};
 static RingBuffer Fdcan2RxRingBuffer = {
     .startAddress = &Fdcan2RxFrameBuffer[0],
     .head = 0,
@@ -100,7 +104,7 @@ int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t
     return res;
 }
 
-int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrame *frame)
+int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrameType *frame)
 {
     return ring_buffer_pop((RingBuffer *)dev->RxFrameBuffer, (void*)frame);
 }
@@ -155,36 +159,126 @@ comm_status_t CanAbs_CreateMessage_Standard(
 	return COMM_SUCCESS;
 }
 
+void CANABS_CheckIsrPollPeriod(uint64_t timestamp, uint64_t timerPeriod)
+{
+    bool PeriodReachedCan1;
+    bool PeriodReachedCan2;
+    bool AnyFrameAvailableCan1;
+    bool AnyFrameAvailableCan2;
+    uint64_t LastIsrTimestamp = 0;
+    FDCAN_HandleTypeDef *hfdcantmp;
+    comm_status_t res;
+    
+    res = FDCAN_GetMostRecentTimestamp(&Fdcan1Driver, &LastIsrTimestamp);
+    
+    if (COMM_SUCCESS == res)
+    {
+        PeriodReachedCan1 = (timestamp - LastIsrTimestamp) >= timerPeriod;
+    }
+    else 
+    {
+        PeriodReachedCan1 = false;
+    }
+
+    res = FDCAN_GetMostRecentTimestamp(&Fdcan2Driver, &LastIsrTimestamp);
+
+    if (COMM_SUCCESS == res)
+    {
+        PeriodReachedCan2 = (timestamp - LastIsrTimestamp) >= timerPeriod;
+    }
+    else 
+    {
+        PeriodReachedCan2 = false;
+    }
+
+    if (!PeriodReachedCan1 && ! PeriodReachedCan2)
+    {
+        return;
+    }
+
+    AnyFrameAvailableCan1 = false;
+    AnyFrameAvailableCan2 = false;
+
+    if (COMM_SUCCESS == fdcan_get_can(&Fdcan1Driver, &hfdcantmp))
+    {
+        AnyFrameAvailableCan1 = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0) > 0;
+    }
+    else 
+    {
+        AnyFrameAvailableCan1 = false;
+        FDCAN_ErrorHandler();
+    }
+
+    if (COMM_SUCCESS == fdcan_get_can(&Fdcan2Driver, &hfdcantmp))
+    {
+        AnyFrameAvailableCan2 = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0) > 0;
+    }
+    else 
+    {
+        AnyFrameAvailableCan2 = false;
+        FDCAN_ErrorHandler();
+    }
+
+#if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+    if (AnyFrameAvailableCan1 || AnyFrameAvailableCan2)
+    {
+        NVIC_SetPendingIRQ(FDCAN_1_IRQn);
+    }
+#else
+    if (AnyFrameAvailableCan1)
+    {
+        NVIC_SetPendingIRQ(FDCAN_1_IRQn);
+    }
+
+    if (AnyFrameAvailableCan2)
+    {
+        NVIC_SetPendingIRQ(FDCAN_2_IRQn);
+    }
+#endif
+}
+
 void NotifyConsumerTask(void)
 {
     CanAbs_RxNotificationCallback();
 }
 
 /**
- * @brief Reconstructs a full 64-bit timestamp from a 16-bit hardware timer value.
- * 
- * Handles timer wraparound by determining which epoch the hardware timestamp belongs to.
- * Used in CAN ISR where delay between frame capture and ISR execution may cause wraparound.
- * 
- * The algorithm compares the hardware timestamp with the current timer position:
- * - Large positive difference (> Period/2): Frame from previous epoch (wrapped)
- * - Large negative difference (< -Period/2): Frame from next epoch (rare edge case)
- * - Otherwise: Frame from current epoch (normal case)
- * 
- * @param[in] hardware_timestamp  16-bit timestamp captured by CAN peripheral at frame arrival
- * @param[in] global_timestamp    Current system timestamp read in ISR
- * 
- * @return Full 64-bit absolute timestamp of frame arrival
- * 
- * @note ISR latency must be < Period/2 for correct epoch detection
- * @note Returns hardware_timestamp unchanged if Period is 0
+ * @brief Reconstructs a full 64-bit timestamp from a hardware capture timestamp.
+ *
+ * Uses the current system timestamp to determine which timer epoch the captured
+ * timestamp belongs to, then applies a monotonic correction based on the last
+ * reconstructed timestamp when it is recent enough to be trusted.
+ *
+ * The epoch selection compares the captured timestamp with the current timer
+ * position:
+ * - Large positive difference (> Period/2): frame from previous epoch (wrapped).
+ * - Large negative difference (< -Period/2): frame from next epoch (rare edge case).
+ * - Otherwise: frame from current epoch (normal case).
+ *
+ * @param[in] hardware_timestamp  Timestamp captured by CAN peripheral at frame arrival,
+ *                                already converted to microseconds.
+ * @param[in] global_timestamp    Current system timestamp read in ISR (microseconds).
+ * @param[inout] last_timestamp   Last absolute reconstructed 64-bit timestamp.
+ *
+ * @return Full 64-bit absolute timestamp of frame arrival.
+ *
+ * @note ISR latency should be < Period/2 for correct epoch detection.
+ * @note Time between ISR calls should be < Period (as enforced by CANABS_CheckIsrPollPeriod).
+ * @note Monotonic correction is only applied when last_timestamp is recent.
+ * @note Returns hardware_timestamp unchanged if Period is 0.
  */
-static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t global_timestamp)
+static uint64_t ReconstructFullTimestamp(
+    uint64_t hardware_timestamp, 
+    uint64_t global_timestamp,
+    uint64_t *last_timestamp
+)
 {
     uint64_t Period;
     uint64_t current_timer_value;
     uint64_t epoch_count;
     int64_t time_diff;
+    uint64_t Delta;
+    uint64_t ReconstructedTimestamp;
 
     Period = FDCAN_GetTimerPeriodHook();
     
@@ -197,7 +291,6 @@ static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t g
     current_timer_value = global_timestamp % Period;
     epoch_count = global_timestamp / Period;
 
-
     time_diff = (int64_t)hardware_timestamp - (int64_t)current_timer_value;
 
     // Determine if frame arrived in previous epoch
@@ -209,8 +302,22 @@ static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t g
         epoch_count++;
     }
 
-    // Reconstruct and return full timestamp
-    return ((uint64_t)epoch_count * Period) + hardware_timestamp;
+    // Reconstruct full timestamp
+    ReconstructedTimestamp = ((uint64_t)epoch_count * Period) + hardware_timestamp;
+
+    if (*last_timestamp != 0 &&
+        *last_timestamp <= global_timestamp &&
+        (global_timestamp - *last_timestamp) <= (2 * Period)) 
+    {                
+        if (*last_timestamp > ReconstructedTimestamp + (Period / 2)) {
+            Delta = *last_timestamp - (ReconstructedTimestamp + (Period / 2));
+            ReconstructedTimestamp += ((Delta + Period - 1) / Period) * Period;
+        }
+    }
+
+    *last_timestamp = ReconstructedTimestamp;
+    
+    return ReconstructedTimestamp;
 }
 
 /**
@@ -221,73 +328,111 @@ static uint64_t ReconstructFullTimestamp(uint64_t hardware_timestamp, uint64_t g
   *                     This parameter can be any combination of @arg FDCAN_Rx_Fifo0_Interrupts.
   * @retval None
   */
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+static uint32_t CanAbs_ReadAllAvailableFrames(CommDriver *driver,
+                                              FDCAN_HandleTypeDef *hfdcan,
+                                              uint8_t channel,
+                                              uint32_t RxFifo0ITs,
+                                              volatile uint64_t *rxOverflowDropCount)
 {
-    FDCAN_ClassicFrame NewFrame;
-    volatile uint32_t frames_processed = 0;
-    volatile uint32_t fill_level = 0;
+    FDCAN_ClassicFrameType NewFrame;
+    uint32_t frames_processed = 0;
+    uint32_t fill_level = 0;
     uint64_t GlobalTimestamp;
     uint64_t HardwareTimestamp;
-    FDCAN_HandleTypeDef *hfdcantmp;
     RingBufferErrorType res;
+
+    if (hfdcan->Instance->RXF0S & FDCAN_RXF0S_RF0L)
+    {
+        hfdcan->Instance->IR = FDCAN_IR_RF0L;
+        if (rxOverflowDropCount != NULL)
+        {
+            (*rxOverflowDropCount)++;
+        }
+    }
+
+    while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0)))
+    {
+        if (driver->interface->read(driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
+        {
+            NewFrame.channel = channel;
+            GlobalTimestamp = FDCAN_GetMostRecentInterruptTimestamp(driver);
+            HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
+            
+            switch (channel)
+            {
+                case 1U:
+                    NewFrame.timestamp = ReconstructFullTimestamp(
+                        HardwareTimestamp, 
+                        GlobalTimestamp,
+                        &LastHardwareTimestampCan1
+                    );
+                    break;
+                case 2U:
+                    NewFrame.timestamp = ReconstructFullTimestamp(
+                        HardwareTimestamp, 
+                        GlobalTimestamp,
+                        &LastHardwareTimestampCan2
+                    );
+                    break;
+                default:
+                    break;
+            }
+
+            res = ring_buffer_put((RingBuffer *)driver->RxFrameBuffer, (void*)&NewFrame);
+            if (RB_E_OK != res)
+            {
+                CanAbs_FrameDropCount++;
+                CanAbs_ErrorHandler();
+            }
+            frames_processed++;
+
+            CanAbs_FrameCount++;
+        }
+        else
+        {
+            CanAbs_FrameDropCount++;
+            CanAbs_ErrorHandler();
+            break;
+        }
+    }
+
+    return frames_processed;
+}
+
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+    uint32_t frames_processed = 0;
+    FDCAN_HandleTypeDef *hfdcantmp;
 
     CanAbs_InstrumentationIsrStartHook();
 
 #if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
     hfdcantmp = hfdcan;
     
-    if (FDCAN_1 == hfdcan->Instance)
+    if (FDCAN_1 == hfdcantmp->Instance)
 #else
     (void) fdcan_get_can(&Fdcan1Driver, &hfdcantmp);
 #endif
     {
-        while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)))
-        {
-            if (Fdcan1Driver.interface->read(&Fdcan1Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
-            {
-                NewFrame.channel = 1;
-                GlobalTimestamp = FDCAN_GetMostRecentInterruptTimestamp(&Fdcan1Driver);
-                HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
-                NewFrame.timestamp = ReconstructFullTimestamp(HardwareTimestamp, GlobalTimestamp);
-
-                res = ring_buffer_put((RingBuffer *)Fdcan1Driver.RxFrameBuffer, (void*)&NewFrame);
-                if (RB_E_OK != res)
-                {
-                    CanAbs_FrameDropCount++;
-                    CanAbs_ErrorHandler();
-                }
-                frames_processed++;
-
-                CanAbs_FrameCount++;
-            }
-        }
+        frames_processed += CanAbs_ReadAllAvailableFrames(
+            &Fdcan1Driver, 
+            hfdcantmp, 
+            1u, 
+            RxFifo0ITs, 
+            &CanAbs_CAN1_Rx_FrameDropCount);
     }
 #if !CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
-    else if ( FDCAN_2 == hfdcan->Instance)
+    else if ( FDCAN_2 == hfdcantmp->Instance)
 #else
     (void) fdcan_get_can(&Fdcan2Driver, &hfdcantmp);
 #endif
     {
-        while (0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcantmp, FDCAN_RX_FIFO0)) )
-        {
-            if (Fdcan2Driver.interface->read(&Fdcan2Driver, (void*)&NewFrame, 8u, RxFifo0ITs) == COMM_SUCCESS)
-            {
-                NewFrame.channel = 2;
-                GlobalTimestamp = FDCAN_GetMostRecentInterruptTimestamp(&Fdcan2Driver);
-                HardwareTimestamp = CANABS_ConvertCountToTimestampHook(NewFrame.timestamp);
-                NewFrame.timestamp = ReconstructFullTimestamp(HardwareTimestamp, GlobalTimestamp);
-
-                res = ring_buffer_put((RingBuffer *)Fdcan2Driver.RxFrameBuffer, (void*)&NewFrame);
-                if (RB_E_OK != res)
-                {
-                    CanAbs_FrameDropCount++;
-                    CanAbs_ErrorHandler();
-                }
-                frames_processed++;
-
-                CanAbs_FrameCount++;
-            }
-        }
+        frames_processed += CanAbs_ReadAllAvailableFrames(
+            &Fdcan2Driver, 
+            hfdcantmp, 
+            2u, 
+            RxFifo0ITs, 
+            &CanAbs_CAN2_Rx_FrameDropCount);
     }
     
     if (frames_processed > 0) {
@@ -319,7 +464,7 @@ comm_status_t CanAbs_Send_Can1(FDCAN_Message *msg)
     return CanAbs_Send(&Fdcan1Driver, msg);
 }
 
-comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrame *frame)
+comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrameType *frame)
 {
     return CanAbs_Receive(&Fdcan1Driver, frame);
 }
@@ -371,7 +516,7 @@ comm_status_t CanAbs_Send_Can2(FDCAN_Message *msg)
     return CanAbs_Send(&Fdcan2Driver, msg);
 }
 
-comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrame *frame)
+comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrameType *frame)
 {
     return CanAbs_Receive(&Fdcan2Driver, frame);
 }
@@ -400,6 +545,27 @@ comm_status_t CanAbs_IsStateOff_Can2(bool * isOff)
 {
     *isOff = Fdcan2Driver.state == DRIVER_STATE_OFF;
     return COMM_SUCCESS;
+}
+
+void CanAbs_Drain(void)
+{
+    FDCAN_HandleTypeDef *hfdcantmp;
+    uint32_t frames_processed = 0;
+
+    if (COMM_SUCCESS == fdcan_get_can(&Fdcan1Driver, &hfdcantmp))
+    {
+        frames_processed += CanAbs_ReadAllAvailableFrames(&Fdcan1Driver, hfdcantmp, 1u, 0u, &CanAbs_CAN1_Rx_FrameDropCount);
+    }
+
+    if (COMM_SUCCESS == fdcan_get_can(&Fdcan2Driver, &hfdcantmp))
+    {
+        frames_processed += CanAbs_ReadAllAvailableFrames(&Fdcan2Driver, hfdcantmp, 2u, 0u, &CanAbs_CAN2_Rx_FrameDropCount);
+    }
+
+    if (frames_processed > 0)
+    {
+        NotifyConsumerTask();
+    }
 }
 
 __attribute__((weak))

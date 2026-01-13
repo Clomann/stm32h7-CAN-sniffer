@@ -3,9 +3,9 @@
 #include "RuntimeChecks.h"
 #include <stdint.h>
 #include <string.h>
+#include "memory_sections.h"
 
-__attribute__((section(".ram_d1")))
-static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] ;
+static uint8_t CanLogBuf1[LOG_BUFFER_SIZE] RAM_D1_SECTION;
 static lwrb_t Rb1;
 static uint8_t EpochCount = 0;
 static uint8_t BlockCount = 0;
@@ -94,42 +94,77 @@ uint8_t CanLogBuffer_AddEntry(const void * entry, uint32_t entryTotalSize)
     }
 }
 
+uint8_t CanLogBuffer_FillBlockWithPadding(void)
+{
+    uint32_t offset;
+    uint32_t pad_len;
+    lwrb_sz_t free_space;
+    lwrb_sz_t linear_space;
+    uint32_t remaining;
+
+    offset = (uint32_t)(Rb1.w_ptr % BLOCK_SIZE);
+    if (offset == 0U)
+    {
+        return CANLOG_E_OK;
+    }
+
+    pad_len = BLOCK_SIZE - offset;
+    free_space = lwrb_get_free(&Rb1);
+    linear_space = lwrb_get_linear_block_write_length(&Rb1);
+
+    if ((free_space < pad_len) || (linear_space < pad_len))
+    {
+        return CANLOG_E_NOT_OK;
+    }
+
+    remaining = pad_len;
+    while (remaining > 0U)
+    {
+        uint32_t chunk = (remaining > sizeof(PaddingChunk)) ? sizeof(PaddingChunk) : remaining;
+
+        if (chunk != lwrb_write(&Rb1, PaddingChunk, chunk))
+        {
+            return CANLOG_E_NOT_OK;
+        }
+
+        remaining -= chunk;
+    }
+
+    return CANLOG_E_OK;
+}
+
 uint8_t CanLogBuffer_IsBlockReady(uint8_t *rdy)
 {
-    uint32_t delta;
     uint32_t skip_to_align;
+    lwrb_sz_t full_len;
     lwrb_sz_t linear_len;
+    uint32_t to_boundary;
 
     skip_to_align = (uint32_t)(Rb1.r_ptr % BLOCK_SIZE);
+    full_len = lwrb_get_full(&Rb1);
+    linear_len = lwrb_get_linear_block_read_length(&Rb1);
+
     if (skip_to_align != 0U)
     {
-        skip_to_align = BLOCK_SIZE - skip_to_align;
-    }
+        to_boundary = BLOCK_SIZE - skip_to_align;
 
-    if (Rb1.w_ptr >= Rb1.r_ptr)
-        delta = (Rb1.w_ptr - Rb1.r_ptr);
-    else
-        delta = (uint32_t)( (int32_t)(Rb1.size) - (int32_t)Rb1.r_ptr + (int32_t)Rb1.w_ptr );
-        
-    if (delta <= skip_to_align)
-    {
-        *rdy = 0U;
-    }
-    else
-    {
-        delta -= skip_to_align;
-        linear_len = lwrb_get_linear_block_read_length(&Rb1);
-
-        if (linear_len < skip_to_align)
+        if (full_len <= to_boundary)
         {
             *rdy = 0U;
+            return 0;
         }
-        else
+
+        if (linear_len <= to_boundary)
         {
-            linear_len -= skip_to_align;
-            *rdy = (delta >= BLOCK_SIZE) && (linear_len >= BLOCK_SIZE);
+            *rdy = 0U;
+            return 0;
         }
+
+        full_len -= to_boundary;
+        linear_len -= to_boundary;
     }
+
+    *rdy = (full_len >= BLOCK_SIZE) && (linear_len >= BLOCK_SIZE);
     
     return 0;
 } 
@@ -143,13 +178,52 @@ uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
     uint32_t SkipBytes = 0;
     uint32_t bytes_available;
     uint32_t BytesRead = 0;
-    uint32_t EntryExpectedSize = 0;
+    uint32_t EntryMinSize = 0;
+    uint32_t EntryMaxSize = 0;
+    uint32_t block_offset = 0;
+    uint32_t block_remaining = 0;
+    uint32_t skip_to_align = 0;
 
     do 
     {
         bytes_available = lwrb_get_full(&Rb1);
         if (bytes_available <= SkipBytes) {
             break;
+        }
+
+        /* If the read pointer starts mid-block, skip padding up to the next block boundary */
+        if ((SkipBytes == 0U) && ((Rb1.r_ptr % BLOCK_SIZE) != 0U))
+        {
+            skip_to_align = BLOCK_SIZE - (uint32_t)(Rb1.r_ptr % BLOCK_SIZE);
+
+            if (bytes_available < skip_to_align)
+            {
+                break;
+            }
+
+            SkipBytes += skip_to_align;
+            continue;
+        }
+
+        block_offset = (uint32_t)((Rb1.r_ptr + SkipBytes) % BLOCK_SIZE);
+
+        if ((block_offset == 0U) 
+            && ((bytes_available - SkipBytes) >= sizeof(CanLogBlockHeaderType)))
+        {
+            SkipBytes += sizeof(CanLogBlockHeaderType); 
+            continue;
+        }
+
+        block_remaining = BLOCK_SIZE - block_offset;
+        if (block_remaining < sizeof(entry->header))
+        {
+            if ((bytes_available - SkipBytes) < block_remaining)
+            {
+                break;
+            }
+
+            SkipBytes += block_remaining;
+            continue;
         }
 
         BytesRead = lwrb_peek(&Rb1, SkipBytes, &entry->header, sizeof(entry->header));
@@ -160,23 +234,32 @@ uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
 
         EntryTotalSize = entry->header.total_len;
 
+        if (EntryTotalSize == 0U)
+        {
+            break;
+        }
+
+        EntryMinSize = 0;
+        EntryMaxSize = 0;
         switch (entry->header.type)
         {
             case CLB_ENTRY_TYPE_FRAME:
-                EntryExpectedSize = sizeof(CanLogEntryType);
+                EntryMinSize = sizeof(CanLogEntryType);
+                EntryMaxSize = sizeof(CanLogEntryType) + CANLOG_ENTRY_MAX_DATA_LENGTH;
                 break;
             case CLB_ENTRY_TYPE_SYNC:
-                EntryExpectedSize = sizeof(CanLogSyncType);
+                EntryMinSize = sizeof(CanLogSyncType);
+                EntryMaxSize = EntryMinSize;
                 break;
             case CLB_ENTRY_TYPE_MARKER:
             case CLB_ENTRY_TYPE_NONE:
-                EntryExpectedSize = 0;
+                EntryMinSize = 0;
+                EntryMaxSize = 0;
             default:
                 break;
         }
-        
 
-        if (EntryTotalSize < sizeof(entry->header) || EntryTotalSize > EntryExpectedSize)
+        if (EntryTotalSize < EntryMinSize || EntryTotalSize > EntryMaxSize)
         {
             break;
         }
@@ -201,6 +284,17 @@ uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
     return 0;
 }
 
+uint8_t CanLogBuffer_UsedBytes(uint32_t *bytes)
+{
+    if (bytes == NULL)
+    {
+        return CANLOG_E_NOT_OK;
+    }
+
+    *bytes = (uint32_t)lwrb_get_full(&Rb1);
+    return CANLOG_E_OK;
+}
+
 uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
 {
     volatile uint8_t res;
@@ -212,11 +306,16 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *fram
     CanLogBlockHeaderType BlockHeader;
     CanLogEntryHeaderType EntryHeader;
     uint8_t *block_ptr;
+    uint32_t block_available;
+    uint32_t pad_len = 0U;
+    lwrb_sz_t free_space = 0U;
+    uint32_t remaining = 0U;
+    lwrb_sz_t linear_len;
 
     res = CANLOG_E_OK;
     total_len = 0;
     offset = sizeof(CanLogBlockHeaderType);
-    *len = BLOCK_SIZE;
+    *len = 0U;
     *frame_count = 0U;
 
     skip_to_align = (uint32_t)(Rb1.r_ptr % BLOCK_SIZE);
@@ -232,18 +331,61 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *fram
         lwrb_skip(&Rb1, skip_to_align);
     }
 
-    if ((lwrb_get_full(&Rb1) < BLOCK_SIZE) ||
-        (lwrb_get_linear_block_read_length(&Rb1) < BLOCK_SIZE))
+    block_available = lwrb_get_full(&Rb1);
+    linear_len = lwrb_get_linear_block_read_length(&Rb1);
+
+    if (block_available > BLOCK_SIZE)
+    {
+        block_available = BLOCK_SIZE;
+    }
+
+    /* Need at least header plus one entry header */
+    if (block_available < (sizeof(CanLogBlockHeaderType) + sizeof(CanLogEntryHeaderType)))
     {
         return CANLOG_E_NOT_OK;
+    }
+
+    /* Require a contiguous block for direct write-out */
+    if (linear_len < BLOCK_SIZE)
+    {
+        return CANLOG_E_NOT_OK;
+    }
+
+    /* If this is a partial block and there is contiguous free space to extend it,
+     * pad to the block boundary with 0xFF so the emitted block is fully padded. */
+    if (block_available < BLOCK_SIZE)
+    {
+        pad_len = BLOCK_SIZE - block_available;
+        free_space = lwrb_get_free(&Rb1);
+
+        if (free_space < pad_len)
+        {
+            return CANLOG_E_NOT_OK;
+        }
+
+        remaining = pad_len;
+
+        while (remaining > 0U)
+        {
+            uint32_t chunk = (remaining > sizeof(PaddingChunk)) ? sizeof(PaddingChunk) : remaining;
+
+            if (chunk != lwrb_write(&Rb1, PaddingChunk, chunk))
+            {
+                return CANLOG_E_NOT_OK;
+            }
+
+            remaining -= chunk;
+        }
+
+        block_available = BLOCK_SIZE;
     }
 
     block_ptr = lwrb_get_linear_block_read_address(&Rb1);
 
     while (CANLOG_E_OK == res)
     {
-        if (lwrb_get_full(&Rb1) < sizeof(EntryHeader)) {
-            break; // Not enough data
+        if ((block_available - offset) < sizeof(EntryHeader)) {
+            break; // Not enough data for another header in this block
         }
 
         BytesRead = lwrb_peek(&Rb1, offset, &EntryHeader, sizeof(EntryHeader));
@@ -260,12 +402,12 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *fram
             break;
         }
 
-        if (CANLOG_UNDEFINED_TYPE == entry_type)
+        if (CLB_ENTRY_TYPE_NONE == entry_type)
         {
             break;
         }
 
-        if ((offset + total_len) > BLOCK_SIZE) {
+        if ((offset + total_len) > block_available) {
             break; // Output block full
         }
 
@@ -302,7 +444,28 @@ uint8_t CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *fram
 
 uint8_t CanLogBuffer_Consume(uint32_t len, uint32_t frame_count)
 {
+    static uint64_t backlog = 0;
+
     lwrb_skip(&Rb1, len);
     CanLogBuffer_FrameCount2 += frame_count;
+
+    if (CanLogBuffer_FrameCount1 > CanLogBuffer_FrameCount2)
+    {
+        backlog = CanLogBuffer_FrameCount1 - CanLogBuffer_FrameCount2;
+    }
+
+    if (backlog > BLOCK_SIZE) {
+        CanLogBuffer_FrameDropCount = backlog - BLOCK_SIZE;
+    } else {
+        CanLogBuffer_FrameDropCount = 0;
+    }
+
+    /* After a partial flush the read pointer may sit mid-block. If the buffer
+     * is now empty, reset the ring to realign r/w pointers to block start. */
+    if ((0U == lwrb_get_full(&Rb1)) && ((Rb1.r_ptr % BLOCK_SIZE) != 0U))
+    {
+        lwrb_reset(&Rb1);
+    }
+
     return 0;
 }
