@@ -15,7 +15,7 @@
 
 #define CANLOG_VERSION      2U
 #define BLOCK_SIZE          (64U * 1024U)
-#define LOG_BUFFER_SIZE     (3U * BLOCK_SIZE)
+#define LOG_BUFFER_SIZE     (6U * BLOCK_SIZE)
 
 #define CLB_ENTRY_TYPE_NONE   0
 #define CLB_ENTRY_TYPE_FRAME  1
