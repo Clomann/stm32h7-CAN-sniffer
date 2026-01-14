@@ -316,6 +316,8 @@ static void Core0Task0Main( void * parameters )
     appCanLogHandlerInit(AppCtrlData.Log);
     Core0Task1_SetCanLogHandle(AppCtrlData.Log);
 
+    Instrumentation_Init();
+
     appConfigSetDefaults(&AppConfig);
 
     appCanCtrlDataSetter(
