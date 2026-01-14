@@ -117,9 +117,6 @@ static void consume_param_values(char *param, char *value)
         {
             SettingsHandler_ApplyRequestCallback();
         }
-        else if(strcmp(value, "save") ==0)
-        {
-        }
     }
 }
 
