@@ -41,6 +41,8 @@
 #define ETH_RX_DESC
 #define ETH_TX_DESC
 #define ETH_RX_POOL
+#define RAM_DTC_SECTION
+#define RAM_D1_SECTION
 #define RAM_D2_SECTION
 #define RAM_D3_SECTION
 #define COMM_FACTORY_SECTION

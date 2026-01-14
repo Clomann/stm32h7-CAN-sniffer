@@ -93,3 +93,8 @@ comm_status_t CanAbs_IsStateOff_Can2(bool *isOff)
     }
     return COMM_SUCCESS;
 }
+
+void CanAbs_Drain(void)
+{
+    /* no-op in stub */
+}

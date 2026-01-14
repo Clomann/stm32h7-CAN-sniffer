@@ -5,6 +5,7 @@
 #include "test_definitions.h"
 #include "CanLogManager.h"
 #include "CanLogBuffer.h"
+#include "RuntimeChecks.h"
 
 #include "fs_custom.h"
 #include "CanAbs.h"
@@ -14,7 +15,7 @@ static CanLogControlDataType *testCtrlData;
 static uint8_t mockMountRes;
 static bool mockRunCanTracer;
 static bool mockCommit;
-static FDCAN_ClassicFrame testFrame;
+static FDCAN_ClassicFrameType testFrame;
 
 void reset_fs_stubs(void);
 void reset_can_stubs(void);
@@ -44,10 +45,10 @@ void test_CanLogManager_setUp(void)
     mockRunCanTracer = false;
     mockCommit = false;
 
-    testFrame.id        = 0x123;
-    testFrame.dlc       = 8;
-    testFrame.channel   = 1;
-    testFrame.timestamp = 1000;
+    testFrame.id           = 0x123;
+    testFrame.dlc_dl_flags = 8;
+    testFrame.channel      = 1;
+    testFrame.timestamp    = 1000;
     memset(testFrame.data, 0xAA, sizeof(testFrame.data));
 
     CanLogBuffer_Init();
@@ -78,57 +79,31 @@ void test_CanLogHandler_Init(void)
 
     uint32_t capacity;
     FsCustom_GetCanLogCapacity(&capacity);
-    TEST_ASSERT_EQUAL(MAX_LOG_INDEX, capacity);
+    TEST_ASSERT_EQUAL(MAX_LOG_INDEX + 1U, capacity);
 }
 
 /**
  * @brief Tests adding a single CAN entry to the buffer
- * @details Verifies CanLogBuffer_AddClassicCanEntry successfully stores a CAN message
+ * @details Verifies CanLogBuffer_AddEntry successfully stores a CAN message
  */
 void test_CanLogBuffer_AddEntry(void)
 {
-    CanLogEntryAccessorType entry;
-    memset(&entry, 0, sizeof(entry));
-    entry.accessor.header.header_len = sizeof(entry.accessor.header);
-    entry.accessor.header.type       = CANLOG_CLASSIC_TYPE;
-    entry.accessor.dlc               = 8;
-    entry.accessor.header.total_len  = sizeof(CanLogEntryType) + entry.accessor.dlc;
-    entry.accessor.timestamp         = 12345;
-    entry.accessor.channel           = 1;
-    entry.accessor.can_id            = 0x123;
-    memset(entry.accessor.data, 0xBB, entry.accessor.dlc);
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+    const uint8_t payload_len           = 8;
 
-    uint8_t result = CanLogBuffer_AddClassicCanEntry(&entry.accessor);
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = payload_len;
+    entry->header.total_len  = sizeof(CanLogEntryType) + entry->data_len;
+    entry->timestamp         = 12345;
+    entry->channel           = 1;
+    entry->can_id            = 0x123;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(payload_len, 0);
+    memset(entry->data, 0xBB, payload_len);
+
+    uint8_t result = CanLogBuffer_AddEntry(entry, entry->header.total_len);
     TEST_ASSERT_EQUAL(0, result);
-}
-
-/**
- * @brief Tests buffer block ready detection
- * @details Fills buffer with enough entries to trigger block ready state
- */
-void test_CanLogBuffer_BlockReady(void)
-{
-    CanLogEntryAccessorType entry;
-    memset(&entry, 0, sizeof(entry));
-    entry.accessor.header.header_len = sizeof(entry.accessor.header);
-    entry.accessor.header.type       = CANLOG_CLASSIC_TYPE;
-    entry.accessor.dlc               = 8;
-    entry.accessor.header.total_len  = sizeof(CanLogEntryType) + entry.accessor.dlc;
-
-    int entriesNeeded = (BLOCK_SIZE / entry.accessor.header.total_len) + 1;
-    for (int i = 0; i < entriesNeeded; i++)
-    {
-        entry.accessor.timestamp = 1000 + i;
-        entry.accessor.can_id    = 0x200 + i;
-        entry.accessor.channel   = (i % 2) + 1;
-
-        uint8_t result = CanLogBuffer_AddClassicCanEntry(&entry.accessor);
-        TEST_ASSERT_EQUAL(0, result);
-    }
-
-    uint8_t blockReady;
-    CanLogBuffer_IsBlockReady(&blockReady);
-    TEST_ASSERT_NOT_EQUAL(0, blockReady);
 }
 
 /**
@@ -137,23 +112,26 @@ void test_CanLogBuffer_BlockReady(void)
  */
 void test_CanLogBuffer_ReadBlock(void)
 {
-    CanLogEntryAccessorType entry;
-    memset(&entry, 0, sizeof(entry));
-    entry.accessor.header.header_len = sizeof(entry.accessor.header);
-    entry.accessor.header.type       = CANLOG_CLASSIC_TYPE;
-    entry.accessor.dlc               = 8;
-    entry.accessor.header.total_len  = sizeof(CanLogEntryType) + entry.accessor.dlc;
-    entry.accessor.timestamp         = 5000;
-    entry.accessor.channel           = 2;
-    entry.accessor.can_id            = 0x456;
-    memset(entry.accessor.data, 0xCC, entry.accessor.dlc);
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+    const uint8_t payload_len           = 8;
 
-    int entriesNeeded = (BLOCK_SIZE / entry.accessor.header.total_len) + 1;
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = payload_len;
+    entry->header.total_len  = sizeof(CanLogEntryType) + entry->data_len;
+    entry->timestamp         = 5000;
+    entry->channel           = 2;
+    entry->can_id            = 0x456;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(payload_len, 0);
+    memset(entry->data, 0xCC, payload_len);
+
+    int entriesNeeded = (BLOCK_SIZE / entry->header.total_len) + 1;
     for (int i = 0; i < entriesNeeded; i++)
     {
-        entry.accessor.timestamp = 5000 + i;
-        entry.accessor.can_id    = 0x456 + i;
-        CanLogBuffer_AddClassicCanEntry(&entry.accessor);
+        entry->timestamp = 5000 + i;
+        entry->can_id    = 0x456 + i;
+        CanLogBuffer_AddEntry(entry, entry->header.total_len);
     }
 
     uint8_t *blockData;
@@ -169,6 +147,134 @@ void test_CanLogBuffer_ReadBlock(void)
     TEST_ASSERT_EQUAL(BLOCK_SIZE, header->block_size);
 
     CanLogBuffer_Consume(blockLength, frameCount);
+}
+
+/**
+ * @brief Ensures ReadNextBlock only succeeds when a full block is available
+ */
+void test_CanLogBuffer_BlockBoundaryPadding(void)
+{
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+    const uint8_t payload_len           = 12;
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = payload_len;
+    entry->header.total_len  = sizeof(CanLogEntryType) + entry->data_len;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(payload_len, 0);
+
+    /* Fill until a full block is ready */
+    uint8_t blockReady = 0;
+    uint32_t i         = 0;
+    while (blockReady == 0)
+    {
+        entry->timestamp = 7000 + i;
+        entry->can_id    = 0x600 + i;
+        entry->channel   = 1;
+        memset(entry->data, 0xA0 + (uint8_t)i, payload_len);
+
+        TEST_ASSERT_EQUAL_UINT8(
+            CANLOG_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+
+        CanLogBuffer_IsBlockReady(&blockReady);
+        i++;
+    }
+
+    uint8_t *blockData;
+    uint32_t blockLength;
+    uint32_t frameCount;
+    TEST_ASSERT_EQUAL_UINT8(
+        CANLOG_E_OK,
+        CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount)
+    );
+
+    CanLogBlockHeaderType *header = (CanLogBlockHeaderType *)blockData;
+    TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
+    TEST_ASSERT_NOT_EQUAL(0U, frameCount);
+    TEST_ASSERT_GREATER_OR_EQUAL(sizeof(CanLogBlockHeaderType), header->header_size);
+    TEST_ASSERT_LESS_OR_EQUAL_UINT(header->block_size, BLOCK_SIZE);
+
+    CanLogBuffer_Consume(blockLength, frameCount);
+
+    /* After consuming, no full block should be ready yet */
+    CanLogBuffer_IsBlockReady(&blockReady);
+    TEST_ASSERT_EQUAL(0, blockReady);
+
+    /* Fill again until another full block is ready */
+    while (blockReady == 0)
+    {
+        entry->timestamp = 9000 + i;
+        entry->can_id    = 0x700 + i;
+        entry->channel   = 2;
+        memset(entry->data, 0xB0 + (uint8_t)i, payload_len);
+
+        TEST_ASSERT_EQUAL_UINT8(
+            CANLOG_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+
+        CanLogBuffer_IsBlockReady(&blockReady);
+        i++;
+    }
+
+    TEST_ASSERT_EQUAL_UINT8(
+        CANLOG_E_OK,
+        CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount)
+    );
+    TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
+    TEST_ASSERT_NOT_EQUAL(0U, frameCount);
+    CanLogBuffer_Consume(blockLength, frameCount);
+}
+
+/**
+ * @brief Verifies consume updates frame counters coherently
+ */
+void test_CanLogBuffer_ConsumeUpdatesCounters(void)
+{
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+    const uint8_t payload_len           = 8;
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = payload_len;
+    entry->header.total_len  = sizeof(CanLogEntryType) + entry->data_len;
+    entry->dlc_flags         = MAKE_DLC_FLAGS(payload_len, 0);
+
+    const uint32_t entriesNeeded =
+        (BLOCK_SIZE / entry->header.total_len) + 1U;
+
+    for (uint32_t i = 0; i < entriesNeeded; i++)
+    {
+        entry->timestamp = 8000 + i;
+        entry->can_id    = 0x700 + i;
+        entry->channel   = 2;
+        memset(entry->data, 0xB0 + (uint8_t)i, payload_len);
+
+        TEST_ASSERT_EQUAL_UINT8(
+            CANLOG_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+    }
+
+    /* Verify write-side counter */
+    TEST_ASSERT_EQUAL_UINT64(entriesNeeded, CanLogBuffer_FrameCount1);
+
+    uint8_t *blockData;
+    uint32_t blockLength;
+    uint32_t frameCount;
+    TEST_ASSERT_EQUAL_UINT8(
+        CANLOG_E_OK,
+        CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount)
+    );
+
+    CanLogBuffer_Consume(blockLength, frameCount);
+
+    TEST_ASSERT_EQUAL_UINT64(frameCount, CanLogBuffer_FrameCount2);
+    TEST_ASSERT_EQUAL_UINT64(0U, CanLogBuffer_FrameDropCount);
 }
 
 /**
@@ -253,8 +359,9 @@ void RunAllTests(void)
 {
     RUN_TEST(test_CanLogHandler_Init);
     RUN_TEST(test_CanLogBuffer_AddEntry);
-    RUN_TEST(test_CanLogBuffer_BlockReady);
     RUN_TEST(test_CanLogBuffer_ReadBlock);
+    RUN_TEST(test_CanLogBuffer_BlockBoundaryPadding);
+    RUN_TEST(test_CanLogBuffer_ConsumeUpdatesCounters);
     RUN_TEST(test_appCanLogHandlerInit);
     RUN_TEST(test_Integration_FrameToBuffer);
     RUN_TEST(test_TracerStartStop);

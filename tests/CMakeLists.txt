@@ -133,8 +133,11 @@ add_library(app STATIC
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/fdcan_msg_port.c
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/ff.c
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/FileHandler.c
+    ${REPO_ROOT}/tests/app/CanLogManager/stubs/instrumentation.c
     ${REPO_ROOT}/app/CanLogBuffer.c
     ${REPO_ROOT}/app/CanLogManager.c
+    ${REPO_ROOT}/app/RuntimeChecks.c
+    ${REPO_ROOT}/libs/coreJSON/source/core_json.c
 )
 
 target_include_directories(app PUBLIC
@@ -142,6 +145,8 @@ target_include_directories(app PUBLIC
     ${REPO_ROOT}/tests/app/CanLogManager
     ${REPO_ROOT}/tests/app
     ${REPO_ROOT}/app
+    ${REPO_ROOT}/Common/Inc
+    ${REPO_ROOT}/CM7/Inc
     ${REPO_ROOT}/libs/ff15a/source
     ${REPO_ROOT}/drivers
     ${REPO_ROOT}/drivers/CanAbs
@@ -149,6 +154,7 @@ target_include_directories(app PUBLIC
     ${REPO_ROOT}/drivers/comm/CommHandle
     ${REPO_ROOT}/ports
     ${REPO_ROOT}/app/http/inc
+    ${REPO_ROOT}/libs/coreJSON/source/include
 )
 
 target_link_libraries(app PRIVATE unity lwrb)
