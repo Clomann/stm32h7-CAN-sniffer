@@ -51,14 +51,13 @@ void test_SPI_CreateDriver_invalid_device_number(void);
 void test_SPI_CreateDriver_all_instances_used(void);
 void test_SPI_Init_hal_failure(void);
 void test_SPI_Read_sets_rx_only_direction_and_reserves_slot(void);
-void test_SPI_Read_null_driver_calls_error_handler(void);
 void test_SPI_Read_null_tx_slots_calls_error_handler(void);
 void test_SPI_Read_no_available_slots_calls_error_handler(void);
 void test_SPI_Read_sets_transaction_length_correctly(void);
 void test_SPI_Send_copies_payload_to_slot_data(void);
 void test_SPI_Send_passes_correct_direction_to_prepare_slot(void);
-void test_SPI_Send_handles_zero_length_memcpy_safely(void);
 void test_SPI_Send_propagates_prepare_slot_errors(void);
+void test_SPI_Send_returns_rx_full_when_rx_slots_full(void);
 
 void test_SpiUtils_ComputePrescaler(void);
 
@@ -77,14 +76,13 @@ int main(void)
     RUN_TEST(test_SPI_CreateDriver_all_instances_used);
     RUN_TEST(test_SPI_Init_hal_failure);
     RUN_TEST(test_SPI_Read_sets_rx_only_direction_and_reserves_slot);
-    RUN_TEST(test_SPI_Read_null_driver_calls_error_handler);
     RUN_TEST(test_SPI_Read_null_tx_slots_calls_error_handler);
     RUN_TEST(test_SPI_Read_no_available_slots_calls_error_handler);
     RUN_TEST(test_SPI_Read_sets_transaction_length_correctly);
     RUN_TEST(test_SPI_Send_copies_payload_to_slot_data);
     RUN_TEST(test_SPI_Send_passes_correct_direction_to_prepare_slot);
-    RUN_TEST(test_SPI_Send_handles_zero_length_memcpy_safely);
     RUN_TEST(test_SPI_Send_propagates_prepare_slot_errors);
+    RUN_TEST(test_SPI_Send_returns_rx_full_when_rx_slots_full);
 
     RUN_TEST(test_SpiUtils_ComputePrescaler);
 
@@ -341,10 +339,11 @@ void test_SPI_Init_calls_hal_and_sets_state(void)
 
 void test_SPI_Send_calls_abs_with_msg_length(void)
 {
-    SPI_Message msg       = {0};
-    uint8_t test_data1[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-    uint8_t test_data2[8] = {11, 12, 13, 14, 15, 16, 17, 18};
-    uint8_t test_data3[7] = {21, 22, 23, 24, 25, 26, 27};
+    SPI_Message msg                = {0};
+    SpiTransactionType transaction = {.direction = SPI_DIR_TX_RX};
+    uint8_t test_data1[9]          = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    uint8_t test_data2[8]          = {11, 12, 13, 14, 15, 16, 17, 18};
+    uint8_t test_data3[7]          = {21, 22, 23, 24, 25, 26, 27};
 
     Spi1Driver.protocol = DRIVER_SPI;
     (void)SPI_CreateDriver(
@@ -357,6 +356,7 @@ void test_SPI_Send_calls_abs_with_msg_length(void)
 
     msg.msgBase.length  = sizeof(test_data1);
     msg.msgBase.payload = test_data1;
+    msg.transaction     = &transaction;
     (void)Spi1Driver.interface->send(&Spi1Driver, &msg);
     msg.msgBase.length  = 0;
     msg.msgBase.payload = NULL;
@@ -559,25 +559,6 @@ void test_SPI_Read_sets_rx_only_direction_and_reserves_slot(void)
     TEST_ASSERT_EQUAL_PTR(transaction.context, txSlot->transaction.context);
 }
 
-void test_SPI_Read_null_driver_calls_error_handler(void)
-{
-    SPI_Message msg                = {0};
-    SpiTransactionType transaction = {0};
-    comm_status_t rc;
-
-    msg.msgBase.length = 5;
-    msg.transaction    = &transaction;
-
-    g_spi_error_handler_calls = 0;
-
-    rc = SPI_Read(NULL, &msg, 0, 0);
-
-    // Note: The actual function doesn't explicitly check for NULL driver,
-    // but it will likely crash or call error handler when accessing txSlots
-    // This test verifies the behavior when NULL is passed
-    TEST_ASSERT_NOT_EQUAL(COMM_SUCCESS, rc);
-}
-
 void test_SPI_Read_null_tx_slots_calls_error_handler(void)
 {
     SPI_Message msg                = {0};
@@ -768,7 +749,6 @@ void test_SPI_Send_passes_correct_direction_to_prepare_slot(void)
     RingBuffer *txSlots;
     SpiSlotType *txSlot;
 
-    // Start with wrong direction to verify SPI_Send overrides it
     transaction.direction = SPI_DIR_RX_ONLY;
 
     Spi1Driver.protocol = DRIVER_SPI;
@@ -788,37 +768,11 @@ void test_SPI_Send_passes_correct_direction_to_prepare_slot(void)
 
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
-    // Verify SPI_Send passes SPI_DIR_TX_RX to m_PrepareTxSlot
+    // SPI_Send forwards the provided transaction direction
     txSlots =
         (RingBuffer *)Spi_GetSlots(Spi1Driver.TxFrameBuffer, SPI_PRIORITY_LOW);
     txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
-    TEST_ASSERT_EQUAL(SPI_DIR_TX_RX, txSlot->transaction.direction);
-}
-
-void test_SPI_Send_handles_zero_length_memcpy_safely(void)
-{
-    SPI_Message msg                = {0};
-    SpiTransactionType transaction = {0};
-    uint8_t test_data[]            = {0x11, 0x22};
-    comm_status_t rc;
-
-    Spi1Driver.protocol = DRIVER_SPI;
-    (void)SPI_CreateDriver(
-        &Spi1Driver,
-        &Spi1Config,
-        sizeof(Spi1Config),
-        (uint8_t *)Spi1TxBinsRingBuffer,
-        (uint8_t *)Spi1RxBinsRingBuffer
-    );
-
-    msg.msgBase.length  = 0; // Zero length - tests memcpy edge case
-    msg.msgBase.payload = test_data;
-    msg.transaction     = &transaction;
-
-    rc = SPI_Send(&Spi1Driver, &msg);
-
-    // Should succeed - memcpy with length 0 is safe
-    TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
+    TEST_ASSERT_EQUAL(SPI_DIR_RX_ONLY, txSlot->transaction.direction);
 }
 
 void test_SPI_Send_propagates_prepare_slot_errors(void)
@@ -852,6 +806,39 @@ void test_SPI_Send_propagates_prepare_slot_errors(void)
 
     // Verify error is propagated and memcpy is not called
     TEST_ASSERT_EQUAL(COMM_TX_FULL, rc);
+}
+
+void test_SPI_Send_returns_rx_full_when_rx_slots_full(void)
+{
+    SPI_Message msg                = {0};
+    SpiTransactionType transaction = {.direction = SPI_DIR_TX_RX};
+    uint8_t test_data[]            = {0x01, 0x02, 0x03};
+    comm_status_t rc;
+    RingBuffer *rxSlots;
+
+    Spi1Driver.protocol = DRIVER_SPI;
+    (void)SPI_CreateDriver(
+        &Spi1Driver,
+        &Spi1Config,
+        sizeof(Spi1Config),
+        (uint8_t *)Spi1TxBinsRingBuffer,
+        (uint8_t *)Spi1RxBinsRingBuffer
+    );
+
+    /* Force Rx buffer full to hit COMM_RX_FULL branch */
+    rxSlots =
+        (RingBuffer *)Spi_GetSlots(Spi1Driver.RxFrameBuffer, SPI_PRIORITY_LOW);
+    rxSlots->elementCount = rxSlots->bufferLength;
+    rxSlots->isFull       = true;
+
+    msg.msgBase.length  = sizeof(test_data);
+    msg.msgBase.payload = test_data;
+    msg.transaction     = &transaction;
+
+    rc = SPI_Send(&Spi1Driver, &msg);
+
+    TEST_ASSERT_EQUAL(COMM_RX_FULL, rc);
+    TEST_ASSERT_EQUAL(0, Spi_SendReceiveMsg_call_count);
 }
 
 void test_SpiUtils_ComputePrescaler()

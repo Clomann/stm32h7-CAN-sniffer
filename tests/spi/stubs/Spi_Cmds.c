@@ -9,6 +9,8 @@ enum {
   TRANSFER_ERROR
 };
 
+uint8_t aRxSpiDummy[1024U];
+uint8_t aRxSpiSink[1024U];
 
 volatile int Spi_Init_return_value = 0;
 volatile int Spi_Init_call_count = 0;

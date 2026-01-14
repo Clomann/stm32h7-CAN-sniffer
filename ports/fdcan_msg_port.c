@@ -12,9 +12,12 @@
 #include <stdint.h>
 #include <string.h>
 
-
-#define CAN_FRAME_BUFFER_SIZE (600U * (sizeof(PageType) + sizeof(configMESSAGE_BUFFER_LENGTH_TYPE)) + 1U)
-#define CAN_FRAME_PAGE_MAX_ENTRIES   (10U)
+#define CAN_FRAME_BUFFER_ELEMENTS_COUNT 600U
+#define CAN_FRAME_BUFFER_ENTRY_SIZE \
+    (sizeof(PageType) + sizeof(configMESSAGE_BUFFER_LENGTH_TYPE))
+#define CAN_FRAME_BUFFER_SIZE \
+    (CAN_FRAME_BUFFER_ELEMENTS_COUNT * CAN_FRAME_BUFFER_ENTRY_SIZE + 1U)
+#define CAN_FRAME_PAGE_MAX_ENTRIES (10U)
 
 typedef struct {
     FDCAN_ClassicFrameType frame;
@@ -51,19 +54,17 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame)
 {
     BaseType_t xHigher = pdFALSE;
     size_t bytes_sent = 0;
-    uint32_t FrameCount = 0;
-
-    FrameCount = Page.count;
 
     if (Page.count >= CAN_FRAME_PAGE_MAX_ENTRIES)
     {
         bytes_sent = xMessageBufferSendFromISR(CanFrameBuffer, (uint8_t *)&Page, sizeof(Page), &xHigher);
-        
-        Page.count = 0;
-
-        if (bytes_sent == 0)
+        if (bytes_sent > 0)
         {
-            FcdanMsgPort_FrameDropCount += FrameCount;
+            Page.count = 0;
+        }
+        else
+        {
+            FcdanMsgPort_FrameDropCount += 1U;
             CanAbs_ErrorHandler();
             /* page still full; drop this frame */
             portYIELD_FROM_ISR(xHigher);
@@ -111,7 +112,7 @@ size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds)
     if (Index == 0)
     {
         BytesReceived = xMessageBufferReceive(CanFrameBuffer, &Page, sizeof(Page), pdMS_TO_TICKS(milliSeconds));
-        
+
         if (BytesReceived > 0)
         {
             Index = Page.count;

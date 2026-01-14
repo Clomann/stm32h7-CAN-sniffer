@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "ErrorContext.h"
 
-#define INSTR_ENABLED        0
+#define INSTR_ENABLED        1
 #define INSTR_PERSIST_ACTIVE 1
 
 #define INSTR_E_OK     0U
