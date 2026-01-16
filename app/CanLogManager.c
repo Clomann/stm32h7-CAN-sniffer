@@ -196,6 +196,12 @@ uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes)
     return 0U;
 }
 
+uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count)
+{
+    *count = CanLogManager_FrameCount;
+    return 0U;
+}
+
 static bool appCanLogIsValidBaudrate(uint32_t value)
 {
     return (value == 250000U) || (value == 500000U) || (value == 1000000U);

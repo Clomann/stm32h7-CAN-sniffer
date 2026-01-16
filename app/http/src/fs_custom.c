@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
 
 #include "fs_custom.h"
 #include "FileHandler.h"
@@ -35,7 +36,7 @@ static const char redirect_reply[] =
 
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
-#define CANLOG_MAX_STATUS_SIZE    128U
+#define CANLOG_MAX_STATUS_SIZE    192U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
 #define CANLOG_STATUS_PATH        "/logger/status"
@@ -45,7 +46,7 @@ static const char redirect_reply[] =
     "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\",\"file_size\":\"%lu\"}"
 
 #define CANLOG_STATUS_STRING \
-    "{ \"active\":%s,\"frames_lost\":%s,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
+    "{ \"active\":%s,\"frames_lost\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
 
 typedef struct {
     uint8_t stage;
@@ -156,6 +157,9 @@ int fs_open_custom(struct fs_file *file, const char *name)
         _Bool AnyFrameLost = false;
         uint32_t Rb1BytesHighWater = 0U;
         float Rb1BytesHighWaterPct = 0.0f;
+        uint64_t FrameCount = 0U;
+        unsigned long FrameCountHi = 0UL;
+        unsigned long FrameCountLo = 0UL;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
@@ -169,6 +173,12 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             Rb1BytesHighWater = 0U;
         }
+        if (0U != FsCustom_GetCanLogFrameCount(&FrameCount))
+        {
+            FrameCount = 0U;
+        }
+        FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
+        FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
 
         if (LOG_BUFFER_SIZE > 0U)
         {
@@ -180,6 +190,8 @@ int fs_open_custom(struct fs_file *file, const char *name)
             CANLOG_STATUS_STRING,
             IsTracerRunning ? "true" : "false",
             AnyFrameLost ? "true" : "false",
+            FrameCountHi,
+            FrameCountLo,
             BusLoadCan1,
             BusLoadCan2,
             Rb1BytesHighWaterPct

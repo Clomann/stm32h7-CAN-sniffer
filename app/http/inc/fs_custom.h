@@ -8,6 +8,7 @@ uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity);
 uint8_t FsCustom_GetBusloadCan1(float *busload);
 uint8_t FsCustom_GetBusloadCan2(float *busload);
 uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes);
+uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count);
 
 uint8_t FsCustom_IsTracerRunning(uint8_t *running);
 _Bool FsCustom_IsAnyFrameLostFlag(void);
