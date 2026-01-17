@@ -25,6 +25,11 @@
 #include "FileHandler.h"
 #endif
 
+#if !defined(UNIT_TEST)
+#include "FreeRTOS.h"
+#include "semphr.h"
+#endif
+
 #define CLM_ABS_TIME_TO_TIMSTAMP(x)   (uint32_t)(x)
 #define CLM_ABS_TIME_TO_ABS_HIGH(x)   ((uint32_t)((x) >> 32U))
 #define CLM_SYNC_EMIT_INTERVAL_US     (30ULL * 60ULL * 1000000ULL)
@@ -113,6 +118,67 @@ static uint32_t Rb1BytesHighWater = 0U;
 static uint32_t CanLogFileSize = MAX_LOG_FILE_SIZE;
 static uint32_t CanLogFileCount = MAX_LOG_FILE_COUNT;
 static uint32_t CanLogClusterSize = CLUSTER_SIZE;
+static volatile uint32_t CanLogPreallocErrorCount = 0U;
+
+#if !defined(UNIT_TEST)
+static StaticSemaphore_t CanLogFileMutexBuffer;
+static SemaphoreHandle_t CanLogFileMutex = NULL;
+#endif
+
+static void CanLogManager_FileLockInit(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex == NULL)
+    {
+        CanLogFileMutex = xSemaphoreCreateMutexStatic(&CanLogFileMutexBuffer);
+        configASSERT(CanLogFileMutex != NULL);
+    }
+#endif
+}
+
+static void CanLogManager_FileLock(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex == NULL)
+    {
+        CanLogManager_FileLockInit();
+    }
+
+    if (CanLogFileMutex != NULL)
+    {
+        (void)xSemaphoreTake(CanLogFileMutex, portMAX_DELAY);
+    }
+#endif
+}
+
+static bool CanLogManager_FileTryLock(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex == NULL)
+    {
+        CanLogManager_FileLockInit();
+    }
+
+    if (CanLogFileMutex == NULL)
+    {
+        return false;
+    }
+
+    return (xSemaphoreTake(CanLogFileMutex, 0) == pdTRUE);
+#else
+    return true;
+#endif
+}
+
+static void CanLogManager_FileUnlock(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex != NULL)
+    {
+        (void)xSemaphoreGive(CanLogFileMutex);
+    }
+#endif
+}
 
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
@@ -407,6 +473,11 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 
     (void)data;
 
+    if (!CanLogManager_FileTryLock())
+    {
+        return 0U;
+    }
+
     FileSizeRes = FatFS_SD_GetBufferedFileSize(
         &(CanLogCtrlData.CanLog.writeFileDevice),
         &FileSize
@@ -468,6 +539,8 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
         }
     }
 
+    CanLogManager_FileUnlock();
+
     return 0U;
 }
 
@@ -496,6 +569,7 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
 
     CanLogPreallocErrorCount = 0U;
     RuntimeChecks_Init();
+    CanLogManager_FileLockInit();
 
     return &CanLogCtrlData;
 }
@@ -1117,7 +1191,9 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     {
         CanLogManager_UpdateRb1BytesHighWater();
         CanLogManager_InstrumentationFlushStartHook();
+        CanLogManager_FileLock();
         res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
+        CanLogManager_FileUnlock();
         CanLogManager_InstrumentationFlushEndHook();
 
         CanLogBuffer_Consume(DataLength, FrameCount);
