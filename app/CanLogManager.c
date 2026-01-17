@@ -256,6 +256,12 @@ uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count)
     return 0U;
 }
 
+uint8_t FsCustom_GetPreallocErrorFlag(uint8_t *flag)
+{
+    *flag = (CanLogPreallocErrorCount > 0U) ? 1U : 0U;
+    return 0U;
+}
+
 static bool appCanLogIsValidBaudrate(uint32_t value)
 {
     return (value == 250000U) || (value == 500000U) || (value == 1000000U);
@@ -488,6 +494,7 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
     CanLogCtrlData.Can2.accumulatedBits = 0;
     CanLogCtrlData.Can2.accumulatedTime = 0;
 
+    CanLogPreallocErrorCount = 0U;
     RuntimeChecks_Init();
 
     return &CanLogCtrlData;
@@ -580,6 +587,7 @@ static FRESULT m_preallocate_log_files(void)
     uint32_t max_index;
 
     UnseekableFiles = 0;
+    CanLogPreallocErrorCount = 0U;
 
     log_file_size = appCanLogGetLogFileSize();
     log_file_count = appCanLogGetLogFileCount();
@@ -596,6 +604,8 @@ static FRESULT m_preallocate_log_files(void)
     {
         for (uint32_t i = 0; i < log_file_count; i++)
         {
+            bool prealloc_ok = true;
+
             snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
             
             // Check if file already exists and is properly sized
@@ -614,12 +624,13 @@ static FRESULT m_preallocate_log_files(void)
             }
             
             if (res != FR_OK) {
+                CanLogPreallocErrorCount++;
                 continue;
             }
             
             if (res == FR_OK) {
                 res = f_expand(&logfile, log_file_size, 0);
-    
+
                 if (res == FR_OK) 
                 {
                     res = f_lseek(&logfile, log_file_size - 1U);
@@ -645,10 +656,15 @@ static FRESULT m_preallocate_log_files(void)
                         res = f_lseek(&logfile, log_file_size - 5U*512U);
                     }
                 }
-    
+
                 if (res == FR_OK) 
                 {
+                    bytes_written = 0U;
                     res = f_write(&logfile, &dummy_byte, 1U, &bytes_written);
+                    if (res == FR_OK && bytes_written != 1U)
+                    {
+                        prealloc_ok = false;
+                    }
                 }
                 
                 if (res == FR_OK && bytes_written == 1) 
@@ -657,7 +673,17 @@ static FRESULT m_preallocate_log_files(void)
                 }
             }
             
-            f_close(&logfile);
+            if (res != FR_OK) {
+                prealloc_ok = false;
+            }
+
+            if (f_close(&logfile) != FR_OK) {
+                prealloc_ok = false;
+            }
+
+            if (!prealloc_ok) {
+                CanLogPreallocErrorCount++;
+            }
         }
     }
 

@@ -48,7 +48,7 @@ static const char redirect_reply[] =
     "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\",\"file_size\":\"%lu\"}"
 
 #define CANLOG_STATUS_STRING \
-    "{ \"active\":%s,\"frames_lost\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
+    "{ \"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
 
 #define CANLOG_CONFIG_STRING \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
@@ -184,6 +184,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
         float BusLoadCan1 = 0.0;
         float BusLoadCan2 = 0.0;
         _Bool AnyFrameLost = false;
+        uint8_t PreallocErrors = 0U;
         uint32_t Rb1BytesHighWater = 0U;
         float Rb1BytesHighWaterPct = 0.0f;
         uint64_t FrameCount = 0U;
@@ -196,6 +197,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
         }
 
         AnyFrameLost = FsCustom_IsAnyFrameLostFlag();
+        (void)FsCustom_GetPreallocErrorFlag(&PreallocErrors);
         FsCustom_GetBusloadCan1(&BusLoadCan1);
         FsCustom_GetBusloadCan2(&BusLoadCan2);
         if (0U != FsCustom_GetRb1BytesHighWater(&Rb1BytesHighWater))
@@ -219,6 +221,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
             CANLOG_STATUS_STRING,
             IsTracerRunning ? "true" : "false",
             AnyFrameLost ? "true" : "false",
+            PreallocErrors ? "true" : "false",
             FrameCountHi,
             FrameCountLo,
             BusLoadCan1,
