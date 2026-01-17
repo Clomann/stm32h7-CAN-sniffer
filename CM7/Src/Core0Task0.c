@@ -125,15 +125,191 @@ void vApplicationStackOverflowHook( TaskHandle_t t, char *name )
     __BKPT(1);                     /* hit here => stack overflow      */
 }
 
+static bool appParseLogConfigJson(
+    char *buffer,
+    uint32_t buffer_len,
+    uint32_t *cluster_size,
+    uint32_t *log_file_size,
+    uint32_t *log_file_count
+)
+{
+    JSONStatus_t result;
+    char *value = NULL;
+    size_t valueLength = 0U;
+    char tmp[32];
+    uint32_t parsed = 0U;
+
+    result = JSON_Validate(buffer, buffer_len);
+    if (JSONSuccess != result)
+    {
+        return false;
+    }
+
+    result = FileHandler_GetValue(
+        buffer,
+        buffer_len,
+        "cluster_size",
+        sizeof("cluster_size") - 1U,
+        &value,
+        &valueLength
+    );
+    if (JSONSuccess == result && valueLength < sizeof(tmp))
+    {
+        memcpy(tmp, value, valueLength);
+        tmp[valueLength] = '\0';
+        if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U) && parsed > 0U)
+        {
+            *cluster_size = parsed;
+        }
+    }
+
+    result = FileHandler_GetValue(
+        buffer,
+        buffer_len,
+        "log_file_size",
+        sizeof("log_file_size") - 1U,
+        &value,
+        &valueLength
+    );
+    if (JSONSuccess == result && valueLength < sizeof(tmp))
+    {
+        memcpy(tmp, value, valueLength);
+        tmp[valueLength] = '\0';
+        if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U) && parsed > 0U)
+        {
+            *log_file_size = parsed;
+        }
+    }
+
+    result = FileHandler_GetValue(
+        buffer,
+        buffer_len,
+        "log_file_count",
+        sizeof("log_file_count") - 1U,
+        &value,
+        &valueLength
+    );
+    if (JSONSuccess == result && valueLength < sizeof(tmp))
+    {
+        memcpy(tmp, value, valueLength);
+        tmp[valueLength] = '\0';
+        if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U) && parsed > 0U)
+        {
+            *log_file_count = parsed;
+        }
+    }
+
+    return true;
+}
+
+static bool appLoadLogConfigFile(
+    const char *filename,
+    uint32_t *cluster_size,
+    uint32_t *log_file_size,
+    uint32_t *log_file_count
+)
+{
+    FRESULT res;
+    FatFsDeviceType DevTmp;
+    uint32_t fileSize = 0U;
+    char buffer[128];
+    uint32_t readSize = 0U;
+    bool parsed = false;
+
+    res = FatFS_SD_OpenFileForRead(&DevTmp, filename);
+
+    if (FR_OK == res)
+    {
+        do
+        {
+            res = FatFS_SD_GetFileSize(&DevTmp, &fileSize);
+            if (FR_OK != res || fileSize == 0U)
+            {
+                break;
+            }
+
+            readSize = (fileSize < (sizeof(buffer) - 1U)) ? fileSize : (sizeof(buffer) - 1U);
+            res = FatFS_SD_ReadFile(&DevTmp, buffer, readSize);
+            if (FR_OK != res)
+            {
+                break;
+            }
+
+            buffer[readSize] = '\0';
+            parsed = appParseLogConfigJson(
+                buffer,
+                readSize,
+                cluster_size,
+                log_file_size,
+                log_file_count
+            );
+        } while (0);
+
+        (void)FatFS_SD_CloseFile(&DevTmp);
+    }
+
+    return parsed;
+}
+
+static FRESULT appStoreLogConfigFile(
+    const char *filename,
+    uint32_t cluster_size,
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
+{
+    FRESULT res;
+    FatFsDeviceType File;
+    char content[128];
+    int length;
+
+    res = FatFS_SD_OpenFileForOverWrite(&File, filename);
+
+    if (res != FR_OK)
+    {
+        return res;
+    }
+
+    length = snprintf(
+        content,
+        sizeof(content),
+        "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}",
+        (unsigned long)cluster_size,
+        (unsigned long)log_file_size,
+        (unsigned long)log_file_count
+    );
+
+    if (length < 0 || (size_t)length >= sizeof(content))
+    {
+        (void)FatFS_SD_CloseFile(&File);
+        return FR_INVALID_PARAMETER;
+    }
+
+    res = FatFS_SD_WriteFile(&File, content, (uint32_t)length);
+
+    (void)FatFS_SD_CloseFile(&File);
+
+    return res;
+}
+
 static void appHandleFormattingRequest(void)
 {
     FRESULT res;
     _Bool ReformattingRequested;
     FatFsDeviceType DevTmp;
     const char FormatRequestFileName[] = FILEHANDLER_FORMATTING_REQUEST_FILENAME;
+    const char LogConfigFileName[] = "log_config.json";
     uint32_t cluster_size = CLUSTER_SIZE;
     uint32_t log_file_size = MAX_LOG_FILE_SIZE;
     uint32_t log_file_count = MAX_LOG_FILE_COUNT;
+    bool log_config_loaded = false;
+
+    log_config_loaded = appLoadLogConfigFile(
+        LogConfigFileName,
+        &cluster_size,
+        &log_file_size,
+        &log_file_count
+    );
 
     res = FatFS_SD_OpenFileForRead(&DevTmp, FormatRequestFileName);
 
@@ -146,11 +322,6 @@ static void appHandleFormattingRequest(void)
             uint32_t fileSize = 0U;
             char buffer[128];
             uint32_t readSize = 0U;
-            JSONStatus_t result;
-            char *value = NULL;
-            size_t valueLength = 0U;
-            char tmp[32];
-            uint32_t parsed = 0U;
 
             res = FatFS_SD_GetFileSize(&DevTmp, &fileSize);
             if (FR_OK != res || fileSize == 0U)
@@ -166,66 +337,13 @@ static void appHandleFormattingRequest(void)
             }
 
             buffer[readSize] = '\0';
-
-            result = JSON_Validate(buffer, readSize);
-            if (JSONSuccess != result)
-            {
-                break;
-            }
-
-            result = FileHandler_GetValue(
+            (void)appParseLogConfigJson(
                 buffer,
                 readSize,
-                "cluster_size",
-                sizeof("cluster_size") - 1U,
-                &value,
-                &valueLength
+                &cluster_size,
+                &log_file_size,
+                &log_file_count
             );
-            if (JSONSuccess == result && valueLength < sizeof(tmp))
-            {
-                memcpy(tmp, value, valueLength);
-                tmp[valueLength] = '\0';
-                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
-                {
-                    cluster_size = parsed;
-                }
-            }
-
-            result = FileHandler_GetValue(
-                buffer,
-                readSize,
-                "log_file_size",
-                sizeof("log_file_size") - 1U,
-                &value,
-                &valueLength
-            );
-            if (JSONSuccess == result && valueLength < sizeof(tmp))
-            {
-                memcpy(tmp, value, valueLength);
-                tmp[valueLength] = '\0';
-                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
-                {
-                    log_file_size = parsed;
-                }
-            }
-
-            result = FileHandler_GetValue(
-                buffer,
-                readSize,
-                "log_file_count",
-                sizeof("log_file_count") - 1U,
-                &value,
-                &valueLength
-            );
-            if (JSONSuccess == result && valueLength < sizeof(tmp))
-            {
-                memcpy(tmp, value, valueLength);
-                tmp[valueLength] = '\0';
-                if (0U == FileHandler_ConvertToInteger(tmp, &parsed, 10U))
-                {
-                    log_file_count = parsed;
-                }
-            }
         } while (0);
 
         (void)FatFS_SD_CloseFile(&DevTmp);
@@ -234,6 +352,9 @@ static void appHandleFormattingRequest(void)
     {
         ReformattingRequested = false;
     }
+
+    appCanLogSetFileConfig(log_file_size, log_file_count);
+    appCanLogSetClusterSize(cluster_size);
     
     if (ReformattingRequested)
     {
@@ -250,10 +371,26 @@ static void appHandleFormattingRequest(void)
         {
             AppCtrlData.mountRes = FatFS_SD_Mount();
         }
-    }
 
-    (void)log_file_size;
-    (void)log_file_count;
+        if (FR_OK == res)
+        {
+            (void)appStoreLogConfigFile(
+                LogConfigFileName,
+                cluster_size,
+                log_file_size,
+                log_file_count
+            );
+        }
+    }
+    else if (!log_config_loaded)
+    {
+        (void)appStoreLogConfigFile(
+            LogConfigFileName,
+            cluster_size,
+            log_file_size,
+            log_file_count
+        );
+    }
 }
 
 static void appCanCtrlDataSetter(

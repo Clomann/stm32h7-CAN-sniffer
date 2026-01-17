@@ -609,7 +609,7 @@
                     <tbody>
                         <tr>
                             <td>Cluster size</td>
-                            <td>32 KiB</td>
+                            <td><span id="cluster-current">32 KiB</span></td>
                             <td>
                                 <div class="input-with-unit">
                                     <input type="number" name="cluster_kb" id="cluster-kb" min="4" step="4" value="32">
@@ -620,7 +620,7 @@
                         </tr>
                         <tr>
                             <td>Log file size</td>
-                            <td>10 MiB</td>
+                            <td><span id="file-size-current">10 MiB</span></td>
                             <td>
                                 <div class="input-with-unit">
                                     <input type="number" name="file_size_mb" id="file-size-mb" min="1" step="1" value="10">
@@ -631,7 +631,7 @@
                         </tr>
                         <tr>
                             <td>Log file count</td>
-                            <td>640 files</td>
+                            <td><span id="file-count-current">640 files</span></td>
                             <td>
                                 <input type="number" name="file_count" id="file-count" min="1" step="1" value="640">
                                 <div class="param-hint">Number of log files kept in the ring buffer.</div>
@@ -655,6 +655,7 @@
         /* ---------- configuration ---------- */
         const STATUS_URL   = "/logger/status";
         const META_URL     = "/logs/meta";
+        const CONFIG_URL   = "/logs/config";
         const POLL_MS      = 1000;
         const DEFAULT_LOG_FILE_SIZE = 10 * 1024 * 1024;
         const btnApply     = document.getElementById("apply-button");
@@ -668,6 +669,13 @@
         const chipBus2     = document.getElementById("status-bus2");
         const logSpaceValue = document.getElementById("log-space-value");
         const logSpaceFill  = document.getElementById("log-space-fill");
+        const clusterCurrent = document.getElementById("cluster-current");
+        const fileSizeCurrent = document.getElementById("file-size-current");
+        const fileCountCurrent = document.getElementById("file-count-current");
+        const clusterInput = document.getElementById("cluster-kb");
+        const fileSizeInput = document.getElementById("file-size-mb");
+        const fileCountInput = document.getElementById("file-count");
+        let hasFrames = null;
         /* ----------------------------------- */
 
         function setChip(el, text, className) {
@@ -705,16 +713,20 @@
             return Number.isFinite(numberValue) ? numberValue : null;
         }
 
-        function calcUsedFiles(head, tail, capacity) {
+        function calcUsedFiles(head, tail, capacity, hasFramesFlag) {
             if (!Number.isFinite(head) || !Number.isFinite(tail) || !Number.isFinite(capacity) || capacity <= 0) {
                 return null;
             }
 
+            if (head === tail && hasFramesFlag === false) {
+                return 0;
+            }
+
             let used;
             if (head >= tail) {
-                used = head - tail;
+                used = head - tail + 1;
             } else {
-                used = capacity + (head - tail);
+                used = capacity + (head - tail) + 1;
             }
 
             if (used < 0) {
@@ -741,6 +753,22 @@
             return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
         }
 
+        function formatKiB(bytes) {
+            if (!Number.isFinite(bytes)) {
+                return null;
+            }
+
+            return `${Math.round(bytes / 1024)} KiB`;
+        }
+
+        function formatMiB(bytes) {
+            if (!Number.isFinite(bytes)) {
+                return null;
+            }
+
+            return `${Math.round(bytes / (1024 * 1024))} MiB`;
+        }
+
         function updateLogSpaceBar(percentUsed) {
             const clamped = Math.max(0, Math.min(100, percentUsed));
             logSpaceFill.style.width = `${clamped}%`;
@@ -758,7 +786,7 @@
                 const capacity = parseMetaNumber(meta.capacity);
                 const fileSize = parseMetaNumber(meta.file_size) ?? DEFAULT_LOG_FILE_SIZE;
 
-                const usedFiles = calcUsedFiles(head, tail, capacity);
+                const usedFiles = calcUsedFiles(head, tail, capacity, hasFrames);
                 if (usedFiles === null) throw new Error("Invalid meta");
 
                 const usedBytes = usedFiles * fileSize;
@@ -779,6 +807,43 @@
                 logSpaceValue.textContent = "Not reported";
                 logSpaceFill.style.width = "0%";
                 logSpaceFill.setAttribute("aria-valuenow", "0");
+            }
+        }
+
+        async function loadLogConfig() {
+            try {
+                const resp = await fetch(CONFIG_URL, {cache: "no-store"});
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const cfg = await resp.json();
+
+                const clusterSize = parseMetaNumber(cfg.cluster_size);
+                const fileSize = parseMetaNumber(cfg.log_file_size);
+                const fileCount = parseMetaNumber(cfg.log_file_count);
+
+                if (clusterSize && clusterCurrent && clusterInput) {
+                    const formatted = formatKiB(clusterSize);
+                    const kbValue = Math.round(clusterSize / 1024);
+                    if (formatted) {
+                        clusterCurrent.textContent = formatted;
+                    }
+                    clusterInput.value = `${kbValue}`;
+                }
+
+                if (fileSize && fileSizeCurrent && fileSizeInput) {
+                    const formatted = formatMiB(fileSize);
+                    const mbValue = Math.round(fileSize / (1024 * 1024));
+                    if (formatted) {
+                        fileSizeCurrent.textContent = formatted;
+                    }
+                    fileSizeInput.value = `${mbValue}`;
+                }
+
+                if (fileCount && fileCountCurrent && fileCountInput) {
+                    fileCountCurrent.textContent = `${fileCount} files`;
+                    fileCountInput.value = `${Math.round(fileCount)}`;
+                }
+            } catch (e) {
+                console.error("Config load failed:", e);
             }
         }
     
@@ -815,6 +880,12 @@
                 updateFrameLoss(status.frames_lost);
                 updateBusLoad(chipBus1, status.bus_load_1, "CAN1");
                 updateBusLoad(chipBus2, status.bus_load_2, "CAN2");
+
+                const framesHi = parseMetaNumber(status.frames_total_hi);
+                const framesLo = parseMetaNumber(status.frames_total_lo);
+                if (framesHi !== null && framesLo !== null) {
+                    hasFrames = (framesHi > 0) || (framesLo > 0);
+                }
             } catch (e) {
                 console.error("Status poll failed:", e);
                 btnApply.disabled = true;
@@ -833,6 +904,7 @@
         }
         pollSnifferState();
         pollLogSpace();
+        loadLogConfig();
         setInterval(pollSnifferState, POLL_MS);
         setInterval(pollLogSpace, POLL_MS);
         /* --------------------------------------- */

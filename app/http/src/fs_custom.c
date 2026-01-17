@@ -37,8 +37,10 @@ static const char redirect_reply[] =
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
 #define CANLOG_MAX_STATUS_SIZE    192U
+#define CANLOG_MAX_CONFIG_SIZE    96U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
+#define CANLOG_CONFIG_PATH        "/logs/config"
 #define CANLOG_STATUS_PATH        "/logger/status"
 #define CANLOG_POST_REDIRECT_PATH "/postredir"
 
@@ -47,6 +49,9 @@ static const char redirect_reply[] =
 
 #define CANLOG_STATUS_STRING \
     "{ \"active\":%s,\"frames_lost\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
+
+#define CANLOG_CONFIG_STRING \
+    "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
 
 typedef struct {
     uint8_t stage;
@@ -63,6 +68,7 @@ static FatFsDeviceType CanLogReadFileDevice;
  * Assumes single-threaded or serialized HTTP request processing. */
 static char MetaData[CANLOG_MAX_META_DATA_SIZE];
 static char StatusData[CANLOG_MAX_STATUS_SIZE];
+static char ConfigData[CANLOG_MAX_CONFIG_SIZE];
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
@@ -137,7 +143,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
             (unsigned long int)TailIndex, 
             (unsigned long int)Capacity, 
             (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
-            (unsigned long int)(MAX_LOG_FILE_SIZE)
+            (unsigned long int)(appCanLogGetLogFileSize())
         );
     
         if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData)) {
@@ -145,6 +151,29 @@ int fs_open_custom(struct fs_file *file, const char *name)
         }
 
         file->data           = MetaData;
+        file->len            = DataSize;
+        file->index          = 0;
+        file->is_custom_file = 0;       /* httpd sends static buffer     */
+        return 1;
+    }
+    else if (0 == strncmp(name, CANLOG_CONFIG_PATH, sizeof(CANLOG_CONFIG_PATH) - 1)) 
+    {
+        int DataSize;
+
+        DataSize = snprintf(
+            ConfigData,
+            sizeof ConfigData,
+            CANLOG_CONFIG_STRING,
+            (unsigned long int)(appCanLogGetClusterSize()),
+            (unsigned long int)(appCanLogGetLogFileSize()),
+            (unsigned long int)(appCanLogGetLogFileCount())
+        );
+    
+        if (DataSize < 0 || (size_t)DataSize >= sizeof(ConfigData)) {
+            return 0;  // Error: formatting failed or buffer too small
+        }
+
+        file->data           = ConfigData;
         file->len            = DataSize;
         file->index          = 0;
         file->is_custom_file = 0;       /* httpd sends static buffer     */
