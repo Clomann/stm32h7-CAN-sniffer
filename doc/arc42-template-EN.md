@@ -559,9 +559,9 @@ The input data used for the measurements in this section were generated using CA
 To test the reliability of the CAN logger representative test cases are defined. In practice, bus loads are kept below 100 % to reduce contention and keep the traffic deterministic. Therefore, the CAN logger tests are run at a bus load of 85 %.
 The actual frame rate is determined by the baud rate and the payload of the frames.
 
-The following figure shows how the data rate depends on the payload length (DLC) assuming all frames have the same length. 
+The following figure shows how the data rate depends on the payload length (DLC) assuming all frames have the same length.
 The maximum data-rate to the SD card is determined as described in section [SPI/SD timings](#spisd-timings) with ~0.88 MiB/s (with 8 byte DLC decreasing with frame rate).
-Each frame is stored with its meta data (e. g. timestamp, ID, etc.). The diagram shows that storage data rate increases as DLC decreases because the frame rate rises. Storing the frames to storage with dynamic length decreases the needed rate to storage considerably.
+Each frame is stored with its metadata (e.g., timestamp, ID, etc.). The diagram shows that storage data rate increases as DLC decreases because the frame rate rises. Storing the frames to storage with dynamic length decreases the needed rate to storage considerably.
 
 ![Classic CAN byte and frame rates over the payload length](images/graphs/datarates_anaylsis.py.svg)
 *Figure: Classic CAN byte and frame rates over the payload length (DLC) (see [script](images/graphs/datarates_anaylsis.py))*
@@ -570,15 +570,15 @@ In conclusion, at 1 Mbit/s and 85% bus load, lower-DLC classic CAN frames provid
 
 #### CAN ISR latency
 
-The FDCAN interrupt service routine empties the hardware buffer and processes the timestamps of the received frames. The frames are then put into a light weight first stage software buffer.
-The measurements with an oscilloscope (1 GSs/s) shown in the following figure yield an eyballed average of 4 us with a jitter of +-400 ns.
+The FDCAN interrupt service routine empties the hardware buffer and processes the timestamps of the received frames. The frames are then put into a lightweight first stage software buffer.
+The measurements with an oscilloscope (1 GSs/s) shown in the following figure yield an eyeballed average of 4 us with a jitter of +-400 ns.
 
 ![FDCAN interrupt service routine duration](images/measurements/fdcan_isr_duration_8_bytes_dlc_1Mbits_at_2x85_percent_busload.png)
 *Figure: FDCAN interrupt service routine duration with 1 Mbit/s on 2 channels at 85 % bus load.*
 
 Notes:
 
-- jitter and ISR duration can be optimize by placing ISR code and data in ITCM/DTCM and 
+- jitter and ISR duration can be optimized by placing ISR code and data in ITCM/DTCM and
 avoiding cache misses by keeping the buffer in tightly coupled RAM.
 
 #### SPI/SD timings
@@ -587,18 +587,18 @@ avoiding cache misses by keeping the buffer in tightly coupled RAM.
 
 *See instrumentation in [FileHandler.c](../app/FileHandler.c).*
 
-Data is written to the SD card from a staging buffer. The staging buffer is a rotating buffer offering multiple slots. When a slot is full it is written to the SD card in one go. Following image shows the time it takes to write one slot to the SD card on the y axis (including FatFS and SD SPI overhead) over the absolute time passed since the device was powered up (global timestamp).
+Data is written to the SD card from a staging buffer. The staging buffer is a rotating buffer offering multiple slots. When a slot is full it is written to the SD card in one go. The following image shows the time it takes to write one slot to the SD card on the y axis (including FatFS and SD SPI overhead) over the absolute time passed since the device was powered up (global timestamp).
 
 ![SD multi-block write timing](images/measurements/SD_card_write_duration/write_duration_block_1_MBps_85_percent_8_byte_dlc.csv.svg)
 
 The diagram shows samples from 999 consecutive written slots. These slots were filled by test frames sent to CAN 1 and CAN 2 with both in listen-only mode. Thus, the bus load on each channel was a little above 85 % (to prevent error frames during logging tests).
 
 There is a recurring peak to over ~38 000 µs every 224 writes.
-Another pattern can be seen reoccuring after every 32 writes where write duration drops below ~34 500 us.
+Another pattern can be seen recurring after every 32 writes where write duration drops below ~34 500 us.
 The median write duration is otherwise ~35 590 us.
 
-The median throughput is accordingly: ~ 0.88 MiB/s. 
-Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a datarate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](../dev/scripts/sd_card_bandwidth.py)).
+The median throughput is accordingly: ~ 0.88 MiB/s.
+Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a data rate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](../dev/scripts/sd_card_bandwidth.py)).
 
 Notes:
 
@@ -625,7 +625,7 @@ Furthermore, it can be seen that a lot of time is spent waiting for the SD card 
 
 #### Lossless logging validation
 
-Frame counters and embedded sequence IDs are captured on both CANoe and the firmware. Frame counters are generated in CANoe using a ramp signal generator creating a verifiable frame sequence. The logger records its own 64-bit start/stop timestamps (logger starts first, then CANoe; stopping happens in the reverse order) and writes only the summary (first/last sequence ID, drop count, timestamps). After the run a host script streams the SD log files, computes a CRC over the actual data, and compares the sequence range + runtime against the CANoe report to confirm no drops.
+Two complementary checks are used to validate lossless logging. The stress test relies on the firmware's internal drop counters and frame totals; after the run, the counters are read and must remain at zero drops. The long-run endurance test embeds monotonic counters in the frame payloads; after the run, the log file is parsed and the counter sequence is checked for any jumps across all frames.
 
 The test was run at 85 % bus load on both channels for 3 hours.
 
@@ -633,9 +633,9 @@ The test was run at 85 % bus load on both channels for 3 hours.
 
 #### Stress test
 
-This section shows the results for a short stress test where both channels log fames at 1 Mbit/s@100 % bus load for 15 minutes to see the behavior under saturation.
+This section shows the results for a short stress test where both channels log frames at 1 Mbit/s @ 100 % bus load for 15 minutes to see the behavior under saturation.
 
-> plceholder image TODO
+> Placeholder image TODO
 
 ### Long-run endurance test
 
