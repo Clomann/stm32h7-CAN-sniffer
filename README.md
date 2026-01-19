@@ -42,14 +42,14 @@ This project implements the software for a device that logs CAN traffic on two C
 
 # Features
 
-The CAN sniffer can log CAN frames on two channels with following specs:
+The CAN sniffer can log CAN frames on two channels with the following specs:
 
-- continuous logging at 2x 1 Mbit/s @ 100% busload using three-stage buffering
+- continuous logging at 2x 1 Mbit/s @ 100% bus load (e.g., ~19920 frames/s) using three-stage buffering
 - supports classic and extended CAN IDs and message filtering
 - rotating log file on an SD card in a way that keeps memory wear low
-- JSON based config persisting
-- HTTP API that supports connecting through built-in web GUI to:
-    - control and config the CAN logger 
+- JSON-based configuration persistence
+- HTTP API that powers the built-in web GUI to:
+    - control and configure the CAN logger
     - download of logged data
     - manage SD card logging (format on next restart, log file size/count, cluster size)
     - client-side log data parser
@@ -60,7 +60,7 @@ The *CAN setup* page allows you to configure the CAN sniffer and start/stop logg
 
 ![CAN Trace screen](doc/images/webGUI/STM32H7%20CAN%20Sniffer%20-%20Setup.pdf.png)
 
-Through the *CAN trace* page you can download logged data as a binary file and decode it through using the funciton in the *Parse and Display Log* function:
+Through the *CAN trace* page you can download logged data as a binary file and decode it using the *Parse and Display Log* function:
 
 ![CAN Setup screen](doc/images/webGUI/STM32H7%20CAN%20Sniffer%20-%20Trace.pdf.png)
 
@@ -70,26 +70,36 @@ Detailed measurement setup, plots, and validation results (CAN ISR latency, SD w
 
 # Quick start
 
-The project consists of the source code written to run on a NUCLEO-144 STM32H745ZI discovery board. It uses GPIO to interface to:
+The project targets a NUCLEO-144 STM32H745ZI discovery board. It uses GPIOs to interface with:
 - SD card
 - CAN transceiver
 - the on-board ETH interface
 
-It is built using cmake and make based on the gcc toolchain.
+It is built using CMake and Make with the GCC toolchain.
 
-This section briefly explains how to build and download the software for and to the device using the tool configuration included in this project.
+This section briefly explains how to build and download the firmware using the tool configuration included in this project.
 
 ## Run unit tests
 
-_Placeholder: describe how to run `cmake -S tests -B build && cmake --build build && ctest`. Add pass/fail screenshot later._
+From the `tests` directory, generate and build the test binaries:
+
+```sh
+cmake -B ./build/ && make -C ./build/
+```
+
+Run the tests:
+
+```sh
+ctest --test-dir build
+```
 
 ## Verify logging
 
-_Placeholder: describe end-to-end logging verification (e.g., feed CAN traffic, show resulting SD file)._
+See [Lossless logging validation](doc/arc42-template-EN.md#lossless-logging-validation) for the end-to-end verification workflow.
 
 ## System overview
 
-The system uses following components:
+The system uses the following components:
 - NUCLEO-H745ZI-Q STM32 board
 - two TJA1050 based CAN transceiver breakout boards
 - a 3 V micro SD card adapter breakout board
@@ -97,13 +107,13 @@ The system uses following components:
 ![System overview](doc/images/system_overview/system_overview.drawio.jpg)
 *Figure: The image shows a simplified overview of the system components.*
 
-More details of the systems technical context and a picture of the prototypical built can be found [here](doc/arc42-template-EN.md#technical-context)
+More details of the system's technical context and a picture of the prototype build can be found [here](doc/arc42-template-EN.md#technical-context)
 
 > **NOTE**: Use a high quality SD card because cheap ones can have reliability issues when used with SPI (e.g., an SD card initializes correctly and some writes/reads work but then it hangs until power cycled for no apparent reason). The system was tested with a Kingston industrial-grade card.
 
 ## Prerequisites
 
-Following tool versions are used to develop, debug and run the program on the target:
+The following tool versions are used to develop, debug and run the program on the target:
 
 | Component | Version | Scope |
 |-|-|-|
@@ -116,13 +126,13 @@ Following tool versions are used to develop, debug and run the program on the ta
 
 ## Build the code
 
-To create the software, you can use following command from the repo's root directory:
+To create the software, you can use the following command from the repo's root directory:
 
 ```sh
 cmake --preset "Debug" -B ./build/
 ``` 
 
-Running this command might take a while because following dependencies are pulled while generating the configuration:
+Running this command might take a while because the following dependencies are pulled while generating the configuration:
 
 - FreeRTOS (see [FreeRTOS on github](https://github.com/FreeRTOS/FreeRTOS-LTS.git))
 - lwrb (see [lwrb on github](https://github.com/MaJerle/lwrb.git))
@@ -133,7 +143,7 @@ To build the actual code, run the following from the root directory:
 make -C build -j4
 ``` 
 
-Alternatively, use the CMake workflow and just run 
+Alternatively, use the CMake workflow and run
 
 ```sh
 cmake --workflow --preset release-cm4 &&
@@ -157,7 +167,7 @@ from the root directory.
 
 ## Access the web GUI
 
-The CAN sniffer uses Multicast DNS (mDNS) and Internet Group Management Protocol (IGMP) so that its hostname can be discoverd. If your network supports mDNS you can access the CAN sniffer via following hostname:
+The CAN sniffer uses Multicast DNS (mDNS) and Internet Group Management Protocol (IGMP) so that its hostname can be discovered. If your network supports mDNS you can access the CAN sniffer via the following hostname:
 
 > http://can-sniffer.local
 
@@ -172,12 +182,12 @@ This is a brief overview of the architecture. You can read the full architecture
 
 ## Software 
 
-The driver design is inspired by Linux's opaque‑ops and linker‑list registration patterns (SPI, CAN, Ethernet) and they run bare-metal
+The driver design is inspired by Linux's opaque‑ops and linker‑list registration patterns (SPI, CAN, Ethernet), and the firmware runs bare-metal
 on FreeRTOS. Task orchestration is realized by prioritized preemptive task scheduling. 
 
 At a high level the firmware separates drivers, a multistage buffering pipeline, storage, and configuration into distinct layers; the full breakdown (logging pipeline, config workflow, hooks) lives in the [arc42 building-block view](doc/arc42-template-EN.md#building-block-view). Storage modules rely on overridable hooks for error handling—see the [architecture decisions](doc/arc42-template-EN.md#error-handling-hooks-for-storage-subsystems) before integrating.
 
-The full arc42 template based document (doc/arc42-template-EN.md) covers the following in more detail:
+The full arc42-template-based document (doc/arc42-template-EN.md) covers the following in more detail:
 
 - building blocks (modules, interfaces)
 - runtime view (ISRs, queues)
