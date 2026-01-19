@@ -23,9 +23,11 @@ This project implements the software for a device that logs CAN traffic on two C
 - [Features](#features)
     - [Measurements](#measurements)
         - [CAN ISR latency](#can-isr-latency)
-        - [SD multi-block write timing](#sd-multi-block-write-timing)
-        - [Block flush window Saleae](#block-flush-window-saleae)
+        - [SPI/SD timings](#spisd-timings)
+            - [SD multi-block write timing](#sd-multi-block-write-timing)
+            - [Block flush window logic analyzer](#block-flush-window-logic-analyzer)
         - [Lossless logging validation](#lossless-logging-validation)
+        - [Stress test](#stress-test)
 - [Quick start](#quick-start)
     - [Run unit tests](#run-unit-tests)
     - [Verify logging](#verify-logging)
@@ -55,11 +57,12 @@ The CAN sniffer can log CAN frames on two channels with following specs:
 - HTTP API that supports connecting through built-in web GUI to:
     - control and config the CAN logger 
     - download of logged data
+    - manage SD card logging (format on next restart, log file size/count, cluster size)
     - client-side log data parser
 
 **Web GUI**
 
-The *CAN setup* page allows you to configure the CAN sniffer and start/stop logging:
+The *CAN setup* page allows you to configure the CAN sniffer and start/stop logging. It also includes SD card management to queue a format on the next restart and adjust log ring settings.
 
 ![CAN Trace screen](doc/images/webGUI/STM32H7%20CAN%20Sniffer%20-%20Setup.pdf.png)
 
@@ -69,42 +72,89 @@ Through the *CAN trace* page you can download logged data as a binary file and d
 
 ## Measurements
 
+The input data used for the measurements in this chapter were generated using CANoe and an Interactive Generator node for precise control and analysis of the test data.
+
+To test the reliability of the CAN logger representative test cases are defined. In practice, bus loads are kept below 100 % to reduce contention and keep the traffic deterministic. Therefore, the CAN logger tests are run at a bus load of 85 %.
+The actual frame rate is determined by the baud rate and the payload of the frames.
+
+The following figure shows how the data rate depends on the payload length (DLC) assuming all frames have the same length. 
+The maximum data-rate to the SD card is determined as described in section [SPI-SD-timings](#spi-sd-timings) with ~0.88 MiB/s (with 8 byte DLC decreasing with frame rate).
+Each frame is stored with its meta data (e. g. timestamp, ID, etc.). The diagram shows that storage data rate increases as DLC decreases because the frame rate rises. Storing the frames to storage with dynamic length decreases the needed rate to storage considerably.
+
+
+![Classic CAN byte and frame rates over the payload length](doc/images/graphs/datarates_anaylsis.py.svg)
+*Figure: Classic CAN byte and frame rates over the payload length (DLC) (see [script](doc/images/graphs/datarates_anaylsis.py))*
+
+In conclusion, at 1 Mbit/s and 85% bus load, lower-DLC classic CAN frames provide a realistic long-run test case (>1 h), complemented by short (<15 min) 100% bus load stress runs.
+
 ### CAN ISR latency
 
-```mermaid
-%% placeholder chart – replace with actual capture image/data %%
-xychart-beta
-    title "CAN ISR latency (µs)"
-    x-axis [1, 2, 3, 4, 5]
-    y-axis "Latency (µs)" 0 --> 6
-    line [4.8, 5.0, 4.9, 4.7, 5.1]
-```
+The FDCAN interrupt service routine empties the hardware buffer and processes the timestamps of the erceived frames. The frames are then put into a light weight first stage software buffer.
+The measurements with an oscilloscope (1 GSs/s) shown in the following figure yield an eyballed average of 4 us with a jitter of +-400 ns.
 
-### SD multi-block write timing
+![FDCAN interrupt service routine duration](doc/images/measurements/fdcan_isr_duration_8_bytes_dlc_1Mbits_at_2x85_percent_busload.png)
+*Figure: FDCAN interrupt service routine duration with 1 Mbit/s on 2 channels at 85 % bus load.*
 
-```mermaid
-xychart-beta
-    title "SD multi-block write duration"
-    x-axis ["Flush 1", "Flush 2", "Flush 3", "Flush 4"]
-    y-axis "Time (ms)" 0 --> 15
-    bar [8.2, 7.9, 8.1, 8.0]
-```
+Notes:
 
-### Block flush window (Saleae)
+- jitter and ISR duration can be optimize by placing ISR code and data in ITCM/DTCM and 
+avoiding cache misses by keeping the buffer in tightly coupled RAM.
 
-```mermaid
-xychart-beta
-    title "Block flush window"
-    x-axis ["Block 1", "Block 2", "Block 3", "Block 4"]
-    y-axis "Duration (ms)" 0 --> 20
-    line [12.5, 12.3, 12.6, 12.4]
-```
+### [SPI/SD timings](#spi-sd-timings)
+
+#### SD multi-block write timing
+
+*See instrumentation in [FileHandler.c](app/FileHandler.c).*
+
+Data is written to the SD card from a staging buffer. The staging buffer is a rotating buffer offering multiple slots. When a slot is full it is written to the SD card in one go. Following image shows the time it takes to write one slot to the SD card on the y axis (including FatFS and SD SPI overhead) over the absolute time passed since the device was powered up (global timestamp).
+
+![SD multi-block write timing](doc/images/measurements/SD_card_write_duration/write_duration_block_1_MBps_85_percent_8_byte_dlc.csv.svg)
+
+The diagram shows samples from 999 consecutive written slots. These slots were filled by test frames sent to CAN 1 and CAN 2 with both in listen-only mode. Thus, the bus load on each channel was a little above 85 % (to prevent error frames during logging tests).
+
+There is a recurring peak to over ~38 000 µs every 224 writes.
+Another pattern can be seen reoccuring after every 32 writes where write duration drops below ~34 500 us.
+The median write duration is otherwise ~35 590 us.
+
+The median throughput is accordingly: ~ 0.88 MiB/s. 
+Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a datarate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](dev/scripts/sd_card_bandwidth.py)).
+
+Notes:
+
+- Recurring fast pattern every 32 writes (32 KiB chunks -> 1 MiB), likely erase/page alignment.
+- Larger spike every 224 writes (7 MiB of data), probably controller cache/maintenance cycle.
+- To confirm, query AU_SIZE/ERASE_SIZE via ACMD13; if erase group is 1 MiB the 32‑write cadence fits, if larger (e.g., several MiB) the 224 cadence may reflect the true erase/flush interval.
+
+#### Block flush window (logic analyzer)
+
+The following screenshot taken with a 50 Msps logic analyzer shows the instrumented GPIO toggle at channel 0 and the SPI communication at the 4 remaining channels. 
+These measurements are marked in the logic analyzer screenshot:
+
+- M0 spans the 32 KiB multi-block write (~35.6 ms)
+- M1 spans flush + idle (~61.7 ms)
+- M2 spans only flush (~2.4 ms)
+
+Thus, it also depicts a 32 KiB block write duration of ~35 ms as measured in the previous section.
+
+![Block flush window measurement with logic analyzer](doc/images/measurements/SD_card_write_duration/write_duration_32KiBblock_Logic%208.png)
+
+Furthermore, it can be seen that a lot of time is spent waiting for the SD card to handle the incoming data between multi-block writes, as the following figure shows:
+
+![Block flush window measurement detail with logic analyzer](doc/images/measurements/SD_card_write_duration/write_detail_multi-block_write_Logic%208.png)
 
 ### Lossless logging validation
 
-Frame counters and embedded sequence IDs are captured on both CANoe and the firmware. The logger records its own 64-bit start/stop timestamps (logger starts first, then CANoe; stopping happens in the reverse order) and writes only the summary (first/last sequence ID, drop count, timestamps). After the run a host script streams the SD log files, computes a CRC over the actual data, and compares the sequence range + runtime against the CANoe report to confirm no drops.
+Frame counters and embedded sequence IDs are captured on both CANoe and the firmware. Frame counters are generated in CANoe using a ramp signal generator creating a verifiable frame sequence. The logger records its own 64-bit start/stop timestamps (logger starts first, then CANoe; stopping happens in the reverse order) and writes only the summary (first/last sequence ID, drop count, timestamps). After the run a host script streams the SD log files, computes a CRC over the actual data, and compares the sequence range + runtime against the CANoe report to confirm no drops.
+
+The test was run at 85 % bus load on both channels for 3 hours.
 
 ![Lossless logging measurement points](doc/images/measurement_lossless_proof.md.svg)
+
+### Stress test
+
+This section shows the results for a short stress test where both channels log fames at 1 Mbit/s@100 % bus load for 15 minutes to see the behavior under saturation.
+
+> plceholder image TODO
 
 # Quick start
 
@@ -340,7 +390,9 @@ To regenerate the .svg outputs:
     > python -m venv .venv && source .venv/bin/activate
 2. Install the converter’s dependencies (inside dev/scripts): 
     > pip install -r requirements.txt
-3. Run 
+3. Start up docker from within dev/scripts
+    > docker-compose -f docker-compose.yaml up -d
+4. Run 
     > python convert_mermaid.py --root ../doc/images
     
     The script scans for .md sources and emits .md.svg files with the same name.

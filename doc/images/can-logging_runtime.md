@@ -17,13 +17,14 @@ sequenceDiagram
     Deferred->>Bridge: vTaskNotifyGiveFromISR
     Bridge->>MsgPort: push frames (fdcan_msg_port_receive)
     loop until queue drained
-        Bridge->>Buffer: CanLogBuffer_AddClassicCanEntry(entry)
+        Manager->>MsgPort: fdcan_msg_port_read
+        Manager->>Buffer: CanLogBuffer_AddEntry(entry)
     end
     loop periodically
         Manager->>Buffer: CanLogBuffer_IsBlockReady?
         alt block ready
             Manager->>Buffer: CanLogBuffer_ReadNextBlock()
-            Buffer-->>Manager: 32 KiB block + header
+            Buffer-->>Manager: 64 KiB block + header
             Manager->>FS: FatFS write / rotate file
             FS-->>Manager: status
         else

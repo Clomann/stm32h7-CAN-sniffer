@@ -1,7 +1,7 @@
 # STM32H7 CAN sniffer software architecture documentation
 ========================================
 
-![arc42 status](https://img.shields.io/badge/arc42-ready-green)
+![arc42 status](https://img.shields.io/badge/arc42-ready/v0.3-green)
 
 **About STM32H7 CAN sniffer**
 
@@ -67,7 +67,7 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
         - [FDCAN driver](#fdcan-driver)
     - [System Scenarios](#system-scenarios)
         - [Scenario 1: End-to-end CAN message logging](#scenario-1-end-to-end-can-message-logging)
-        - [Scenario 2: Configuration load/save flow](#scenario-2-configuration-loadsave-flow)
+        - [Scenario 2: Configuration load/apply flow](#scenario-2-configuration-loadapply-flow)
     - [CAN Logging Subsystem System scenarios](#can-logging-subsystem-system-scenarios)
         - [Scenario 1: CAN frame capture to buffer](#scenario-1-can-frame-capture-to-buffer)
         - [Scenario 2: Block-based flush to file](#scenario-2-block-based-flush-to-file)
@@ -86,6 +86,7 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
         - [Concurrency & Interrupt Priorities](#concurrency--interrupt-priorities)
             - [Interrupts](#interrupts)
             - [Tasks](#tasks)
+    - [Memory Overview](#memory-overview)
 - [Architecture Decisions](#architecture-decisions)
     - [Using STM HAL](#using-stm-hal)
     - [Frame logging](#frame-logging)
@@ -94,6 +95,10 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
     - [Prioritize logging determinism over UI responsiveness](#prioritize-logging-determinism-over-ui-responsiveness)
     - [Comm module driver factory pattern](#comm-module-driver-factory-pattern)
     - [Error-handling hooks for storage subsystems](#error-handling-hooks-for-storage-subsystems)
+    - [Clock source selection](#clock-source-selection)
+    - [SPI ring-buffer data management](#spi-ring-buffer-data-management)
+    - [Chunked log files](#chunked-log-files)
+    - [HTTP stack selection](#http-stack-selection)
     - [CAN timestamp reconstruction strategy](#can-timestamp-reconstruction-strategy)
 - [Risks and Technical Debts](#risks-and-technical-debts)
     - [Risks](#risks)
@@ -295,13 +300,14 @@ The application layer hosts the FreeRTOS tasks and services that turn the middle
 
 | Task / Service | Responsibility | Interfaces |
 | - | - | - |
-| **Core0Task0** (main loop) | Boots the system, mounts SD, initializes HTTP + settings, then periodically calls *http_poll*, *appCanLogHandlerPoll*, and configuration hooks to keep the UI responsive and configs synced. | *http_init/http_poll*, *SettingsHandler*, *ConfigManager*, *CanLogManager* |
-| **CanBridgeTask** | Pulls frames from *CanAbs*, stamps them, enqueues into *CanLogBuffer*, and feeds telemetry to the HTTP stats view. | *CanAbs*, *fdcan_msg_port*, logging telemetry hooks |
-| **SdBridgeTask** | Serializes all FatFS access: drains *CanLogBuffer*, manages rotating log files, and executes deferred flushes/config writes. | *CanLogBuffer*, *FileHandler*, ConfigManager hooks |
+| **Core0Task0** (main loop) | Boots the system, mounts SD, initializes HTTP + settings, then periodically calls *http_poll* and configuration hooks to keep the UI responsive and configs synced. Applies CAN settings when requested. | *http_init/http_poll*, *SettingsHandler*, *ConfigManager*, *CanCtrl* |
+| **Core0Task1** (log manager loop) | Polls *CanLogManager*: drains *fdcan_msg_port*, builds log entries, updates counters, and notifies *SdBridgeTask* when a block is ready. | *CanLogManager*, *fdcan_msg_port*, *CanLogBuffer*, *SdBridgeTask* |
+| **CanBridgeTask** | Pulls frames from *CanAbs* and enqueues them into *fdcan_msg_port* for downstream logging. | *CanAbs*, *fdcan_msg_port*, logging telemetry hooks |
+| **SdBridgeTask** | Flushes *CanLogBuffer* blocks to SD via the log manager hook; dedicated to log writes. | *CanLogManager*, *FileHandler* |
 | **CanSendTask** | Handles optional CAN transmission (test frames / tracer) and propagates run/stop state from the UI/config. | *CanCtrl*, *Core0Task0* control flags |
-| **SpiTask** | Multiplexes SPI clients, owns the hardware semaphore, and drives DMA transfers for SD/logging and other peripherals. | *SpiAbs*, device-specific completion hooks |
+| **SpiTask** | Multiplexes SPI clients, coordinates completion via RTOS semaphores/notifications, and drives DMA transfers for SD/logging and other peripherals. | *SpiAbs*, device-specific completion hooks |
 
-Scheduling: CAN path tasks (*CanBridgeTask*, *SdBridgeTask*, *CanSendTask*) and *SpiTask* run at higher priority than the *Core0Task0* loop to guarantee logging determinism (see [Concurrency & Interrupt Priorities](#concurrency--interrupt-priorities)). HTTP/config work executes inside *Core0Task0*’s periodic loop via *http_poll*, so callbacks must stay short to avoid extending the cycle. All application tasks avoid touching HAL drivers directly and instead rely on the comm/file abstractions, keeping the layer testable.
+Scheduling: CAN path tasks (*CanBridgeTask*, *Core0Task1*, *SdBridgeTask*, *CanSendTask*) and *SpiTask* run at higher priority than the *Core0Task0* loop to guarantee logging determinism (see [Concurrency & Interrupt Priorities](#concurrency--interrupt-priorities)). HTTP/config work executes inside *Core0Task0*’s periodic loop via *http_poll*, so callbacks must stay short to avoid extending the cycle. All application tasks avoid touching HAL drivers directly and instead rely on the comm/file abstractions, keeping the layer testable.
 
 ### Middleware Components
 
@@ -343,7 +349,7 @@ CM7/CM4 share startup files, HAL MSP init, and system clock setup reused from ST
 | - | - | - |
 | ConfigManager | Persistence facade around FatFS; exposes load/save plus weak hooks. | Tracks diagnostics (*lastError*, *needsSync*, *fileOpen*). |
 | SettingsHandler | JSON adapter for *AppConfigType*; owns dirty flag. | Uses *coreJSON* + small helpers in *FileHandler*. |
-| HTTP control surface | CGI/SSI glue that forwards form data to *SettingsHandler* and triggers apply/save. | Runs inside the CM7 LwIP/httpd task. |
+| HTTP control surface | CGI/SSI glue that forwards form data to *SettingsHandler* and triggers apply + persistence. | Runs inside the CM7 LwIP/httpd task. |
 
 Data model excerpt (*app/SettingsHandler.h*):
 
@@ -385,29 +391,31 @@ The persistent JSON mirrors these fields 1:1, keeping schema translation out of 
 | - | - | - |
 | *CanAbs* + deferred IRQ | Copies frames out of the FDCAN FIFOs in IRQ context and schedules lower-priority processing. | ISR ring buffer keeps latency deterministic; deferred IRQ notifies FreeRTOS tasks safely. |
 | *CanBridgeTask* + *fdcan_msg_port* | Moves frames from the driver domain into a lock-free queue owned by the application. | Provides back-pressure before the logging pipeline. |
-| *CanLogBuffer* | LwRB-based staging buffer (3 × 32 KiB blocks) in D2 SRAM. Produces fixed-size blocks with headers for SD writes. | Exposed via *CanLogBuffer_Add**/*ReadNextBlock*. |
+| *CanLogBuffer* | LwRB-based staging buffer (3 × 64 KiB blocks) in D1 SRAM. Produces fixed-size blocks with headers for SD writes. | Exposed via *CanLogBuffer_AddEntry*/*ReadNextBlock*. |
 | *CanLogManager* | Drains ready blocks, writes them to */logs/CAN.LOG<n>*, handles rotation + metadata, exposes statistics. | Uses *FileHandler*/FatFS and notifies *SdBridgeTask* for background flush. |
-| *SdBridgeTask* + FileHandler | Provides serialized access to the SD card and performs FatFS writes/flushes. | Shared with other subsystems (config persistence). |
+| *SdBridgeTask* + FileHandler | Performs log block writes/flushes for the logging pipeline. | Config writes run in *Core0Task0* and are not routed through *SdBridgeTask*. |
 
 ![CAN logging building blocks](images/can-logging_building-block.md.svg)
 
 ### Level 2: CanLogBuffer Component
 
-- Implemented with *lwrb* and located in *.ram_d2* to guarantee bandwidth for DMA + CPU.
+- Implemented with *lwrb* and located in the D1 SRAM bulk-buffer region (see [Memory Overview](#memory-overview)) to guarantee bandwidth for DMA + CPU.
 - Maintains an epoch counter and per-block sequence ID so offline tools can detect gaps.
 - API surface:
-  - *CanLogBuffer_AddClassicCanEntry*/*AddFdCanEntry* copy frames (includes timestamp, channel, DLC, flags).
-  - *CanLogBuffer_IsBlockReady* reports when at least 32 KiB are buffered.
+  - *CanLogBuffer_AddEntry* copies entries (includes timestamp, channel, DLC, flags).
+  - *CanLogBuffer_IsBlockReady* reports when at least 64 KiB are buffered.
   - *CanLogBuffer_ReadNextBlock* emits *{header, payload, padding}* and clears consumed bytes. Block header layout:
 
 ```c
 typedef struct {
     uint8_t version;
     uint8_t header_size;
-    uint16_t block_size;
-    uint16_t block_fill;
     uint8_t epoch;
     uint8_t cnt;
+    uint32_t block_size;
+    uint32_t block_fill;
+    uint32_t ingress_frames;
+    uint32_t frame_count;
 } __attribute__((packed)) CanLogBlockHeaderType;
 ```
 
@@ -415,21 +423,21 @@ typedef struct {
 
 #### Log file structure (packet format)
 
-Each block written to SD starts with *CanLogBlockHeaderType*, followed by a series of packed entries (*CanLogClassicCanEntryType*, *CanLogFdcanCanEntryType*, etc.), and padding. Packet-style diagrams:
+Each block written to SD starts with *CanLogBlockHeaderType*, followed by a series of packed entries (*CanLogEntryType* frames and periodic *CanLogSyncType* sync entries), and padding. Packet-style diagrams:
 
 ![Block header layout](images/log_block_header_packet.md.svg)
 
 ![CAN entry layout](images/log_block_entry_packet.md.svg)
 
-Classic frames embed: 64-bit timestamp, 29/11-bit ID, channel, DLC, flags (IDE/RTR), bus_id, and an 8-byte data payload. Other entry types share the same header and extend the payload (e.g., 64-byte data for CAN FD). *block_fill* tells post-processing tools where padding (*0xFF*) begins for each block as byte index.
+Frame entries embed: 32-bit timestamp (us, low bits), CAN ID, channel, DLC/flags, and payload length/data. Periodic *SYNC* entries carry *abs_time_high* so tools can reconstruct a 64-bit timeline from the 32-bit per-frame timestamp. *block_fill* tells post-processing tools where padding (*0xFF*) begins for each block as byte index.
 
 ### Level 3: CanLogManager Component
 
-- Owns the active log filename, head/tail indices (*MAX_LOG_INDEX* circular buffer), and rotation policy (*MAX_LOG_FILE_SIZE*).
+- Owns the active log filename, head/tail indices (circular buffer sized by configured *log_file_count*), and rotation policy driven by configured *log_file_size* (defaults to *MAX_LOG_FILE_SIZE*/*MAX_LOG_FILE_COUNT*).
 - Polls *CanLogBuffer_IsBlockReady* inside *appCanLogHandlerPoll*. When ready it:
   1. Reads the block.
   2. Writes it via *FatFS_SD_WriteFile*.
-  3. Checks *MAX_LOG_FILE_SIZE* and rotates to */logs/CAN.LOG<n>* if needed (with wrap-around and optional pre-allocation).
+  3. Checks configured *log_file_size* and rotates to */logs/CAN.LOG<n>* if needed (with wrap-around based on *log_file_count* and optional pre-allocation).
 - Exposes hooks for UI/CLI queries via *FsCustom_GetCanLogHeadIndex/TailIndex*, *FsCustom_IsTracerRunning*, etc.
 - Provides *CanLogFileManager_ErrorHandler* so the application can react to SD errors (LED, telemetry).
 - Initialization / shutdown entry points:
@@ -492,11 +500,11 @@ This section describes the behavioral aspects of the software components.
 
 ## Configuration Management Scenarios
 
-**Boot-time load.** *Core0Task0* mounts the SD card, initializes *ConfigManager*, and issues *ConfigManager_LoadConfig*. The component opens *CONF.TXT*, reads it into the staging buffer, and calls the deserialize hook implemented by *SettingsHandler*. On success the shared *AppConfig* struct is populated and handed to the rest of the system.
+**Boot-time load.** *Core0Task0* mounts the SD card, initializes *ConfigManager*, and issues *ConfigManager_LoadConfig*. The component opens *CONF.TXT*, reads it into the staging buffer, and calls the deserialize hook implemented by *SettingsHandler*. On success the shared *AppConfig* struct is populated and handed to the rest of the system. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if `formatting_requested.txt` exists, it reformats the SD card on boot and rewrites `log_config.json`.
 
 ![Boot-time load flow](images/config-management_boot-load.md.svg)
 
-**Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack.
+**Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack. SD card management requests write `formatting_requested.txt` with log sizing parameters and are applied on the next boot when `log_config.json` is rewritten.
 
 ![Remote update flow](images/config-management_remote-update.md.svg)
 
@@ -549,8 +557,8 @@ This section contains long-run test results for selected releases.
 
 Core runtime responsibilities:
 - *SpiTask* multiplexes producer requests into the single SPI driver instance, tracking completion callbacks per client.
-- *CanBridgeTask* consumes CAN frames via *fdcan_msg_port*, ensuring ISR -> task transfer is lossless.
-- *SdBridgeTask* serializes all FatFS access so logging + config writes never collide.
+- *CanBridgeTask* drains *CanAbs* and writes frames into *fdcan_msg_port*, ensuring ISR -> task transfer is lossless.
+- *SdBridgeTask* flushes log blocks to SD; config writes are handled in *Core0Task0*.
 - *CommFactory* initializes driver instances via linker-based registration, keeping startup deterministic.
 Each runtime component follows the same pattern: ISR copies data, deferred handler notifies a task, and the task interacts with drivers/middleware at safe priority levels.
 
@@ -568,7 +576,7 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 
 - **Trigger**: Hardware RX FIFO hits watermark or TX completes.
 - **Flow**: IRQ copies frame meta/data into *CanAbs* ring buffer, posts deferred IRQ -> *CanBridgeTask* drains frames via *fdcan_msg_port_receive*, updates statistics, optionally notifies higher layers (logging, HTTP telemetry).
-- **TX path**: Application queues messages via *fdcan_msg_port_send*; *CanBridgeTask* programs HAL Tx mailbox, handling priority and retries.
+- **TX path**: Application queues messages via *CanAbs_Send_Can1/Can2* (e.g., in *CanCtrl*), which programs the HAL Tx mailbox and handles retries.
 - **Error handling**: Bus-off or error-passive events are surfaced via callbacks so the UI can warn the user and logging can mark gaps.
 - **Diagram**: reuse *images/can-logging_runtime.md.svg* (shows IRQ -> task flow).
 ## System Scenarios
@@ -576,14 +584,14 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: End-to-end CAN message logging
 
 - **Trigger**: Both CAN channels report traffic at up to 1 Mbit/s.
-- **Flow**: FDCAN IRQ -> CanBridgeTask -> fdcan_msg_port -> CanLogBuffer batches 32 KiB blocks -> CanLogManager writes */logs/CAN.LOG<n>* via *SdBridgeTask*.
+- **Flow**: FDCAN IRQ -> CanBridgeTask -> fdcan_msg_port -> CanLogManager adds entries to CanLogBuffer (64 KiB blocks) -> CanLogManager writes */logs/CAN.LOG<n>* via *SdBridgeTask*.
 - **Outcome**: Frames are persisted without loss; rotation keeps a constant number of files.
 - **Key risks**: SD stalls; mitigated through triple buffering and block-based writes.
 
-### Scenario 2: Configuration load/save flow
+### Scenario 2: Configuration load/apply flow
 
 - **Trigger**: Device boot or user applies new settings via HTTP.
-- **Flow**: ConfigManager loads *CONF.TXT* into RAM through FileHandler; SettingsHandler parses JSON -> UI updates fields; when *updated* flag is set and user presses “Save”, ConfigManager serializes JSON and overwrites the file.
+- **Flow**: ConfigManager loads *CONF.TXT* into RAM through FileHandler; SettingsHandler parses JSON -> UI updates fields; when *updated* flag is set and user presses “Apply”, ConfigManager serializes JSON and overwrites the file.
 - **Outcome**: Configuration changes survive reboots; HTTP clients see immediate feedback.
 - **Key risks**: SD removal or parse failure; exposed via *lastError* and UI diagnostics.
 
@@ -592,20 +600,20 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: CAN frame capture to buffer
 
 - **Trigger**: FDCAN RX interrupt fires.
-- **Flow**: ISR copies frame into *CanAbs* ring buffer and wakes *CanBridgeTask*. The task pulls all pending frames, pushes them into *fdcan_msg_port*, and calls *CanLogBuffer_AddClassicCanEntry*, incrementing epoch/block counters.
+- **Flow**: ISR copies frame into *CanAbs* ring buffer and wakes *CanBridgeTask*. The task pushes frames into *fdcan_msg_port*. *Core0Task1* then polls *CanLogManager*, which converts frames into *CanLogBuffer_AddEntry* calls, incrementing epoch/block counters.
 - **Outcome**: Logging pipeline receives frames already timestamped and tagged with channel metadata, ready for batching.
 - **Key constraint**: ISR stays under 6 µs to avoid CAN FIFO overflow; achieved by deferring all heavy work to the task.
 
 ### Scenario 2: Block-based flush to file
 
-- **Trigger**: *CanLogBuffer_IsBlockReady* reports ≥32 KiB buffered.
-- **Flow**: CanLogManager calls *ReadNextBlock*, stamps header (epoch, sequence), and writes the block via *FatFS_SD_WriteFile* through SdBridgeTask. If the current file size reaches *MAX_LOG_FILE_SIZE*, rotation kicks in.
+- **Trigger**: *CanLogBuffer_IsBlockReady* reports ≥64 KiB buffered.
+- **Flow**: CanLogManager calls *ReadNextBlock*, stamps header (epoch, sequence), and writes the block via *FatFS_SD_WriteFile* through SdBridgeTask. If the current file size reaches configured *log_file_size*, rotation kicks in.
 - **Outcome**: SD writes remain aligned and amortized, minimizing wear and ensuring deterministic latencies.
 - **Key metrics**: Block counters per channel, write latency (exposed through telemetry hooks).
 
 ### Scenario 3: Log file rotation
 
-- **Trigger**: Active file exceeds *MAX_LOG_FILE_SIZE* or user requests purge.
+- **Trigger**: Active file exceeds configured *log_file_size*.
 - **Flow**: CanLogManager closes the current file, increments *fileHeadIndex*, optionally wraps and updates *fileTailIndex*, opens */logs/CAN.LOG<n>* (pre-allocates if enabled), and updates metadata presented via *FsCustom_GetCanLogHeadIndex/TailIndex*.
 - **Outcome**: Circular buffer of log files; oldest data overwritten first when storage fills.
 - **Key risks**: Power loss mid-rotation; mitigated via padding + block headers allowing recovery.
@@ -615,20 +623,21 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: Load settings on boot
 
 - **Trigger**: CM7 boots and mounts the SD card.
-- **Flow**: FileHandler mounts partition, ConfigManager opens *CONF.TXT*, reads into internal buffer, SettingsHandler deserializes JSON into *AppConfig*.
+- **Flow**: FileHandler mounts partition, ConfigManager opens *CONF.TXT*, reads into internal buffer, SettingsHandler deserializes JSON into *AppConfig*. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if `formatting_requested.txt` exists, it formats the SD card on boot and rewrites `log_config.json`.
 - **Outcome**: System starts with last persisted CAN baud rates, modes, and IP settings.
 - **Failure handling**: Missing file->defaults applied; mount error->*CONFIG_ERROR_MOUNT_FAILED*.
 
 ### Scenario 2: HTTP POST updates settings
 
 - **Trigger**: User submits the configuration form in the web UI.
-- **Flow**: *httpd_post_cb* parses parameters, *SettingsHandler* updates *AppConfig* fields (baud, mode, IP) and sets *updated*. If the action was “apply”, application tasks adjust hardware immediately; if “save”, ConfigManager serializes to disk.
+- **Flow**: *httpd_post_cb* parses parameters, *SettingsHandler* updates *AppConfig* fields (baud, mode, IP) and sets *updated*. The “apply” action updates hardware immediately, and the main loop persists the new config.
+- **Flow**: SD card management requests persist log sizing parameters in `formatting_requested.txt`; they are applied on the next boot and saved in `log_config.json`.
 - **Outcome**: Running system reflects new settings instantly, and persistence occurs when requested.
 - **Edge cases**: Invalid input rejected by parser; UI reports the error and *updated* stays unchanged.
 
 ### Scenario 3: Persist changes to file
 
-- **Trigger**: Operator hits “Save” in the web UI or CLI command requests persistence.
+- **Trigger**: Operator hits “Apply” in the web UI or a CLI command requests persistence.
 - **Flow**: SettingsHandler detects *updated* flag -> ConfigManager serializes current *AppConfig* via hook -> writes using FileHandler. *needsSync* flag indicates pending flush if power removal is imminent.
 - **Outcome**: New settings stored atomically; UI clears dirty flag.
 - **Observability**: *ConfigManager_GetFileInfo* used to expose filename, size, last modified timestamp.
@@ -677,8 +686,8 @@ Three buffering stages decouple hard-real-time work from lower-priority processi
 2. **Second stage – deferred IRQ callback**  
    The driver invokes an **integration-layer callback**. Because the CAN IRQ runs at very high priority, it cannot call *vTaskNotifyGiveFromISR* directly. Instead, the callback triggers a ***DEFERRED_IRQ*** with a lower priority suitable for RTOS primitives.
 
-3. **Third stage – *CanBridgeTask***  
-   *CanBridgeTask* runs till completion on a notification from the deferred IRQ. Once unblocked, it pulls all pending frames from ***CanAbs*** and writes them in bulk to the ***fdcan_msg_port* message buffer**.
+3. **Third stage – *CanLogManager* (Core0Task1)**  
+   *CanBridgeTask* runs on a notification from the deferred IRQ and pushes frames into ***fdcan_msg_port***. *Core0Task1* then drains the port via *CanLogManager*, converts frames into log entries, and writes them to *CanLogBuffer* for SD flushing.
 
 > **Note**  
 > *fdcan_msg_port* exposes a classic producer/consumer buffer:  
@@ -713,9 +722,26 @@ Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL
 | *CanBridgeTask* | *configMAX_PRIORITIES - 1* | Wakes on deferred IRQ notifications; highest priority to drain CAN buffers. |
 | *SpiTask* | *configMAX_PRIORITIES - 2* | Owns SPI bus/DMA; kept just below CAN bridge to feed SD writes. |
 | *CanSendTask* | *configMAX_PRIORITIES - 3* | Handles optional transmission while staying above SD tasks. |
-| *SdBridgeTask* | *configMAX_PRIORITIES - 4* | Serializes FatFS writes; lower than send but above main loop. |
+| *SdBridgeTask* | *configMAX_PRIORITIES - 4* | Flushes log blocks; lower than send but above main loop. |
+| *Core0Task1Main* | *configMAX_PRIORITIES - 4* | CanLogManager poll loop; drains message port and fills log buffer. |
 | *Core0Task0Main* | *configMAX_PRIORITIES - 5* | Main control loop (HTTP poll, config, log control). |
-| *Core0Task1Main* | *configMAX_PRIORITIES - 6* | Background/auxiliary work (profiling, stats). |
+
+## Memory Overview
+
+This firmware uses linker sections (defined in *CM7/Inc/memory_sections.h*) to place buffers in RAM regions that match their access and DMA needs. The table below consolidates current usage so it is not scattered across multiple sections.
+
+| Section / macro | Placement intent | Current usage |
+| - | - | - |
+| *.ram_d1* / *RAM_D1_SECTION* | Large, CPU-friendly SRAM for bulk buffers. | *CanLogBuffer* ring buffer (3 x 64 KiB blocks). |
+| *.dtcram* / *RAM_DTC_SECTION* | Core-coupled RAM for deterministic, low-latency access (not DMA). | *fdcan_msg_port* message buffer storage. |
+| *.dma_buffer* / *DMA_BUFFER* | DMA-capable, 32-byte aligned buffers. | SPI DMA scratch buffers in *drivers/spi/Spi_Cmds.c*. |
+| *.RxDecripSection* / *ETH_RX_DESC* | Ethernet RX DMA descriptors. | RX descriptor table in *app/http/src/ethernetif.c*. |
+| *.TxDecripSection* / *ETH_TX_DESC* | Ethernet TX DMA descriptors. | TX descriptor table in *app/http/src/ethernetif.c*. |
+| *.Rx_PoolSection* / *ETH_RX_POOL* | Ethernet RX pool backing store. | LwIP RX pool in *app/http/src/ethernetif.c*. |
+
+Notes:
+- *RAM_D2_SECTION* and *RAM_D3_SECTION* are defined for future or retention use, but are not referenced by current CM7 allocations.
+- Linker scripts map these sections to physical RAM regions; when adding new buffers, pick the section based on DMA and latency requirements.
 
 # Architecture Decisions
 
@@ -741,7 +767,7 @@ This section enables you to understand core design decisions of the STM32H7 CAN 
 **Decision.** Introduce a three-stage pipeline:
 1. **ISR ring buffer (CanAbs)** copies frames immediately from the hardware FIFO and triggers a deferred IRQ.
 2. **Deferred IRQ + CanBridgeTask** moves frames into *fdcan_msg_port*, isolating RTOS primitives from the high-priority ISR.
-3. **CanLogBuffer + CanLogManager** batch frames into 32 KiB blocks and persist them asynchronously through *SdBridgeTask*.
+3. **CanLogBuffer + CanLogManager** batch frames into 64 KiB blocks and persist them asynchronously through *SdBridgeTask*.
 
 **Consequences.**
 
@@ -749,7 +775,7 @@ Pros:
 - ISR latency stays bounded; SD jitter is absorbed by buffered blocks; rotation logic can run independently of CAN IRQs.
 
 Cons:
-- Higher RAM consumption (≈96 KiB for buffers); more moving pieces to test (queues, rotations).
+- Higher RAM consumption (≈192 KiB for buffers); more moving pieces to test (queues, rotations).
 
 ## FreeRTOS tasks
 
@@ -908,7 +934,7 @@ Cons:
 | *AppConfig* | Runtime structure holding CAN baud rates, modes, and network settings; persisted via ConfigManager. |
 | *CanAbs* | CAN abstraction layer that hides STM32 HAL specifics and exposes RX/TX hooks plus callbacks. |
 | *CanBridgeTask* | High-priority FreeRTOS task that drains CanAbs buffers and feeds fdcan_msg_port. |
-| *CanLogBuffer* | RAM buffer pipeline that batches frames into 32 KiB blocks for SD flushes. |
+| *CanLogBuffer* | RAM buffer pipeline that batches frames into 64 KiB blocks for SD flushes. |
 | *CanLogManager* | Component that rotates log files, writes metadata, and orchestrates SdBridgeTask flushes. |
 | *ConfigManager* | Persistence facade around FatFS; provides load/save hooks for AppConfig. |
 | *Core0Task0* | Main application loop responsible for HTTP polling, config handling, and control flags. |

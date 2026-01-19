@@ -8,7 +8,7 @@ sequenceDiagram
     participant FatFS
     participant SDCard
 
-    Buffer->>LogMgr: Block ready (32 KiB)
+    Buffer->>LogMgr: Block ready (64 KiB)
     Note over LogMgr: GPIO toggle (start SD write)<br/>Scope channel 2 rising edge
     LogMgr->>FileHandler: FatFS_SD_WriteFile(block)
     FileHandler->>FatFS: f_write (multi-block)
