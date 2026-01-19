@@ -36,6 +36,12 @@
 #define PREALLOCATE_LOG_FILES         1U
 
 FRESULT appCanLogHandlerInit(CanLogControlDataType *data);
+void appCanLogSetFileConfig(uint32_t log_file_size, uint32_t log_file_count);
+void appCanLogSetClusterSize(uint32_t cluster_size);
+uint32_t appCanLogGetLogFileSize(void);
+uint32_t appCanLogGetLogFileCount(void);
+uint32_t appCanLogGetClusterSize(void);
+uint32_t appCanLogGetMaxLogIndex(void);
 
 /**
  * @brief Set runtime parameters for the CAN log manager.

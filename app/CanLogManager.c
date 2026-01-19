@@ -25,6 +25,11 @@
 #include "FileHandler.h"
 #endif
 
+#if !defined(UNIT_TEST)
+#include "FreeRTOS.h"
+#include "semphr.h"
+#endif
+
 #define CLM_ABS_TIME_TO_TIMSTAMP(x)   (uint32_t)(x)
 #define CLM_ABS_TIME_TO_ABS_HIGH(x)   ((uint32_t)((x) >> 32U))
 #define CLM_SYNC_EMIT_INTERVAL_US     (30ULL * 60ULL * 1000000ULL)
@@ -110,6 +115,70 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void) {}
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
 static uint32_t Rb1BytesHighWater = 0U;
+static uint32_t CanLogFileSize = MAX_LOG_FILE_SIZE;
+static uint32_t CanLogFileCount = MAX_LOG_FILE_COUNT;
+static uint32_t CanLogClusterSize = CLUSTER_SIZE;
+static volatile uint32_t CanLogPreallocErrorCount = 0U;
+
+#if !defined(UNIT_TEST)
+static StaticSemaphore_t CanLogFileMutexBuffer;
+static SemaphoreHandle_t CanLogFileMutex = NULL;
+#endif
+
+static void CanLogManager_FileLockInit(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex == NULL)
+    {
+        CanLogFileMutex = xSemaphoreCreateMutexStatic(&CanLogFileMutexBuffer);
+        configASSERT(CanLogFileMutex != NULL);
+    }
+#endif
+}
+
+static void CanLogManager_FileLock(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex == NULL)
+    {
+        CanLogManager_FileLockInit();
+    }
+
+    if (CanLogFileMutex != NULL)
+    {
+        (void)xSemaphoreTake(CanLogFileMutex, portMAX_DELAY);
+    }
+#endif
+}
+
+static bool CanLogManager_FileTryLock(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex == NULL)
+    {
+        CanLogManager_FileLockInit();
+    }
+
+    if (CanLogFileMutex == NULL)
+    {
+        return false;
+    }
+
+    return (xSemaphoreTake(CanLogFileMutex, 0) == pdTRUE);
+#else
+    return true;
+#endif
+}
+
+static void CanLogManager_FileUnlock(void)
+{
+#if !defined(UNIT_TEST)
+    if (CanLogFileMutex != NULL)
+    {
+        (void)xSemaphoreGive(CanLogFileMutex);
+    }
+#endif
+}
 
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
@@ -145,6 +214,57 @@ void __attribute__((weak)) CanLogFileManager_ErrorHandler()
     __asm volatile("nop");
 }
 
+void appCanLogSetFileConfig(uint32_t log_file_size, uint32_t log_file_count)
+{
+    if (log_file_size == 0U)
+    {
+        log_file_size = MAX_LOG_FILE_SIZE;
+    }
+
+    if (log_file_count == 0U)
+    {
+        log_file_count = MAX_LOG_FILE_COUNT;
+    }
+
+    CanLogFileSize = log_file_size;
+    CanLogFileCount = log_file_count;
+}
+
+void appCanLogSetClusterSize(uint32_t cluster_size)
+{
+    if (cluster_size == 0U)
+    {
+        cluster_size = CLUSTER_SIZE;
+    }
+
+    CanLogClusterSize = cluster_size;
+}
+
+uint32_t appCanLogGetLogFileSize(void)
+{
+    return CanLogFileSize;
+}
+
+uint32_t appCanLogGetLogFileCount(void)
+{
+    return CanLogFileCount;
+}
+
+uint32_t appCanLogGetClusterSize(void)
+{
+    return CanLogClusterSize;
+}
+
+uint32_t appCanLogGetMaxLogIndex(void)
+{
+    if (CanLogFileCount > 0U)
+    {
+        return CanLogFileCount - 1U;
+    }
+
+    return 0U;
+}
+
 uint8_t FsCustom_GetCanLogHeadIndex(uint32_t *index)
 {
     *index = CanLogCtrlData.CanLog.fileHeadIndex;
@@ -164,7 +284,7 @@ uint8_t FsCustom_GetCanLogTailIndex(uint32_t *index)
 
 uint8_t FsCustom_GetCanLogCapacity(uint32_t *capacity)
 {
-    *capacity = MAX_LOG_INDEX + 1;
+    *capacity = appCanLogGetLogFileCount();
     return 0U;
 }
 
@@ -193,6 +313,18 @@ uint8_t FsCustom_GetBusloadCan2(float *busload)
 uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes)
 {
     *bytes = Rb1BytesHighWater;
+    return 0U;
+}
+
+uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count)
+{
+    *count = CanLogManager_FrameCount;
+    return 0U;
+}
+
+uint8_t FsCustom_GetPreallocErrorFlag(uint8_t *flag)
+{
+    *flag = (CanLogPreallocErrorCount > 0U) ? 1U : 0U;
     return 0U;
 }
 
@@ -262,11 +394,13 @@ find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix)
 static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
 {
     int lastUsed;
+    uint32_t max_index;
     volatile FRESULT res;
 
     (void)data;
 
-    lastUsed = find_highest_suffix("/logs/", "CAN.LOG", MAX_LOG_INDEX);
+    max_index = appCanLogGetMaxLogIndex();
+    lastUsed = find_highest_suffix("/logs/", "CAN.LOG", (int)max_index);
 
 #if 0U == PERSIST_CAN_LOG_FILE_HEAD_TAIL
     lastUsed = 0U;
@@ -333,32 +467,44 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
 {
     FRESULT FileSizeRes;
     uint32_t FileSize;
+    uint32_t log_file_size;
+    uint32_t log_file_count;
+    uint32_t max_index;
 
     (void)data;
+
+    if (!CanLogManager_FileTryLock())
+    {
+        return 0U;
+    }
 
     FileSizeRes = FatFS_SD_GetBufferedFileSize(
         &(CanLogCtrlData.CanLog.writeFileDevice),
         &FileSize
     );
 
-    if (FileSizeRes == FR_OK && (FileSize >= MAX_LOG_FILE_SIZE ) )
+    log_file_size = appCanLogGetLogFileSize();
+    log_file_count = appCanLogGetLogFileCount();
+    max_index = appCanLogGetMaxLogIndex();
+
+    if (FileSizeRes == FR_OK && (FileSize >= log_file_size) )
     {
         // File exists and is full, advance to next one
-        if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)))
+        if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)) && log_file_count > 0U)
         {
-            if (CanLogCtrlData.CanLog.fileHeadIndex >= MAX_LOG_INDEX)
+            if (CanLogCtrlData.CanLog.fileHeadIndex >= max_index)
             {
                 CanLogCtrlData.CanLog.fileIndexWrapped = 1;
             }
 
             CanLogCtrlData.CanLog.fileHeadIndex =
-                (CanLogCtrlData.CanLog.fileHeadIndex + 1) % (MAX_LOG_INDEX + 1);
+                (CanLogCtrlData.CanLog.fileHeadIndex + 1U) % log_file_count;
 
             if (1 == CanLogCtrlData.CanLog.fileIndexWrapped)
             {
                 CanLogCtrlData.CanLog.fileTailIndex =
                     (CanLogCtrlData.CanLog.fileHeadIndex + 1)
-                    % (MAX_LOG_INDEX + 1);
+                    % log_file_count;
             }
 
             snprintf(
@@ -393,6 +539,8 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
         }
     }
 
+    CanLogManager_FileUnlock();
+
     return 0U;
 }
 
@@ -419,7 +567,9 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
     CanLogCtrlData.Can2.accumulatedBits = 0;
     CanLogCtrlData.Can2.accumulatedTime = 0;
 
+    CanLogPreallocErrorCount = 0U;
     RuntimeChecks_Init();
+    CanLogManager_FileLockInit();
 
     return &CanLogCtrlData;
 }
@@ -467,6 +617,8 @@ static bool m_verify_preallocation(const char* path) {
     UINT bytes_read;
     UINT bytes_to_read;
     BYTE dummy_bytes[1U] ={0};
+    uint32_t log_file_size;
+    uint32_t seek_offset;
     bool can_seek;
     bool verified;
     
@@ -474,7 +626,17 @@ static bool m_verify_preallocation(const char* path) {
     if (res != FR_OK) return false;
     
     // Try seeking to near the expected pre-allocated size
-    res = f_lseek(&fil, MAX_LOG_FILE_SIZE - sizeof(dummy_bytes));
+    log_file_size = appCanLogGetLogFileSize();
+    if (log_file_size == 0U)
+    {
+        f_close(&fil);
+        return false;
+    }
+
+    seek_offset = (log_file_size > sizeof(dummy_bytes))
+        ? (log_file_size - sizeof(dummy_bytes))
+        : 0U;
+    res = f_lseek(&fil, seek_offset);
     can_seek = (res == FR_OK);
 
     bytes_to_read = sizeof(dummy_bytes);
@@ -494,15 +656,30 @@ static FRESULT m_preallocate_log_files(void)
     UINT bytes_written;
     BYTE dummy_byte = 0;
     char full_path[256];
+    uint32_t log_file_size;
+    uint32_t log_file_count;
+    uint32_t max_index;
 
     UnseekableFiles = 0;
+    CanLogPreallocErrorCount = 0U;
 
-    snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)MAX_LOG_INDEX);
+    log_file_size = appCanLogGetLogFileSize();
+    log_file_count = appCanLogGetLogFileCount();
+    max_index = appCanLogGetMaxLogIndex();
+
+    if (log_file_size == 0U || log_file_count == 0U)
+    {
+        return FR_INVALID_PARAMETER;
+    }
+
+    snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)max_index);
 
     if (1U != m_verify_preallocation(full_path))
     {
-        for (uint32_t i = 0; i < MAX_LOG_FILE_COUNT; i++)
+        for (uint32_t i = 0; i < log_file_count; i++)
         {
+            bool prealloc_ok = true;
+
             snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
             
             // Check if file already exists and is properly sized
@@ -521,41 +698,47 @@ static FRESULT m_preallocate_log_files(void)
             }
             
             if (res != FR_OK) {
+                CanLogPreallocErrorCount++;
                 continue;
             }
             
             if (res == FR_OK) {
-                res = f_expand(&logfile, MAX_LOG_FILE_SIZE, 0);
-    
+                res = f_expand(&logfile, log_file_size, 0);
+
                 if (res == FR_OK) 
                 {
-                    res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 1U);
+                    res = f_lseek(&logfile, log_file_size - 1U);
                     
                     if (res != FR_OK) 
                     {
-                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 512U);
+                        res = f_lseek(&logfile, log_file_size - 512U);
                     }
                     if (res != FR_OK) 
                     {
-                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 1024U);
+                        res = f_lseek(&logfile, log_file_size - 1024U);
                     }
                     if (res != FR_OK) 
                     {
-                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 3U*512U);
+                        res = f_lseek(&logfile, log_file_size - 3U*512U);
                     }
                     if (res != FR_OK) 
                     {
-                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 4U*512U);
+                        res = f_lseek(&logfile, log_file_size - 4U*512U);
                     }
                     if (res != FR_OK) 
                     {
-                        res = f_lseek(&logfile, MAX_LOG_FILE_SIZE - 5U*512U);
+                        res = f_lseek(&logfile, log_file_size - 5U*512U);
                     }
                 }
-    
+
                 if (res == FR_OK) 
                 {
+                    bytes_written = 0U;
                     res = f_write(&logfile, &dummy_byte, 1U, &bytes_written);
+                    if (res == FR_OK && bytes_written != 1U)
+                    {
+                        prealloc_ok = false;
+                    }
                 }
                 
                 if (res == FR_OK && bytes_written == 1) 
@@ -564,7 +747,17 @@ static FRESULT m_preallocate_log_files(void)
                 }
             }
             
-            f_close(&logfile);
+            if (res != FR_OK) {
+                prealloc_ok = false;
+            }
+
+            if (f_close(&logfile) != FR_OK) {
+                prealloc_ok = false;
+            }
+
+            if (!prealloc_ok) {
+                CanLogPreallocErrorCount++;
+            }
         }
     }
 
@@ -998,7 +1191,9 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     {
         CanLogManager_UpdateRb1BytesHighWater();
         CanLogManager_InstrumentationFlushStartHook();
+        CanLogManager_FileLock();
         res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
+        CanLogManager_FileUnlock();
         CanLogManager_InstrumentationFlushEndHook();
 
         CanLogBuffer_Consume(DataLength, FrameCount);

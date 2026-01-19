@@ -15,6 +15,7 @@ jobs:
     - name: Init required submodules
       run: |
         git submodule sync --recursive
+        git submodule update --init --recursive libs/coreJSON
         git submodule update --init --depth 1 libs/STM32_HAL/STM32H7
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/STM32H7xx_Nucleo
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/lan8742
