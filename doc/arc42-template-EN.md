@@ -64,10 +64,10 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
             - [SPI/SD timings](#spisd-timings)
                 - [SD multi-block write timing](#sd-multi-block-write-timing)
                 - [Block flush window logic analyzer](#block-flush-window-logic-analyzer)
-            - [Lossless logging validation](#lossless-logging-validation)
-            - [Stress test](#stress-test)
-        - [Long-run endurance test](#long-run-endurance-test)
-            - [Long-run test for release v0.2](#long-run-test-for-release-v02)
+            - [Validation plan](#validation-plan)
+            - [Stress test results](#stress-test-results)
+            - [Long-run endurance test](#long-run-endurance-test)
+                - [Long-run test for release v0.2](#long-run-test-for-release-v02)
     - [Comm drivers Runtime view](#comm-drivers-runtime-view)
     - [Comm driver factory](#comm-driver-factory)
         - [SPI driver](#spi-driver)
@@ -556,7 +556,7 @@ To validate determinism, the firmware exposes GPIO toggles that align with Salea
 
 The input data used for the measurements in this section were generated using CANoe and an Interactive Generator node for precise control and analysis of the test data.
 
-To test the reliability of the CAN logger representative test cases are defined. In practice, bus loads are kept below 100 % to reduce contention and keep the traffic deterministic. Therefore, the CAN logger tests are run at a bus load of 85 %.
+To test the reliability of the CAN logger representative test cases are defined. In practice, end-to-end validation runs keep bus loads below 100 % to reduce contention and keep the traffic deterministic (85 % target), while stress tests use 100 % bus load to probe saturation behavior.
 The actual frame rate is determined by the baud rate and the payload of the frames.
 
 The following figure shows how the data rate depends on the payload length (DLC) assuming all frames have the same length.
@@ -566,7 +566,7 @@ Each frame is stored with its metadata (e.g., timestamp, ID, etc.). The diagram 
 ![Classic CAN byte and frame rates over the payload length](images/graphs/datarates_anaylsis.py.svg)
 *Figure: Classic CAN byte and frame rates over the payload length (DLC) (see [script](images/graphs/datarates_anaylsis.py))*
 
-In conclusion, at 1 Mbit/s and 85% bus load, lower-DLC classic CAN frames provide a realistic long-run test case (>1 h), complemented by short (<15 min) 100% bus load stress runs.
+In conclusion, at 1 Mbit/s and 85% bus load, lower-DLC classic CAN frames provide a realistic long-run test case (>1 h), complemented by 100% bus load stress runs to probe saturation behavior.
 
 #### CAN ISR latency
 
@@ -623,25 +623,34 @@ Furthermore, it can be seen that a lot of time is spent waiting for the SD card 
 
 ![Block flush window measurement detail with logic analyzer](images/measurements/SD_card_write_duration/write_detail_multi-block_write_Logic%208.png)
 
-#### Lossless logging validation
+#### Validation plan
 
-Two complementary checks are used to validate lossless logging. The stress test relies on the firmware's internal drop counters and frame totals; after the run, the counters are read and must remain at zero drops. The long-run endurance test embeds monotonic counters in the frame payloads; after the run, the log file is parsed and the counter sequence is checked for any jumps across all frames.
+Lossless logging validation uses two complementary checks. The stress test relies on the firmware's internal drop counters and frame totals; after the run, the counters are read and must remain at zero drops. The end-to-end validation embeds monotonic counters in the frame payloads; after the run, the log file is parsed and the counter sequence is checked for any jumps across all frames.
 
-The test was run at 85 % bus load on both channels for 3 hours.
+The end-to-end validation test at 85 % bus load is planned but not yet completed.
 
 ![Lossless logging measurement points](images/measurement_lossless_proof.md.svg)
 
-#### Stress test
+#### Stress test results
 
-This section shows the results for a short stress test where both channels log frames at 1 Mbit/s @ 100 % bus load for 15 minutes to see the behavior under saturation.
+This section shows the results for a multi-hour stress test where both channels log frames at 1 Mbit/s @ 100 % bus load (~19900 frames/s) to see the behavior under saturation.
 
-> Placeholder image TODO
+Stress-test log summary (CANoe, two channels) from `tests/log_run/v0.2/rb1_usage_2026-01-19.log`.
+Collected with `./tools/poll_rb1_usage.sh -u http://can-sniffer.local/logger/status -i 10 -o rb1_usage.log`:
 
-### Long-run endurance test
+- Both channels active from 2026-01-19T17:41:47Z to 2026-01-19T21:02:01Z (duration 3 h 20 m 14 s). A brief CANoe pause (~15 s) at 2026-01-19T20:57:00Z is excluded from averages.
+- Channel 1 traffic stops at 2026-01-19T21:02:16Z; channel 2 continues until 2026-01-20T00:56:30Z (duration 3 h 54 m 14 s).
+- Average frame rate during the two-channel window: ~39,748 frames/s total (~19,874 frames/s per channel).
+- Average frame rate during the single-channel window (channel 2 only): ~19,929 frames/s.
+- Expected frame rate is 19,920 frames/s per channel; measured values are within ~0.3 %.
+- `frames_lost` stays false throughout the run, indicating no internal frame drops.
+- This run uses classic CAN with standard IDs and no payload to maximize frame rate; it does not include end-to-end content validation.
+
+#### Long-run endurance test
 
 This section contains long-run test results for selected releases.
 
-#### Long-run test for release v0.2
+##### Long-run test for release v0.2
 
 *Planned.* The overview and data of the upcoming long-run test will be captured [here](../tests/log_run/v0.2/long_run_test_v2.0.md) once the measurement is completed.
 
