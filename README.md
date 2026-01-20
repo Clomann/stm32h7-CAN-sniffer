@@ -4,8 +4,7 @@
   <p><em>Dual-channel CAN logger with HTTP config UI and SD persistence</em></p>
 </div>
 
-<!-- [![Build](https://github.com/Clomann/stm32h745-spi-to-microSD/actions/workflows/build.yml/badge.svg?branch=main&event=push)](https://github.com/Clomann/stm32h745-spi-to-microSD/actions/workflows/build.yml) -->
-
+[![Build](https://github.com/Clomann/stm32h7-CAN-sniffer/actions/workflows/unity-tests.yml/badge.svg?branch=main&event=push)](https://github.com/Clomann/stm32h7-CAN-sniffer/actions/workflows/unity-tests.yml)
 
 This project implements the software for a device that logs CAN traffic on two CAN channels and stores the data on an SD card. The device can be configured and the logged data can be accessed via a simple built-in web GUI.
 
@@ -333,10 +332,9 @@ clang-format -i --files=tools/clang/clang_files.txt
 # Future work
 
 Planned features are:
-- support for CAN FD frames
-- SDIO interface to allow for lower-quality SD cards
+- in-app-programming to update the firmware via web GUI
 - Wi-Fi extension
+- SDIO interface to allow for lower-quality SD cards
 - external Realtime-Clock (RTC)
 - support to convert to various CAN log formats via GUI (e.g. Vector ASCII)
 - for better performance and higher availability the serving of requests via ethernet shall be executed on another core to not interfere with the CAN trace logging when large files are loaded for user downloads.
-- in-app-programming to update the firmware via web GUI
