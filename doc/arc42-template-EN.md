@@ -589,22 +589,20 @@ avoiding cache misses by keeping the buffer in tightly coupled RAM.
 
 Data is written to the SD card from a staging buffer. The staging buffer is a rotating buffer offering multiple slots. When a slot is full it is written to the SD card in one go. The following image shows the time it takes to write one slot to the SD card on the y axis (including FatFS and SD SPI overhead) over the absolute time passed since the device was powered up (global timestamp).
 
-![SD multi-block write timing](images/measurements/SD_card_write_duration/write_duration_block_1_MBps_85_percent_8_byte_dlc.csv.svg)
+![SD multi-block write timing](images/measurements/SD_card_write_duration/write_duration_2_channel_19920_fps_per_channel.csv.svg)
 
-The diagram shows samples from 999 consecutive written slots. These slots were filled by test frames sent to CAN 1 and CAN 2 with both in listen-only mode. Thus, the bus load on each channel was a little above 85 % (to prevent error frames during logging tests).
+The diagram shows samples from 999 consecutive written slots. These slots were filled by test frames sent to CAN 1 and CAN 2 with both in listen-only mode. Thus, the bus load on each channel was a little above 100 % (to prevent error frames during logging tests).
 
-There is a recurring peak to over ~38 000 µs every 224 writes.
-Another pattern can be seen recurring after every 32 writes where write duration drops below ~34 500 us.
-The median write duration is otherwise ~35 590 us.
+Write duration is tightly clustered around ~72.1 ms (median ~72105 us), with 95 % of samples between ~71.3 ms and ~72.7 ms. Occasional spikes are visible: 10 samples exceed ~73.7 ms (0x12000 us), mostly recurring every 112 writes.
 
-The median throughput is accordingly: ~ 0.88 MiB/s.
-Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a data rate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](../dev/scripts/sd_card_bandwidth.py)).
+The median throughput is accordingly: ~0.91 MiB/s for 64 KiB blocks with FAT32 overhead.
+Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a needed data rate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](../dev/scripts/sd_card_bandwidth.py)).
 
 Notes:
 
-- Recurring fast pattern every 32 writes (32 KiB chunks -> 1 MiB), likely erase/page alignment.
-- Larger spike every 224 writes (7 MiB of data), probably controller cache/maintenance cycle.
-- To confirm, query AU_SIZE/ERASE_SIZE via ACMD13; if erase group is 1 MiB the 32‑write cadence fits, if larger (e.g., several MiB) the 224 cadence may reflect the true erase/flush interval.
+- High-latency spikes repeat with a cadence of ~112 writes, suggesting periodic card-internal housekeeping (erase/program or cache flush).
+- A separate 32 KiB write measurement shows spikes every 224 samples, consistent with card bookkeeping roughly every 224 * 32 KiB (~7 MiB).
+- The single 0x22634 us outlier in the CSV corresponds to the last file write for the instrumentation itself
 
 ##### Block flush window (logic analyzer)
 
