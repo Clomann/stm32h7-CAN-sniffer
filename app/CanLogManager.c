@@ -316,6 +316,43 @@ uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes)
     return 0U;
 }
 
+uint8_t FsCustom_GetCanAbsRxHighWaterCan1(uint32_t *frames)
+{
+    return CanAbs_GetRxHighWater_Can1(frames);
+}
+
+uint8_t FsCustom_GetCanAbsRxHighWaterCan2(uint32_t *frames)
+{
+    return CanAbs_GetRxHighWater_Can2(frames);
+}
+
+uint8_t FsCustom_GetCanAbsRxCapacity(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_GetRxBufferCapacity();
+    return 0U;
+}
+
+uint8_t FsCustom_GetFdcanMsgPortHighWater(uint32_t *bytes)
+{
+    return fdcan_msg_port_get_highwater_bytes(bytes);
+}
+
+uint8_t FsCustom_GetFdcanMsgPortCapacity(uint32_t *bytes)
+{
+    if (bytes == NULL)
+    {
+        return 1U;
+    }
+
+    *bytes = fdcan_msg_port_get_capacity_bytes();
+    return 0U;
+}
+
 uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count)
 {
     *count = CanLogManager_FrameCount;
