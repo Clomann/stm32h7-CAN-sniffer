@@ -36,7 +36,7 @@ static const char redirect_reply[] =
 
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
-#define CANLOG_MAX_STATUS_SIZE    192U
+#define CANLOG_MAX_STATUS_SIZE    320U
 #define CANLOG_MAX_CONFIG_SIZE    96U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
@@ -48,7 +48,7 @@ static const char redirect_reply[] =
     "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\",\"file_size\":\"%lu\"}"
 
 #define CANLOG_STATUS_STRING \
-    "{ \"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f}"
+    "{ \"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f,\"can1_rx_highwater_pct\":%.2f,\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f}"
 
 #define CANLOG_CONFIG_STRING \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
@@ -187,6 +187,14 @@ int fs_open_custom(struct fs_file *file, const char *name)
         uint8_t PreallocErrors = 0U;
         uint32_t Rb1BytesHighWater = 0U;
         float Rb1BytesHighWaterPct = 0.0f;
+        uint32_t CanAbsRxHighWaterCan1 = 0U;
+        uint32_t CanAbsRxHighWaterCan2 = 0U;
+        uint32_t CanAbsRxCapacity = 0U;
+        float CanAbsRxHighWaterPctCan1 = 0.0f;
+        float CanAbsRxHighWaterPctCan2 = 0.0f;
+        uint32_t FdcanMsgPortHighWater = 0U;
+        uint32_t FdcanMsgPortCapacity = 0U;
+        float FdcanMsgPortHighWaterPct = 0.0f;
         uint64_t FrameCount = 0U;
         unsigned long FrameCountHi = 0UL;
         unsigned long FrameCountLo = 0UL;
@@ -204,6 +212,26 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             Rb1BytesHighWater = 0U;
         }
+        if (0U != FsCustom_GetCanAbsRxHighWaterCan1(&CanAbsRxHighWaterCan1))
+        {
+            CanAbsRxHighWaterCan1 = 0U;
+        }
+        if (0U != FsCustom_GetCanAbsRxHighWaterCan2(&CanAbsRxHighWaterCan2))
+        {
+            CanAbsRxHighWaterCan2 = 0U;
+        }
+        if (0U != FsCustom_GetCanAbsRxCapacity(&CanAbsRxCapacity))
+        {
+            CanAbsRxCapacity = 0U;
+        }
+        if (0U != FsCustom_GetFdcanMsgPortHighWater(&FdcanMsgPortHighWater))
+        {
+            FdcanMsgPortHighWater = 0U;
+        }
+        if (0U != FsCustom_GetFdcanMsgPortCapacity(&FdcanMsgPortCapacity))
+        {
+            FdcanMsgPortCapacity = 0U;
+        }
         if (0U != FsCustom_GetCanLogFrameCount(&FrameCount))
         {
             FrameCount = 0U;
@@ -214,6 +242,18 @@ int fs_open_custom(struct fs_file *file, const char *name)
         if (LOG_BUFFER_SIZE > 0U)
         {
             Rb1BytesHighWaterPct = (float)Rb1BytesHighWater * 100.0f / (float)LOG_BUFFER_SIZE;
+        }
+        if (CanAbsRxCapacity > 0U)
+        {
+            CanAbsRxHighWaterPctCan1 =
+                (float)CanAbsRxHighWaterCan1 * 100.0f / (float)CanAbsRxCapacity;
+            CanAbsRxHighWaterPctCan2 =
+                (float)CanAbsRxHighWaterCan2 * 100.0f / (float)CanAbsRxCapacity;
+        }
+        if (FdcanMsgPortCapacity > 0U)
+        {
+            FdcanMsgPortHighWaterPct =
+                (float)FdcanMsgPortHighWater * 100.0f / (float)FdcanMsgPortCapacity;
         }
 
         int n = snprintf(StatusData,
@@ -226,8 +266,16 @@ int fs_open_custom(struct fs_file *file, const char *name)
             FrameCountLo,
             BusLoadCan1,
             BusLoadCan2,
-            Rb1BytesHighWaterPct
+            Rb1BytesHighWaterPct,
+            CanAbsRxHighWaterPctCan1,
+            CanAbsRxHighWaterPctCan2,
+            FdcanMsgPortHighWaterPct
         );
+
+        if (n < 0 || (size_t)n >= sizeof(StatusData))
+        {
+            return 0;
+        }
     
         file->data           = StatusData;
         file->len            = n;
