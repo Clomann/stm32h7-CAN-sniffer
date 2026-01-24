@@ -79,6 +79,9 @@ static RingBuffer Fdcan2TxRingBuffer = {
     .isFull = false
 };
 
+static uint32_t CanAbs_Can1_RxHighWater = 0U;
+static uint32_t CanAbs_Can2_RxHighWater = 0U;
+
 /* Private functions */
 
 /**
@@ -86,6 +89,26 @@ static RingBuffer Fdcan2TxRingBuffer = {
  */
 static inline int can_ioctl(struct CommDriver *dev, int cmd, void *arg) {
     return dev->interface->ioctl(dev, cmd, arg);
+}
+
+static void CanAbs_UpdateRxHighWater(uint8_t channel, const RingBuffer *rb)
+{
+    uint32_t used = ring_buffer_count(rb);
+
+    if (channel == 1U)
+    {
+        if (used > CanAbs_Can1_RxHighWater)
+        {
+            CanAbs_Can1_RxHighWater = used;
+        }
+    }
+    else if (channel == 2U)
+    {
+        if (used > CanAbs_Can2_RxHighWater)
+        {
+            CanAbs_Can2_RxHighWater = used;
+        }
+    }
 }
 
 int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t *rx)
@@ -384,6 +407,10 @@ static uint32_t CanAbs_ReadAllAvailableFrames(CommDriver *driver,
                 CanAbs_FrameDropCount++;
                 CanAbs_ErrorHandler();
             }
+            else
+            {
+                CanAbs_UpdateRxHighWater(channel, (RingBuffer *)driver->RxFrameBuffer);
+            }
             frames_processed++;
 
             CanAbs_FrameCount++;
@@ -449,6 +476,8 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
 {
     comm_status_t res;
 
+    CanAbs_Can1_RxHighWater = 0U;
+
     res = CanAbs_Init(&Fdcan1Driver, &Fdcan1Config, (uint8_t *)&Fdcan1TxRingBuffer, (uint8_t *)&Fdcan1RxRingBuffer);
 
     if (0 == COMM_SUCCESS)
@@ -501,6 +530,8 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
 {
     comm_status_t res;
 
+    CanAbs_Can2_RxHighWater = 0U;
+
     res = CanAbs_Init(&Fdcan2Driver, &Fdcan2Config, (uint8_t *)&Fdcan2TxRingBuffer, (uint8_t *)&Fdcan2RxRingBuffer);
 
     if (0 == COMM_SUCCESS)
@@ -545,6 +576,33 @@ comm_status_t CanAbs_IsStateOff_Can2(bool * isOff)
 {
     *isOff = Fdcan2Driver.state == DRIVER_STATE_OFF;
     return COMM_SUCCESS;
+}
+
+uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_Can1_RxHighWater;
+    return 0U;
+}
+
+uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_Can2_RxHighWater;
+    return 0U;
+}
+
+uint32_t CanAbs_GetRxBufferCapacity(void)
+{
+    return SW_RX_FRAME_BUFFER_SIZE;
 }
 
 void CanAbs_Drain(void)

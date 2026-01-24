@@ -94,6 +94,29 @@ comm_status_t CanAbs_IsStateOff_Can2(bool *isOff)
     return COMM_SUCCESS;
 }
 
+uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames)
+{
+    if (frames)
+    {
+        *frames = 0U;
+    }
+    return 0U;
+}
+
+uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
+{
+    if (frames)
+    {
+        *frames = 0U;
+    }
+    return 0U;
+}
+
+uint32_t CanAbs_GetRxBufferCapacity(void)
+{
+    return 0U;
+}
+
 void CanAbs_Drain(void)
 {
     /* no-op in stub */
