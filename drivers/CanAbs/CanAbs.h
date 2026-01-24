@@ -13,6 +13,7 @@ comm_status_t CanAbs_Stop_Can1(void);
 comm_status_t CanAbs_SetBaudrate_Can1(uint32_t baudrate);
 comm_status_t CanAbs_SetMode_Can1(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can1(bool * isOff);
+uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames);
 
 comm_status_t CanAbs_Init_Can2(uint32_t baudrate);
 comm_status_t CanAbs_Send_Can2(FDCAN_Message *msg);
@@ -22,6 +23,9 @@ comm_status_t CanAbs_Stop_Can2(void);
 comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate);
 comm_status_t CanAbs_SetMode_Can2(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can2(bool * isOff);
+uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames);
+
+uint32_t CanAbs_GetRxBufferCapacity(void);
 
 void  CanAbs_ErrorHandler(void);
 
