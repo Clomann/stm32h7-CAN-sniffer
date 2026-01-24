@@ -31,6 +31,7 @@ typedef struct {
 static MessageBufferHandle_t CanFrameBuffer;
 static StaticMessageBuffer_t MessageBuffer;
 uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE] RAM_DTC_SECTION;
+static uint32_t CanFrameBufferHighWaterBytes = 0U;
 
 /**
  * @brief CAN frame page buffer shared between ISR and task context
@@ -42,6 +43,31 @@ uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE] RAM_DTC_SECTION;
 static PageType Page = {.count = 0};
 
 // STATIC_ASSERT( CAN_FRAME_BUFFER_SIZE >= 2U * sizeof(FDCAN_ClassicFrameType) );
+
+static void fdcan_msg_port_update_highwater(void)
+{
+    size_t space;
+    size_t capacity;
+    size_t used;
+
+    if (CanFrameBuffer == NULL)
+    {
+        return;
+    }
+
+    capacity = (CAN_FRAME_BUFFER_SIZE > 0U) ? (CAN_FRAME_BUFFER_SIZE - 1U) : 0U;
+    space = xMessageBufferSpacesAvailable(CanFrameBuffer);
+    if (space > capacity)
+    {
+        return;
+    }
+
+    used = capacity - space;
+    if (used > CanFrameBufferHighWaterBytes)
+    {
+        CanFrameBufferHighWaterBytes = (uint32_t)used;
+    }
+}
 
 static inline void AddEntryToPage(PageType *page, const FDCAN_ClassicFrameType *frame)
 {
@@ -61,6 +87,7 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame)
         if (bytes_sent > 0)
         {
             Page.count = 0;
+            fdcan_msg_port_update_highwater();
         }
         else
         {
@@ -86,6 +113,7 @@ void fdcan_msg_port_init(void)
     volatile size_t ActualSize;
 
     FcdanMsgPort_FrameDropCount = 0U;
+    CanFrameBufferHighWaterBytes = 0U;
 
     CanFrameBuffer = xMessageBufferCreateStatic(
                         CAN_FRAME_BUFFER_SIZE,
@@ -146,6 +174,7 @@ void fdcan_msg_port_flush(void)
         if (bytes_sent > 0)
         {
             Page.count = 0;
+            fdcan_msg_port_update_highwater();
         }
         else
         {
@@ -154,4 +183,25 @@ void fdcan_msg_port_flush(void)
             return;
         }
     }
+}
+
+uint8_t fdcan_msg_port_get_highwater_bytes(uint32_t *bytes)
+{
+    if (bytes == NULL)
+    {
+        return 1U;
+    }
+
+    *bytes = CanFrameBufferHighWaterBytes;
+    return 0U;
+}
+
+uint32_t fdcan_msg_port_get_capacity_bytes(void)
+{
+    if (CAN_FRAME_BUFFER_SIZE > 0U)
+    {
+        return (uint32_t)(CAN_FRAME_BUFFER_SIZE - 1U);
+    }
+
+    return 0U;
 }

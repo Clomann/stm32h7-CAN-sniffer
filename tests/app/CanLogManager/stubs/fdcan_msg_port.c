@@ -79,3 +79,17 @@ size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **frame, uint32_t timeout)
     }
     return 0;
 }
+
+uint8_t fdcan_msg_port_get_highwater_bytes(uint32_t *bytes)
+{
+    if (bytes)
+    {
+        *bytes = 0U;
+    }
+    return 0U;
+}
+
+uint32_t fdcan_msg_port_get_capacity_bytes(void)
+{
+    return 0U;
+}
