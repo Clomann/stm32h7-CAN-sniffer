@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "RuntimeChecks.h"
 #include "stm32h745xx.h"
+#include "stm32h7xx_hal_fdcan.h"
+#include "stm32h7xx_hal_cortex.h"
 
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
@@ -110,6 +112,36 @@ static void CanAbs_UpdateRxHighWater(uint8_t channel, const RingBuffer *rb)
         }
     }
 }
+
+#if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+
+#define CANABS_FDCAN_RX_FIFO0_MASK (FDCAN_IR_RF0L | FDCAN_IR_RF0F | FDCAN_IR_RF0W | FDCAN_IR_RF0N)
+
+static void CanAbs_ClearRxFifo0IrqIfEmpty(CommDriver *driver)
+{
+    FDCAN_HandleTypeDef *hfdcan;
+    uint32_t pending;
+
+    if (COMM_SUCCESS != fdcan_get_can(driver, &hfdcan))
+    {
+        return;
+    }
+
+    if (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) != 0U)
+    {
+        return;
+    }
+
+    /* Avoid back-to-back IRQs from stale RX FIFO0 flags after draining. */
+    pending = hfdcan->Instance->IR & CANABS_FDCAN_RX_FIFO0_MASK;
+    pending &= hfdcan->Instance->IE;
+    
+    if (pending != 0U)
+    {
+        __HAL_FDCAN_CLEAR_FLAG(hfdcan, pending);
+    }
+}
+#endif
 
 int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t *rx)
 {
@@ -242,18 +274,29 @@ void CANABS_CheckIsrPollPeriod(uint64_t timestamp, uint64_t timerPeriod)
         FDCAN_ErrorHandler();
     }
 
+    bool bIsPendingCan1 = false;
+    bool bIsPendingCan2 = false;
+
+    bIsPendingCan1 = NVIC_GetPendingIRQ(FDCAN_1_IRQn) > 0;
+    bIsPendingCan2 = NVIC_GetPendingIRQ(FDCAN_2_IRQn) > 0;
+
 #if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
-    if (AnyFrameAvailableCan1 || AnyFrameAvailableCan2)
+
+    if (bIsPendingCan1 || bIsPendingCan2)
+    {
+        // fall through
+    }
+    else if (AnyFrameAvailableCan1 || AnyFrameAvailableCan2)
     {
         NVIC_SetPendingIRQ(FDCAN_1_IRQn);
     }
 #else
-    if (AnyFrameAvailableCan1)
+    if (AnyFrameAvailableCan1 && !bIsPendingCan1)
     {
         NVIC_SetPendingIRQ(FDCAN_1_IRQn);
     }
 
-    if (AnyFrameAvailableCan2)
+    if (AnyFrameAvailableCan2 && !bIsPendingCan2)
     {
         NVIC_SetPendingIRQ(FDCAN_2_IRQn);
     }
@@ -462,6 +505,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             &CanAbs_CAN2_Rx_FrameDropCount);
     }
     
+#if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+    CanAbs_ClearRxFifo0IrqIfEmpty(&Fdcan1Driver);
+    CanAbs_ClearRxFifo0IrqIfEmpty(&Fdcan2Driver);
+#endif
+
     if (frames_processed > 0) {
         NotifyConsumerTask();
     }
