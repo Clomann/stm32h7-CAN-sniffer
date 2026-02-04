@@ -9,7 +9,7 @@ _bin/
 _deps/
 tests/_deps
 tests/build/
-*/**/measurements/**/*
+*.tar.zst
 
 CMakeCache.txt
 *.cmake

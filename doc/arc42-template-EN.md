@@ -65,9 +65,9 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
                 - [SD multi-block write timing](#sd-multi-block-write-timing)
                 - [Block flush window logic analyzer](#block-flush-window-logic-analyzer)
             - [Lossless logging validation](#lossless-logging-validation)
+                - [Test results](#test-results)
             - [Stress test](#stress-test)
-        - [Long-run endurance test](#long-run-endurance-test)
-            - [Long-run test for release v0.2](#long-run-test-for-release-v02)
+                - [Test results](#test-results)
     - [Comm drivers Runtime view](#comm-drivers-runtime-view)
     - [Comm driver factory](#comm-driver-factory)
         - [SPI driver](#spi-driver)
@@ -549,24 +549,26 @@ To validate determinism, the firmware exposes GPIO toggles that align with Salea
   ![SD write measurement points](images/measurement_sd_write.md.svg)
 - **Block flush duration** – Saleae capture shows the flush window alongside SPI CLK/MOSI/MISO to correlate *CanLogBuffer* drain with actual SD traffic.  
   ![Block flush measurement points](images/measurement_block_flush.md.svg)
-- **Lossless logging validation** – CANoe provides reference frame counts via embedded sequence IDs, while the firmware records the same range plus internal 64-bit start/stop timestamps (logger starts first, CANoe starts second, stopping happens in reverse) and a drop counter. After each long run a host script streams the SD logs, computes a CRC over the actual bytes, and compares the metadata with the CANoe report to confirm zero drops.  
+- **Lossless logging validation** – Logger starts first, then CANoe traffic; stopping happens in reverse. After each run, the firmware's drop counter and total received frame count are read, and the SD log is parsed to verify continuous CANoe sequence IDs. The total frame count is compared against the CANoe report to confirm zero loss.  
   ![Lossless proof measurement points](images/measurement_lossless_proof.md.svg)
 
 ### Measurements
 
 The input data used for the measurements in this section were generated using CANoe and an Interactive Generator node for precise control and analysis of the test data.
 
-To test the reliability of the CAN logger representative test cases are defined. In practice, bus loads are kept below 100 % to reduce contention and keep the traffic deterministic. Therefore, the CAN logger tests are run at a bus load of 85 %.
-The actual frame rate is determined by the baud rate and the payload of the frames.
+To test the reliability of the CAN logger representative test cases are defined. In practice, average bus loads are kept considerably below 100 % to reduce contention and keep the traffic deterministic. Therefore, the end-to-end CAN logger tests are run at a bus load of ~85 %.
+The actual frame rate is determined by the baud rate and the payload of the frames. Stress tests have to show reliable operation at worst case frame rates as described further down in this section.
 
 The following figure shows how the data rate depends on the payload length (DLC) assuming all frames have the same length.
-The maximum data-rate to the SD card is determined as described in section [SPI/SD timings](#spisd-timings) with ~0.88 MiB/s (with 8 byte DLC decreasing with frame rate).
-Each frame is stored with its metadata (e.g., timestamp, ID, etc.). The diagram shows that storage data rate increases as DLC decreases because the frame rate rises. Storing the frames to storage with dynamic length decreases the needed rate to storage considerably.
+For storing a log entry, each log entry adds a packed 14-byte header (excluding payload), so dynamic storage is 14 + DLC bytes per frame (22 bytes at DLC=8). At 1 Mbit/s and 100% bus load this yields ~0.35 MiB/s at DLC=8 and up to ~0.49 MiB/s at DLC=0; a fixed 8-byte payload in each log entry would push the worst case to ~0.76 MiB/s.
+Worst case in this model (classic CAN, standard ID, 2 channels, DLC=0, 1 Mbit/s, 100% bus load) is therefore ~0.49 MiB/s for dynamic logging.
+
+The following diagram shows that storage data rate to the SD card increases as DLC decreases because the frame rate rises; dynamic storage reduces the required bandwidth at low DLC. The SD throughput reference line (dashed green) is taken from the [SPI/SD timings section](#sd-multi-block-write-timing).
 
 ![Classic CAN byte and frame rates over the payload length](images/graphs/datarates_anaylsis.py.svg)
 *Figure: Classic CAN byte and frame rates over the payload length (DLC) (see [script](images/graphs/datarates_anaylsis.py))*
 
-In conclusion, at 1 Mbit/s and 85% bus load, lower-DLC classic CAN frames provide a realistic long-run test case (>1 h), complemented by short (<15 min) 100% bus load stress runs.
+In conclusion, at 1 Mbit/s and 85% bus load, lower-DLC classic CAN frames provide a realistic long-run test case (~6 h), complemented by short (~15 h) 100% bus load stress runs.
 
 #### CAN ISR latency
 
@@ -577,11 +579,13 @@ The measurements with an oscilloscope (1 GSs/s) shown in the following figure yi
 *Figure: FDCAN interrupt service routine duration with 1 Mbit/s on 2 channels at 85 % bus load.*
 
 Notes:
-
+- the measurement was taken for a per frame IRQ and not a watemark based policy
 - jitter and ISR duration can be optimized by placing ISR code and data in ITCM/DTCM and
 avoiding cache misses by keeping the buffer in tightly coupled RAM.
 
 #### SPI/SD timings
+
+This section describes the measured effective write speed and its statistical metrics.
 
 ##### SD multi-block write timing
 
@@ -589,59 +593,97 @@ avoiding cache misses by keeping the buffer in tightly coupled RAM.
 
 Data is written to the SD card from a staging buffer. The staging buffer is a rotating buffer offering multiple slots. When a slot is full it is written to the SD card in one go. The following image shows the time it takes to write one slot to the SD card on the y axis (including FatFS and SD SPI overhead) over the absolute time passed since the device was powered up (global timestamp).
 
+The diagram can be re-generated using following commands:
+
+```sh
+cd doc/images/measurements/SD_card_write_duration \
+&& python3 write_duration_block.py write_duration_2_channel_19920_fps_per_channel.csv
+```
+
 ![SD multi-block write timing](images/measurements/SD_card_write_duration/write_duration_2_channel_19920_fps_per_channel.csv.svg)
 
-The diagram shows samples from 999 consecutive written slots. These slots were filled by test frames sent to CAN 1 and CAN 2 with both in listen-only mode. Thus, the bus load on each channel was a little above 100 % (to prevent error frames during logging tests).
+The diagram shows samples from 4001 consecutive written slots. These slots were filled by test frames sent to CAN 1 and CAN 2 with both in listen-only mode. Thus, the bus load on each channel was ~100 %.
 
-Write duration is tightly clustered around ~72.1 ms (median ~72105 us), with 95 % of samples between ~71.3 ms and ~72.7 ms. Occasional spikes are visible: 10 samples exceed ~73.7 ms (0x12000 us), mostly recurring every 112 writes.
+Write duration is tightly clustered around ~69.5 ms (median ~69520 us), with 95 % of samples between ~69.1 ms and ~70.8 ms. Occasional spikes are visible: 6 samples exceed ~73.7 ms (0x12000 us), with spacing in the hundreds of writes.
 
-The median throughput is accordingly: ~0.91 MiB/s for 64 KiB blocks with FAT32 overhead.
-Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a needed data rate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](../dev/scripts/sd_card_bandwidth.py)).
+The median throughput is accordingly: ~0.90 MiB/s for a single 64 KiB block with FAT32 overhead.
+Logging 2 channels at 100 % bus load at 1 Mbit/s currently results in a needed data rate of 0.39 MiB/s to the SD card (28 byte per frame total; see [SD card bandwidth script](../dev/scripts/sd_card_bandwidth.py)). The end-to-end (E2E) throughput based on the measured write cadence and duration is ~0.53 MiB/s. This value is a little more than the theoretical one determined in [Measurements](#measurements). The delta is explained by the block header and sync frames that are added to each block of the log. 
 
 Notes:
 
-- High-latency spikes repeat with a cadence of ~112 writes, suggesting periodic card-internal housekeeping (erase/program or cache flush).
+- High-latency spikes are sparse and spaced by hundreds of writes, consistent with periodic card-internal housekeeping (erase/program or cache flush).
 - A separate 32 KiB write measurement shows spikes every 224 samples, consistent with card bookkeeping roughly every 224 * 32 KiB (~7 MiB).
-- The single 0x22634 us outlier in the CSV corresponds to the last file write for the instrumentation itself
 
 ##### Block flush window (logic analyzer)
 
 The following screenshot taken with a 50 Msps logic analyzer shows the instrumented GPIO toggle at channel 0 and the SPI communication at the 4 remaining channels. 
 These measurements are marked in the logic analyzer screenshot:
 
-- M0 spans the 32 KiB multi-block write (~35.6 ms)
-- M1 spans flush + idle (~61.7 ms)
-- M2 spans only flush (~2.4 ms)
+- M0 (PB1) shows the FDCAN ISR timing
+- M1 (PB2) spans the 64 KiB multi-block write (~70.0 ms)
+- M2 (PB4) spans each iteration of copying a frame from the message port to the SD card staging buffer and the flush management
 
-Thus, it also depicts a 32 KiB block write duration of ~35 ms as measured in the previous section.
+![Block flush window measurement with logic analyzer](images/measurements/SD_card_write_duration/write_duration_64KiBblock_Logic%208.png)
 
-![Block flush window measurement with logic analyzer](images/measurements/SD_card_write_duration/write_duration_32KiBblock_Logic%208.png)
-
-Furthermore, it can be seen that a lot of time is spent waiting for the SD card to handle the incoming data between multi-block writes, as the following figure shows:
-
-![Block flush window measurement detail with logic analyzer](images/measurements/SD_card_write_duration/write_detail_multi-block_write_Logic%208.png)
+Thus, it also depicts a 64 KiB block write duration of ~71.70 ms consistent with the measurement in the previous section.
 
 #### Lossless logging validation
 
-Two complementary checks are used to validate lossless logging. The stress test relies on the firmware's internal drop counters and frame totals; after the run, the counters are read and must remain at zero drops. The long-run endurance test embeds monotonic counters in the frame payloads; after the run, the log file is parsed and the counter sequence is checked for any jumps across all frames.
+Lossless logging validation uses three checks after each run: 
 
-The test was run at 85 % bus load on both channels for 3 hours.
+1. the internal drop counters remains zero, 
+2. the recorded CANoe-generated sequence IDs are continuous across all frames (indicating no E2E frame loss), 
+3. and the total received frame count matches the CANoe report. 
 
 ![Lossless logging measurement points](images/measurement_lossless_proof.md.svg)
+
+The procedure is to start the logger, start CANoe traffic, stop CANoe, stop the logger, then read the metadata and parse the SD log.
+
+The losslessness E2E tests are run at ~85 % bus load on both channels for 6 hours and the end-to-end captures from the SD card are stored here: [external link](https://my.hidrive.com/share/rc0mksyt9x).
+
+Some metadata is read via the REST API using following scripts:
+
+- error flags, drop counts and buffer utilizations: [poll_rb1_usage.sh](tools/poll_rb1_usage.sh) 
+- log file status (using ` curl can-sniffer.local/logger/status >> tools/rb1_usage.log`)
+
+##### Test results
+
+The files resulting from the test are big (~10 Gb) and, therefore, compressed using
+
+```sh
+date=2026-01-30 \
+&& tar -cvf - ./logs | zstd -T0 -19 -o logs_${date}.tar.zst \
+&& zstd -t logs_${date}.tar.zst
+``` 
+
+and then uploaded to a private cloud storage.
+A quick archive check:
+
+```sh
+zstd -t logs_${date}.tar.zst \
+&& zstd -dc logs_${date}.tar.zst | tar -tvf - | head
+``` 
+
+The archive can be unpacked using following command:
+
+```sh
+mkdir -p ./logs \
+&& zstd -dc logs_${date}.tar.zst | tar -xvf - -C ./logs --strip-components=2
+```
+
+Follwoing tests were conducted:
+
+- 2026-01-30: The test results are stored in: [measurements/losslessnes/2026-01-30/README.md](measurements/losslessnes/2026-01-30/README.md).
 
 #### Stress test
 
 This section shows the results for a short stress test where both channels log frames at 1 Mbit/s @ 100 % bus load for 15 minutes to see the behavior under saturation.
 
-> Placeholder image TODO
+##### Test results
 
-### Long-run endurance test
+- 2026-01-30: The test results are stored in: [doc/images/measurements/stress/results/2026-01-30/README.md](images/measurements/stress/results/2026-01-30/README.md).
 
-This section contains long-run test results for selected releases.
-
-#### Long-run test for release v0.2
-
-*Planned.* The overview and data of the upcoming long-run test will be captured [here](../tests/log_run/v0.2/long_run_test_v2.0.md) once the measurement is completed.
+> TODO
 
 ## Comm drivers (Runtime view)
 

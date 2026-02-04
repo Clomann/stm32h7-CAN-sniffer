@@ -1,9 +1,36 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
+import sys
 
-file = f'write_duration_2_channel_19920_fps_per_channel.csv'
-BYTES = 64 * 1024
+# Parse command-line arguments
+parser = argparse.ArgumentParser(
+    description='Analyze and visualize multi-block write duration performance metrics.',
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog='''
+Examples:
+  %(prog)s data.csv
+  %(prog)s write_duration_2_channel_19920_fps_per_channel.csv --bytes 65536
+
+Notes:
+  - The CSV file should contain two columns: timestamp (t) and duration (dT)
+  - Output includes statistics printed to console and an SVG plot
+  - The plot shows write duration over time and distribution histograms
+    ''')
+
+parser.add_argument('file', 
+                    help='Path to the CSV file containing write duration data')
+parser.add_argument('--bytes', 
+                    type=int, 
+                    default=64 * 1024,
+                    help='Number of bytes per flush (default: 65536 = 64 KiB)')
+
+args = parser.parse_args()
+
+file = args.file
+BYTES = args.bytes
+
 
 def ParseCsvValue(value):
     if pd.isna(value):
@@ -21,104 +48,206 @@ def ParseCsvValue(value):
 
     return float(text.replace(',', '.'))
 
+
 def ConfigureAxis(ax):
     ax.set_xlabel('t in s')
     ax.set_ylabel('dT in us')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    # Get current axis limits
+
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    
-    # X-axis arrow at the RIGHT end, at BOTTOM of plot (ylim[0], not 0!)
+
     ax.annotate('', xy=(xlim[1], ylim[0]), xytext=(xlim[0], ylim[0]),
                 xycoords='data',
                 arrowprops=dict(arrowstyle='->', lw=2, color='black'))
-    
-    # Y-axis arrow at the TOP, at LEFT of plot (xlim[0], not 0!)
+
     ax.annotate('', xy=(xlim[0], ylim[1]), xytext=(xlim[0], ylim[0]),
                 xycoords='data',
                 arrowprops=dict(arrowstyle='->', lw=2, color='black'))
 
-df = pd.read_csv(file, 
-                 sep=';', 
-                 names=['t','dT'],
-                 skiprows=2,
-                 converters={'t': ParseCsvValue, 'dT': ParseCsvValue})
 
-tt = df['t'] / 1000 / 1000
-yy = df['dT']
+def pct(x: np.ndarray, q: float) -> float:
+    """Percentile helper; ignores NaNs."""
+    x = np.asarray(x)
+    x = x[np.isfinite(x)]
+    if x.size == 0:
+        return np.nan
+    return float(np.percentile(x, q))
 
-sort_indices = np.argsort(tt)
 
-tt = tt.iloc[sort_indices]  # Use .iloc for pandas Series
-yy = yy.iloc[sort_indices]
+# Read CSV file
+try:
+    df = pd.read_csv(
+        file,
+        sep=';',
+        names=['t', 'dT'],
+        skiprows=2,
+        converters={'t': ParseCsvValue, 'dT': ParseCsvValue}
+    )
+except FileNotFoundError:
+    print(f"Error: File '{file}' not found.", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"Error reading file: {e}", file=sys.stderr)
+    sys.exit(1)
 
-# drop last entry (last entry is cause by persisting the log)
-tt = tt[:-1]
-yy = yy[:-1]
+t_us = df['t'].to_numpy(dtype=np.float64)
+dT_us = df['dT'].to_numpy(dtype=np.float64)
 
-print("Median write duration", np.median(yy))
-print(f"Median raw data throughput: {round(BYTES / np.median(yy),2)} Mbytes/s")
+mask = np.isfinite(t_us) & np.isfinite(dT_us)
+t_us = t_us[mask]
+dT_us = dT_us[mask]
 
-COARSE_CADENCE_LIMIT = 38000
-FINE_CADENCE_LIMIT   = 34000
+# ---- Fix circular buffer dump order (head/tail meet) ----
+dt = np.diff(t_us)
+wrap_candidates = np.where(dt < 0)[0]
+if wrap_candidates.size > 0:
+    k = wrap_candidates[np.argmin(dt[wrap_candidates])]
+    t_us = np.concatenate([t_us[k + 1:], t_us[:k + 1]])
+    dT_us = np.concatenate([dT_us[k + 1:], dT_us[:k + 1]])
+else:
+    order = np.argsort(t_us)
+    t_us = t_us[order]
+    dT_us = dT_us[order]
 
-# compute circular forward differences, including wrap-around at the end
-idx = yy[yy > COARSE_CADENCE_LIMIT].index
-diffs = (np.roll(idx.values, -1) - idx.values) % len(yy)
+# ---- Drop the last sample w.r.t. time (persist-log entry) ----
+if len(t_us) > 1:
+    dT_us = dT_us[:-2]
+    t_us = t_us[:-2]
 
-# print("Index differences of coarse cadence for values > " + str(COARSE_CADENCE_LIMIT) + ": ", diffs)
+print(len(t_us))
 
-# compute circular forward differences, including wrap-around at the end
-idx = yy[yy < FINE_CADENCE_LIMIT].index
-diffs = (np.roll(idx.values, -1) - idx.values) % len(yy)
+tt = t_us / 1e6  # seconds
+yy = dT_us       # microseconds
 
-# print("Index differences of fine cadence for values < " + str(FINE_CADENCE_LIMIT) + ": ", diffs)
+# ---- Derived metrics: cadence + end-to-end throughput ----
+P_us_full = np.diff(t_us)
+valid = P_us_full > 0
+P_us = P_us_full[valid]
 
-grid_style = {
-    'linestyle': ':', 
-    'linewidth': 1, 
-    'alpha': 0.7
-}
+cadence_hz = 1e6 / P_us
+e2e_MBps = (BYTES / (P_us * 1e-6)) / (1024 * 1024)
 
-fig = plt.figure(constrained_layout=True)
-axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
-                          gridspec_kw={'width_ratios':[2, 2]})
+dT_aligned = dT_us[:-1]
+util = dT_aligned[valid] / P_us_full[valid]
 
-axs['Left'].set_title(f'Multi-block write duration ({round(BYTES)/1024} kB data)')
-axs['Left'].grid(True, **grid_style)
+raw_MBps = (BYTES / (yy * 1e-6)) / (1024 * 1024)
 
-x_min = min(tt)
-x_max = max(tt)
-y_min = min(yy[:-1]) - 500
-y_max = max(yy) + 500
+# ---- Print key stats to console ----
+print("=== f_write duration dT (us) ===")
+print("p50  :", round(pct(yy, 50), 2))
+print("p99  :", round(pct(yy, 99), 2))
+print("p999 :", round(pct(yy, 99.9), 2))
+print("max  :", round(np.nanmax(yy), 2))
+
+print("\n=== Raw in-flush rate (MiB/s), computed from dT ===")
+print("p50  :", round(pct(raw_MBps, 50), 3))
+print("p99  :", round(pct(raw_MBps, 99), 3))
+print("p999 :", round(pct(raw_MBps, 99.9), 3))
+print("min  :", round(np.nanmin(raw_MBps), 3))
+
+print("\n=== Flush cadence (Hz), computed from start timestamps ===")
+print("p50  :", round(pct(cadence_hz, 50), 2))
+print("p99  :", round(pct(cadence_hz, 99), 2))
+print("p999 :", round(pct(cadence_hz, 99.9), 2))
+print("min  :", round(np.nanmin(cadence_hz), 2))
+
+print("\n=== End-to-end throughput (MiB/s), includes waiting (start-to-start) ===")
+print("p50  :", round(pct(e2e_MBps, 50), 3))
+print("p99  :", round(pct(e2e_MBps, 99), 3))
+print("p999 :", round(pct(e2e_MBps, 99.9), 3))
+print("min  :", round(np.nanmin(e2e_MBps), 3))
+
+print("\n=== Writer utilization U = dT/P (unitless) ===")
+print("p50  :", round(pct(util, 50), 3))
+print("p99  :", round(pct(util, 99), 3))
+print("p999 :", round(pct(util, 99.9), 3))
+print("min  :", round(np.nanmin(util), 3))
+print("max  :", round(np.nanmax(util), 3))
+
+# ---- Plotting ----
+grid_style = {'linestyle': ':', 'linewidth': 1, 'alpha': 0.7}
+
+fig = plt.figure(constrained_layout=False)
+axs = fig.subplot_mosaic([['Left', 'TopRight'], ['Left', 'BottomRight']],
+                         gridspec_kw={'width_ratios': [2, 2]})
+
+# Grid on ALL axes (same style)
+for key in axs:
+    axs[key].grid(True, **grid_style)
+
+axs['Left'].set_title(f'Multi-block write duration ({BYTES/1024:.1f} kB data; {len(tt)} samples)')
+
+x_min = float(np.nanmin(tt))
+x_max = float(np.nanmax(tt))
+y_min = float(np.nanmin(yy)) - 500
+y_max = float(np.nanmax(yy)) + 500
 
 axs['Left'].plot(tt, yy)
 axs['Left'].axis([x_min, x_max, y_min, y_max])
 
-axs['Left'].annotate(f" Median raw rate: {round(BYTES / np.median(yy), 2)} Mbytes/s", 
-                xy=(x_min, y_max - 250), xytext=(x_min, y_max - 250),
-                xycoords='data')
-
-# histograms 
+# ---- Histograms ----
 BIN_DURATION_1 = 50
-
-hist = yy.hist(bins=round((y_max - y_min) / BIN_DURATION_1), ax=axs['TopRight'])
-
 BIN_DURATION_2 = 100
 
-hist = yy.hist(bins=round((y_max - y_min) / BIN_DURATION_2), ax=axs['BottomRight'])
+yy_series = pd.Series(yy)
 
+# Same x-range on both histograms to align x axes
+hist_bins_1 = max(1, round((y_max - y_min) / BIN_DURATION_1))
+hist_bins_2 = max(1, round((y_max - y_min) / BIN_DURATION_2))
+
+yy_series.hist(bins=hist_bins_1, range=(y_min, y_max), ax=axs['TopRight'])
+yy_series.hist(bins=hist_bins_2, range=(y_min, y_max), ax=axs['BottomRight'])
+
+# Force identical x-limits and identical ticks
+axs['TopRight'].set_xlim(y_min, y_max)
+axs['BottomRight'].set_xlim(y_min, y_max)
+axs['BottomRight'].set_xticks(axs['TopRight'].get_xticks())
+
+# Axis cosmetics (arrows)
 for el in axs:
     ConfigureAxis(axs[el])
 
-axs['TopRight'].set_xlabel('dT in us')
-axs['TopRight'].set_xlabel('dT in us (bin width: ' + str(BIN_DURATION_1) + ' us)')
-
-axs['BottomRight'].set_xlabel('dT in us (bin width: ' + str(BIN_DURATION_2) + ' us)')
+# Labels for histogram axes
+axs['TopRight'].set_xlabel(f'dT in us')
+axs['TopRight'].set_ylabel('samples')
+fig.text(0.90, 0.85, f'bin width:\n{BIN_DURATION_1} us', ha='right', va='top', fontsize=8)
+axs['BottomRight'].set_xlabel(f'dT in us')
 axs['BottomRight'].set_ylabel('samples')
 axs['BottomRight'].axis([y_min, y_max, 0, 10])
+fig.text(0.90, 0.5, f'bin width:\n{BIN_DURATION_2} us', ha='right', va='top', fontsize=8)
+fig.tight_layout()
 
-plt.savefig(file + '.svg', format='svg', bbox_inches='tight')
+# ---- Put stats BELOW the plot (line breaks, fully printed) ----
+median_dT = pct(yy, 50)
+p99_dT = pct(yy, 99)
+p999_dT = pct(yy, 99.9)
+max_dT = float(np.nanmax(yy))
+
+median_raw = (BYTES / (median_dT * 1e-6)) / (1024 * 1024)  # MiB/s
+median_cad = pct(cadence_hz, 50) if cadence_hz.size else np.nan
+median_e2e = pct(e2e_MBps, 50) if e2e_MBps.size else np.nan
+
+stats_line_1 = (
+f"dT(us):\n\
+  p50={median_dT:.0f}\n\
+  p99={p99_dT:.0f}\n\
+  p999={p999_dT:.0f}\n\
+  max={max_dT:.0f}"
+)
+stats_line_2 = (
+f"Raw(in-flush): p50={median_raw:.2f} MiB/s\n\
+Cadence: p50={median_cad:.2f} Hz\n\
+E2E: p50={median_e2e:.2f} MiB/s\n"
+)
+
+# Reserve space for 2 lines of stats text
+plt.subplots_adjust(bottom=0.26)
+fig.text(0.01, 0.02, stats_line_1, ha='left', va='bottom', fontsize=10)
+fig.text(0.51, 0.02, stats_line_2, ha='left', va='bottom', fontsize=10)
+
+output_file = file + '.svg'
+plt.savefig(output_file, format='svg', bbox_inches='tight')
+print(f"\nPlot saved to: {output_file}")
 plt.show()

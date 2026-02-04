@@ -5,7 +5,8 @@ import pathlib
 # Parameters
 bus_rate = 1_000_000  # 1 Mbit/s
 bus_load = 1.0
-available_bits = bus_rate * bus_load  # 850,000 bits/sec
+base_bytes_wo_data = 14  # bytes without the payload data[] (packed header)
+available_bits = bus_rate * bus_load  # bits/sec
 
 # DLC range
 dlc = np.arange(0, 9)
@@ -20,24 +21,24 @@ frame_rate = available_bits / frame_size_bits
 frame_rate_total = 2 * frame_rate
 
 # Storage rate (2 channels, dynamic storage: 20 + DLC bytes per frame)
-storage_rate_dynamic = 2 * frame_rate * (20 + dlc) / (1024 * 1024)  # MiB/s
+storage_rate_dynamic = 2 * frame_rate * (base_bytes_wo_data + dlc) / (1024 * 1024)  # MiB/s
 
-# Storage rate (2 channels, fixed 28 bytes per frame)
-storage_rate_fixed = 2 * frame_rate * 28 / (1024 * 1024)  # MiB/s
+# Storage rate (2 channels, fixed 8 byte payload)
+storage_rate_fixed = 2 * frame_rate * (base_bytes_wo_data + 8) / (1024 * 1024)  # MiB/s
 
 # Payload rate (2 channels)
 payload_rate = 2 * frame_rate * dlc / (1024 * 1024)  # MiB/s
 
 # SD card capacity
-sd_capacity = 0.87  # MiB/s
+sd_capacity = 0.91  # MiB/s
 
 # Create the plot with two y-axes
 fig, ax1 = plt.subplots(figsize=(10, 6))
 ax2 = ax1.twinx()
 
 # Plot byte rates on left axis
-line1, = ax1.plot(dlc, storage_rate_dynamic, 'o-', color='#e74c3c', linewidth=2.5, markersize=8, label='Storage dynamic (20+DLC)')
-line2, = ax1.plot(dlc, storage_rate_fixed, 'x--', color='#e67e22', linewidth=2.5, markersize=8, label='Storage fixed (28)')
+line1, = ax1.plot(dlc, storage_rate_dynamic, 'o-', color='#e74c3c', linewidth=2.5, markersize=8, label='Storage dynamic (14+DLC)')
+line2, = ax1.plot(dlc, storage_rate_fixed, 'x--', color='#e67e22', linewidth=2.5, markersize=8, label='Storage fixed (22)')
 line3, = ax1.plot(dlc, payload_rate, 's-', color='#3498db', linewidth=2.5, markersize=8, label='Payload byte rate')
 
 # SD capacity reference line
@@ -51,7 +52,7 @@ ax1.set_xlabel('DLC (bytes)', fontsize=12)
 ax1.set_ylabel('Byte Rate (MiB/s)', fontsize=12, color='black')
 ax2.set_ylabel('Frame Rate (kFrames/s, 2 channels)', fontsize=12, color='#9b59b6')
 
-ax1.set_title(f'CAN Logger Rates vs DLC\n2 channels @ {round(bus_load * 100)}% bus load, {round(bus_rate / 1000)} kbit/s, dynamic storage (20 + DLC bytes/frame)', 
+ax1.set_title(f'CAN Logger Rates vs DLC\n2 channels @ {round(bus_load * 100)}% bus load, {round(bus_rate / 1000)} kbit/s, dynamic storage (14 + DLC bytes/frame)', 
              fontsize=12, fontweight='bold')
 
 # Grid and ticks
