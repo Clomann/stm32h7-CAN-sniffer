@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "RuntimeChecks.h"
 #include "stm32h745xx.h"
+#include "stm32h7xx_hal_fdcan.h"
+#include "stm32h7xx_hal_cortex.h"
 
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
@@ -79,6 +81,9 @@ static RingBuffer Fdcan2TxRingBuffer = {
     .isFull = false
 };
 
+static uint32_t CanAbs_Can1_RxHighWater = 0U;
+static uint32_t CanAbs_Can2_RxHighWater = 0U;
+
 /* Private functions */
 
 /**
@@ -87,6 +92,56 @@ static RingBuffer Fdcan2TxRingBuffer = {
 static inline int can_ioctl(struct CommDriver *dev, int cmd, void *arg) {
     return dev->interface->ioctl(dev, cmd, arg);
 }
+
+static void CanAbs_UpdateRxHighWater(uint8_t channel, const RingBuffer *rb)
+{
+    uint32_t used = ring_buffer_count(rb);
+
+    if (channel == 1U)
+    {
+        if (used > CanAbs_Can1_RxHighWater)
+        {
+            CanAbs_Can1_RxHighWater = used;
+        }
+    }
+    else if (channel == 2U)
+    {
+        if (used > CanAbs_Can2_RxHighWater)
+        {
+            CanAbs_Can2_RxHighWater = used;
+        }
+    }
+}
+
+#if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+
+#define CANABS_FDCAN_RX_FIFO0_MASK (FDCAN_IR_RF0L | FDCAN_IR_RF0F | FDCAN_IR_RF0W | FDCAN_IR_RF0N)
+
+static void CanAbs_ClearRxFifo0IrqIfEmpty(CommDriver *driver)
+{
+    FDCAN_HandleTypeDef *hfdcan;
+    uint32_t pending;
+
+    if (COMM_SUCCESS != fdcan_get_can(driver, &hfdcan))
+    {
+        return;
+    }
+
+    if (HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0) != 0U)
+    {
+        return;
+    }
+
+    /* Avoid back-to-back IRQs from stale RX FIFO0 flags after draining. */
+    pending = hfdcan->Instance->IR & CANABS_FDCAN_RX_FIFO0_MASK;
+    pending &= hfdcan->Instance->IE;
+    
+    if (pending != 0U)
+    {
+        __HAL_FDCAN_CLEAR_FLAG(hfdcan, pending);
+    }
+}
+#endif
 
 int CanAbs_Init(CommDriver *dev, CommDriverConfigType *cfg, uint8_t *tx, uint8_t *rx)
 {
@@ -219,18 +274,29 @@ void CANABS_CheckIsrPollPeriod(uint64_t timestamp, uint64_t timerPeriod)
         FDCAN_ErrorHandler();
     }
 
+    bool bIsPendingCan1 = false;
+    bool bIsPendingCan2 = false;
+
+    bIsPendingCan1 = NVIC_GetPendingIRQ(FDCAN_1_IRQn) > 0;
+    bIsPendingCan2 = NVIC_GetPendingIRQ(FDCAN_2_IRQn) > 0;
+
 #if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
-    if (AnyFrameAvailableCan1 || AnyFrameAvailableCan2)
+
+    if (bIsPendingCan1 || bIsPendingCan2)
+    {
+        // fall through
+    }
+    else if (AnyFrameAvailableCan1 || AnyFrameAvailableCan2)
     {
         NVIC_SetPendingIRQ(FDCAN_1_IRQn);
     }
 #else
-    if (AnyFrameAvailableCan1)
+    if (AnyFrameAvailableCan1 && !bIsPendingCan1)
     {
         NVIC_SetPendingIRQ(FDCAN_1_IRQn);
     }
 
-    if (AnyFrameAvailableCan2)
+    if (AnyFrameAvailableCan2 && !bIsPendingCan2)
     {
         NVIC_SetPendingIRQ(FDCAN_2_IRQn);
     }
@@ -384,6 +450,10 @@ static uint32_t CanAbs_ReadAllAvailableFrames(CommDriver *driver,
                 CanAbs_FrameDropCount++;
                 CanAbs_ErrorHandler();
             }
+            else
+            {
+                CanAbs_UpdateRxHighWater(channel, (RingBuffer *)driver->RxFrameBuffer);
+            }
             frames_processed++;
 
             CanAbs_FrameCount++;
@@ -435,6 +505,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             &CanAbs_CAN2_Rx_FrameDropCount);
     }
     
+#if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
+    CanAbs_ClearRxFifo0IrqIfEmpty(&Fdcan1Driver);
+    CanAbs_ClearRxFifo0IrqIfEmpty(&Fdcan2Driver);
+#endif
+
     if (frames_processed > 0) {
         NotifyConsumerTask();
     }
@@ -448,6 +523,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
 {
     comm_status_t res;
+
+    CanAbs_Can1_RxHighWater = 0U;
 
     res = CanAbs_Init(&Fdcan1Driver, &Fdcan1Config, (uint8_t *)&Fdcan1TxRingBuffer, (uint8_t *)&Fdcan1RxRingBuffer);
 
@@ -501,6 +578,8 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
 {
     comm_status_t res;
 
+    CanAbs_Can2_RxHighWater = 0U;
+
     res = CanAbs_Init(&Fdcan2Driver, &Fdcan2Config, (uint8_t *)&Fdcan2TxRingBuffer, (uint8_t *)&Fdcan2RxRingBuffer);
 
     if (0 == COMM_SUCCESS)
@@ -545,6 +624,33 @@ comm_status_t CanAbs_IsStateOff_Can2(bool * isOff)
 {
     *isOff = Fdcan2Driver.state == DRIVER_STATE_OFF;
     return COMM_SUCCESS;
+}
+
+uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_Can1_RxHighWater;
+    return 0U;
+}
+
+uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_Can2_RxHighWater;
+    return 0U;
+}
+
+uint32_t CanAbs_GetRxBufferCapacity(void)
+{
+    return SW_RX_FRAME_BUFFER_SIZE;
 }
 
 void CanAbs_Drain(void)

@@ -20,4 +20,7 @@ comm_status_t CanAbs_Stop_Can1(void);
 comm_status_t CanAbs_Stop_Can2(void);
 comm_status_t CanAbs_IsStateOff_Can1(bool *isOff);
 comm_status_t CanAbs_IsStateOff_Can2(bool *isOff);
+uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames);
+uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames);
+uint32_t CanAbs_GetRxBufferCapacity(void);
 void CanAbs_Drain(void);

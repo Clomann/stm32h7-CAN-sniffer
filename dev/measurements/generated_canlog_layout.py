@@ -1,0 +1,40 @@
+"""Auto-generated from app/CanLogBuffer.h. Do not edit manually."""
+import struct
+
+CANLOG_VERSION = 2
+CANLOG_ENTRY_MAX_DATA_LENGTH = 64
+CAN_DLC_MASK = 15
+CLB_ENTRY_TYPE_NONE = 0
+CLB_ENTRY_TYPE_FRAME = 1
+CLB_ENTRY_TYPE_SYNC = 2
+CLB_ENTRY_TYPE_MARKER = 3
+
+BLOCK_HEADER_FORMAT = "<BBBBIIII"
+BLOCK_HEADER_STRUCT = struct.Struct(BLOCK_HEADER_FORMAT)
+BLOCK_HEADER_SIZE = BLOCK_HEADER_STRUCT.size
+
+ENTRY_HEADER_FORMAT = "<BBB"
+ENTRY_HEADER_STRUCT = struct.Struct(ENTRY_HEADER_FORMAT)
+ENTRY_HEADER_SIZE = ENTRY_HEADER_STRUCT.size
+
+ENTRY_FIXED_FIELDS = [
+    ("timestamp", "I", None),
+    ("can_id", "I", None),
+    ("channel", "B", None),
+    ("dlc_flags", "B", None),
+    ("data_len", "B", None),
+]
+
+ENTRY_FIXED_FORMAT = "<IIBBB"
+ENTRY_FIXED_STRUCT = struct.Struct(ENTRY_FIXED_FORMAT)
+ENTRY_FIXED_SIZE = ENTRY_FIXED_STRUCT.size
+
+SYNC_FIXED_FIELDS = [
+    ("timestamp", "I", None),
+    ("abs_time_high", "I", None),
+]
+
+SYNC_FIXED_FORMAT = "<II"
+SYNC_FIXED_STRUCT = struct.Struct(SYNC_FIXED_FORMAT)
+SYNC_FIXED_SIZE = SYNC_FIXED_STRUCT.size
+

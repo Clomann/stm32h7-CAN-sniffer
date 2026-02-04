@@ -26,3 +26,6 @@ void fdcan_msg_port_flush(void);
 void fdcan_msg_port_init(void);
 
 size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds);
+
+uint8_t fdcan_msg_port_get_highwater_bytes(uint32_t *bytes);
+uint32_t fdcan_msg_port_get_capacity_bytes(void);

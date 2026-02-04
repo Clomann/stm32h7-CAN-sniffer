@@ -12,11 +12,11 @@
 
 typedef struct
 {
-    uint64_t timestamp; /*<! in micro seconds */
+    uint32_t timestamp; /*<! in micro seconds; wraps at ~71 minutes */
     uint32_t timedelta; /*<! wraps at ~71 minutes */
 } InstrumentationTimeTraceType;
 
-#define INSTR_TRACE_COUNT_MAX 1000U
+#define INSTR_TRACE_COUNT_MAX 4001U
 #define INSTR_CAN_ISR_PIN     DBG_PIN_1
 #define INSTR_DRAIN_PORT_PIN  DBG_PIN_4
 #define INSTR_SD_WRITE_PIN    DBG_PIN_2
