@@ -863,7 +863,7 @@ This firmware uses linker sections (defined in *CM7/Inc/memory_sections.h*) to p
 | - | - | - |
 | *.ram_d1* / *RAM_D1_SECTION* | Large, CPU-friendly SRAM for bulk buffers. | *CanLogBuffer* ring buffer (3 x 64 KiB blocks). |
 | *.dtcram* / *RAM_DTC_SECTION* | Core-coupled RAM for deterministic, low-latency access (not DMA). | *fdcan_msg_port* message buffer storage. |
-| *.dma_buffer* / *DMA_BUFFER* | DMA-capable, 32-byte aligned buffers. | SPI DMA scratch buffers in *drivers/spi/Spi_Cmds.c*. |
+| *.dma_buffer* / *DMA_BUFFER* | DMA-capable, 32-byte aligned buffers. | SPI DMA scratch buffers in *platform/drivers/spi/Spi_Cmds.c*. |
 | *.RxDecripSection* / *ETH_RX_DESC* | Ethernet RX DMA descriptors. | RX descriptor table in *app/services/http/src/ethernetif.c*. |
 | *.TxDecripSection* / *ETH_TX_DESC* | Ethernet TX DMA descriptors. | TX descriptor table in *app/services/http/src/ethernetif.c*. |
 | *.Rx_PoolSection* / *ETH_RX_POOL* | Ethernet RX pool backing store. | LwIP RX pool in *app/services/http/src/ethernetif.c*. |
