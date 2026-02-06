@@ -1,6 +1,6 @@
-drivers/spi/spi.c
-drivers/spi/spi.h
-drivers/buffers.h
+platform/drivers/spi/spi.c
+platform/drivers/spi/spi.h
+platform/drivers/buffers.h
 tests/spi/test_spi.c
 tests/spi/stubs/SpiAbs.h
 tests/spi/stubs/SpiAbs.c

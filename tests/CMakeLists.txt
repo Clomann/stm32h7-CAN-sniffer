@@ -24,12 +24,12 @@ set(CTEST_OUTPUT_ON_FAILURE ON)
 # ===== fdcan =====
 
 add_library(fdcan STATIC
-    ${REPO_ROOT}/drivers/fdcan/fdcan_utils.c
+    ${REPO_ROOT}/platform/drivers/fdcan/fdcan_utils.c
 )
 
 target_include_directories(fdcan PUBLIC
-    ${REPO_ROOT}/drivers
-    ${REPO_ROOT}/drivers/fdcan
+    ${REPO_ROOT}/platform/drivers
+    ${REPO_ROOT}/platform/drivers/fdcan
 )
 
 add_executable(test_fdcan
@@ -39,8 +39,8 @@ target_link_libraries(test_fdcan PRIVATE fdcan unity)
 
 target_include_directories(test_fdcan PRIVATE
     ${unity_SOURCE_DIR}/src
-    ${REPO_ROOT}/drivers
-    ${REPO_ROOT}/drivers/fdcan
+    ${REPO_ROOT}/platform/drivers
+    ${REPO_ROOT}/platform/drivers/fdcan
 )
 
 # ===== buffer =====
@@ -50,7 +50,7 @@ add_executable(test_buffer
 
 target_include_directories(test_buffer PRIVATE
     ${unity_SOURCE_DIR}/src
-    ${REPO_ROOT}/drivers
+    ${REPO_ROOT}/platform/drivers
 )
 
 target_link_libraries(test_buffer PRIVATE unity)
@@ -69,18 +69,18 @@ set(symbols_SPI                    # Modified
 
 add_library(spi STATIC
     ${REPO_ROOT}/tests/spi/stubs/SpiAbs.c
-    ${REPO_ROOT}/drivers/spi/spi.c
+    ${REPO_ROOT}/platform/drivers/spi/spi.c
     ${REPO_ROOT}/tests/spi/stubs/Spi_Cmds.c
 )
 
 target_include_directories(spi PUBLIC
     ${REPO_ROOT}/CM7/Inc
-    ${REPO_ROOT}/Common/Inc
+    ${REPO_ROOT}/platform/Common/Inc
     ${REPO_ROOT}/tests/spi/stubs
-    ${REPO_ROOT}/drivers
-    ${REPO_ROOT}/drivers/spi
-    ${REPO_ROOT}/drivers/comm/CommManager
-    ${REPO_ROOT}/drivers/comm/CommHandle
+    ${REPO_ROOT}/platform/drivers
+    ${REPO_ROOT}/platform/drivers/spi
+    ${REPO_ROOT}/platform/drivers/comm/CommManager
+    ${REPO_ROOT}/platform/drivers/comm/CommHandle
 )
 
 target_include_directories(spi SYSTEM PUBLIC
@@ -99,8 +99,8 @@ target_link_libraries(test_spi PRIVATE spi unity)
 
 target_include_directories(test_spi PRIVATE
     ${unity_SOURCE_DIR}/src
-    ${REPO_ROOT}/drivers
-    ${REPO_ROOT}/drivers/spi
+    ${REPO_ROOT}/platform/drivers
+    ${REPO_ROOT}/platform/drivers/spi
 )
 
 # ===== app =====
@@ -147,14 +147,14 @@ target_include_directories(app PUBLIC
     ${REPO_ROOT}/app/services/config
     ${REPO_ROOT}/app/services/logging
     ${REPO_ROOT}/app/services/storage
-    ${REPO_ROOT}/Common/Inc
+    ${REPO_ROOT}/platform/Common/Inc
     ${REPO_ROOT}/CM7/Inc
     ${REPO_ROOT}/libs/ff15a/source
-    ${REPO_ROOT}/drivers
-    ${REPO_ROOT}/drivers/CanAbs
-    ${REPO_ROOT}/drivers/comm/CommManager
-    ${REPO_ROOT}/drivers/comm/CommHandle
-    ${REPO_ROOT}/ports
+    ${REPO_ROOT}/platform/drivers
+    ${REPO_ROOT}/platform/drivers/CanAbs
+    ${REPO_ROOT}/platform/drivers/comm/CommManager
+    ${REPO_ROOT}/platform/drivers/comm/CommHandle
+    ${REPO_ROOT}/platform/ports
     ${REPO_ROOT}/app/services/http/inc
     ${REPO_ROOT}/libs/coreJSON/source/include
 )

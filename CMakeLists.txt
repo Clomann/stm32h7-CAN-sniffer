@@ -152,8 +152,8 @@ if(CORE STREQUAL "CM7")
         ${PROJ_PATH}/CM7/Src/SpiTask.c
         ${PROJ_PATH}/CM7/Src/utils_mpu.c
 
-        ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
-        ${PROJ_PATH}/Common/Src/instrumentation.c
+        ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/platform/Common/Src/instrumentation.c
 
         ${PROJ_PATH}/middleware/freertos/freertos_interface.c
 
@@ -168,17 +168,17 @@ if(CORE STREQUAL "CM7")
     set(include_path_DIRS               # Modified
         ${PROJ_PATH}/CM7/Inc
         ${PROJ_PATH}/CM7/Src
-        ${PROJ_PATH}/Common/Inc
+        ${PROJ_PATH}/platform/Common/Inc
         ${PROJ_PATH}/middleware/freertos
     )
 
     add_subdirectory(CM7)
     add_subdirectory(adapters)
     add_subdirectory(app)
-    add_subdirectory(drivers)
+    add_subdirectory(platform/drivers)
     add_subdirectory(libs)
     add_subdirectory(middleware)
-    add_subdirectory(ports)
+    add_subdirectory(platform/ports)
 
 elseif(CORE STREQUAL "CM4")
     #
@@ -189,7 +189,7 @@ elseif(CORE STREQUAL "CM4")
         ${PROJ_PATH}/CM4/Src/stm32h7xx_hal_msp.c
         ${PROJ_PATH}/CM4/Src/stm32h7xx_it.c
 
-        ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
 
         ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/syscalls.c
         ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/sysmem.c
@@ -201,7 +201,7 @@ elseif(CORE STREQUAL "CM4")
     #
     set(include_path_DIRS               # Modified
         ${PROJ_PATH}/CM4/Inc
-        ${PROJ_PATH}/Common/Inc
+        ${PROJ_PATH}/platform/Common/Inc
     )
     
     add_subdirectory(libs)
