@@ -1,5 +1,5 @@
 """
-Generate a Python layout module from app/CanLogBuffer.h.
+Generate a Python layout module from app/services/logging/CanLogBuffer.h.
 
 The generated module (`generated_canlog_layout.py` in the same directory)
 provides struct formats, sizes, and constants so log_parser.py stays in sync
@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HEADER_PATH = REPO_ROOT / "app/CanLogBuffer.h"
+HEADER_PATH = REPO_ROOT / "app/services/logging/CanLogBuffer.h"
 OUTPUT_PATH = Path(__file__).with_name("generated_canlog_layout.py")
 
 # Minimal type map for the header
@@ -198,7 +198,7 @@ def generate_layout(header_path: Path = HEADER_PATH, output_path: Path = OUTPUT_
     sync_fixed_fields = [f for f in structs["CanLogSyncType"] if f.name != "header"]
 
     output = []
-    output.append('"""Auto-generated from app/CanLogBuffer.h. Do not edit manually."""')
+    output.append('"""Auto-generated from app/services/logging/CanLogBuffer.h. Do not edit manually."""')
     output.append("import struct")
     output.append("")
 

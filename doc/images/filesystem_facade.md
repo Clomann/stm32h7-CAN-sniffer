@@ -9,7 +9,7 @@ flowchart LR
         Diagnostics[Diagnostics CLI/scripts]
     end
 
-    subgraph FileHandler["FileHandler(app/FileHandler.*)"]
+    subgraph FileHandler["FileHandler(app/services/storage/FileHandler.*)"]
         Mount[Mount/unmount]
         OpenClose["Open/Close helpers"]
         RW["Buffered read/write"]

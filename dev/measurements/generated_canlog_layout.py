@@ -1,4 +1,4 @@
-"""Auto-generated from app/CanLogBuffer.h. Do not edit manually."""
+"""Auto-generated from app/services/logging/CanLogBuffer.h. Do not edit manually."""
 import struct
 
 CANLOG_VERSION = 2
@@ -37,4 +37,3 @@ SYNC_FIXED_FIELDS = [
 SYNC_FIXED_FORMAT = "<II"
 SYNC_FIXED_STRUCT = struct.Struct(SYNC_FIXED_FORMAT)
 SYNC_FIXED_SIZE = SYNC_FIXED_STRUCT.size
-

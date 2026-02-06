@@ -1,5 +1,4 @@
 # STM32H7 CAN sniffer software architecture documentation
-========================================
 
 ![arc42 status](https://img.shields.io/badge/arc42-ready/v0.3-green)
 
@@ -66,7 +65,8 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
                 - [Block flush window logic analyzer](#block-flush-window-logic-analyzer)
             - [Lossless logging validation](#lossless-logging-validation)
                 - [Test results](#test-results)
-            - [Long-run test for release v0.2](#long-run-test-for-release-v02)
+            - [Stress test](#stress-test)
+                - [Test results](#test-results)
     - [Comm drivers Runtime view](#comm-drivers-runtime-view)
     - [Comm driver factory](#comm-driver-factory)
         - [SPI driver](#spi-driver)
@@ -357,7 +357,7 @@ CM7/CM4 share startup files, HAL MSP init, and system clock setup reused from ST
 | SettingsHandler | JSON adapter for *AppConfigType*; owns dirty flag. | Uses *coreJSON* + small helpers in *FileHandler*. |
 | HTTP control surface | CGI/SSI glue that forwards form data to *SettingsHandler* and triggers apply + persistence. | Runs inside the CM7 LwIP/httpd task. |
 
-Data model excerpt (*app/SettingsHandler.h*):
+Data model excerpt (*app/services/config/SettingsHandler.h*):
 
 ```c
 typedef struct {
@@ -588,7 +588,7 @@ This section describes the measured effective write speed and its statistical me
 
 ##### SD multi-block write timing
 
-*See instrumentation in [FileHandler.c](../app/FileHandler.c).*
+*See instrumentation in [FileHandler.c](../app/services/storage/FileHandler.c).*
 
 Data is written to the SD card from a staging buffer. The staging buffer is a rotating buffer offering multiple slots. When a slot is full it is written to the SD card in one go. The following image shows the time it takes to write one slot to the SD card on the y axis (including FatFS and SD SPI overhead) over the absolute time passed since the device was powered up (global timestamp).
 
@@ -864,9 +864,9 @@ This firmware uses linker sections (defined in *CM7/Inc/memory_sections.h*) to p
 | *.ram_d1* / *RAM_D1_SECTION* | Large, CPU-friendly SRAM for bulk buffers. | *CanLogBuffer* ring buffer (3 x 64 KiB blocks). |
 | *.dtcram* / *RAM_DTC_SECTION* | Core-coupled RAM for deterministic, low-latency access (not DMA). | *fdcan_msg_port* message buffer storage. |
 | *.dma_buffer* / *DMA_BUFFER* | DMA-capable, 32-byte aligned buffers. | SPI DMA scratch buffers in *drivers/spi/Spi_Cmds.c*. |
-| *.RxDecripSection* / *ETH_RX_DESC* | Ethernet RX DMA descriptors. | RX descriptor table in *app/http/src/ethernetif.c*. |
-| *.TxDecripSection* / *ETH_TX_DESC* | Ethernet TX DMA descriptors. | TX descriptor table in *app/http/src/ethernetif.c*. |
-| *.Rx_PoolSection* / *ETH_RX_POOL* | Ethernet RX pool backing store. | LwIP RX pool in *app/http/src/ethernetif.c*. |
+| *.RxDecripSection* / *ETH_RX_DESC* | Ethernet RX DMA descriptors. | RX descriptor table in *app/services/http/src/ethernetif.c*. |
+| *.TxDecripSection* / *ETH_TX_DESC* | Ethernet TX DMA descriptors. | TX descriptor table in *app/services/http/src/ethernetif.c*. |
+| *.Rx_PoolSection* / *ETH_RX_POOL* | Ethernet RX pool backing store. | LwIP RX pool in *app/services/http/src/ethernetif.c*. |
 
 Notes:
 - *RAM_D2_SECTION* and *RAM_D3_SECTION* are defined for future or retention use, but are not referenced by current CM7 allocations.

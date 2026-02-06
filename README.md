@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="app/fs/pages/files/logo.png" alt="CAN Sniffer Logo" width="120">
+  <img src="app/services/http/fs/pages/files/logo.png" alt="CAN Sniffer Logo" width="120">
   <h1>STM32H7 CAN sniffer</h1>
   <p><em>Dual-channel CAN logger with HTTP config UI and SD persistence</em></p>
 </div>

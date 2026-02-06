@@ -1,7 +1,7 @@
 """
 Parse CAN logger blocks produced by CanLogBuffer_ReadNextBlock.
 
-The binary layout is generated from app/CanLogBuffer.h at runtime to keep this
+The binary layout is generated from app/services/logging/CanLogBuffer.h at runtime to keep this
 tool in sync with the firmware source.
 """
 
