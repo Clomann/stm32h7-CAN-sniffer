@@ -1,6 +1,9 @@
 platform/drivers/spi/spi.c
 platform/drivers/spi/spi.h
+platform/drivers/spi/spi_utils.h
 platform/drivers/buffers.h
+platform/drivers/gpio/gpio.c
+platform/drivers/gpio/gpio.h
 tests/spi/test_spi.c
 tests/spi/stubs/SpiAbs.h
 tests/spi/stubs/SpiAbs.c
@@ -22,7 +25,7 @@ CM7/Src/SpiTask.h
 CM7/Src/SpiTask.c
 app/services/http/src/app_mdns.c
 app/services/http/inc/app_mdns.h
-
+middleware/Sd/Sd.h
 tests/test_template.c
 tests/app/test_app.c
 tests/app/test_definitions.h
