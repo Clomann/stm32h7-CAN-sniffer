@@ -1,6 +1,8 @@
 #include "test_CanLogManager.h"
 
 #include "unity.h"
+#include <string.h>
+#include <stdio.h>
 
 #include "test_definitions.h"
 #include "CanLogManager.h"
@@ -10,6 +12,8 @@
 #include "fs_custom.h"
 #include "CanAbs.h"
 #include "fdcan_msg_port.h"
+#include "test_filehandler_state.h"
+#include "test_ff_state.h"
 
 static CanLogControlDataType *testCtrlData;
 static uint8_t mockMountRes;
@@ -21,6 +25,7 @@ void reset_fs_stubs(void);
 void reset_can_stubs(void);
 void reset_fdcan_stubs(void);
 void reset_filehandler_stubs(void);
+void test_ff_reset(void);
 
 void set_file_size(uint32_t size);
 void set_file_open_result(FRESULT result);
@@ -30,6 +35,10 @@ void set_tracer_running(bool running);
 
 bool get_file_closed(void);
 bool get_file_open_failed(void);
+uint64_t get_total_bytes_written(void);
+uint64_t get_total_frames_written(void);
+uint32_t get_last_block_frame_count(void);
+uint32_t get_write_call_count(void);
 bool get_can_started(void);
 bool get_can_stopped(void);
 bool get_read_called(void);
@@ -326,7 +335,7 @@ void test_TracerStartStop(void)
  * @brief Tests log file rotation trigger
  * @details Verifies file closure when maximum file size is exceeded
  */
-void test_FileRotation(void)
+void test_FileRotation_ClosesFileOnSizeExceeded(void)
 {
     appCanLogHandlerInit(testCtrlData);
 
@@ -338,6 +347,194 @@ void test_FileRotation(void)
     appCanLogHandlerPoll(testCtrlData);
 
     TEST_ASSERT_TRUE(get_file_closed());
+}
+
+/**
+ * @brief Tests end-to-end store pipeline to file
+ * @details Verifies a padded block is flushed and counted in the file handler stub
+ */
+void test_StorePipeline_WritesFramesToFile(void)
+{
+    appCanLogHandlerInit(testCtrlData);
+
+    /* Clear metadata write side effects from init. */
+    reset_filehandler_stubs();
+
+    /* Start tracer once to avoid sync entry in the measured batch. */
+    mockRunCanTracer = true;
+    set_frames_available(0);
+    appCanLogHandlerPoll(testCtrlData);
+
+    /* Clear the sync entry emitted on start. */
+    CanLogBuffer_Init();
+
+    set_frames_available(3);
+    appCanLogHandlerPoll(testCtrlData);
+
+    /* Stop tracer to force commit/padding flush. */
+    mockRunCanTracer = false;
+    appCanLogHandlerPoll(testCtrlData);
+
+    TEST_ASSERT_GREATER_THAN_UINT32(0U, get_write_call_count());
+    TEST_ASSERT_GREATER_THAN_UINT64(0U, get_total_bytes_written());
+    TEST_ASSERT_EQUAL_UINT32(3U, get_last_block_frame_count());
+    TEST_ASSERT_EQUAL_UINT64(
+        get_last_block_frame_count(),
+        get_total_frames_written()
+    );
+}
+
+/**
+ * @brief Tests commit/flush-on-stop path
+ * @details Stops tracer to pad buffer and flush a block to storage
+ */
+void test_CommitFlushOnStop_PadsAndFlushes(void)
+{
+    appCanLogHandlerInit(testCtrlData);
+
+    /* Clear metadata/prealloc write side effects from init. */
+    reset_filehandler_stubs();
+
+    /* Start tracer once to enable stop/commit path. */
+    mockRunCanTracer = true;
+    set_frames_available(0);
+    appCanLogHandlerPoll(testCtrlData);
+
+    /* Clear any sync entry emitted on start. */
+    CanLogBuffer_Init();
+
+    /* Inject exactly 54 frames into the buffer. */
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry = (CanLogEntryType *)entryBuf.raw;
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len = 0;
+    entry->header.total_len = sizeof(CanLogEntryType);
+    entry->dlc_flags = MAKE_DLC_FLAGS(0, 0);
+
+    for (uint32_t i = 0; i < 54U; i++)
+    {
+        entry->timestamp = 1000U + i;
+        entry->channel = 1;
+        entry->can_id = 0x100U + i;
+        TEST_ASSERT_EQUAL_UINT8(
+            CANLOG_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+    }
+
+    mockRunCanTracer = false;
+    appCanLogHandlerPoll(testCtrlData);
+
+    TEST_ASSERT_GREATER_THAN_UINT32(0U, get_write_call_count());
+    TEST_ASSERT_EQUAL_UINT64(BLOCK_SIZE, get_total_bytes_written());
+    TEST_ASSERT_EQUAL_UINT32(54U, get_last_block_frame_count());
+    TEST_ASSERT_EQUAL_UINT64(54U, get_total_frames_written());
+}
+
+/**
+ * @brief Tests metadata load/store JSON round-trip
+ * @details Verifies epoch increment and value persistence across init
+ */
+void test_MetaDataPersistence_RoundTrip(void)
+{
+    const char input_json[] =
+        "{\n"
+        "    \"epoch\":5,\n"
+        "    \"index\":7,\n"
+        "    \"offset\":123,\n"
+        "    \"crc\":42\n"
+        "}\n";
+
+    test_filehandler_set_meta_content(input_json, (uint32_t)strlen(input_json));
+    appCanLogHandlerInit(testCtrlData);
+
+    uint32_t stored_len = 0;
+    const char *stored = test_filehandler_get_meta_content(&stored_len);
+    TEST_ASSERT_NOT_NULL(stored);
+    TEST_ASSERT_GREATER_THAN_UINT32(0U, stored_len);
+
+    TEST_ASSERT_NOT_NULL(strstr(stored, "\"epoch\":6"));
+    TEST_ASSERT_NOT_NULL(strstr(stored, "\"index\":7"));
+    TEST_ASSERT_NOT_NULL(strstr(stored, "\"offset\":123"));
+    TEST_ASSERT_NOT_NULL(strstr(stored, "\"crc\":42"));
+}
+
+/**
+ * @brief Tests preallocation creates and sizes log files
+ * @details Verifies preallocation runs and sizes log files to configured size
+ */
+void test_Preallocation_CreatesSizedFiles(void)
+{
+    const uint32_t file_count = 3U;
+    const uint32_t file_size = 2048U;
+
+    test_ff_reset();
+    appCanLogSetFileConfig(file_size, file_count);
+    appCanLogHandlerInit(testCtrlData);
+
+    for (uint32_t i = 0; i < file_count; i++)
+    {
+        char path[64];
+        snprintf(path, sizeof(path), "/logs/CAN.LOG%u", i);
+        TEST_ASSERT_TRUE(test_ff_file_exists(path));
+        TEST_ASSERT_EQUAL_UINT32(file_size, test_ff_get_file_size(path));
+    }
+
+    uint8_t prealloc_error = 1U;
+    FsCustom_GetPreallocErrorFlag(&prealloc_error);
+    TEST_ASSERT_EQUAL_UINT8(0U, prealloc_error);
+
+    appCanLogSetFileConfig(0U, 0U);
+}
+
+/**
+ * @brief Tests file rotation head/tail wrap behavior
+ * @details Forces rotation across 100 files (10 MB each => ~1 GB total capacity)
+ */
+void test_FileRotation_WrapsHeadTailAtLimit(void)
+{
+    const uint32_t file_count = 100U;
+
+    /* Limit test to 100 files; size defaults to MAX_LOG_FILE_SIZE (10 MB). */
+    appCanLogSetFileConfig(0U, file_count);
+    appCanLogHandlerInit(testCtrlData);
+
+    uint32_t capacity = 0;
+    FsCustom_GetCanLogCapacity(&capacity);
+    TEST_ASSERT_EQUAL_UINT32(file_count, capacity);
+
+    uint32_t head = 0;
+    uint32_t tail = 0;
+
+    FsCustom_GetCanLogHeadIndex(&head);
+    FsCustom_GetCanLogTailIndex(&tail);
+    TEST_ASSERT_EQUAL_UINT32(0U, head);
+    TEST_ASSERT_EQUAL_UINT32(0U, tail);
+
+    /* First rotation: head advances, tail stays until wrap. */
+    set_file_size(appCanLogGetLogFileSize());
+    appCanLogHandlerPoll(testCtrlData);
+    FsCustom_GetCanLogHeadIndex(&head);
+    FsCustom_GetCanLogTailIndex(&tail);
+    TEST_ASSERT_EQUAL_UINT32(1U, head);
+    TEST_ASSERT_EQUAL_UINT32(0U, tail);
+
+    /* Rotate through remaining slots to force wrap. */
+    for (uint32_t i = 1U; i < file_count; i++)
+    {
+        set_file_size(appCanLogGetLogFileSize());
+        appCanLogHandlerPoll(testCtrlData);
+    }
+
+    FsCustom_GetCanLogHeadIndex(&head);
+    FsCustom_GetCanLogTailIndex(&tail);
+    TEST_ASSERT_EQUAL_UINT32(0U, head);
+    TEST_ASSERT_EQUAL_UINT32(1U, tail);
+
+    /* Restore defaults for other tests. */
+    appCanLogSetFileConfig(0U, 0U);
 }
 
 /**
@@ -365,7 +562,12 @@ void RunAllTests(void)
     RUN_TEST(test_appCanLogHandlerInit);
     RUN_TEST(test_Integration_FrameToBuffer);
     RUN_TEST(test_TracerStartStop);
-    RUN_TEST(test_FileRotation);
+    RUN_TEST(test_FileRotation_ClosesFileOnSizeExceeded);
+    RUN_TEST(test_StorePipeline_WritesFramesToFile);
+    RUN_TEST(test_CommitFlushOnStop_PadsAndFlushes);
+    RUN_TEST(test_MetaDataPersistence_RoundTrip);
+    RUN_TEST(test_Preallocation_CreatesSizedFiles);
+    RUN_TEST(test_FileRotation_WrapsHeadTailAtLimit);
     RUN_TEST(test_ErrorHandling_FileOpenFailure);
 }
 
