@@ -44,7 +44,7 @@ AllowAllArgumentsOnNextLine: false
 PenaltyBreakBeforeFirstCallParameter: 0
 
 # Preprocessor readability
-IndentPPDirectives: AfterHash
+IndentPPDirectives: None
 AlignConsecutiveMacros:
   Enabled: true
   AcrossEmptyLines: false
@@ -61,4 +61,3 @@ AlignConsecutiveAssignments:
 InsertNewlineAtEOF: true
 MaxEmptyLinesToKeep: 1
 ...
-
