@@ -140,17 +140,17 @@ if(CORE STREQUAL "CM7")
     # List of source files to compile
     #
     set(sources_SRCS                    # Modified
-        ${PROJ_PATH}/CM7/Src/main.c
-        ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
-        ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
-        ${PROJ_PATH}/CM7/Src/Core0Task0.c
-        ${PROJ_PATH}/CM7/Src/Core0Task1.c
-        ${PROJ_PATH}/CM7/Src/SdBridgeTask.c
-        ${PROJ_PATH}/CM7/Src/CanBridgeTask.c
-        ${PROJ_PATH}/CM7/Src/CanSendTask.c
-        ${PROJ_PATH}/CM7/Src/CanCtrl.c
-        ${PROJ_PATH}/CM7/Src/SpiTask.c
-        ${PROJ_PATH}/CM7/Src/utils_mpu.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/main.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/stm32h7xx_hal_msp.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/stm32h7xx_it.c
+        ${PROJ_PATH}/app/cores/cm7/Src/Core0Task0.c
+        ${PROJ_PATH}/app/cores/cm7/Src/Core0Task1.c
+        ${PROJ_PATH}/app/cores/cm7/Src/SdBridgeTask.c
+        ${PROJ_PATH}/app/cores/cm7/Src/CanBridgeTask.c
+        ${PROJ_PATH}/app/cores/cm7/Src/CanSendTask.c
+        ${PROJ_PATH}/app/cores/cm7/Src/CanCtrl.c
+        ${PROJ_PATH}/app/cores/cm7/Src/SpiTask.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/utils_mpu.c
 
         ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
         ${PROJ_PATH}/platform/Common/Src/instrumentation.c
@@ -166,13 +166,15 @@ if(CORE STREQUAL "CM7")
     # Include directories
     #
     set(include_path_DIRS               # Modified
-        ${PROJ_PATH}/CM7/Inc
-        ${PROJ_PATH}/CM7/Src
+        ${PROJ_PATH}/app/cores/cm7/Inc
+        ${PROJ_PATH}/app/cores/cm7/Src
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Inc
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src
         ${PROJ_PATH}/platform/Common/Inc
         ${PROJ_PATH}/middleware/freertos
     )
 
-    add_subdirectory(CM7)
+    add_subdirectory(app/cores/cm7)
     add_subdirectory(adapters)
     add_subdirectory(app)
     add_subdirectory(platform/drivers)
@@ -185,9 +187,9 @@ elseif(CORE STREQUAL "CM4")
     # List of source files to compile
     #
     set(sources_SRCS                    # Modified
-        ${PROJ_PATH}/CM4/Src/main.c
-        ${PROJ_PATH}/CM4/Src/stm32h7xx_hal_msp.c
-        ${PROJ_PATH}/CM4/Src/stm32h7xx_it.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Src/main.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Src/stm32h7xx_hal_msp.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Src/stm32h7xx_it.c
 
         ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
 
@@ -200,7 +202,7 @@ elseif(CORE STREQUAL "CM4")
     # Include directories
     #
     set(include_path_DIRS               # Modified
-        ${PROJ_PATH}/CM4/Inc
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Inc
         ${PROJ_PATH}/platform/Common/Inc
     )
     

@@ -74,7 +74,8 @@ add_library(spi STATIC
 )
 
 target_include_directories(spi PUBLIC
-    ${REPO_ROOT}/CM7/Inc
+    ${REPO_ROOT}/app/cores/cm7/Inc
+    ${REPO_ROOT}/platform/board/stm32h745/cm7/Inc
     ${REPO_ROOT}/platform/Common/Inc
     ${REPO_ROOT}/tests/spi/stubs
     ${REPO_ROOT}/platform/drivers
@@ -148,7 +149,8 @@ target_include_directories(app PUBLIC
     ${REPO_ROOT}/app/services/logging
     ${REPO_ROOT}/app/services/storage
     ${REPO_ROOT}/platform/Common/Inc
-    ${REPO_ROOT}/CM7/Inc
+    ${REPO_ROOT}/app/cores/cm7/Inc
+    ${REPO_ROOT}/platform/board/stm32h745/cm7/Inc
     ${REPO_ROOT}/libs/ff15a/source
     ${REPO_ROOT}/platform/drivers
     ${REPO_ROOT}/platform/drivers/CanAbs
