@@ -13,17 +13,19 @@
 #include <string.h>
 
 #define CAN_FRAME_BUFFER_ELEMENTS_COUNT 600U
-#define CAN_FRAME_BUFFER_ENTRY_SIZE \
+#define CAN_FRAME_BUFFER_ENTRY_SIZE                                            \
     (sizeof(PageType) + sizeof(configMESSAGE_BUFFER_LENGTH_TYPE))
-#define CAN_FRAME_BUFFER_SIZE \
+#define CAN_FRAME_BUFFER_SIZE                                                  \
     (CAN_FRAME_BUFFER_ELEMENTS_COUNT * CAN_FRAME_BUFFER_ENTRY_SIZE + 1U)
 #define CAN_FRAME_PAGE_MAX_ENTRIES (10U)
 
-typedef struct {
+typedef struct
+{
     FDCAN_ClassicFrameType frame;
 } PageEntryType;
 
-typedef struct {
+typedef struct
+{
     uint32_t count;
     PageEntryType frames[CAN_FRAME_PAGE_MAX_ENTRIES];
 } PageType;
@@ -56,7 +58,7 @@ static void fdcan_msg_port_update_highwater(void)
     }
 
     capacity = (CAN_FRAME_BUFFER_SIZE > 0U) ? (CAN_FRAME_BUFFER_SIZE - 1U) : 0U;
-    space = xMessageBufferSpacesAvailable(CanFrameBuffer);
+    space    = xMessageBufferSpacesAvailable(CanFrameBuffer);
     if (space > capacity)
     {
         return;
@@ -69,21 +71,31 @@ static void fdcan_msg_port_update_highwater(void)
     }
 }
 
-static inline void AddEntryToPage(PageType *page, const FDCAN_ClassicFrameType *frame)
+static inline void
+AddEntryToPage(PageType *page, const FDCAN_ClassicFrameType *frame)
 {
     // page->frames[page->count].size = sizeof(FDCAN_ClassicFrameType);
-    memcpy(&page->frames[page->count].frame, frame, sizeof(FDCAN_ClassicFrameType));
+    memcpy(
+        &page->frames[page->count].frame,
+        frame,
+        sizeof(FDCAN_ClassicFrameType)
+    );
     page->count++;
 }
 
 void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame)
 {
     BaseType_t xHigher = pdFALSE;
-    size_t bytes_sent = 0;
+    size_t bytes_sent  = 0;
 
     if (Page.count >= CAN_FRAME_PAGE_MAX_ENTRIES)
     {
-        bytes_sent = xMessageBufferSendFromISR(CanFrameBuffer, (uint8_t *)&Page, sizeof(Page), &xHigher);
+        bytes_sent = xMessageBufferSendFromISR(
+            CanFrameBuffer,
+            (uint8_t *)&Page,
+            sizeof(Page),
+            &xHigher
+        );
         if (bytes_sent > 0)
         {
             Page.count = 0;
@@ -104,7 +116,7 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame)
         AddEntryToPage(&Page, frame);
     }
 
-    portYIELD_FROM_ISR(xHigher); 
+    portYIELD_FROM_ISR(xHigher);
 }
 
 void fdcan_msg_port_init(void)
@@ -112,51 +124,59 @@ void fdcan_msg_port_init(void)
     volatile size_t NeededSize;
     volatile size_t ActualSize;
 
-    FcdanMsgPort_FrameDropCount = 0U;
+    FcdanMsgPort_FrameDropCount  = 0U;
     CanFrameBufferHighWaterBytes = 0U;
 
     CanFrameBuffer = xMessageBufferCreateStatic(
-                        CAN_FRAME_BUFFER_SIZE,
-                        MessageBufferStorageArea,
-                        &MessageBuffer);
+        CAN_FRAME_BUFFER_SIZE,
+        MessageBufferStorageArea,
+        &MessageBuffer
+    );
 
     NeededSize = sizeof(MessageBufferStorageArea);
     ActualSize = xMessageBufferSpaceAvailable(CanFrameBuffer);
 
     if (NeededSize - 1U > ActualSize)
     {
-        (void) NeededSize;
-        (void) ActualSize;
+        (void)NeededSize;
+        (void)ActualSize;
     }
     // configASSERT(CanFrameBuffer != NULL);
 }
 
 size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds)
 {
-    size_t BytesReceived = 0U;
+    size_t BytesReceived  = 0U;
     static uint32_t Index = 0;
-    static PageType Page = {0};
-    
+    static PageType Page  = {0};
+
     if (Index == 0)
     {
-        BytesReceived = xMessageBufferReceive(CanFrameBuffer, &Page, sizeof(Page), pdMS_TO_TICKS(milliSeconds));
+        BytesReceived = xMessageBufferReceive(
+            CanFrameBuffer,
+            &Page,
+            sizeof(Page),
+            pdMS_TO_TICKS(milliSeconds)
+        );
 
         if (BytesReceived > 0)
         {
             Index = Page.count;
         }
-        else 
+        else
         {
             Index = 0;
         }
     }
-    
+
     if (Index > 0)
     {
-        *dst = &Page.frames[Page.count - Index].frame;
-        BytesReceived = sizeof(Page.frames[Page.count - Index].frame); // Page.frames[Page.count - Index].size;
+        *dst          = &Page.frames[Page.count - Index].frame;
+        BytesReceived = sizeof(
+            Page.frames[Page.count - Index].frame
+        ); // Page.frames[Page.count - Index].size;
         Index--;
-    }   
+    }
 
     return BytesReceived;
 }
@@ -167,10 +187,12 @@ void fdcan_msg_port_flush(void)
 
     if (Page.count > 0)
     {
-        bytes_sent = xMessageBufferSend(CanFrameBuffer, 
-                                        (uint8_t *)&Page, 
-                                        sizeof(Page), 
-                                        portMAX_DELAY);
+        bytes_sent = xMessageBufferSend(
+            CanFrameBuffer,
+            (uint8_t *)&Page,
+            sizeof(Page),
+            portMAX_DELAY
+        );
         if (bytes_sent > 0)
         {
             Page.count = 0;

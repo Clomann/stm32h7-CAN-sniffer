@@ -6,15 +6,15 @@
 #include "stm32h7xx_nucleo.h"
 
 /* Definition for TIMx clock resources and definition for TIMx's NVIC */
-#define TIMx                           TIM3
-#define TIMx_CLK_ENABLE()              __HAL_RCC_TIM3_CLK_ENABLE()
-#define TIMx_IRQn                      TIM3_IRQn
-#define TIMx_IRQHandler                TIM3_IRQHandler
+#define TIMx              TIM3
+#define TIMx_CLK_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
+#define TIMx_IRQn         TIM3_IRQn
+#define TIMx_IRQHandler   TIM3_IRQHandler
 
-#define TIM_HAL                        TIM4
-#define TIM_HAL_CLK_ENABLE()           __HAL_RCC_TIM4_CLK_ENABLE()
-#define TIM_HAL_IRQn                   TIM4_IRQn
-#define TIM_HAL_IRQHandler             TIM4_IRQHandler
+#define TIM_HAL              TIM4
+#define TIM_HAL_CLK_ENABLE() __HAL_RCC_TIM4_CLK_ENABLE()
+#define TIM_HAL_IRQn         TIM4_IRQn
+#define TIM_HAL_IRQHandler   TIM4_IRQHandler
 
 /**
  * Initialize timer with a provided resolution.

@@ -3,7 +3,7 @@
 #include "stm32h7xx_hal_tim.h"
 #include <stdint.h>
 
-#define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL)  // = 10_000_000_000
+#define BASE_CONSTANT (1000000ULL * 1000ULL * 10ULL) // = 10_000_000_000
 
 TIM_HandleTypeDef TimHandle;
 TIM_HandleTypeDef TimHalHandle; /* timer used to feed HAL tick */
@@ -11,9 +11,13 @@ TIM_HandleTypeDef TimHalHandle; /* timer used to feed HAL tick */
 uint32_t GetTimerMaxARR(TIM_TypeDef *htim)
 {
     if (htim == TIM2 || htim == TIM5)
-        return 0xFFFFFFFF;  // 32-bit timers
+    {
+        return 0xFFFFFFFF; // 32-bit timers
+    }
     else
-        return 0xFFFF;      // 16-bit timers
+    {
+        return 0xFFFF; // 16-bit timers
+    }
 }
 
 uint32_t GetTimerInputClock(TIM_TypeDef *htim)
@@ -26,14 +30,15 @@ uint32_t GetTimerInputClock(TIM_TypeDef *htim)
     // Get current clock configuration
     HAL_RCC_GetClockConfig(&clkconfig, &flash_latency);
 
-    if (htim == TIM1 || htim == TIM8 ||
-        htim == TIM15 || htim == TIM16 || htim == TIM17)
+    if (htim == TIM1 || htim == TIM8 || htim == TIM15 || htim == TIM16
+        || htim == TIM17)
     {
         // APB2 timer
         pclk = HAL_RCC_GetPCLK2Freq();
 
         // Check if APB2 prescaler is > 1
-        timer_clk = (clkconfig.APB2CLKDivider != RCC_HCLK_DIV1) ? pclk * 2 : pclk;
+        timer_clk =
+            (clkconfig.APB2CLKDivider != RCC_HCLK_DIV1) ? pclk * 2 : pclk;
     }
     else
     {
@@ -41,7 +46,8 @@ uint32_t GetTimerInputClock(TIM_TypeDef *htim)
         pclk = HAL_RCC_GetPCLK1Freq();
 
         // Check if APB1 prescaler is > 1
-        timer_clk = (clkconfig.APB1CLKDivider != RCC_HCLK_DIV1) ? pclk * 2 : pclk;
+        timer_clk =
+            (clkconfig.APB1CLKDivider != RCC_HCLK_DIV1) ? pclk * 2 : pclk;
     }
 
     return timer_clk;
@@ -59,21 +65,24 @@ uint32_t GetTimerInputClock(TIM_TypeDef *htim)
  * @return uint8_t        0 if successful, 1 if no suitable values were found.
  */
 uint8_t ComputePrescalerAndARR(
-    uint32_t timer_clk, 
-    uint64_t target_freq, 
+    uint32_t timer_clk,
+    uint64_t target_freq,
     uint32_t max_arr,
-    uint32_t *prescaler_out, 
-    uint32_t *arr_out)
+    uint32_t *prescaler_out,
+    uint32_t *arr_out
+)
 {
     uint8_t res;
-    uint32_t prescaler = 0;
-    uint32_t arr = 0;
+    uint32_t prescaler             = 0;
+    uint32_t arr                   = 0;
     volatile uint64_t total_counts = 0U;
 
     res = 1;
 
     if (target_freq == 0)
-        return res;  // Avoid division by zero
+    {
+        return res; // Avoid division by zero
+    }
 
     // Upper bound on product (PSC+1)*(ARR+1)
     total_counts = ((uint64_t)timer_clk * 1000ULL) / target_freq;
@@ -81,22 +90,39 @@ uint8_t ComputePrescalerAndARR(
     for (arr = max_arr; arr > 0; --arr)
     {
         uint64_t divisor = (uint64_t)arr + 1;
-        
-        if (total_counts % divisor != 0)
-            continue;
-    
-        prescaler = (uint32_t)((total_counts / divisor) - 1);
-    
-        if ( ((uint64_t)prescaler + 1U) == 0 || ((uint64_t)prescaler + 1U) > 0x10000)
-            continue;
 
-        if (prescaler_out) *prescaler_out = prescaler;
-        if (arr_out) *arr_out = arr;
-        return 0;  // Exact match found
+        if (total_counts % divisor != 0)
+        {
+            continue;
+        }
+
+        prescaler = (uint32_t)((total_counts / divisor) - 1);
+
+        if (((uint64_t)prescaler + 1U) == 0
+            || ((uint64_t)prescaler + 1U) > 0x10000)
+        {
+            continue;
+        }
+
+        if (prescaler_out)
+        {
+            *prescaler_out = prescaler;
+        }
+        if (arr_out)
+        {
+            *arr_out = arr;
+        }
+        return 0; // Exact match found
     }
 
-    if (arr_out) *arr_out = arr;
-    if (prescaler_out) *prescaler_out = prescaler;
+    if (arr_out)
+    {
+        *arr_out = arr;
+    }
+    if (prescaler_out)
+    {
+        *prescaler_out = prescaler;
+    }
 
     return res;
 }
@@ -112,14 +138,15 @@ uint8_t TIMx_Init(uint32_t resolution)
     volatile uint64_t freq_int;
 
     InputClock = GetTimerInputClock(TIMx);
-    MaxArr = GetTimerMaxARR(TIMx);
+    MaxArr     = GetTimerMaxARR(TIMx);
 
     Arr = MaxArr;
     while (Arr > 0)
     {
         // find lowest frequency that yields the desired resolution
         freq_int = BASE_CONSTANT / (resolution * (Arr + 1));
-        if (BASE_CONSTANT == freq_int * resolution * (Arr + 1)) {
+        if (BASE_CONSTANT == freq_int * resolution * (Arr + 1))
+        {
             freq = freq_int / 10;
             break;
         }
@@ -129,21 +156,19 @@ uint8_t TIMx_Init(uint32_t resolution)
         }
     }
 
-    if (0 == Arr) 
+    if (0 == Arr)
     {
         TIM_ErrorHandlerHook();
     }
 
-    res = ComputePrescalerAndARR(
-            InputClock, 
-            freq,
-            MaxArr,
-            &Prescaler, 
-            &Arr);
+    res = ComputePrescalerAndARR(InputClock, freq, MaxArr, &Prescaler, &Arr);
 
-    if (0 != res) return res;
-    
-    if (resolution != (InputClock/ (1+Prescaler)) / 1000000U)
+    if (0 != res)
+    {
+        return res;
+    }
+
+    if (resolution != (InputClock / (1 + Prescaler)) / 1000000U)
     {
         TIM_ErrorHandlerHook();
     }
@@ -238,11 +263,11 @@ void TIMx_IRQHandler(void)
 void TIM_GetCounterValueAndUpdateInterruptFlag(uint32_t *cnt, uint32_t *uifcpy)
 {
     uint32_t CntRaw;
-    
+
     *uifcpy = 0;
 
     CntRaw = __HAL_TIM_GetCounter(&TimHandle);
-    
+
     if (TimHandle.Instance->CR1 & TIM_CR1_UIFREMAP)
     {
         *uifcpy = __HAL_TIM_GET_UIFCPY(CntRaw);
@@ -266,16 +291,14 @@ uint8_t TIM_HAL_Init(uint32_t freq)
     uint32_t Prescaler;
 
     InputClock = GetTimerInputClock(TIM_HAL);
-    MaxArr = GetTimerMaxARR(TIM_HAL);
+    MaxArr     = GetTimerMaxARR(TIM_HAL);
 
-    res = ComputePrescalerAndARR(
-            InputClock, 
-            freq,
-            MaxArr,
-            &Prescaler, 
-            &Arr);
+    res = ComputePrescalerAndARR(InputClock, freq, MaxArr, &Prescaler, &Arr);
 
-    if (0 != res) return res;
+    if (0 != res)
+    {
+        return res;
+    }
 
     /* Set TIM instance */
     TimHalHandle.Instance = TIM_HAL;

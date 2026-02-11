@@ -18,8 +18,8 @@
 /*!< 32 Gb in bytes */
 #define SD_TOTAL_SIZE 0x800000000
 /*!< Sector lemngth in bytes (512 bytes) */
-#define SD_SECTOR_LENGTH              0x000000200
-#define SD_SECTOR_COUNT               (SD_TOTAL_SIZE / SD_BLOCK_LENGTH)
+#define SD_SECTOR_LENGTH 0x000000200
+#define SD_SECTOR_COUNT  (SD_TOTAL_SIZE / SD_BLOCK_LENGTH)
 /**
  * @brief Max poll iterations while waiting for a read response token.
  *
@@ -42,13 +42,13 @@
 /*!< Length of the CSD data send by the SD card in bytes. */
 #define SD_SPI_CSD_LENGTH 16U
 
-#define SD_DEF_DATA_RESP_TOKEN   0x05
-#define SD_DEF_START_DATA_MARKER 0xFE
+#define SD_DEF_DATA_RESP_TOKEN         0x05
+#define SD_DEF_START_DATA_MARKER       0xFE
 #define SD_DEF_MULTI_BLOCK_START_TOKEN 0xFC
-#define SD_DEF_MULTI_BLOCK_STOP_TOKEN 0xFD
-#define SD_DEF_DATA_ACCEPTED_TOKEN  0x05
-#define SD_DEF_CRC_ERROR_TOKEN  0x0B
-#define SD_DEF_WRITE_ERROR_TOKEN 0x0D
+#define SD_DEF_MULTI_BLOCK_STOP_TOKEN  0xFD
+#define SD_DEF_DATA_ACCEPTED_TOKEN     0x05
+#define SD_DEF_CRC_ERROR_TOKEN         0x0B
+#define SD_DEF_WRITE_ERROR_TOKEN       0x0D
 
 #define SD_E_OK 0U
 
@@ -138,9 +138,11 @@ uint8_t SD_Spi_SendOpCond(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadOCR(Spi_R1Response *pResponse);
 uint8_t SD_Spi_ReadRes7(uint8_t *pRxBuffer);
 uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response *pResponse);
-uint8_t SD_Spi_readMultiBlock(uint32_t address, uint8_t * const buff, uint32_t cnt);
+uint8_t
+SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt);
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
-uint8_t SD_Spi_writeMultiBlock(uint32_t address, uint8_t const  *buff, uint32_t cnt);
+uint8_t
+SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
 DRESULT SD_Spi_hotReset(void);
 

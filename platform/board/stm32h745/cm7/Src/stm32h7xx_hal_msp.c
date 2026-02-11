@@ -56,120 +56,122 @@ static DMA_HandleTypeDef hdma_rx;
   */
 void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
 {
-  GPIO_InitTypeDef  GPIO_InitStruct;
+    GPIO_InitTypeDef GPIO_InitStruct;
 
-  if (hspi->Instance == SPI1)
-  {
-    /*##-1- Enable peripherals and GPIO Clocks #################################*/
-    /* Enable GPIO TX/RX clock */
-    SPI1_SS_GPIO_CLK_ENABLE();
-    SPI1_SCK_GPIO_CLK_ENABLE();
-    SPI1_MISO_GPIO_CLK_ENABLE();
-    SPI1_MOSI_GPIO_CLK_ENABLE();
-    /* Enable SPI1 clock */
-    SPI1_CLK_ENABLE();
-    /* Enable DMA clock */
-    DMA1_CLK_ENABLE();
+    if (hspi->Instance == SPI1)
+    {
+        /*##-1- Enable peripherals and GPIO Clocks #################################*/
+        /* Enable GPIO TX/RX clock */
+        SPI1_SS_GPIO_CLK_ENABLE();
+        SPI1_SCK_GPIO_CLK_ENABLE();
+        SPI1_MISO_GPIO_CLK_ENABLE();
+        SPI1_MOSI_GPIO_CLK_ENABLE();
+        /* Enable SPI1 clock */
+        SPI1_CLK_ENABLE();
+        /* Enable DMA clock */
+        DMA1_CLK_ENABLE();
 
-    /*##-2- Configure peripheral GPIO ##########################################*/
-    /* SPI PWR GPIO pin configuration  */
-    GPIO_InitStruct.Pin       = SPI1_PWR_PIN;
-    GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;// GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;
-    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = SPI1_PWR_AF;
-    HAL_GPIO_Init(SPI1_PWR_GPIO_PORT, &GPIO_InitStruct);
+        /*##-2- Configure peripheral GPIO ##########################################*/
+        /* SPI PWR GPIO pin configuration  */
+        GPIO_InitStruct.Pin       = SPI1_PWR_PIN;
+        GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP; // GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull      = GPIO_PULLUP;
+        GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStruct.Alternate = SPI1_PWR_AF;
+        HAL_GPIO_Init(SPI1_PWR_GPIO_PORT, &GPIO_InitStruct);
 
-    /* SPI SS GPIO pin configuration  */
-    GPIO_InitStruct.Pin       = SPI1_SS_PIN;
-    GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;// GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;
-    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = SPI1_SS_AF;
-    HAL_GPIO_Init(SPI1_SS_GPIO_PORT, &GPIO_InitStruct);
+        /* SPI SS GPIO pin configuration  */
+        GPIO_InitStruct.Pin       = SPI1_SS_PIN;
+        GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP; // GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull      = GPIO_PULLUP;
+        GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStruct.Alternate = SPI1_SS_AF;
+        HAL_GPIO_Init(SPI1_SS_GPIO_PORT, &GPIO_InitStruct);
 
-    /* SPI SCK GPIO pin configuration  */
-    GPIO_InitStruct.Pin       = SPI1_SCK_PIN;
-    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull      = GPIO_PULLDOWN;
-    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = SPI1_SCK_AF;
-    HAL_GPIO_Init(SPI1_SCK_GPIO_PORT, &GPIO_InitStruct);
+        /* SPI SCK GPIO pin configuration  */
+        GPIO_InitStruct.Pin       = SPI1_SCK_PIN;
+        GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull      = GPIO_PULLDOWN;
+        GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStruct.Alternate = SPI1_SCK_AF;
+        HAL_GPIO_Init(SPI1_SCK_GPIO_PORT, &GPIO_InitStruct);
 
-    /* SPI MISO GPIO pin configuration  */
-    GPIO_InitStruct.Pin = SPI1_MISO_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = SPI1_MISO_AF;
-    HAL_GPIO_Init(SPI1_MISO_GPIO_PORT, &GPIO_InitStruct);
+        /* SPI MISO GPIO pin configuration  */
+        GPIO_InitStruct.Pin       = SPI1_MISO_PIN;
+        GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull      = GPIO_NOPULL;
+        GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStruct.Alternate = SPI1_MISO_AF;
+        HAL_GPIO_Init(SPI1_MISO_GPIO_PORT, &GPIO_InitStruct);
 
-    /* SPI MOSI GPIO pin configuration  */
-    GPIO_InitStruct.Pin = SPI1_MOSI_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = SPI1_MOSI_AF;
-    HAL_GPIO_Init(SPI1_MOSI_GPIO_PORT, &GPIO_InitStruct);
+        /* SPI MOSI GPIO pin configuration  */
+        GPIO_InitStruct.Pin       = SPI1_MOSI_PIN;
+        GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull      = GPIO_NOPULL;
+        GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStruct.Alternate = SPI1_MOSI_AF;
+        HAL_GPIO_Init(SPI1_MOSI_GPIO_PORT, &GPIO_InitStruct);
 
-    /*##-3- Configure the DMA ##################################################*/
-    /* Configure the DMA handler for Transmission process */
-    hdma_tx.Instance                 = SPI1_TX_DMA_STREAM;
-    hdma_tx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
-    hdma_tx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
-    hdma_tx.Init.MemBurst            = DMA_MBURST_INC4;
-    hdma_tx.Init.PeriphBurst         = DMA_PBURST_INC4;
-    hdma_tx.Init.Request             = SPI1_TX_DMA_REQUEST;
-    hdma_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
-    hdma_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
-    hdma_tx.Init.MemInc              = DMA_MINC_ENABLE;
-    hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-    hdma_tx.Init.Mode                = DMA_NORMAL;
-    hdma_tx.Init.Priority            = DMA_PRIORITY_LOW;
+        /*##-3- Configure the DMA ##################################################*/
+        /* Configure the DMA handler for Transmission process */
+        hdma_tx.Instance                 = SPI1_TX_DMA_STREAM;
+        hdma_tx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
+        hdma_tx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
+        hdma_tx.Init.MemBurst            = DMA_MBURST_INC4;
+        hdma_tx.Init.PeriphBurst         = DMA_PBURST_INC4;
+        hdma_tx.Init.Request             = SPI1_TX_DMA_REQUEST;
+        hdma_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
+        hdma_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
+        hdma_tx.Init.MemInc              = DMA_MINC_ENABLE;
+        hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+        hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+        hdma_tx.Init.Mode                = DMA_NORMAL;
+        hdma_tx.Init.Priority            = DMA_PRIORITY_LOW;
 
-    HAL_DMA_Init(&hdma_tx);
+        HAL_DMA_Init(&hdma_tx);
 
-    /* Associate the initialized DMA handle to the the SPI handle */
-    __HAL_LINKDMA(hspi, hdmatx, hdma_tx);
+        /* Associate the initialized DMA handle to the the SPI handle */
+        __HAL_LINKDMA(hspi, hdmatx, hdma_tx);
 
-    /* Configure the DMA handler for Transmission process */
-    hdma_rx.Instance                 = SPI1_RX_DMA_STREAM;
+        /* Configure the DMA handler for Transmission process */
+        hdma_rx.Instance = SPI1_RX_DMA_STREAM;
 
-    hdma_rx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
-    hdma_rx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
-    hdma_rx.Init.MemBurst            = DMA_MBURST_INC4;
-    hdma_rx.Init.PeriphBurst         = DMA_PBURST_INC4;
-    hdma_rx.Init.Request             = SPI1_RX_DMA_REQUEST;
-    hdma_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
-    hdma_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
-    hdma_rx.Init.MemInc              = DMA_MINC_ENABLE;
-    hdma_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-    hdma_rx.Init.Mode                = DMA_NORMAL;
-    hdma_rx.Init.Priority            = DMA_PRIORITY_HIGH;
+        hdma_rx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
+        hdma_rx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
+        hdma_rx.Init.MemBurst            = DMA_MBURST_INC4;
+        hdma_rx.Init.PeriphBurst         = DMA_PBURST_INC4;
+        hdma_rx.Init.Request             = SPI1_RX_DMA_REQUEST;
+        hdma_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
+        hdma_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
+        hdma_rx.Init.MemInc              = DMA_MINC_ENABLE;
+        hdma_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+        hdma_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
+        hdma_rx.Init.Mode                = DMA_NORMAL;
+        hdma_rx.Init.Priority            = DMA_PRIORITY_HIGH;
 
-    HAL_DMA_Init(&hdma_rx);
+        HAL_DMA_Init(&hdma_rx);
 
-    /* Associate the initialized DMA handle to the the SPI handle */
-    __HAL_LINKDMA(hspi, hdmarx, hdma_rx);
+        /* Associate the initialized DMA handle to the the SPI handle */
+        __HAL_LINKDMA(hspi, hdmarx, hdma_rx);
 
-    HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4); // demanded by FreeRTOS
+        HAL_NVIC_SetPriorityGrouping(
+            NVIC_PRIORITYGROUP_4
+        ); // demanded by FreeRTOS
 
-    /*##-4- Configure the NVIC for DMA #########################################*/
-    /* NVIC configuration for DMA transfer complete interrupt (SPI1_TX) */
-    HAL_NVIC_SetPriority(SPI1_DMA_TX_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 1);
-    HAL_NVIC_EnableIRQ(SPI1_DMA_TX_IRQn);
+        /*##-4- Configure the NVIC for DMA #########################################*/
+        /* NVIC configuration for DMA transfer complete interrupt (SPI1_TX) */
+        HAL_NVIC_SetPriority(SPI1_DMA_TX_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 1);
+        HAL_NVIC_EnableIRQ(SPI1_DMA_TX_IRQn);
 
-    /* NVIC configuration for DMA transfer complete interrupt (SPI1_RX) */
-    HAL_NVIC_SetPriority(SPI1_DMA_RX_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 0);
-    HAL_NVIC_EnableIRQ(SPI1_DMA_RX_IRQn);
+        /* NVIC configuration for DMA transfer complete interrupt (SPI1_RX) */
+        HAL_NVIC_SetPriority(SPI1_DMA_RX_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 0);
+        HAL_NVIC_EnableIRQ(SPI1_DMA_RX_IRQn);
 
-    /*##-5- Configure the NVIC for SPI #########################################*/
-    /* NVIC configuration for SPI transfer complete interrupt (SPI1) */
-    HAL_NVIC_SetPriority(SPI1_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 0);
-    HAL_NVIC_EnableIRQ(SPI1_IRQn);
-  }
+        /*##-5- Configure the NVIC for SPI #########################################*/
+        /* NVIC configuration for SPI transfer complete interrupt (SPI1) */
+        HAL_NVIC_SetPriority(SPI1_IRQn, SPI1_INTERRUPT_PREEMPT_PRIO, 0);
+        HAL_NVIC_EnableIRQ(SPI1_IRQn);
+    }
 }
 
 /**
@@ -182,33 +184,33 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_MspDeInit(SPI_HandleTypeDef *hspi)
 {
-  if(hspi->Instance == SPI1)
-  {
-    /*##-1- Reset peripherals ##################################################*/
-    SPI1_FORCE_RESET();
-    SPI1_RELEASE_RESET();
+    if (hspi->Instance == SPI1)
+    {
+        /*##-1- Reset peripherals ##################################################*/
+        SPI1_FORCE_RESET();
+        SPI1_RELEASE_RESET();
 
-    /*##-2- Disable peripherals and GPIO Clocks ################################*/
-    /* Deconfigure SPI SCK */
-    HAL_GPIO_DeInit(SPI1_SCK_GPIO_PORT, SPI1_SCK_PIN);
-    /* Deconfigure SPI MISO */
-    HAL_GPIO_DeInit(SPI1_MISO_GPIO_PORT, SPI1_MISO_PIN);
-    /* Deconfigure SPI MOSI */
-    HAL_GPIO_DeInit(SPI1_MOSI_GPIO_PORT, SPI1_MOSI_PIN);
+        /*##-2- Disable peripherals and GPIO Clocks ################################*/
+        /* Deconfigure SPI SCK */
+        HAL_GPIO_DeInit(SPI1_SCK_GPIO_PORT, SPI1_SCK_PIN);
+        /* Deconfigure SPI MISO */
+        HAL_GPIO_DeInit(SPI1_MISO_GPIO_PORT, SPI1_MISO_PIN);
+        /* Deconfigure SPI MOSI */
+        HAL_GPIO_DeInit(SPI1_MOSI_GPIO_PORT, SPI1_MOSI_PIN);
 
-    /*##-3- Disable the DMA ####################################################*/
-    /* De-Initialize the DMA associated to transmission process */
-    HAL_DMA_DeInit(&hdma_tx);
-    /* De-Initialize the DMA associated to reception process */
-    HAL_DMA_DeInit(&hdma_rx);
+        /*##-3- Disable the DMA ####################################################*/
+        /* De-Initialize the DMA associated to transmission process */
+        HAL_DMA_DeInit(&hdma_tx);
+        /* De-Initialize the DMA associated to reception process */
+        HAL_DMA_DeInit(&hdma_rx);
 
-    /*##-4- Disable the NVIC for DMA ###########################################*/
-    HAL_NVIC_DisableIRQ(SPI1_DMA_TX_IRQn);
-    HAL_NVIC_DisableIRQ(SPI1_DMA_RX_IRQn);
+        /*##-4- Disable the NVIC for DMA ###########################################*/
+        HAL_NVIC_DisableIRQ(SPI1_DMA_TX_IRQn);
+        HAL_NVIC_DisableIRQ(SPI1_DMA_RX_IRQn);
 
-    /*##-5- Disable the NVIC for SPI ###########################################*/
-    HAL_NVIC_DisableIRQ(SPI1_IRQn);
-  }
+        /*##-5- Disable the NVIC for SPI ###########################################*/
+        HAL_NVIC_DisableIRQ(SPI1_IRQn);
+    }
 }
 
 /**
@@ -222,4 +224,3 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef *hspi)
 /**
   * @}
   */
-

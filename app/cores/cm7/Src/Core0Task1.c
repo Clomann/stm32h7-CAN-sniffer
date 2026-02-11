@@ -9,9 +9,9 @@ TASK_VARIABLES(CORE0_TASK3_FUNCTION, CORE0_TASK3_STACK_SIZE)
 
 static CanLogControlDataType *CanLogHandle = NULL;
 
-static void Core0Task1Main( void * parameters )
+static void Core0Task1Main(void *parameters)
 {
-    (void) parameters;
+    (void)parameters;
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
@@ -26,7 +26,11 @@ static void Core0Task1Main( void * parameters )
 
 void Core0Task1Init(void)
 {
-    TASK_CREATE_STATIC(CORE0_TASK3_FUNCTION, CORE0_TASK3_STACK_SIZE, CORE0_TASK3_PRIO);
+    TASK_CREATE_STATIC(
+        CORE0_TASK3_FUNCTION,
+        CORE0_TASK3_STACK_SIZE,
+        CORE0_TASK3_PRIO
+    );
 }
 
 void Core0Task1_SetCanLogHandle(CanLogControlDataType *handle)

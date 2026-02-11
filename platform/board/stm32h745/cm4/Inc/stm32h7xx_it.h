@@ -21,7 +21,7 @@
 #define __STM32H7xx_IT_H
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
@@ -47,4 +47,3 @@ void SPI4_DMA_TX_IRQHandler(void);
 #endif
 
 #endif /* __STM32H7xx_IT_H */
-

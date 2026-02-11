@@ -13,10 +13,11 @@ comm_status_t CommManager_Init(
     const void *cfg,
     size_t cfg_size,
     uint8_t *tx,
-    uint8_t *rx)
+    uint8_t *rx
+)
 {
     const CommFactoryEntry *e = CommFactory_Find(drv->protocol);
-    if (!e) 
+    if (!e)
     {
         /* unknown protocol */
         return COMM_ERROR;

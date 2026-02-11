@@ -26,14 +26,14 @@ void SdBridgeTask(void *arg)
     static UBaseType_t MinUnusedStack;
 
     (void)MinUnusedStack;
-    (void) (arg);
+    (void)(arg);
 
     ulTaskNotifyTake(pdTRUE, 0);
 
     for (;;)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        
+
         SdBridgeTask_ActionHook();
 
         MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
@@ -47,7 +47,7 @@ void SdBridgeTask(void *arg)
 
 void SdBridgeTask_Notify()
 {
-    if (NULL != SdBridgeTaskHdl) 
+    if (NULL != SdBridgeTaskHdl)
     {
         xTaskNotifyGive(SdBridgeTaskHdl);
     }

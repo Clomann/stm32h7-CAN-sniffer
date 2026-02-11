@@ -185,5 +185,5 @@ uint64_t FDCAN_GetTimerPeriodHook(void)
 
     TIM_GetArrValue(&Arr);
 
-    return ((uint64_t)Arr + (uint64_t)1U)  * (uint64_t)TIMx_TIME_RESOLUTION;
+    return ((uint64_t)Arr + (uint64_t)1U) * (uint64_t)TIMx_TIME_RESOLUTION;
 }

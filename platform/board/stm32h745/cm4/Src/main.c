@@ -33,10 +33,11 @@
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 #define HSEM_ID_0 (0U) /* HW semaphore 0*/
-enum {
-  TRANSFER_WAIT,
-  TRANSFER_COMPLETE,
-  TRANSFER_ERROR
+enum
+{
+    TRANSFER_WAIT,
+    TRANSFER_COMPLETE,
+    TRANSFER_ERROR
 };
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -45,10 +46,11 @@ SPI_HandleTypeDef SpiHandle4;
 
 volatile uint32_t Notif_Recieved;
 /* Buffer used for transmission */
-uint8_t aTxBuffer[] = "****SPI - Two Boards communication based on DMA **** SPI Message ********* SPI Message *********";
+uint8_t aTxBuffer[] = "****SPI - Two Boards communication based on DMA **** "
+                      "SPI Message ********* SPI Message *********";
 
 /* Buffer used for reception */
-#define BUFFER_ALIGNED_SIZE (((BUFFERSIZE+31)/32)*32)
+#define BUFFER_ALIGNED_SIZE (((BUFFERSIZE + 31) / 32) * 32)
 ALIGN_32BYTES(uint8_t aRxBuffer[BUFFER_ALIGNED_SIZE]);
 
 /* transfer state */
@@ -58,7 +60,8 @@ __IO uint32_t wTransferState = TRANSFER_WAIT;
 
 /* Private function prototypes -----------------------------------------------*/
 static void Error_Handler(void);
-static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
+static uint16_t
+Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength);
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -68,27 +71,31 @@ static uint16_t Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferL
   */
 int main(void)
 {
-	uint8_t RetVal;
-	uint8_t counter;
-	uint32_t spiClockSource;
+    uint8_t RetVal;
+    uint8_t counter;
+    uint32_t spiClockSource;
 
- /*HW semaphore Clock enable*/
-  __HAL_RCC_HSEM_CLK_ENABLE();
+    /*HW semaphore Clock enable*/
+    __HAL_RCC_HSEM_CLK_ENABLE();
 
-  /* Activate HSEM notification for Cortex-M4*/
-  HAL_HSEM_ActivateNotification(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
+    /* Activate HSEM notification for Cortex-M4*/
+    HAL_HSEM_ActivateNotification(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
 
-  /* 
+    /* 
     Domain D2 goes to STOP mode (Cortex-M4 in deep-sleep) waiting for Cortex-M7 to
     perform system initialization (system clock config, external memory configuration.. )   
   */
-  HAL_PWREx_ClearPendingEvent();
-  HAL_PWREx_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFE, PWR_D2_DOMAIN);
+    HAL_PWREx_ClearPendingEvent();
+    HAL_PWREx_EnterSTOPMode(
+        PWR_MAINREGULATOR_ON,
+        PWR_STOPENTRY_WFE,
+        PWR_D2_DOMAIN
+    );
 
-  /* Clear HSEM flag */
-  __HAL_HSEM_CLEAR_FLAG(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
+    /* Clear HSEM flag */
+    __HAL_HSEM_CLEAR_FLAG(__HAL_HSEM_SEMID_TO_MASK(HSEM_ID_0));
 
- /* STM32H7xx HAL library initialization:
+    /* STM32H7xx HAL library initialization:
        - Systick timer is configured by default as source of time base, but user
          can eventually implement his proper time base source (a general purpose
          timer for example or other time source), keeping in mind that Time base
@@ -97,89 +104,95 @@ int main(void)
        - Set NVIC Group Priority to 4
        - Low Level Initialization
      */
-  HAL_Init();
+    HAL_Init();
 
-  /* Add Cortex-M4 user application code here */
+    /* Add Cortex-M4 user application code here */
 
     /*##-1- Configure the SPI peripheral #######################################*/
-/* Set the SPI3 parameters */
-  SpiHandle4.Instance               = SPI4;
-  SpiHandle4.Init.Mode              = SPI_MODE_SLAVE;
+    /* Set the SPI3 parameters */
+    SpiHandle4.Instance  = SPI4;
+    SpiHandle4.Init.Mode = SPI_MODE_SLAVE;
 #if TEST_SPI_PLL2
-  SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+    SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
 #else
-  SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+    SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
 #endif
-  SpiHandle4.Init.Direction         = SPI_DIRECTION_2LINES;
-  SpiHandle4.Init.CLKPhase          = SPI_PHASE_1EDGE;
-  SpiHandle4.Init.CLKPolarity       = SPI_POLARITY_LOW;
-  SpiHandle4.Init.DataSize          = SPI_DATASIZE_8BIT;
-  SpiHandle4.Init.FirstBit          = SPI_FIRSTBIT_MSB;
-  SpiHandle4.Init.TIMode            = SPI_TIMODE_DISABLE;
-  SpiHandle4.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-  SpiHandle4.Init.CRCPolynomial     = 7;
-  SpiHandle4.Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
-  SpiHandle4.Init.NSS               = SPI_NSS_HARD_INPUT;
-  SpiHandle4.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
-  SpiHandle4.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE;  /* Recommended setting to avoid glitches */
+    SpiHandle4.Init.Direction      = SPI_DIRECTION_2LINES;
+    SpiHandle4.Init.CLKPhase       = SPI_PHASE_1EDGE;
+    SpiHandle4.Init.CLKPolarity    = SPI_POLARITY_LOW;
+    SpiHandle4.Init.DataSize       = SPI_DATASIZE_8BIT;
+    SpiHandle4.Init.FirstBit       = SPI_FIRSTBIT_MSB;
+    SpiHandle4.Init.TIMode         = SPI_TIMODE_DISABLE;
+    SpiHandle4.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+    SpiHandle4.Init.CRCPolynomial  = 7;
+    SpiHandle4.Init.CRCLength      = SPI_CRC_LENGTH_8BIT;
+    SpiHandle4.Init.NSS            = SPI_NSS_HARD_INPUT;
+    SpiHandle4.Init.NSSPMode       = SPI_NSS_PULSE_DISABLE;
+    SpiHandle4.Init.MasterKeepIOState =
+        SPI_MASTER_KEEP_IO_STATE_ENABLE; /* Recommended setting to avoid glitches */
 
-  if(HAL_SPI_Init(&SpiHandle4) != HAL_OK)
-  {
-    /* Initialization Error */
-    Error_Handler();
-  }
+    if (HAL_SPI_Init(&SpiHandle4) != HAL_OK)
+    {
+        /* Initialization Error */
+        Error_Handler();
+    }
 
     /* Configure LED1, LED2 and LED3 */
-  BSP_LED_Init(LED1);
-  BSP_LED_Init(LED2);
-  BSP_LED_Init(LED3);
+    BSP_LED_Init(LED1);
+    BSP_LED_Init(LED2);
+    BSP_LED_Init(LED3);
 
-  spiClockSource = __HAL_RCC_GET_SPI4_SOURCE();
-  (void)spiClockSource;
+    spiClockSource = __HAL_RCC_GET_SPI4_SOURCE();
+    (void)spiClockSource;
 
-  counter = 0;
+    counter = 0;
 
-  /* Infinite loop */
-  while (1)
-  {
-	  aTxBuffer[0] = counter++;
+    /* Infinite loop */
+    while (1)
+    {
+        aTxBuffer[0] = counter++;
 
-	  wTransferState = TRANSFER_WAIT;
-	  RetVal = HAL_SPI_TransmitReceive_DMA(&SpiHandle4, (uint8_t*)aTxBuffer, (uint8_t *)aRxBuffer, BUFFERSIZE);
+        wTransferState = TRANSFER_WAIT;
+        RetVal         = HAL_SPI_TransmitReceive_DMA(
+            &SpiHandle4,
+            (uint8_t *)aTxBuffer,
+            (uint8_t *)aRxBuffer,
+            BUFFERSIZE
+        );
 
-	  if(RetVal != HAL_OK)
-	  {
-	    /* Transfer error in transmission process */
-	    Error_Handler();
-	  }
+        if (RetVal != HAL_OK)
+        {
+            /* Transfer error in transmission process */
+            Error_Handler();
+        }
 
-	  while (wTransferState == TRANSFER_WAIT)
-	  {
-	  }
+        while (wTransferState == TRANSFER_WAIT)
+        {
+        }
 
-	  switch(wTransferState)
-	  {
-	    case TRANSFER_COMPLETE :
-	      /*##-4- Compare the sent and received buffers ##############################*/
-	      if(Buffercmp((uint8_t*)aTxBuffer, (uint8_t*)aRxBuffer, BUFFERSIZE))
-	      {
-	        /* Processing Error */
-	        Error_Handler();
-	      }
-	      else
-	      {
-
-	      }
-	      break;
-	    default :
-	      Error_Handler();
-	      break;
-	  }
-
-  }
+        switch (wTransferState)
+        {
+        case TRANSFER_COMPLETE:
+            /*##-4- Compare the sent and received buffers ##############################*/
+            if (Buffercmp(
+                    (uint8_t *)aTxBuffer,
+                    (uint8_t *)aRxBuffer,
+                    BUFFERSIZE
+                ))
+            {
+                /* Processing Error */
+                Error_Handler();
+            }
+            else
+            {
+            }
+            break;
+        default:
+            Error_Handler();
+            break;
+        }
+    }
 }
-
-
 
 /**
   * @brief Semaphore Released Callback.
@@ -188,7 +201,7 @@ int main(void)
   */
 void HAL_HSEM_FreeCallback(uint32_t SemMask)
 {
-  Notif_Recieved = 1;
+    Notif_Recieved = 1;
 }
 
 /**
@@ -200,13 +213,12 @@ void HAL_HSEM_FreeCallback(uint32_t SemMask)
   */
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
-  /* Turn LED1 on: Transfer in transmission process is complete */
-  BSP_LED_On(LED1);
-  /* Turn LED2 on: Transfer in reception process is complete */
-  BSP_LED_On(LED2);
-  wTransferState = TRANSFER_COMPLETE;
+    /* Turn LED1 on: Transfer in transmission process is complete */
+    BSP_LED_On(LED1);
+    /* Turn LED2 on: Transfer in reception process is complete */
+    BSP_LED_On(LED2);
+    wTransferState = TRANSFER_COMPLETE;
 }
-
 
 /**
   * @brief  SPI error callbacks.
@@ -217,7 +229,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
-  wTransferState = TRANSFER_ERROR;
+    wTransferState = TRANSFER_ERROR;
 }
 
 /**
@@ -227,10 +239,9 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
   */
 static void Error_Handler(void)
 {
-  BSP_LED_Off(LED1);
-  /* Turn LED3 on */
-  BSP_LED_On(LED3);
-
+    BSP_LED_Off(LED1);
+    /* Turn LED3 on */
+    BSP_LED_On(LED3);
 }
 
 /**
@@ -240,23 +251,23 @@ static void Error_Handler(void)
   * @retval 0  : pBuffer1 identical to pBuffer2
   *         >0 : pBuffer1 differs from pBuffer2
   */
-static uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
+static uint16_t
+Buffercmp(uint8_t *pBuffer1, uint8_t *pBuffer2, uint16_t BufferLength)
 {
-  while (BufferLength--)
-  {
-    if((*pBuffer1) != *pBuffer2)
+    while (BufferLength--)
     {
-      return BufferLength;
+        if ((*pBuffer1) != *pBuffer2)
+        {
+            return BufferLength;
+        }
+        pBuffer1++;
+        pBuffer2++;
     }
-    pBuffer1++;
-    pBuffer2++;
-  }
 
-  return 0;
+    return 0;
 }
 
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 
 /**
   * @brief  Reports the name of the source file and the source line number
@@ -267,13 +278,13 @@ static uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferL
   */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* User can add his own implementation to report the file name and line number,
+    /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 
-  /* Infinite loop */
-  while (1)
-  {
-  }
+    /* Infinite loop */
+    while (1)
+    {
+    }
 }
 #endif
 
@@ -284,4 +295,3 @@ void assert_failed(uint8_t *file, uint32_t line)
 /**
   * @}
   */
-

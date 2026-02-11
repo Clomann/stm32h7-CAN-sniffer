@@ -18,9 +18,10 @@ uint8_t CANFD_GetSJW(const uint8_t reg_value[4], bool is_data_phase);
  * @return true if successful, false if no valid timing found
  */
 uint8_t CANFD_CalculateBitTimingRegister(
-    uint32_t clock_hz, 
-    uint32_t bitrate, 
-    uint32_t sample_point, 
+    uint32_t clock_hz,
+    uint32_t bitrate,
+    uint32_t sample_point,
     uint32_t sjw,
-    bool is_data_phase, 
-    uint8_t reg_value_out[4]);
+    bool is_data_phase,
+    uint8_t reg_value_out[4]
+);

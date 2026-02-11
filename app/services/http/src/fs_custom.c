@@ -12,7 +12,8 @@
 #include "CanLogManager.h"
 #include "CanLogBuffer.h"
 
-struct fs_custom_data {
+struct fs_custom_data
+{
     FILE *f;
 #if LWIP_HTTPD_EXAMPLE_CUSTOMFILES_DELAYED
     int delay_read;
@@ -21,12 +22,11 @@ struct fs_custom_data {
 #endif
 };
 
-static const char redirect_reply[] =
-    "HTTP/1.1 303 See Other\r\n"
-    "Location: /can.shtml\r\n"
-    "Connection: close\r\n"
-    "Content-Length: 0\r\n"
-    "\r\n";
+static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
+                                     "Location: /can.shtml\r\n"
+                                     "Connection: close\r\n"
+                                     "Content-Length: 0\r\n"
+                                     "\r\n";
 
 #if LWIP_HTTPD_CUSTOM_FILES
 
@@ -44,16 +44,22 @@ static const char redirect_reply[] =
 #define CANLOG_STATUS_PATH        "/logger/status"
 #define CANLOG_POST_REDIRECT_PATH "/postredir"
 
-#define CANLOG_META_DATA_STRING \
-    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\",\"file_size\":\"%lu\"}"
+#define CANLOG_META_DATA_STRING                                                \
+    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\","   \
+    "\"file_size\":\"%lu\"}"
 
-#define CANLOG_STATUS_STRING \
-    "{ \"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%.2f,\"rb1_bytes_highwater_pct\":%.2f,\"can1_rx_highwater_pct\":%.2f,\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f}"
+#define CANLOG_STATUS_STRING                                                   \
+    "{ "                                                                       \
+    "\"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_"  \
+    "hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%."   \
+    "2f,\"rb1_bytes_highwater_pct\":%.2f,\"can1_rx_highwater_pct\":%.2f,"      \
+    "\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f}"
 
-#define CANLOG_CONFIG_STRING \
+#define CANLOG_CONFIG_STRING                                                   \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
 
-typedef struct {
+typedef struct
+{
     uint8_t stage;
     uint32_t index;
     uint32_t callcount;
@@ -73,43 +79,44 @@ static char ConfigData[CANLOG_MAX_CONFIG_SIZE];
 int fs_open_custom(struct fs_file *file, const char *name)
 {
     uint32_t FileSize = 0U;
-    
+
     /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
     if (0 == strncmp(name, CANLOG_FILE_PATH, sizeof(CANLOG_FILE_PATH) - 1))
     {
         char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
-        
-        reqState.index = 0;
-        reqState.stage = 0;
+
+        reqState.index     = 0;
+        reqState.stage     = 0;
         reqState.callcount = 0;
         reqState.byteCount = 0;
 
-        strncat(
-            FileName, 
-            name, 
-            sizeof(FileName) - strlen(FileName) - 1
-        );
+        strncat(FileName, name, sizeof(FileName) - strlen(FileName) - 1);
         strncpy((char *)reqState.name, FileName, sizeof(reqState.name) - 1);
         reqState.name[sizeof(reqState.name) - 1] = '\0';
 
-        if ( 0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, FileName) )
+        if (0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, FileName))
         {
             return 0;
         }
 
-        (void) FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize);
+        (void)FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize);
 
         CanLogReadFileDevice.readTargetSize = FileSize;
 
-        file->pextension = &reqState;
-        file->data = NULL;
-        file->len = FileSize;  // tell lwip the total file size
-        file->index = 0;
+        file->pextension     = &reqState;
+        file->data           = NULL;
+        file->len            = FileSize; // tell lwip the total file size
+        file->index          = 0;
         file->is_custom_file = 1;
-    
+
         return 1;
     }
-    else if (0 == strncmp(name, CANLOG_META_DATA_PATH, sizeof(CANLOG_META_DATA_PATH) - 1)) 
+    else if (0
+             == strncmp(
+                 name,
+                 CANLOG_META_DATA_PATH,
+                 sizeof(CANLOG_META_DATA_PATH) - 1
+             ))
     {
         uint32_t HeadIndex;
         uint32_t TailIndex;
@@ -117,9 +124,9 @@ int fs_open_custom(struct fs_file *file, const char *name)
         uint32_t Progression;
         int DataSize;
 
-        (void) FsCustom_GetCanLogHeadIndex(&HeadIndex);
-        (void) FsCustom_GetCanLogTailIndex(&TailIndex);
-        (void) FsCustom_GetCanLogCapacity(&Capacity);
+        (void)FsCustom_GetCanLogHeadIndex(&HeadIndex);
+        (void)FsCustom_GetCanLogTailIndex(&TailIndex);
+        (void)FsCustom_GetCanLogCapacity(&Capacity);
 
         if (HeadIndex >= TailIndex)
         {
@@ -127,7 +134,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
         }
         else if (HeadIndex < TailIndex)
         {
-            Progression = Capacity + (HeadIndex - TailIndex + 1) ;
+            Progression = Capacity + (HeadIndex - TailIndex + 1);
         }
 
         if (Progression < 2)
@@ -139,24 +146,30 @@ int fs_open_custom(struct fs_file *file, const char *name)
             MetaData,
             sizeof MetaData,
             CANLOG_META_DATA_STRING,
-            (unsigned long int)HeadIndex, 
-            (unsigned long int)TailIndex, 
-            (unsigned long int)Capacity, 
+            (unsigned long int)HeadIndex,
+            (unsigned long int)TailIndex,
+            (unsigned long int)Capacity,
             (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
             (unsigned long int)(appCanLogGetLogFileSize())
         );
-    
-        if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData)) {
-            return 0;  // Error: formatting failed or buffer too small
+
+        if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData))
+        {
+            return 0; // Error: formatting failed or buffer too small
         }
 
         file->data           = MetaData;
         file->len            = DataSize;
         file->index          = 0;
-        file->is_custom_file = 0;       /* httpd sends static buffer     */
+        file->is_custom_file = 0; /* httpd sends static buffer     */
         return 1;
     }
-    else if (0 == strncmp(name, CANLOG_CONFIG_PATH, sizeof(CANLOG_CONFIG_PATH) - 1)) 
+    else if (0
+             == strncmp(
+                 name,
+                 CANLOG_CONFIG_PATH,
+                 sizeof(CANLOG_CONFIG_PATH) - 1
+             ))
     {
         int DataSize;
 
@@ -168,40 +181,47 @@ int fs_open_custom(struct fs_file *file, const char *name)
             (unsigned long int)(appCanLogGetLogFileSize()),
             (unsigned long int)(appCanLogGetLogFileCount())
         );
-    
-        if (DataSize < 0 || (size_t)DataSize >= sizeof(ConfigData)) {
-            return 0;  // Error: formatting failed or buffer too small
+
+        if (DataSize < 0 || (size_t)DataSize >= sizeof(ConfigData))
+        {
+            return 0; // Error: formatting failed or buffer too small
         }
 
         file->data           = ConfigData;
         file->len            = DataSize;
         file->index          = 0;
-        file->is_custom_file = 0;       /* httpd sends static buffer     */
+        file->is_custom_file = 0; /* httpd sends static buffer     */
         return 1;
     }
-    else if (0 == strncmp(name, CANLOG_STATUS_PATH, sizeof(CANLOG_STATUS_PATH) - 1)) {
-        uint8_t IsTracerRunning = 1;
-        float BusLoadCan1 = 0.0;
-        float BusLoadCan2 = 0.0;
-        _Bool AnyFrameLost = false;
-        uint8_t PreallocErrors = 0U;
-        uint32_t Rb1BytesHighWater = 0U;
-        float Rb1BytesHighWaterPct = 0.0f;
+    else if (0
+             == strncmp(
+                 name,
+                 CANLOG_STATUS_PATH,
+                 sizeof(CANLOG_STATUS_PATH) - 1
+             ))
+    {
+        uint8_t IsTracerRunning        = 1;
+        float BusLoadCan1              = 0.0;
+        float BusLoadCan2              = 0.0;
+        _Bool AnyFrameLost             = false;
+        uint8_t PreallocErrors         = 0U;
+        uint32_t Rb1BytesHighWater     = 0U;
+        float Rb1BytesHighWaterPct     = 0.0f;
         uint32_t CanAbsRxHighWaterCan1 = 0U;
         uint32_t CanAbsRxHighWaterCan2 = 0U;
-        uint32_t CanAbsRxCapacity = 0U;
+        uint32_t CanAbsRxCapacity      = 0U;
         float CanAbsRxHighWaterPctCan1 = 0.0f;
         float CanAbsRxHighWaterPctCan2 = 0.0f;
         uint32_t FdcanMsgPortHighWater = 0U;
-        uint32_t FdcanMsgPortCapacity = 0U;
+        uint32_t FdcanMsgPortCapacity  = 0U;
         float FdcanMsgPortHighWaterPct = 0.0f;
-        uint64_t FrameCount = 0U;
-        unsigned long FrameCountHi = 0UL;
-        unsigned long FrameCountLo = 0UL;
+        uint64_t FrameCount            = 0U;
+        unsigned long FrameCountHi     = 0UL;
+        unsigned long FrameCountLo     = 0UL;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
-            IsTracerRunning =  1;
+            IsTracerRunning = 1;
         }
 
         AnyFrameLost = FsCustom_IsAnyFrameLostFlag();
@@ -241,7 +261,8 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
         if (LOG_BUFFER_SIZE > 0U)
         {
-            Rb1BytesHighWaterPct = (float)Rb1BytesHighWater * 100.0f / (float)LOG_BUFFER_SIZE;
+            Rb1BytesHighWaterPct =
+                (float)Rb1BytesHighWater * 100.0f / (float)LOG_BUFFER_SIZE;
         }
         if (CanAbsRxCapacity > 0U)
         {
@@ -252,11 +273,12 @@ int fs_open_custom(struct fs_file *file, const char *name)
         }
         if (FdcanMsgPortCapacity > 0U)
         {
-            FdcanMsgPortHighWaterPct =
-                (float)FdcanMsgPortHighWater * 100.0f / (float)FdcanMsgPortCapacity;
+            FdcanMsgPortHighWaterPct = (float)FdcanMsgPortHighWater * 100.0f
+                                       / (float)FdcanMsgPortCapacity;
         }
 
-        int n = snprintf(StatusData,
+        int n = snprintf(
+            StatusData,
             sizeof(StatusData),
             CANLOG_STATUS_STRING,
             IsTracerRunning ? "true" : "false",
@@ -276,28 +298,35 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             return 0;
         }
-    
+
         file->data           = StatusData;
         file->len            = n;
         file->index          = 0;
-        file->is_custom_file = 0;       /* httpd sends static buffer     */
+        file->is_custom_file = 0; /* httpd sends static buffer     */
         return 1;
     }
-    else if (0 == strncmp(name, CANLOG_POST_REDIRECT_PATH, sizeof(CANLOG_POST_REDIRECT_PATH) - 1)) {
-        file->data   = redirect_reply;
-        file->len    = sizeof(redirect_reply) - 1;
-        file->flags	= FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
-        file->index  = 0;
-        #if LWIP_HTTPD_DYNAMIC_HEADERS
-            // file->http_header_included = 1;
-        #endif
-        #if LWIP_HTTPD_CUSTOM_FILES
-            file->is_custom_file       = 1;
-        #endif
+    else if (0
+             == strncmp(
+                 name,
+                 CANLOG_POST_REDIRECT_PATH,
+                 sizeof(CANLOG_POST_REDIRECT_PATH) - 1
+             ))
+    {
+        file->data = redirect_reply;
+        file->len  = sizeof(redirect_reply) - 1;
+        file->flags =
+            FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
+        file->index = 0;
+#if LWIP_HTTPD_DYNAMIC_HEADERS
+        // file->http_header_included = 1;
+#endif
+#if LWIP_HTTPD_CUSTOM_FILES
+        file->is_custom_file = 1;
+#endif
         return 1;
     }
 
-    return 0;  // Fallback to default file system
+    return 0; // Fallback to default file system
 }
 
 #define CAN_LOG_BUFFER_SIZE 8U
@@ -305,10 +334,11 @@ int fs_open_custom(struct fs_file *file, const char *name)
 void fs_state_free(struct fs_file *file, void *state)
 {
     LWIP_UNUSED_ARG(file);
-    if (state != NULL) {
-        if (state == &reqState) 
-        { 
-            (void) FatFS_SD_CloseFile(&CanLogReadFileDevice);
+    if (state != NULL)
+    {
+        if (state == &reqState)
+        {
+            (void)FatFS_SD_CloseFile(&CanLogReadFileDevice);
         }
     }
 }
@@ -316,16 +346,17 @@ void fs_state_free(struct fs_file *file, void *state)
 int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
     FRESULT fr;
-    uint32_t len = 0U;
+    uint32_t len              = 0U;
     CustomHandlerState *state = (CustomHandlerState *)file->pextension;
     uint32_t ByteCount;
 
-    if (state == NULL) {
+    if (state == NULL)
+    {
         return FS_READ_EOF;
     }
 
     ByteCount = state->byteCount;
-    
+
     if (ByteCount >= CanLogReadFileDevice.readTargetSize)
     {
         state->callcount = 0;
@@ -343,7 +374,7 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
     }
     else
     {
-        len = CanLogReadFileDevice.readTargetSize - ByteCount;   
+        len = CanLogReadFileDevice.readTargetSize - ByteCount;
     }
 
     fr = FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
@@ -355,7 +386,7 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
 
     state->callcount++;
     state->byteCount += len;
-    
+
     return len; // triggers send
 }
 

@@ -10,16 +10,18 @@
 
 #include "CommTypes.h"
 
-typedef struct {
-	Message msgBase;
+typedef struct
+{
+    Message msgBase;
     uint32_t can_id;
     bool isExtendedId;
     uint8_t frame_type;
     uint8_t msgMarker;
 } FDCAN_Message;
 
-typedef struct {
-	Message msgBase;
+typedef struct
+{
+    Message msgBase;
     void *transaction;
 } SPI_Message;
 

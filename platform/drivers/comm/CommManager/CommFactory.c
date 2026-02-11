@@ -9,7 +9,11 @@ const CommFactoryEntry *CommFactory_Find(CommProtocolType key)
 {
     const CommFactoryEntry *p = __start_comm_factory;
     for (; p < __stop_comm_factory; ++p)
+    {
         if (p->protocol == key)
+        {
             return p;
-    return NULL;                        /* nothing registered      */
+        }
+    }
+    return NULL; /* nothing registered      */
 }

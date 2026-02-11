@@ -52,7 +52,7 @@ void test_CanLogManager_setUp(void)
 
     mockMountRes     = RES_OK;
     mockRunCanTracer = false;
-    mockCommit = false;
+    mockCommit       = false;
 
     testFrame.id           = 0x123;
     testFrame.dlc_dl_flags = 8;
@@ -61,7 +61,8 @@ void test_CanLogManager_setUp(void)
     memset(testFrame.data, 0xAA, sizeof(testFrame.data));
 
     CanLogBuffer_Init();
-    testCtrlData = CanLogHandler_Init(&mockMountRes, &mockRunCanTracer, &mockCommit);
+    testCtrlData =
+        CanLogHandler_Init(&mockMountRes, &mockRunCanTracer, &mockCommit);
 }
 
 void test_CanLogManager_tearDown(void)
@@ -146,7 +147,8 @@ void test_CanLogBuffer_ReadBlock(void)
     uint8_t *blockData;
     uint32_t blockLength;
     uint32_t frameCount;
-    uint8_t readResult = CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount);
+    uint8_t readResult =
+        CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount);
 
     TEST_ASSERT_EQUAL(CANLOG_E_OK, readResult);
     TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
@@ -203,7 +205,10 @@ void test_CanLogBuffer_BlockBoundaryPadding(void)
     CanLogBlockHeaderType *header = (CanLogBlockHeaderType *)blockData;
     TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
     TEST_ASSERT_NOT_EQUAL(0U, frameCount);
-    TEST_ASSERT_GREATER_OR_EQUAL(sizeof(CanLogBlockHeaderType), header->header_size);
+    TEST_ASSERT_GREATER_OR_EQUAL(
+        sizeof(CanLogBlockHeaderType),
+        header->header_size
+    );
     TEST_ASSERT_LESS_OR_EQUAL_UINT(header->block_size, BLOCK_SIZE);
 
     CanLogBuffer_Consume(blockLength, frameCount);
@@ -253,8 +258,7 @@ void test_CanLogBuffer_ConsumeUpdatesCounters(void)
     entry->header.total_len  = sizeof(CanLogEntryType) + entry->data_len;
     entry->dlc_flags         = MAKE_DLC_FLAGS(payload_len, 0);
 
-    const uint32_t entriesNeeded =
-        (BLOCK_SIZE / entry->header.total_len) + 1U;
+    const uint32_t entriesNeeded = (BLOCK_SIZE / entry->header.total_len) + 1U;
 
     for (uint32_t i = 0; i < entriesNeeded; i++)
     {
@@ -405,19 +409,19 @@ void test_CommitFlushOnStop_PadsAndFlushes(void)
 
     /* Inject exactly 54 frames into the buffer. */
     CanLogEntryStackBufferType entryBuf = {0};
-    CanLogEntryType *entry = (CanLogEntryType *)entryBuf.raw;
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
 
     entry->header.header_len = sizeof(entry->header);
-    entry->header.type = CLB_ENTRY_TYPE_FRAME;
-    entry->data_len = 0;
-    entry->header.total_len = sizeof(CanLogEntryType);
-    entry->dlc_flags = MAKE_DLC_FLAGS(0, 0);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = 0;
+    entry->header.total_len  = sizeof(CanLogEntryType);
+    entry->dlc_flags         = MAKE_DLC_FLAGS(0, 0);
 
     for (uint32_t i = 0; i < 54U; i++)
     {
         entry->timestamp = 1000U + i;
-        entry->channel = 1;
-        entry->can_id = 0x100U + i;
+        entry->channel   = 1;
+        entry->can_id    = 0x100U + i;
         TEST_ASSERT_EQUAL_UINT8(
             CANLOG_E_OK,
             CanLogBuffer_AddEntry(entry, entry->header.total_len)
@@ -439,19 +443,18 @@ void test_CommitFlushOnStop_PadsAndFlushes(void)
  */
 void test_MetaDataPersistence_RoundTrip(void)
 {
-    const char input_json[] =
-        "{\n"
-        "    \"epoch\":5,\n"
-        "    \"index\":7,\n"
-        "    \"offset\":123,\n"
-        "    \"crc\":42\n"
-        "}\n";
+    const char input_json[] = "{\n"
+                              "    \"epoch\":5,\n"
+                              "    \"index\":7,\n"
+                              "    \"offset\":123,\n"
+                              "    \"crc\":42\n"
+                              "}\n";
 
     test_filehandler_set_meta_content(input_json, (uint32_t)strlen(input_json));
     appCanLogHandlerInit(testCtrlData);
 
     uint32_t stored_len = 0;
-    const char *stored = test_filehandler_get_meta_content(&stored_len);
+    const char *stored  = test_filehandler_get_meta_content(&stored_len);
     TEST_ASSERT_NOT_NULL(stored);
     TEST_ASSERT_GREATER_THAN_UINT32(0U, stored_len);
 
@@ -468,7 +471,7 @@ void test_MetaDataPersistence_RoundTrip(void)
 void test_Preallocation_CreatesSizedFiles(void)
 {
     const uint32_t file_count = 3U;
-    const uint32_t file_size = 2048U;
+    const uint32_t file_size  = 2048U;
 
     test_ff_reset();
     appCanLogSetFileConfig(file_size, file_count);

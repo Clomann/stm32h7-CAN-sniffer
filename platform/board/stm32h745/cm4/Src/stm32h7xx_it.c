@@ -62,10 +62,10 @@ void NMI_Handler(void)
   */
 void HardFault_Handler(void)
 {
-  /* Go to infinite loop when Hard Fault exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Hard Fault exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -75,10 +75,10 @@ void HardFault_Handler(void)
   */
 void MemManage_Handler(void)
 {
-  /* Go to infinite loop when Memory Manage exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Memory Manage exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -88,10 +88,10 @@ void MemManage_Handler(void)
   */
 void BusFault_Handler(void)
 {
-  /* Go to infinite loop when Bus Fault exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Bus Fault exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -101,10 +101,10 @@ void BusFault_Handler(void)
   */
 void UsageFault_Handler(void)
 {
-  /* Go to infinite loop when Usage Fault exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Usage Fault exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -141,7 +141,7 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
-  HAL_IncTick();
+    HAL_IncTick();
 }
 
 /******************************************************************************/
@@ -158,7 +158,7 @@ void SysTick_Handler(void)
   */
 void SPI4_IRQHandler(void)
 {
-  HAL_SPI_IRQHandler(&SpiHandle4);
+    HAL_SPI_IRQHandler(&SpiHandle4);
 }
 
 /**
@@ -168,7 +168,7 @@ void SPI4_IRQHandler(void)
   */
 void SPI4_DMA_RX_IRQHandler(void)
 {
-  HAL_DMA_IRQHandler(SpiHandle4.hdmarx);
+    HAL_DMA_IRQHandler(SpiHandle4.hdmarx);
 }
 
 /**
@@ -178,7 +178,7 @@ void SPI4_DMA_RX_IRQHandler(void)
   */
 void SPI4_DMA_TX_IRQHandler(void)
 {
-  HAL_DMA_IRQHandler(SpiHandle4.hdmatx);
+    HAL_DMA_IRQHandler(SpiHandle4.hdmatx);
 }
 
 /**
@@ -188,4 +188,3 @@ void SPI4_DMA_TX_IRQHandler(void)
 /**
   * @}
   */
-

@@ -36,9 +36,9 @@
 uint32_t EthernetLinkTimer;
 
 #if LWIP_DHCP
-#define MAX_DHCP_TRIES  4
+#define MAX_DHCP_TRIES 4
 uint32_t DHCPfineTimer = 0;
-uint8_t DHCP_state = DHCP_OFF;
+uint8_t DHCP_state     = DHCP_OFF;
 #endif
 
 static uint32_t EthLinkStatePrev = 0U;
@@ -52,32 +52,32 @@ static uint32_t EthLinkStatePrev = 0U;
   */
 void ethernet_link_status_updated(struct netif *netif)
 {
-  if (netif_is_link_up(netif))
-  {
+    if (netif_is_link_up(netif))
+    {
 #if LWIP_DHCP
-    /* Update DHCP state machine */
-    DHCP_state = DHCP_START;
+        /* Update DHCP state machine */
+        DHCP_state = DHCP_START;
 #elif defined(USE_LCD)
-    uint8_t iptxt[20];
-    sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
-    LCD_UsrTrace ("Static IP address: %s\n", iptxt);
+        uint8_t iptxt[20];
+        sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
+        LCD_UsrTrace("Static IP address: %s\n", iptxt);
 #else
-    BSP_LED_On(LED1);
-    BSP_LED_Off(LED2);
+        BSP_LED_On(LED1);
+        BSP_LED_Off(LED2);
 #endif /* LWIP_DHCP */
-  }
-  else
-  {
+    }
+    else
+    {
 #if LWIP_DHCP
-    /* Update DHCP state machine */
-    DHCP_state = DHCP_LINK_DOWN;
+        /* Update DHCP state machine */
+        DHCP_state = DHCP_LINK_DOWN;
 #elif defined(USE_LCD)
-    LCD_UsrTrace ("The network cable is not connected \n");
+        LCD_UsrTrace("The network cable is not connected \n");
 #else
-    BSP_LED_Off(LED1);
-    BSP_LED_On(LED2);
+        BSP_LED_Off(LED1);
+        BSP_LED_On(LED2);
 #endif /* LWIP_DHCP */
-  }
+    }
 }
 
 #if LWIP_NETIF_LINK_CALLBACK
@@ -88,23 +88,22 @@ void ethernet_link_status_updated(struct netif *netif)
   */
 void Ethernet_Link_Periodic_Handle(struct netif *netif)
 {
-  uint8_t EthLinkChanged = 0U;
+    uint8_t EthLinkChanged = 0U;
 
-  /* Ethernet Link every 100ms */
-  if (HAL_GetTick() - EthernetLinkTimer >= 100)
-  {
-    EthernetLinkTimer = HAL_GetTick();
-    ethernet_link_check_state(netif);
-
-    EthLinkChanged = netif_is_link_up(netif) != EthLinkStatePrev;
-    EthLinkStatePrev = netif_is_link_up(netif);
-
-    if (EthLinkChanged)
+    /* Ethernet Link every 100ms */
+    if (HAL_GetTick() - EthernetLinkTimer >= 100)
     {
-      ethernet_link_status_updated(netif);
+        EthernetLinkTimer = HAL_GetTick();
+        ethernet_link_check_state(netif);
+
+        EthLinkChanged   = netif_is_link_up(netif) != EthLinkStatePrev;
+        EthLinkStatePrev = netif_is_link_up(netif);
+
+        if (EthLinkChanged)
+        {
+            ethernet_link_status_updated(netif);
+        }
     }
-    
-  }
 }
 #endif
 
@@ -116,85 +115,88 @@ void Ethernet_Link_Periodic_Handle(struct netif *netif)
   */
 void DHCP_Process(struct netif *netif)
 {
-  ip_addr_t ipaddr;
-  ip_addr_t netmask;
-  ip_addr_t gw;
-  struct dhcp *dhcp;
+    ip_addr_t ipaddr;
+    ip_addr_t netmask;
+    ip_addr_t gw;
+    struct dhcp *dhcp;
 #ifdef USE_LCD
-  uint8_t iptxt[20];
+    uint8_t iptxt[20];
 #endif
 
-  switch (DHCP_state)
-  {
-    case DHCP_START:
+    switch (DHCP_state)
     {
+    case DHCP_START: {
 #ifdef USE_LCD
-      LCD_UsrTrace ("  State: Looking for DHCP server ...\n");
+        LCD_UsrTrace("  State: Looking for DHCP server ...\n");
 #else
-      // BSP_LED_Off(LED1);
-      // BSP_LED_Off(LED2);
-#endif
-      ip_addr_set_zero_ip4(&netif->ip_addr);
-      ip_addr_set_zero_ip4(&netif->netmask);
-      ip_addr_set_zero_ip4(&netif->gw);
-      dhcp_start(netif);
-      DHCP_state = DHCP_WAIT_ADDRESS;
-    }
-    break;
-
-  case DHCP_WAIT_ADDRESS:
-    {
-      if (dhcp_supplied_address(netif))
-      {
-        DHCP_state = DHCP_ADDRESS_ASSIGNED;
-#ifdef USE_LCD
-        sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
-        LCD_UsrTrace ("IP address assigned by a DHCP server: %s\n", iptxt);
-#else
-        // BSP_LED_On(LED1);
+        // BSP_LED_Off(LED1);
         // BSP_LED_Off(LED2);
 #endif
-      }
-      else
-      {
-        dhcp = (struct dhcp *)netif_get_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP);
+        ip_addr_set_zero_ip4(&netif->ip_addr);
+        ip_addr_set_zero_ip4(&netif->netmask);
+        ip_addr_set_zero_ip4(&netif->gw);
+        dhcp_start(netif);
+        DHCP_state = DHCP_WAIT_ADDRESS;
+    }
+    break;
 
-        /* DHCP timeout */
-        if (dhcp->tries > MAX_DHCP_TRIES)
+    case DHCP_WAIT_ADDRESS: {
+        if (dhcp_supplied_address(netif))
         {
-          DHCP_state = DHCP_TIMEOUT;
-
-          /* Static address used */
-          // IP_ADDR4(&ipaddr, IP_ADDR0 ,IP_ADDR1 , IP_ADDR2 , IP_ADDR3 );
-          // IP_ADDR4(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
-          // IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
-          netif_set_addr(netif, &ipaddr, &netmask, &gw);
-
+            DHCP_state = DHCP_ADDRESS_ASSIGNED;
 #ifdef USE_LCD
-          sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
-          LCD_UsrTrace ("DHCP Timeout !! \n");
-          LCD_UsrTrace ("Static IP address: %s\n", iptxt);
+            sprintf((char *)iptxt, "%s", ip4addr_ntoa(netif_ip4_addr(netif)));
+            LCD_UsrTrace("IP address assigned by a DHCP server: %s\n", iptxt);
 #else
-          // BSP_LED_On(LED1);
-          // BSP_LED_Off(LED2);
+            // BSP_LED_On(LED1);
+            // BSP_LED_Off(LED2);
 #endif
         }
-      }
+        else
+        {
+            dhcp = (struct dhcp *)
+                netif_get_client_data(netif, LWIP_NETIF_CLIENT_DATA_INDEX_DHCP);
+
+            /* DHCP timeout */
+            if (dhcp->tries > MAX_DHCP_TRIES)
+            {
+                DHCP_state = DHCP_TIMEOUT;
+
+                /* Static address used */
+                // IP_ADDR4(&ipaddr, IP_ADDR0 ,IP_ADDR1 , IP_ADDR2 , IP_ADDR3 );
+                // IP_ADDR4(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
+                // IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
+                netif_set_addr(netif, &ipaddr, &netmask, &gw);
+
+#ifdef USE_LCD
+                sprintf(
+                    (char *)iptxt,
+                    "%s",
+                    ip4addr_ntoa(netif_ip4_addr(netif))
+                );
+                LCD_UsrTrace("DHCP Timeout !! \n");
+                LCD_UsrTrace("Static IP address: %s\n", iptxt);
+#else
+                // BSP_LED_On(LED1);
+                // BSP_LED_Off(LED2);
+#endif
+            }
+        }
     }
     break;
-  case DHCP_LINK_DOWN:
-    {
-      DHCP_state = DHCP_OFF;
+    case DHCP_LINK_DOWN: {
+        DHCP_state = DHCP_OFF;
 #ifdef USE_LCD
-      LCD_UsrTrace ("The network cable is not connected \n");
+        LCD_UsrTrace("The network cable is not connected \n");
 #else
-      // BSP_LED_Off(LED1);
-      // BSP_LED_On(LED2);
+        // BSP_LED_Off(LED1);
+        // BSP_LED_On(LED2);
 #endif
     }
     break;
-  default: break;
-  }
+    default:
+        break;
+    }
 }
 
 /**
@@ -204,14 +206,12 @@ void DHCP_Process(struct netif *netif)
   */
 void DHCP_Periodic_Handle(struct netif *netif)
 {
-  /* Fine DHCP periodic process every 500ms */
-  if (HAL_GetTick() - DHCPfineTimer >= DHCP_FINE_TIMER_MSECS)
-  {
-    DHCPfineTimer =  HAL_GetTick();
-    /* process DHCP state machine */
-    DHCP_Process(netif);
-  }
+    /* Fine DHCP periodic process every 500ms */
+    if (HAL_GetTick() - DHCPfineTimer >= DHCP_FINE_TIMER_MSECS)
+    {
+        DHCPfineTimer = HAL_GetTick();
+        /* process DHCP state machine */
+        DHCP_Process(netif);
+    }
 }
 #endif
-
-

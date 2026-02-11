@@ -34,11 +34,11 @@
 /* USER CODE END 0 */
 
 #ifdef __cplusplus
- extern "C" 
+extern "C"
 #endif
 
-/* linker symbols defined in STM32H745ZITX_FLASH.ld */
-extern uint8_t __lwip_heap_start[];
+    /* linker symbols defined in STM32H745ZITX_FLASH.ld */
+    extern uint8_t __lwip_heap_start[];
 extern uint8_t __lwip_heap_end[];
 
 /* STM32CubeMX Specific Parameters (not defined in opt.h) ---------------------*/
@@ -122,42 +122,42 @@ extern uint8_t __lwip_heap_end[];
 /*----- Value in opt.h for CHECKSUM_CHECK_ICMP6: 1 -----*/
 #define CHECKSUM_CHECK_ICMP6 0
 
-
-#define LWIP_DHCP 1
+#define LWIP_DHCP  1
 #define LWIP_HTTPD 0
 
 /** Set this to 1 to support CGI */
-#define LWIP_HTTPD_CGI            1
+#define LWIP_HTTPD_CGI 1
 
 /** Set this to 1 to support SSI (Server-Side-Includes) */
-#define LWIP_HTTPD_SSI            1
+#define LWIP_HTTPD_SSI 1
 
 #define LWIP_TCP 1
 
-#define HTTPD_USE_CUSTOM_FSDATA 1
-#define LWIP_HTTPD_CUSTOM_FILES 1 /* enable custom GET handlers */
+#define HTTPD_USE_CUSTOM_FSDATA      1
+#define LWIP_HTTPD_CUSTOM_FILES      1 /* enable custom GET handlers */
 #define LWIP_HTTPD_DYNAMIC_FILE_READ 1
-#define LWIP_HTTPD_DYNAMIC_HEADERS 1
-#define LWIP_HTTPD_FILE_STATE 0
+#define LWIP_HTTPD_DYNAMIC_HEADERS   1
+#define LWIP_HTTPD_FILE_STATE        0
 
 #define LWIP_HTTPD_SSI_INCLUDE_TAG 1
 
-#define LWIP_HTTPD_SUPPORT_POST 1 /* enable custom POST handlers */
-#define HTTPD_USE_MEM_POOL  1U
-#define MEMP_NUM_PARALLEL_HTTPD_CONNS 8U
+#define LWIP_HTTPD_SUPPORT_POST           1 /* enable custom POST handlers */
+#define HTTPD_USE_MEM_POOL                1U
+#define MEMP_NUM_PARALLEL_HTTPD_CONNS     8U
 #define MEMP_NUM_PARALLEL_HTTPD_SSI_CONNS 8U
-#define LWIP_HTTPD_POST_MANUAL_WND  0U
+#define LWIP_HTTPD_POST_MANUAL_WND        0U
 
 // mDNS to use .local hostname
 
-#define LWIP_NETIF_STATUS_CALLBACK  1  /* Enable the callback */
+#define LWIP_NETIF_STATUS_CALLBACK     1 /* Enable the callback */
 #define LWIP_NETIF_EXT_STATUS_CALLBACK 1
-#define LWIP_MDNS_RESPONDER         1  /* Enable mDNS */
-#define LWIP_IGMP                   1  /* For multicast support */
-#define LWIP_UDP                    1 
-#define LWIP_NETIF_HOSTNAME         1  /* For hostname in DHCP/netif */
-#define LWIP_NUM_NETIF_CLIENT_DATA  (LWIP_MDNS_RESPONDER + LWIP_IGMP)  /* Client data */
-#define MEMP_NUM_IGMP_GROUP         8 /* Max multicast groups */
+#define LWIP_MDNS_RESPONDER            1 /* Enable mDNS */
+#define LWIP_IGMP                      1 /* For multicast support */
+#define LWIP_UDP                       1
+#define LWIP_NETIF_HOSTNAME            1 /* For hostname in DHCP/netif */
+#define LWIP_NUM_NETIF_CLIENT_DATA                                             \
+    (LWIP_MDNS_RESPONDER + LWIP_IGMP) /* Client data */
+#define MEMP_NUM_IGMP_GROUP            8 /* Max multicast groups */
 #define MDNS_RESP_USENETIF_EXTCALLBACK 1
 
 /*-----------------------------------------------------------------------------*/
@@ -172,11 +172,11 @@ extern uint8_t __lwip_heap_end[];
 /* ETH_CODE: macro and prototypes for proper (hopefuly?)
  * multithreading support
  */
-#define LOCK_TCPIP_CORE sys_lock_tcpip_core
+#define LOCK_TCPIP_CORE   sys_lock_tcpip_core
 #define UNLOCK_TCPIP_CORE sys_unlock_tcpip_core
 
 #define LWIP_ASSERT_CORE_LOCKED sys_check_core_locking
-#define LWIP_MARK_TCPIP_THREAD sys_mark_tcpip_thread
+#define LWIP_MARK_TCPIP_THREAD  sys_mark_tcpip_thread
 
 void sys_lock_tcpip_core(void);
 void sys_unlock_tcpip_core(void);

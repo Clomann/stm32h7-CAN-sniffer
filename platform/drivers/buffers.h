@@ -141,7 +141,8 @@ static inline void *ring_buffer_reserve(RingBuffer *pBuffer)
     return element;
 }
 
-static inline RingBufferErrorType ring_buffer_put(RingBuffer *pBuffer, const void *pElement)
+static inline RingBufferErrorType
+ring_buffer_put(RingBuffer *pBuffer, const void *pElement)
 {
     RingBufferErrorType res = RB_E_OK;
     void *FreeElement;
@@ -200,7 +201,7 @@ static inline void *ring_buffer_pop_ptr(RingBuffer *rb)
 static inline uint32_t ring_buffer_pop(RingBuffer *pBuffer, void *pElement)
 {
     uint32_t SwBufferIndex;
-    
+
     if (pBuffer->elementCount == 0)
     {
         return 1;
@@ -224,10 +225,10 @@ static inline uint32_t ring_buffer_pop(RingBuffer *pBuffer, void *pElement)
     pBuffer->elementCount--;
 
     pBuffer->tail =
-    ring_buffer_wrap_index(pBuffer->tail, pBuffer->bufferLength);
+        ring_buffer_wrap_index(pBuffer->tail, pBuffer->bufferLength);
 
     pBuffer->isFull = 0;
-    
+
     return RB_E_OK;
 }
 

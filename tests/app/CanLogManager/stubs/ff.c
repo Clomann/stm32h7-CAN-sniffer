@@ -21,8 +21,8 @@ typedef struct
 
 static TestFileEntry test_files[256];
 static TestOpenHandle open_handles[16];
-static uint32_t test_file_count = 0;
-static uint32_t test_open_count = 0;
+static uint32_t test_file_count   = 0;
+static uint32_t test_open_count   = 0;
 static uint32_t test_expand_count = 0;
 
 static int test_find_file_index(const char *path)
@@ -44,16 +44,22 @@ static int test_create_file_entry(const char *path)
         return -1;
     }
 
-    strncpy(test_files[test_file_count].path, path, sizeof(test_files[test_file_count].path) - 1U);
-    test_files[test_file_count].path[sizeof(test_files[test_file_count].path) - 1U] = '\0';
-    test_files[test_file_count].size = 0U;
-    test_files[test_file_count].exists = true;
+    strncpy(
+        test_files[test_file_count].path,
+        path,
+        sizeof(test_files[test_file_count].path) - 1U
+    );
+    test_files[test_file_count]
+        .path[sizeof(test_files[test_file_count].path) - 1U] = '\0';
+    test_files[test_file_count].size                         = 0U;
+    test_files[test_file_count].exists                       = true;
     return (int)test_file_count++;
 }
 
 static TestOpenHandle *test_open_handle_for(FIL *fp)
 {
-    for (uint32_t i = 0; i < (sizeof(open_handles) / sizeof(open_handles[0])); i++)
+    for (uint32_t i = 0; i < (sizeof(open_handles) / sizeof(open_handles[0]));
+         i++)
     {
         if (open_handles[i].in_use && open_handles[i].fil == fp)
         {
@@ -65,14 +71,15 @@ static TestOpenHandle *test_open_handle_for(FIL *fp)
 
 static TestOpenHandle *test_alloc_handle(FIL *fp, int file_index)
 {
-    for (uint32_t i = 0; i < (sizeof(open_handles) / sizeof(open_handles[0])); i++)
+    for (uint32_t i = 0; i < (sizeof(open_handles) / sizeof(open_handles[0]));
+         i++)
     {
         if (!open_handles[i].in_use)
         {
-            open_handles[i].in_use = true;
-            open_handles[i].fil = fp;
+            open_handles[i].in_use     = true;
+            open_handles[i].fil        = fp;
             open_handles[i].file_index = file_index;
-            open_handles[i].pos = 0U;
+            open_handles[i].pos        = 0U;
             test_open_count++;
             return &open_handles[i];
         }
@@ -84,8 +91,8 @@ void test_ff_reset(void)
 {
     memset(test_files, 0, sizeof(test_files));
     memset(open_handles, 0, sizeof(open_handles));
-    test_file_count = 0;
-    test_open_count = 0;
+    test_file_count   = 0;
+    test_open_count   = 0;
     test_expand_count = 0;
 }
 
@@ -151,8 +158,12 @@ FRESULT f_stat(const char *path, FILINFO *fno)
             if (fno)
             {
                 fno->fattrib = 0;
-                fno->fsize = test_files[idx].size;
-                strncpy(fno->fname, test_files[idx].path, sizeof(fno->fname) - 1U);
+                fno->fsize   = test_files[idx].size;
+                strncpy(
+                    fno->fname,
+                    test_files[idx].path,
+                    sizeof(fno->fname) - 1U
+                );
                 fno->fname[sizeof(fno->fname) - 1U] = '\0';
             }
             return FR_OK;
@@ -208,9 +219,9 @@ FRESULT f_open(FIL *fp, const char *path, BYTE mode)
         return FR_INVALID_PARAMETER;
     }
 
-    int idx = test_find_file_index(path);
+    int idx               = test_find_file_index(path);
     const bool create_new = (mode & FA_CREATE_NEW) != 0U;
-    const bool write = (mode & FA_WRITE) != 0U;
+    const bool write      = (mode & FA_WRITE) != 0U;
 
     if (idx < 0)
     {
@@ -281,9 +292,9 @@ FRESULT f_read(FIL *fp, void *buff, UINT btr, UINT *br)
         return FR_INVALID_OBJECT;
     }
 
-    uint32_t size = test_files[handle->file_index].size;
+    uint32_t size      = test_files[handle->file_index].size;
     uint32_t available = (handle->pos < size) ? (size - handle->pos) : 0U;
-    uint32_t to_read = (btr < available) ? btr : available;
+    uint32_t to_read   = (btr < available) ? btr : available;
 
     if (buff && to_read > 0U)
     {

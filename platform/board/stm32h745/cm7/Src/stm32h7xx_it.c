@@ -38,7 +38,6 @@ extern ETH_HandleTypeDef heth;
 void SPI1_IRQHandler(void);
 void ETH_IRQHandler(void);
 
-
 /* Private functions ---------------------------------------------------------*/
 
 /******************************************************************************/
@@ -61,10 +60,10 @@ void NMI_Handler(void)
   */
 void HardFault_Handler(void)
 {
-  /* Go to infinite loop when Hard Fault exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Hard Fault exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -74,10 +73,10 @@ void HardFault_Handler(void)
   */
 void MemManage_Handler(void)
 {
-  /* Go to infinite loop when Memory Manage exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Memory Manage exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -87,10 +86,10 @@ void MemManage_Handler(void)
   */
 void BusFault_Handler(void)
 {
-  /* Go to infinite loop when Bus Fault exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Bus Fault exception occurs */
+    while (1)
+    {
+    }
 }
 
 /**
@@ -100,10 +99,10 @@ void BusFault_Handler(void)
   */
 void UsageFault_Handler(void)
 {
-  /* Go to infinite loop when Usage Fault exception occurs */
-  while (1)
-  {
-  }
+    /* Go to infinite loop when Usage Fault exception occurs */
+    while (1)
+    {
+    }
 }
 
 #if !defined(vPortSVCHandler) && (vPortSVCHandler != SVC_Handler)
@@ -150,7 +149,7 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
-  HAL_IncTick();
+    HAL_IncTick();
 }
 
 #endif
@@ -165,16 +164,16 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles Ethernet global interrupt.
   */
- void ETH_IRQHandler(void)
- {
-   /* USER CODE BEGIN ETH_IRQn 0 */
- 
-   /* USER CODE END ETH_IRQn 0 */
-   HAL_ETH_IRQHandler(&heth);
-   /* USER CODE BEGIN ETH_IRQn 1 */
- 
-   /* USER CODE END ETH_IRQn 1 */
- }
+void ETH_IRQHandler(void)
+{
+    /* USER CODE BEGIN ETH_IRQn 0 */
+
+    /* USER CODE END ETH_IRQn 0 */
+    HAL_ETH_IRQHandler(&heth);
+    /* USER CODE BEGIN ETH_IRQn 1 */
+
+    /* USER CODE END ETH_IRQn 1 */
+}
 
 /**
   * @brief  This function handles PPP interrupt request.
@@ -192,4 +191,3 @@ void SysTick_Handler(void)
 /**
   * @}
   */
-

@@ -12,8 +12,8 @@
 #define SPI_PORT_USE_SEMAPHORE 1
 #endif
 
-#ifndef MAX_SPI_INSTANCES          /* tune to your MCU */
-  #define MAX_SPI_INSTANCES   1
+#ifndef MAX_SPI_INSTANCES /* tune to your MCU */
+#define MAX_SPI_INSTANCES 1
 #endif
 
 uint8_t spi_port_freertos_init(void *handle);

@@ -22,7 +22,7 @@
 #ifndef __mx_lwip_H
 #define __mx_lwip_H
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
@@ -49,7 +49,7 @@
 extern ETH_HandleTypeDef heth;
 
 /* LWIP init function */
-struct netif * MX_LWIP_Init(void);
+struct netif *MX_LWIP_Init(void);
 
 #if !WITH_RTOS
 /* USER CODE BEGIN 1 */

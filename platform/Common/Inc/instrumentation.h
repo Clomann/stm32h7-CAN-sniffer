@@ -13,7 +13,6 @@ typedef uint8_t InstrErrorType;
 
 void Instrumentation_Init(void);
 
-InstrErrorType
-Instrumentation_SerializeHook(uint8_t *buf, uint32_t *size);
+InstrErrorType Instrumentation_SerializeHook(uint8_t *buf, uint32_t *size);
 
 void Instrumentation_ErrorHandlerHook(ErrorContextType *context);

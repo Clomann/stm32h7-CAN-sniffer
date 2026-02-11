@@ -8,7 +8,7 @@ int mock_frames_available = 0;
 bool mock_read_called     = false;
 
 static FDCAN_ClassicFrameType mock_frames[16];
-static int frames_remaining   = 0;
+static int frames_remaining = 0;
 
 void reset_fdcan_stubs(void)
 {
@@ -37,8 +37,8 @@ void set_frames_available(int count)
     /* Seed remaining frames with incrementing id/timestamp for variety */
     for (int i = 0; i < count; i++)
     {
-        mock_frames[i]           = mock_frames[0];
-        mock_frames[i].id       += (uint32_t)i;
+        mock_frames[i] = mock_frames[0];
+        mock_frames[i].id += (uint32_t)i;
         mock_frames[i].timestamp += (uint32_t)(10 * i);
     }
 }

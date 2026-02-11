@@ -443,7 +443,7 @@ void test_SPI_CreateDriver_all_instances_used(void)
     CommDriverConfigType config2;
     CommDriver driver3 = {0};
 #if 4 <= (SPI_DRIVER_NUMBERn + 1U)
-#    error "SPI_DRIVER_NUMBERn exceeds number of testen drivers!"
+#error "SPI_DRIVER_NUMBERn exceeds number of testen drivers!"
 #endif
 
     config1        = Spi1Config;

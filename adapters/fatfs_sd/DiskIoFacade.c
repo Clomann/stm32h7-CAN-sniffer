@@ -10,8 +10,8 @@
 #include "MmcAdapter.h"
 
 PARTITION VolToPart[FF_VOLUMES] = {
-    {0, 1},    // "0:" = Physical drive 0, Partition 1
-    {0, 2}     // "1:" = Physical drive 0, Partition 2
+    {0, 1}, // "0:" = Physical drive 0, Partition 1
+    {0, 2} // "1:" = Physical drive 0, Partition 2
 };
 
 static void MMC_ErrorHandler(void)
@@ -24,72 +24,72 @@ static void MMC_ErrorHandler(void)
   * @param  None
   * @retval Time in DWORD
   */
- DWORD get_fattime(void)
- {
-   /* USER CODE BEGIN get_fattime */
-   return 0;
-   /* USER CODE END get_fattime */  
- }
+DWORD get_fattime(void)
+{
+    /* USER CODE BEGIN get_fattime */
+    return 0;
+    /* USER CODE END get_fattime */
+}
 
 uint8_t MMC_disk_status(void)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 uint8_t MMC_disk_initialize(void)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = MMCAdapter_initialize();
+    result = MMCAdapter_initialize();
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
-uint8_t MMC_disk_read(BYTE * buff, LBA_t sector, UINT count)
+uint8_t MMC_disk_read(BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = MMCAdapter_read(buff, sector, count);
+    result = MMCAdapter_read(buff, sector, count);
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 uint8_t MMC_disk_write(const BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = MMCAdapter_write(buff, sector, count);
+    result = MMCAdapter_write(buff, sector, count);
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 DRESULT MMC_disk_ioctl(
-	BYTE cmd,		/* Control code */
-	void *buff		/* Buffer to send/receive control data */
+    BYTE cmd, /* Control code */
+    void *buff /* Buffer to send/receive control data */
 )
 {
     DRESULT result;
@@ -140,8 +140,8 @@ DRESULT MMC_disk_ioctl(
     case ISDIO_MRITE:
         result = RES_ERROR;
         break;
-    default: 
-        result = RES_PARERR; 
+    default:
+        result = RES_PARERR;
         break;
     }
 
@@ -155,168 +155,168 @@ DRESULT MMC_disk_ioctl(
 
 uint8_t RAM_disk_status(void)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 uint8_t USB_disk_status(void)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
-    
+    result = 0U;
+
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 uint8_t RAM_disk_initialize(void)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 uint8_t USB_disk_initialize(void)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
-uint8_t RAM_disk_read(BYTE * buff, LBA_t sector, UINT count)
+uint8_t RAM_disk_read(BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
-    (void) buff;
-    (void) sector;
-    (void) count;
+    (void)buff;
+    (void)sector;
+    (void)count;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
-uint8_t USB_disk_read(BYTE * buff, LBA_t sector, UINT count)
+uint8_t USB_disk_read(BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
-    (void) buff;
-    (void) sector;
-    (void) count;
+    (void)buff;
+    (void)sector;
+    (void)count;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
-uint8_t RAM_disk_write(const BYTE * buff, LBA_t sector, UINT count)
+uint8_t RAM_disk_write(const BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
-    (void) buff;
-    (void) sector;
-    (void) count;
+    (void)buff;
+    (void)sector;
+    (void)count;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
-uint8_t USB_disk_write(const BYTE * buff, LBA_t sector, UINT count)
+uint8_t USB_disk_write(const BYTE *buff, LBA_t sector, UINT count)
 {
-	uint8_t result;
+    uint8_t result;
 
-	result = 0U;
+    result = 0U;
 
-    (void) buff;
-    (void) sector;
-    (void) count;
+    (void)buff;
+    (void)sector;
+    (void)count;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 DRESULT RAM_disk_ioctl(
-		BYTE cmd,		/* Control code */
-		void *buff		/* Buffer to send/receive control data */
+    BYTE cmd, /* Control code */
+    void *buff /* Buffer to send/receive control data */
 )
 {
-	DRESULT result;
+    DRESULT result;
 
-	result = 0U;
+    result = 0U;
 
-    (void) cmd;
-    (void) buff;
+    (void)cmd;
+    (void)buff;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }
 
 DRESULT USB_disk_ioctl(
-		BYTE cmd,		/* Control code */
-		void *buff		/* Buffer to send/receive control data */
+    BYTE cmd, /* Control code */
+    void *buff /* Buffer to send/receive control data */
 )
 {
-	DRESULT result;
+    DRESULT result;
 
-	result = 0U;
+    result = 0U;
 
-    (void) cmd;
-    (void) buff;
+    (void)cmd;
+    (void)buff;
 
     if (0 != result)
     {
         MMC_ErrorHandler();
     }
 
-	return result;
+    return result;
 }

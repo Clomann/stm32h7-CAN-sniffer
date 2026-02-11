@@ -34,7 +34,7 @@ void CanBridgeTask(void *arg)
     static UBaseType_t MinUnusedStack;
 
     (void)MinUnusedStack;
-    (void) (arg);
+    (void)(arg);
 
     ulTaskNotifyTake(pdTRUE, 0);
 

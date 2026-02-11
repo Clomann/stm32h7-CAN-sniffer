@@ -2,6 +2,7 @@
 
 void __attribute((weak)) SpiAbs_ErrorHandler(void)
 {
-    while (1) {
+    while (1)
+    {
     };
 }

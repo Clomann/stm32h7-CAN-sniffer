@@ -10,7 +10,7 @@
 #include "httpd.h"
 #include "http_cgi_ssi.h"
 
-static struct netif * gnetif;
+static struct netif *gnetif;
 
 void http_init(void)
 {
@@ -28,7 +28,7 @@ void http_init(void)
 
 void http_poll(void)
 {
-    static struct netif * netif;
+    static struct netif *netif;
 
     netif = gnetif;
 

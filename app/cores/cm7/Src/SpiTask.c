@@ -53,7 +53,7 @@ void SpiAbs_TaskControlCallback(uint32_t timeout)
     {
         Tasks_ErrorHandler();
     }
-        
+
     ulTaskNotifyTake(pdTRUE, timeout);
 }
 

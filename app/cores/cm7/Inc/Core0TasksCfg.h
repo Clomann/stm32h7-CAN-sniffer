@@ -3,7 +3,7 @@
 #include "FreeRTOSConfig.h"
 #include "stm32h745xx.h"
 
-#define DEFERRED_IRQn UART5_IRQn
+#define DEFERRED_IRQn       UART5_IRQn
 #define DEFERRED_IRQHandler UART5_IRQHandler
 
 #define CORE0_TASK0_FUNCTION CanBridgeTask
@@ -27,20 +27,21 @@
 #define CORE0_TASK4_PRIO (configMAX_PRIORITIES - 2U) // SpiTask
 #define CORE0_TASK5_PRIO (configMAX_PRIORITIES - 4U) // SdBridgeTask
 
-
-#define STRINGIFY(x) #x
+#define STRINGIFY(x)             #x
 #define FUNCTION_TO_STRING(func) STRINGIFY(func)
 
 #define PASTE(a, b) a##b
-#define TASK_VARIABLES(func, stack_size) \
-    static volatile StaticTask_t PASTE(func,TCB); \
-    static volatile TaskHandle_t PASTE(func,Hdl); \
-    static volatile StackType_t PASTE(func,Stack[ stack_size ]);
-#define TASK_CREATE_STATIC(func, stack_size, prio) \
-    PASTE(func,Hdl) = xTaskCreateStatic( func, \
-    FUNCTION_TO_STRING(func), \
-    stack_size, \
-    NULL, \
-    prio, \
-    (StackType_t*)&( PASTE(func,Stack)[ 0 ] ), \
-    (StaticTask_t*)&( PASTE(func,TCB) ) );
+#define TASK_VARIABLES(func, stack_size)                                       \
+    static volatile StaticTask_t PASTE(func, TCB);                             \
+    static volatile TaskHandle_t PASTE(func, Hdl);                             \
+    static volatile StackType_t PASTE(func, Stack[stack_size]);
+#define TASK_CREATE_STATIC(func, stack_size, prio)                             \
+    PASTE(func, Hdl) = xTaskCreateStatic(                                      \
+        func,                                                                  \
+        FUNCTION_TO_STRING(func),                                              \
+        stack_size,                                                            \
+        NULL,                                                                  \
+        prio,                                                                  \
+        (StackType_t *)&(PASTE(func, Stack)[0]),                               \
+        (StaticTask_t *)&(PASTE(func, TCB))                                    \
+    );

@@ -33,12 +33,16 @@
    resources */
 
 /* Exported macro ------------------------------------------------------------*/
-#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
+#define COUNTOF(__BUFFER__) (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
 
 /* Exported functions ------------------------------------------------------- */
 
 void Error_Handler(void);
-void appCtrlCgiHandler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
+void appCtrlCgiHandler(
+    int iIndex,
+    int iNumParams,
+    char *pcParam[],
+    char *pcValue[]
+);
 
 #endif /* __MAIN_H */
-

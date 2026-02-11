@@ -14,13 +14,21 @@
 #include "CommFactory.h"
 
 #ifndef FDCAN_MODE_DEFAULT
-#error "FDCAN_MODE_DEFAULT is not defined! You can select: e.g. FDCAN_MODE_NORMAL)" 
-#endif 
+#error                                                                         \
+    "FDCAN_MODE_DEFAULT is not defined! You can select: e.g. FDCAN_MODE_NORMAL)"
+#endif
 
-#define SW_RX_FRAME_BUFFER_SIZE (10U * FDCAN_RAM_RX_ELEMENTS) /* software Rx frame buffer size in number of FDCAN_ClassicFrameType elements */
-#define SW_TX_FRAME_BUFFER_SIZE (FDCAN_RAM_TX_ELEMENTS)      /* software Tx frame buffer size in number of FDCAN_ClassicFrameType elements */
+#define SW_RX_FRAME_BUFFER_SIZE                                                \
+    (                                                                          \
+        10U * FDCAN_RAM_RX_ELEMENTS                                            \
+    ) /* software Rx frame buffer size in number of FDCAN_ClassicFrameType elements */
+#define SW_TX_FRAME_BUFFER_SIZE                                                \
+    (                                                                          \
+        FDCAN_RAM_TX_ELEMENTS                                                  \
+    ) /* software Tx frame buffer size in number of FDCAN_ClassicFrameType elements */
 
-typedef enum {
+typedef enum
+{
     CANABS_IOCTL_CMD_SET_BAUDRATE,
     CANABS_IOCTL_CMD_SET_FILTERMASK,
     CANABS_IOCTL_CMD_START,
@@ -28,50 +36,56 @@ typedef enum {
     CANABS_IOCTL_CMD_SET_MODE,
 } FdcanIoctlCmdType;
 
-#define FDCAN_BAUDRATE_250000      250000U
-#define FDCAN_BAUDRATE_500000      500000U
-#define FDCAN_BAUDRATE_1000000     1000000U
+#define FDCAN_BAUDRATE_250000  250000U
+#define FDCAN_BAUDRATE_500000  500000U
+#define FDCAN_BAUDRATE_1000000 1000000U
 typedef uint32_t FdcanBaudrateType;
 
-#define FDCAN_MODE_1      1U /*<! normal */
-#define FDCAN_MODE_2      2U /*<! listen only */
-#define FDCAN_MODE_3      3U /*<! off */
+#define FDCAN_MODE_1 1U /*<! normal */
+#define FDCAN_MODE_2 2U /*<! listen only */
+#define FDCAN_MODE_3 3U /*<! off */
 typedef uint32_t FdcanModeType;
 
-#define FDCAN_STATUS_OK     0U
+#define FDCAN_STATUS_OK 0U
 typedef uint8_t FdcanStatusType;
 
-typedef struct {
-    uint16_t brp;   /* Clock prescaler. */
-    uint8_t sjw;    /* Synchronization jump width. */
-    uint8_t tseg1;  /* Number of time quanta to use for propagation segment + segment 1. */
-    uint8_t tseg2;  /* Number of time quanta to use for segment 2. */
+typedef struct
+{
+    uint16_t brp; /* Clock prescaler. */
+    uint8_t sjw; /* Synchronization jump width. */
+    uint8_t
+        tseg1; /* Number of time quanta to use for propagation segment + segment 1. */
+    uint8_t tseg2; /* Number of time quanta to use for segment 2. */
 } FdcanBitTimingType;
 
-typedef struct {
+typedef struct
+{
     CommDriverConfigType config;
     // Other FDCAN-specific fields
 } FDCANHandle;
 
-typedef struct FdcanConfigType {
-    FdcanBitTimingType * bittiming;
-    int bitrate;            // CAN bitrate (e.g., 500 kbps)
-    int mode;               // CAN mode (normal, loopback, etc.)
-    int auto_retransmit;     // Enable/disable auto retransmission
+typedef struct FdcanConfigType
+{
+    FdcanBitTimingType *bittiming;
+    int bitrate; // CAN bitrate (e.g., 500 kbps)
+    int mode; // CAN mode (normal, loopback, etc.)
+    int auto_retransmit; // Enable/disable auto retransmission
 } FdcanConfigType;
 
-typedef struct {
+typedef struct
+{
     FdcanStatusType status;
     uint32_t rxBufferFillLevel;
     uint32_t txBufferFillLevel;
     uint32_t rxBufferLength;
     uint32_t txBufferLength;
-    FDCAN_ClassicFrameType * rxBuffer;
-    FDCAN_ClassicFrameType * txBuffer;
+    FDCAN_ClassicFrameType *rxBuffer;
+    FDCAN_ClassicFrameType *txBuffer;
 } FdcanDataType;
 
-typedef struct {
-    FdcanConfigType const * cfg;
+typedef struct
+{
+    FdcanConfigType const *cfg;
     FdcanDataType data;
 } FdcanDeviceType;
 
@@ -83,30 +97,24 @@ extern const CommInterface FDCAN_Interface;
  * @param[out] timestamp Absolute timestamp in microseconds.
  * @return A comm_status_t value (e.g. COMM_SUCCESS or COMM_NULL_POINTER).
  */
-comm_status_t FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp);
+comm_status_t
+FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp);
 
 comm_status_t FDCAN_CreateDriver(
-    CommDriver *pDriver, 
-    const void *cfg, 
+    CommDriver *pDriver,
+    const void *cfg,
     size_t cfg_size,
-    uint8_t *tx, 
-    uint8_t *rx) COMM_FACTORY_USED_ATTR;
+    uint8_t *tx,
+    uint8_t *rx
+) COMM_FACTORY_USED_ATTR;
 
-comm_status_t FDCAN_Init(
-    CommDriver *dev);
+comm_status_t FDCAN_Init(CommDriver *dev);
 
-comm_status_t FDCAN_DeInit(
-    CommDriver *dev);
-    
-comm_status_t FDCAN_Send(
-    CommDriver *dev,
-    const void*);
+comm_status_t FDCAN_DeInit(CommDriver *dev);
 
-comm_status_t FDCAN_Read(
-    CommDriver *dev,
-    void*, 
-    uint8_t, 
-    uint32_t);
+comm_status_t FDCAN_Send(CommDriver *dev, const void *);
+
+comm_status_t FDCAN_Read(CommDriver *dev, void *, uint8_t, uint32_t);
 
 comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan);
 

@@ -13,27 +13,33 @@
 #include "CommHandle.h"
 #include "CommMessages.h"
 
-typedef comm_status_t (*RegisterMessageFunction)(void* message, void* protocolSpecific, uint32_t *msgId);
+typedef comm_status_t (*RegisterMessageFunction)(
+    void *message,
+    void *protocolSpecific,
+    uint32_t *msgId
+);
 
 /* config type forward declarations: 
     need to be completed by the respective drivers 
 */
 typedef struct FdcanConfigType FdcanConfigType;
 
-typedef struct CommDriverConfigType {
+typedef struct CommDriverConfigType
+{
     CommConfigType config;
     CommDeviceNumberType devNbr;
     void *driver;
 } CommDriverConfigType;
 
-typedef struct CommDriver {
-	CommInterface *interface;
-	CommDriverConfigType *config;
+typedef struct CommDriver
+{
+    CommInterface *interface;
+    CommDriverConfigType *config;
     void *instance;
-	CommProtocolType protocol;
-	CommDriverStatesType state;
-	uint8_t *RxFrameBuffer;
-	uint8_t *TxFrameBuffer;
+    CommProtocolType protocol;
+    CommDriverStatesType state;
+    uint8_t *RxFrameBuffer;
+    uint8_t *TxFrameBuffer;
 } CommDriver;
 
 comm_status_t CommManager_Init(
@@ -41,4 +47,5 @@ comm_status_t CommManager_Init(
     const void *cfg,
     size_t cfg_size,
     uint8_t *tx,
-    uint8_t *rx);
+    uint8_t *rx
+);

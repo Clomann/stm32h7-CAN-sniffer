@@ -30,9 +30,9 @@
 #include "semphr.h"
 #endif
 
-#define CLM_ABS_TIME_TO_TIMSTAMP(x)   (uint32_t)(x)
-#define CLM_ABS_TIME_TO_ABS_HIGH(x)   ((uint32_t)((x) >> 32U))
-#define CLM_SYNC_EMIT_INTERVAL_US     (30ULL * 60ULL * 1000000ULL)
+#define CLM_ABS_TIME_TO_TIMSTAMP(x) (uint32_t)(x)
+#define CLM_ABS_TIME_TO_ABS_HIGH(x) ((uint32_t)((x) >> 32U))
+#define CLM_SYNC_EMIT_INTERVAL_US   (30ULL * 60ULL * 1000000ULL)
 
 extern uint64_t FDCAN_GetTimestampHook(void);
 
@@ -54,7 +54,7 @@ static volatile CanLogMetaDataType LogMetaData;
 static uint8_t LogMetaDataOpenRes;
 #endif
 
-typedef struct 
+typedef struct
 {
     uint64_t receivedFrames;
     uint32_t prevTimestamp;
@@ -92,32 +92,40 @@ struct CanLogControlDataType
  * @brief Hook called before flushing a CAN log block to storage.
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
  */
-__attribute__((weak)) void CanLogManager_InstrumentationFlushStartHook(void) {}
+__attribute__((weak)) void CanLogManager_InstrumentationFlushStartHook(void)
+{
+}
 
 /**
  * @brief Hook called after flushing a CAN log block to storage.
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
  */
-__attribute__((weak)) void CanLogManager_InstrumentationFlushEndHook(void) {}
+__attribute__((weak)) void CanLogManager_InstrumentationFlushEndHook(void)
+{
+}
 
 /**
  * @brief  Hook called before reading all available frames in the fdcan port buffer.
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
  */
-__attribute__((weak)) void CanLogManager_DrainPortStartHook(void) {}
+__attribute__((weak)) void CanLogManager_DrainPortStartHook(void)
+{
+}
 
 /**
  * @brief Hook called after reading all available frames in the fdcan port buffer.
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
  */
-__attribute__((weak)) void CanLogManager_DrainPortEndHook(void) {}
+__attribute__((weak)) void CanLogManager_DrainPortEndHook(void)
+{
+}
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
-static uint32_t Rb1BytesHighWater = 0U;
-static uint32_t CanLogFileSize = MAX_LOG_FILE_SIZE;
-static uint32_t CanLogFileCount = MAX_LOG_FILE_COUNT;
-static uint32_t CanLogClusterSize = CLUSTER_SIZE;
+static uint32_t Rb1BytesHighWater                 = 0U;
+static uint32_t CanLogFileSize                    = MAX_LOG_FILE_SIZE;
+static uint32_t CanLogFileCount                   = MAX_LOG_FILE_COUNT;
+static uint32_t CanLogClusterSize                 = CLUSTER_SIZE;
 static volatile uint32_t CanLogPreallocErrorCount = 0U;
 
 #if !defined(UNIT_TEST)
@@ -190,8 +198,7 @@ static void appCanLogFillEntry(
     uint64_t timestamp,
     uint8_t channel
 );
-static comm_status_t
-appCanLogStoreToFrameBuffer(void *entry);
+static comm_status_t appCanLogStoreToFrameBuffer(void *entry);
 static comm_status_t
 appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length);
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
@@ -226,7 +233,7 @@ void appCanLogSetFileConfig(uint32_t log_file_size, uint32_t log_file_count)
         log_file_count = MAX_LOG_FILE_COUNT;
     }
 
-    CanLogFileSize = log_file_size;
+    CanLogFileSize  = log_file_size;
     CanLogFileCount = log_file_count;
 }
 
@@ -376,25 +383,25 @@ CanLogResult appCanLogSetParam(ClmParameterIdType id, uint32_t value)
 
     switch (id)
     {
-        case CLM_PARAMETER_ID_CAN1_BAUDRATE:
-            if (!appCanLogIsValidBaudrate(value))
-            {
-                res = CAN_LOG_ERR_INVALID_PARAM;
-                break;
-            }
-            CanLogCtrlData.Can1.baudrate = value;
-            break;
-        case CLM_PARAMETER_ID_CAN2_BAUDRATE:
-            if (!appCanLogIsValidBaudrate(value))
-            {
-                res = CAN_LOG_ERR_INVALID_PARAM;
-                break;
-            }
-            CanLogCtrlData.Can2.baudrate = value;
-            break;
-        default:
+    case CLM_PARAMETER_ID_CAN1_BAUDRATE:
+        if (!appCanLogIsValidBaudrate(value))
+        {
             res = CAN_LOG_ERR_INVALID_PARAM;
             break;
+        }
+        CanLogCtrlData.Can1.baudrate = value;
+        break;
+    case CLM_PARAMETER_ID_CAN2_BAUDRATE:
+        if (!appCanLogIsValidBaudrate(value))
+        {
+            res = CAN_LOG_ERR_INVALID_PARAM;
+            break;
+        }
+        CanLogCtrlData.Can2.baudrate = value;
+        break;
+    default:
+        res = CAN_LOG_ERR_INVALID_PARAM;
+        break;
     }
 
     return res;
@@ -437,7 +444,7 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
     (void)data;
 
     max_index = appCanLogGetMaxLogIndex();
-    lastUsed = find_highest_suffix("/logs/", "CAN.LOG", (int)max_index);
+    lastUsed  = find_highest_suffix("/logs/", "CAN.LOG", (int)max_index);
 
 #if 0U == PERSIST_CAN_LOG_FILE_HEAD_TAIL
     lastUsed = 0U;
@@ -471,10 +478,11 @@ static CanLogResult appCanLogReopenFile(CanLogControlDataType *data)
 
     res = CAN_LOG_OK;
 
-    if (FR_OK != FatFS_SD_OpenFileForWrite(
-            &(CanLogCtrlData.CanLog.writeFileDevice), 
-            data->CanLog.filename)
-        )
+    if (FR_OK
+        != FatFS_SD_OpenFileForWrite(
+            &(CanLogCtrlData.CanLog.writeFileDevice),
+            data->CanLog.filename
+        ))
     {
         res = CAN_LOG_NOT_OK;
         CanLogFileManager_ErrorHandler();
@@ -520,14 +528,15 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
         &FileSize
     );
 
-    log_file_size = appCanLogGetLogFileSize();
+    log_file_size  = appCanLogGetLogFileSize();
     log_file_count = appCanLogGetLogFileCount();
-    max_index = appCanLogGetMaxLogIndex();
+    max_index      = appCanLogGetMaxLogIndex();
 
-    if (FileSizeRes == FR_OK && (FileSize >= log_file_size) )
+    if (FileSizeRes == FR_OK && (FileSize >= log_file_size))
     {
         // File exists and is full, advance to next one
-        if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice)) && log_file_count > 0U)
+        if (0 == FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice))
+            && log_file_count > 0U)
         {
             if (CanLogCtrlData.CanLog.fileHeadIndex >= max_index)
             {
@@ -540,8 +549,7 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
             if (1 == CanLogCtrlData.CanLog.fileIndexWrapped)
             {
                 CanLogCtrlData.CanLog.fileTailIndex =
-                    (CanLogCtrlData.CanLog.fileHeadIndex + 1)
-                    % log_file_count;
+                    (CanLogCtrlData.CanLog.fileHeadIndex + 1) % log_file_count;
             }
 
             snprintf(
@@ -564,8 +572,9 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
             {
                 CanLogFileManager_ErrorHandler();
             }
-            
-            if (FR_OK != FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice)))
+
+            if (FR_OK
+                != FatFS_SD_Flush(&(CanLogCtrlData.CanLog.writeFileDevice)))
             {
                 CanLogFileManager_ErrorHandler();
             }
@@ -581,7 +590,8 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
     return 0U;
 }
 
-CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
+CanLogControlDataType *
+CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 {
     memset(&CanLogCtrlData, 0x0, sizeof(CanLogCtrlData));
     Rb1BytesHighWater = 0U;
@@ -592,15 +602,15 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
 
     CanLogCtrlData.mountRes     = mount_res;
     CanLogCtrlData.runCanTracer = run;
-    CanLogCtrlData.commitLog = commit;
+    CanLogCtrlData.commitLog    = commit;
 
-    CanLogCtrlData.Can1.busLoad = 0.0;
-    CanLogCtrlData.Can1.prevTimestamp = 0;
+    CanLogCtrlData.Can1.busLoad         = 0.0;
+    CanLogCtrlData.Can1.prevTimestamp   = 0;
     CanLogCtrlData.Can1.accumulatedBits = 0;
     CanLogCtrlData.Can1.accumulatedTime = 0;
 
-    CanLogCtrlData.Can2.busLoad = 0.0;
-    CanLogCtrlData.Can2.prevTimestamp = 0;
+    CanLogCtrlData.Can2.busLoad         = 0.0;
+    CanLogCtrlData.Can2.prevTimestamp   = 0;
     CanLogCtrlData.Can2.accumulatedBits = 0;
     CanLogCtrlData.Can2.accumulatedTime = 0;
 
@@ -613,55 +623,71 @@ CanLogControlDataType *CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *c
 
 #if CANLOGMANAGER_CLEAR_ALL_LOGS
 
-static FRESULT delete_all_files(const char* path) {
+static FRESULT delete_all_files(const char *path)
+{
     DIR dir;
     FILINFO fno;
     FRESULT res;
     char full_path[256];
-    
+
     // Open directory
     res = f_opendir(&dir, path);
-    if (res != FR_OK) return res;
-    
+    if (res != FR_OK)
+    {
+        return res;
+    }
+
     // Read all entries
-    while (1) {
+    while (1)
+    {
         res = f_readdir(&dir, &fno);
-        if (res != FR_OK || fno.fname[0] == 0) break; // End of dir
-        
+        if (res != FR_OK || fno.fname[0] == 0)
+        {
+            break; // End of dir
+        }
+
         // Skip directories (optional - remove if you want to delete subdirs too)
-        if (fno.fattrib & AM_DIR) continue;
-        
+        if (fno.fattrib & AM_DIR)
+        {
+            continue;
+        }
+
         // Build full path
         sprintf(full_path, "%s/%s", path, fno.fname);
-        
+
         // Delete the file
         res = f_unlink(full_path);
-        if (res != FR_OK) {
+        if (res != FR_OK)
+        {
             f_closedir(&dir);
             return res; // Return on error
         }
     }
-    
+
     f_closedir(&dir);
     return FR_OK;
 }
 
 #endif
 
-static bool m_verify_preallocation(const char* path) {
+static bool m_verify_preallocation(const char *path)
+{
     FIL fil;
     FRESULT res;
     UINT bytes_read;
     UINT bytes_to_read;
-    BYTE dummy_bytes[1U] ={0};
+    BYTE dummy_bytes[1U] = {0};
     uint32_t log_file_size;
     uint32_t seek_offset;
     bool can_seek;
     bool verified;
-    
+
     res = f_open(&fil, path, FA_READ);
-    if (res != FR_OK) return false;
-    
+    if (res != FR_OK)
+    {
+        return false;
+    }
+
     // Try seeking to near the expected pre-allocated size
     log_file_size = appCanLogGetLogFileSize();
     if (log_file_size == 0U)
@@ -671,15 +697,15 @@ static bool m_verify_preallocation(const char* path) {
     }
 
     seek_offset = (log_file_size > sizeof(dummy_bytes))
-        ? (log_file_size - sizeof(dummy_bytes))
-        : 0U;
-    res = f_lseek(&fil, seek_offset);
-    can_seek = (res == FR_OK);
+                      ? (log_file_size - sizeof(dummy_bytes))
+                      : 0U;
+    res         = f_lseek(&fil, seek_offset);
+    can_seek    = (res == FR_OK);
 
     bytes_to_read = sizeof(dummy_bytes);
-    res = f_read(&fil, dummy_bytes, bytes_to_read, &bytes_read);
-    verified = (res == FR_OK && bytes_read > 0U);
-    
+    res           = f_read(&fil, dummy_bytes, bytes_to_read, &bytes_read);
+    verified      = (res == FR_OK && bytes_read > 0U);
+
     f_close(&fil);
     return can_seek;
 }
@@ -697,19 +723,24 @@ static FRESULT m_preallocate_log_files(void)
     uint32_t log_file_count;
     uint32_t max_index;
 
-    UnseekableFiles = 0;
+    UnseekableFiles          = 0;
     CanLogPreallocErrorCount = 0U;
 
-    log_file_size = appCanLogGetLogFileSize();
+    log_file_size  = appCanLogGetLogFileSize();
     log_file_count = appCanLogGetLogFileCount();
-    max_index = appCanLogGetMaxLogIndex();
+    max_index      = appCanLogGetMaxLogIndex();
 
     if (log_file_size == 0U || log_file_count == 0U)
     {
         return FR_INVALID_PARAMETER;
     }
 
-    snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)max_index);
+    snprintf(
+        full_path,
+        sizeof(full_path),
+        FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d",
+        (int)max_index
+    );
 
     if (1U != m_verify_preallocation(full_path))
     {
@@ -717,58 +748,67 @@ static FRESULT m_preallocate_log_files(void)
         {
             bool prealloc_ok = true;
 
-            snprintf(full_path, sizeof(full_path), FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d", (int)i);
-            
+            snprintf(
+                full_path,
+                sizeof(full_path),
+                FILEHANDLER_PARTITION_NO "/logs/CAN.LOG%d",
+                (int)i
+            );
+
             // Check if file already exists and is properly sized
-            if (1U == m_verify_preallocation(full_path)) {
+            if (1U == m_verify_preallocation(full_path))
+            {
                 // File exists and is properly sized - skip
                 continue;
             }
-    
+
             UnseekableFiles++;
-    
+
             // File doesn't exist or is too small - create/resize it
             res = f_open(&logfile, full_path, FA_WRITE | FA_CREATE_NEW);
-            if (res == FR_EXIST) {
+            if (res == FR_EXIST)
+            {
                 // File exists but is too small - open for expansion
                 res = f_open(&logfile, full_path, FA_WRITE);
             }
-            
-            if (res != FR_OK) {
+
+            if (res != FR_OK)
+            {
                 CanLogPreallocErrorCount++;
                 continue;
             }
-            
-            if (res == FR_OK) {
+
+            if (res == FR_OK)
+            {
                 res = f_expand(&logfile, log_file_size, 0);
 
-                if (res == FR_OK) 
+                if (res == FR_OK)
                 {
                     res = f_lseek(&logfile, log_file_size - 1U);
-                    
-                    if (res != FR_OK) 
+
+                    if (res != FR_OK)
                     {
                         res = f_lseek(&logfile, log_file_size - 512U);
                     }
-                    if (res != FR_OK) 
+                    if (res != FR_OK)
                     {
                         res = f_lseek(&logfile, log_file_size - 1024U);
                     }
-                    if (res != FR_OK) 
+                    if (res != FR_OK)
                     {
-                        res = f_lseek(&logfile, log_file_size - 3U*512U);
+                        res = f_lseek(&logfile, log_file_size - 3U * 512U);
                     }
-                    if (res != FR_OK) 
+                    if (res != FR_OK)
                     {
-                        res = f_lseek(&logfile, log_file_size - 4U*512U);
+                        res = f_lseek(&logfile, log_file_size - 4U * 512U);
                     }
-                    if (res != FR_OK) 
+                    if (res != FR_OK)
                     {
-                        res = f_lseek(&logfile, log_file_size - 5U*512U);
+                        res = f_lseek(&logfile, log_file_size - 5U * 512U);
                     }
                 }
 
-                if (res == FR_OK) 
+                if (res == FR_OK)
                 {
                     bytes_written = 0U;
                     res = f_write(&logfile, &dummy_byte, 1U, &bytes_written);
@@ -777,22 +817,25 @@ static FRESULT m_preallocate_log_files(void)
                         prealloc_ok = false;
                     }
                 }
-                
-                if (res == FR_OK && bytes_written == 1) 
+
+                if (res == FR_OK && bytes_written == 1)
                 {
                     res = f_lseek(&logfile, 0);
                 }
             }
-            
-            if (res != FR_OK) {
+
+            if (res != FR_OK)
+            {
                 prealloc_ok = false;
             }
 
-            if (f_close(&logfile) != FR_OK) {
+            if (f_close(&logfile) != FR_OK)
+            {
                 prealloc_ok = false;
             }
 
-            if (!prealloc_ok) {
+            if (!prealloc_ok)
+            {
                 CanLogPreallocErrorCount++;
             }
         }
@@ -818,65 +861,105 @@ static FRESULT m_preallocate_log_files(void)
 
 #if CANLOGAMANGER_PERSIST_METADATA
 
-static int CanLogManager_ParseMetaData(char *buffer, uint32_t len, CanLogMetaDataType *meta)
+static int CanLogManager_ParseMetaData(
+    char *buffer,
+    uint32_t len,
+    CanLogMetaDataType *meta
+)
 {
     // Variables used in this example.
     JSONStatus_t result;
     char TmpBuf[64];
-    char * value;
+    char *value;
     size_t valueLength;
     size_t bufferLength = len;
     uint32_t Epoch;
-    const char queryKey1[] = "epoch";
-    const size_t queryKeyLength1 = sizeof( queryKey1 ) - 1;
+    const char queryKey1[]       = "epoch";
+    const size_t queryKeyLength1 = sizeof(queryKey1) - 1;
     uint32_t FileIndex;
-    const char queryKey2[] = "index";
-    const size_t queryKeyLength2 = sizeof( queryKey2 ) - 1;
+    const char queryKey2[]       = "index";
+    const size_t queryKeyLength2 = sizeof(queryKey2) - 1;
     uint32_t ByteOffset;
-    const char queryKey3[] = "offset";
-    const size_t queryKeyLength3 = sizeof( queryKey3 ) - 1;
+    const char queryKey3[]       = "offset";
+    const size_t queryKeyLength3 = sizeof(queryKey3) - 1;
     uint32_t Crc;
-    const char queryKey4[] = "crc";
-    const size_t queryKeyLength4 = sizeof( queryKey4 ) - 1;
+    const char queryKey4[]       = "crc";
+    const size_t queryKeyLength4 = sizeof(queryKey4) - 1;
 
-    result = JSON_Validate( buffer, bufferLength );    
+    result = JSON_Validate(buffer, bufferLength);
 
-    if( result == JSONSuccess )
+    if (result == JSONSuccess)
     {
-        result = FileHandler_GetValue( buffer, bufferLength, queryKey1, queryKeyLength1, &value, &valueLength);
-        if( JSONSuccess ==  result )
+        result = FileHandler_GetValue(
+            buffer,
+            bufferLength,
+            queryKey1,
+            queryKeyLength1,
+            &value,
+            &valueLength
+        );
+        if (JSONSuccess == result)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
-            if ( 0U == FileHandler_ConvertToInteger(TmpBuf, &Epoch, 10U) )
+            if (0U == FileHandler_ConvertToInteger(TmpBuf, &Epoch, 10U))
+            {
                 meta->epoch = Epoch;
+            }
         }
-        
-        result = FileHandler_GetValue( buffer, bufferLength, queryKey2, queryKeyLength2, &value, &valueLength );
-        if( JSONSuccess == result ) 
+
+        result = FileHandler_GetValue(
+            buffer,
+            bufferLength,
+            queryKey2,
+            queryKeyLength2,
+            &value,
+            &valueLength
+        );
+        if (JSONSuccess == result)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == FileHandler_ConvertToInteger(TmpBuf, &FileIndex, 10U))
+            {
                 meta->fileIndex = FileIndex;
+            }
         }
 
-        result = FileHandler_GetValue( buffer, bufferLength, queryKey3, queryKeyLength3, &value, &valueLength);
-        if( JSONSuccess ==  result )
+        result = FileHandler_GetValue(
+            buffer,
+            bufferLength,
+            queryKey3,
+            queryKeyLength3,
+            &value,
+            &valueLength
+        );
+        if (JSONSuccess == result)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
-            if ( 0U == FileHandler_ConvertToInteger(TmpBuf, &ByteOffset, 10U) )
+            if (0U == FileHandler_ConvertToInteger(TmpBuf, &ByteOffset, 10U))
+            {
                 meta->byteOffset = ByteOffset;
+            }
         }
-        
-        result = FileHandler_GetValue( buffer, bufferLength, queryKey4, queryKeyLength4, &value, &valueLength );
-        if( JSONSuccess == result ) 
+
+        result = FileHandler_GetValue(
+            buffer,
+            bufferLength,
+            queryKey4,
+            queryKeyLength4,
+            &value,
+            &valueLength
+        );
+        if (JSONSuccess == result)
         {
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == FileHandler_ConvertToInteger(TmpBuf, &Crc, 10U))
+            {
                 meta->crc = Crc;
+            }
         }
     }
 
@@ -903,7 +986,7 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
 
     res = f_stat(CAN_LOG_META_FILENAME, &fno);
 
-    switch (res) 
+    switch (res)
     {
     case FR_OK:
         res = FatFS_SD_OpenFileForRead(&Dev, CAN_LOG_META_FILENAME);
@@ -917,26 +1000,24 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
     if (FR_OK == res)
     {
         BufferSize = sizeof(Content);
-        
+
         res = FatFS_SD_GetFileSize(&Dev, &FileSize);
         if (res != FR_OK)
         {
             res = CANLOG_E_FILE_READ;
         }
 
-        
         if (CANLOG_E_OK == res)
         {
             // Read data
             ReadSize = (FileSize < BufferSize) ? FileSize : BufferSize;
-            res = FatFS_SD_ReadFile(&Dev, Content, ReadSize);
-                    
+            res      = FatFS_SD_ReadFile(&Dev, Content, ReadSize);
+
             if (CANLOG_E_OK != res)
             {
                 res = CANLOG_E_FILE_READ;
             }
-
-        }   
+        }
 
         if (FR_OK == res)
         {
@@ -950,7 +1031,7 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
             ErrorContext.code = res;
             ErrorContext.line = __LINE__;
             snprintf(
-                ErrorContext.function, 
+                ErrorContext.function,
                 sizeof(ErrorContext.function),
                 "%s",
                 "SD_Spi_writeMultiBlock"
@@ -967,10 +1048,17 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
     return res;
 }
 
-static uint8_t m_MetaDataToJSonString(CanLogMetaDataType *data, char *json, uint32_t maxLength, uint32_t *len)
+static uint8_t m_MetaDataToJSonString(
+    CanLogMetaDataType *data,
+    char *json,
+    uint32_t maxLength,
+    uint32_t *len
+)
 {
     // Create the JSON string
-    snprintf(json, maxLength,
+    snprintf(
+        json,
+        maxLength,
         "{\n"
         "    \"epoch\":%" PRIu32 ",\n"
         "    \"index\":%" PRIu32 ",\n"
@@ -1002,20 +1090,20 @@ static FRESULT m_MetaDataStore(CanLogMetaDataType *data)
     {
         BufferSize = sizeof(Content);
 
-        (void) m_MetaDataToJSonString(data, Content, BufferSize, &StringSize);
-        
+        (void)m_MetaDataToJSonString(data, Content, BufferSize, &StringSize);
+
         if (CANLOG_E_OK == res)
         {
             // Read data
             WriteSize = (StringSize < BufferSize) ? StringSize : BufferSize;
-            res = FatFS_SD_WriteFile(&Dev, Content, WriteSize);
-                    
+            res       = FatFS_SD_WriteFile(&Dev, Content, WriteSize);
+
             if (CANLOG_E_OK != res)
             {
                 res = CANLOG_E_FILE_WRITE;
                 CanLogFileManager_ErrorHandler();
             }
-        }   
+        }
         else
         {
             CanLogFileManager_ErrorHandler();
@@ -1128,11 +1216,11 @@ static void appCanLogFillEntry(
     uint8_t Dlc;
     uint8_t DataLen;
 
-    Dlc = FDCAN_GET_DLC(frame);
+    Dlc   = FDCAN_GET_DLC(frame);
     Flags = FDCAN_GET_BRS(frame) << CAN_FLAG_BRS_Pos
-        | FDCAN_GET_ESI(frame) << CAN_FLAG_ESI_Pos
-        | FDCAN_GET_FDF(frame) << CAN_FLAG_RTR_FDF_Pos
-        | FDCAN_GET_IDE(frame) << CAN_FLAG_IDE_Pos;
+            | FDCAN_GET_ESI(frame) << CAN_FLAG_ESI_Pos
+            | FDCAN_GET_FDF(frame) << CAN_FLAG_RTR_FDF_Pos
+            | FDCAN_GET_IDE(frame) << CAN_FLAG_IDE_Pos;
     DataLen = FDCAN_GET_DATA_LEN(frame);
 
     entry->header.header_len = sizeof(entry->header);
@@ -1154,11 +1242,11 @@ static InstrErrorType appPersistInstrumentationData(void)
     FRESULT res;
     FatFsDeviceType File;
     uint32_t BytesToWrite = 0;
-    uint8_t * Data = NULL;
+    uint8_t *Data         = NULL;
     const char FileName[] = "InstrumentationData.bin";
 
     res = FatFS_SD_OpenFileForOverWrite(&File, FileName);
-    
+
     if (FR_OK == res)
     {
         Instrumentation_SerializeHook(Data, &BytesToWrite);
@@ -1172,14 +1260,13 @@ static InstrErrorType appPersistInstrumentationData(void)
 #endif
 #endif
 
-static comm_status_t
-appCanLogStoreToFrameBuffer(void *entry)
+static comm_status_t appCanLogStoreToFrameBuffer(void *entry)
 {
     comm_status_t res = COMM_SUCCESS;
     CanLogEntryHeaderType *pHeader;
 
     pHeader = (CanLogEntryHeaderType *)entry;
-    
+
     if (0 != CanLogBuffer_AddEntry(entry, pHeader->total_len))
     {
         CanLogManager_FrameDropCount1++;
@@ -1207,7 +1294,7 @@ appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
         res = COMM_ERROR;
     }
 
-    (void) FatFS_SD_GetBufferedFileSize(
+    (void)FatFS_SD_GetBufferedFileSize(
         &(CanLogCtrlData.CanLog.writeFileDevice),
         &LogMetaData.byteOffset
     );
@@ -1224,7 +1311,8 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     uint8_t *DataPtr;
     comm_status_t res = COMM_SUCCESS;
 
-    if (CANLOG_E_OK == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
+    if (CANLOG_E_OK
+        == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
     {
         CanLogManager_UpdateRb1BytesHighWater();
         CanLogManager_InstrumentationFlushStartHook();
@@ -1248,7 +1336,7 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     {
         res = COMM_ERROR;
     }
-    
+
     return res;
 }
 
@@ -1260,8 +1348,8 @@ static comm_status_t CanLogManager_EmitSyncEntry(
 {
     /* Keep the 32-bit timestamp aligned with the originating frame to avoid
      * offsets when the absolute 64-bit timer wraps. */
-    sync->timestamp = CLM_ABS_TIME_TO_TIMSTAMP(frameTimestamp);
-    sync->abs_time_high  = CLM_ABS_TIME_TO_ABS_HIGH(absTime);
+    sync->timestamp     = CLM_ABS_TIME_TO_TIMSTAMP(frameTimestamp);
+    sync->abs_time_high = CLM_ABS_TIME_TO_ABS_HIGH(absTime);
 
     sync->header.header_len = sizeof(sync->header);
     sync->header.type       = CLB_ENTRY_TYPE_SYNC;
@@ -1287,57 +1375,77 @@ CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
 
     switch (Dlc)
     {
-        case  9: Dlc = 12; break;
-        case 10: Dlc = 16; break;
-        case 11: Dlc = 20; break;
-        case 12: Dlc = 24; break;
-        case 13: Dlc = 32; break;
-        case 14: Dlc = 48; break;
-        case 15: Dlc = 64; break;
-        default: 
-            break;
+    case 9:
+        Dlc = 12;
+        break;
+    case 10:
+        Dlc = 16;
+        break;
+    case 11:
+        Dlc = 20;
+        break;
+    case 12:
+        Dlc = 24;
+        break;
+    case 13:
+        Dlc = 32;
+        break;
+    case 14:
+        Dlc = 48;
+        break;
+    case 15:
+        Dlc = 64;
+        break;
+    default:
+        break;
     }
 
-    IsCanfd = (frame->dlc_flags & CAN_FLAG_RTR_FDF);
+    IsCanfd    = (frame->dlc_flags & CAN_FLAG_RTR_FDF);
     IsExtended = (frame->dlc_flags & CAN_FLAG_IDE);
 
-    if (IsCanfd) {
+    if (IsCanfd)
+    {
         // CAN FD frame structure
-        if (IsExtended) {
+        if (IsExtended)
+        {
             // Extended ID: 1 + 32 + 2 + 1 + 1 + 4 + data + CRC + 2 + 7 + 3 = 53 + data + CRC
             FrameBits = 53 + (Dlc * 8);
             // CRC: 17 bits for ≤16 bytes, 21 bits for >16 bytes
             FrameBits += (Dlc <= 16) ? 17 : 21;
-        } else {
+        }
+        else
+        {
             // Standard ID: 1 + 12 + 2 + 1 + 1 + 4 + data + CRC + 2 + 7 + 3 = 33 + data + CRC
             FrameBits = 33 + (Dlc * 8);
             FrameBits += (Dlc <= 16) ? 17 : 21;
         }
-    } else {
+    }
+    else
+    {
         // Classic CAN frame structure
-        if (IsExtended) {
+        if (IsExtended)
+        {
             // Extended: 1 + 32 + 6 + data + 15 + 1 + 2 + 7 + 3 = 67 + data
             FrameBits = 67 + (Dlc * 8);
-        } else {
+        }
+        else
+        {
             // Standard: 1 + 11 + 6 + data + 15 + 1 + 2 + 7 + 3 = 47 + data
             FrameBits = 47 + (Dlc * 8);
         }
     }
-    
+
     *bits = FrameBits;
 
     return res;
 }
 
-CanLogResult m_ComputeBusLoad(
-    CanStatusDataType *can,
-    CanLogEntryType *frame
-)
+CanLogResult m_ComputeBusLoad(CanStatusDataType *can, CanLogEntryType *frame)
 {
-    CanLogResult res = CAN_LOG_OK;
-    float Period = 0.0f; // in seconds
+    CanLogResult res   = CAN_LOG_OK;
+    float Period       = 0.0f; // in seconds
     uint32_t FrameBits = 0;
-    uint32_t TimeDiff = 0;
+    uint32_t TimeDiff  = 0;
     uint32_t ts;
     uint32_t prev;
     uint32_t diff;
@@ -1353,7 +1461,8 @@ CanLogResult m_ComputeBusLoad(
         return res;
     }
 
-    if (can->prevTimestamp == 0) {
+    if (can->prevTimestamp == 0)
+    {
         can->prevTimestamp = frame->timestamp;
         return res;
     }
@@ -1364,14 +1473,14 @@ CanLogResult m_ComputeBusLoad(
 
     if (ts >= prev)
     {
-        diff = ts - prev;
+        diff               = ts - prev;
         can->prevTimestamp = ts;
     }
-    else // prev > ts 
+    else // prev > ts
     {
-        if ((prev > UINT32_MAX/2U) && (ts < UINT32_MAX/2U))
+        if ((prev > UINT32_MAX / 2U) && (ts < UINT32_MAX / 2U))
         {
-            diff = (UINT32_MAX - prev) + ts + 1U;
+            diff               = (UINT32_MAX - prev) + ts + 1U;
             can->prevTimestamp = ts;
         }
     }
@@ -1384,9 +1493,11 @@ CanLogResult m_ComputeBusLoad(
     can->accumulatedTime += TimeDiff;
 
     // Update every 1 second
-    if (can->accumulatedTime >= 1000000U) {
+    if (can->accumulatedTime >= 1000000U)
+    {
         Period = can->accumulatedTime / 1000000.0f;
-        can->busLoad = ((can->accumulatedBits * 1.1f) / (can->baudrate * Period)) * 100.0f;
+        can->busLoad =
+            ((can->accumulatedBits * 1.1f) / (can->baudrate * Period)) * 100.0f;
 
         if (can->busLoad > 0.0f && can->busLoad < 0.01f)
         {
@@ -1400,23 +1511,17 @@ CanLogResult m_ComputeBusLoad(
     return res;
 }
 
-CanLogResult m_ComputeBusLoad1(
-    CanStatusDataType *can, 
-    CanLogEntryType *frame
-)
+CanLogResult m_ComputeBusLoad1(CanStatusDataType *can, CanLogEntryType *frame)
 {
     return m_ComputeBusLoad(can, frame);
 }
 
-CanLogResult m_ComputeBusLoad2(
-    CanStatusDataType *can, 
-    CanLogEntryType *frame
-)
+CanLogResult m_ComputeBusLoad2(CanStatusDataType *can, CanLogEntryType *frame)
 {
     return m_ComputeBusLoad(can, frame);
 }
 
-void m_DecayBusLoad(CanStatusDataType * can, uint32_t currentTime)
+void m_DecayBusLoad(CanStatusDataType *can, uint32_t currentTime)
 {
     int64_t TimeDiff;
 
@@ -1430,11 +1535,12 @@ void m_DecayBusLoad(CanStatusDataType * can, uint32_t currentTime)
     if (TimeDiff > 1000000)
     {
         can->busLoad *= 0.75f;
-        if (can->busLoad < 0.01f) {
+        if (can->busLoad < 0.01f)
+        {
             can->busLoad = 0.0f;
         }
         can->accumulatedBits = 0;
-        can->accumulatedTime = 0; 
+        can->accumulatedTime = 0;
     }
 }
 
@@ -1452,8 +1558,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     CanLogEntryType *pFrameEntry = (CanLogEntryType *)(&EntryBuffer);
     volatile uint32_t LocalFrameCount;
     static uint64_t NextPeriodicSyncAbsTime = 0;
-    static uint32_t LastFrameTimestamp = 0;
-    static bool LastFrameTimestampValid = false;
+    static uint32_t LastFrameTimestamp      = 0;
+    static bool LastFrameTimestampValid     = false;
 
     RuntimeChecks_CheckFrameCounts(&ErrorContext);
 
@@ -1507,9 +1613,9 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
 
         CanLogCtrlData.emitSyncEntry = true;
-        AbsTime = FDCAN_GetTimestampHook();
-        NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
-        LastFrameTimestampValid = false;
+        AbsTime                      = FDCAN_GetTimestampHook();
+        NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        LastFrameTimestampValid      = false;
 
         CanLogCtrlData.framesLost = false;
         RuntimeChecks_Init();
@@ -1537,7 +1643,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
     appCanLogCheckNewFileOpen(data);
 
-    (void) LocalFrameCount;
+    (void)LocalFrameCount;
     LocalFrameCount = 0;
 
     AbsTime = FDCAN_GetTimestampHook();
@@ -1545,10 +1651,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
     m_DecayBusLoad(&CanLogCtrlData.Can1, CLM_ABS_TIME_TO_TIMSTAMP(AbsTime));
     m_DecayBusLoad(&CanLogCtrlData.Can2, CLM_ABS_TIME_TO_TIMSTAMP(AbsTime));
 
-    if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
+    if ((0ULL != NextPeriodicSyncAbsTime)
+        && (AbsTime >= NextPeriodicSyncAbsTime))
     {
         CanLogCtrlData.emitSyncEntry = true;
-        NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
     }
 
     while (0 < fdcan_msg_port_read(&pNewFrame, 2))
@@ -1559,19 +1666,22 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         AbsTime = FDCAN_GetTimestampHook();
 
-        if ((0ULL != NextPeriodicSyncAbsTime) && (AbsTime >= NextPeriodicSyncAbsTime))
+        if ((0ULL != NextPeriodicSyncAbsTime)
+            && (AbsTime >= NextPeriodicSyncAbsTime))
         {
             CanLogCtrlData.emitSyncEntry = true;
-            NextPeriodicSyncAbsTime = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+            NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
         }
 
         if (true == CanLogCtrlData.emitSyncEntry)
         {
             CanLogCtrlData.emitSyncEntry = false;
-            if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
-                        &SyncEntry,
-                        AbsTime,
-                        pNewFrame->timestamp))
+            if (COMM_SUCCESS
+                != CanLogManager_EmitSyncEntry(
+                    &SyncEntry,
+                    AbsTime,
+                    pNewFrame->timestamp
+                ))
             {
                 CanLogFileManager_ErrorHandler();
             }
@@ -1587,26 +1697,20 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         if (pFrameEntry->channel == 1)
         {
             CanLogCtrlData.Can1.receivedFrames++;
-            m_ComputeBusLoad1(
-                &CanLogCtrlData.Can1,
-                pFrameEntry
-            );
+            m_ComputeBusLoad1(&CanLogCtrlData.Can1, pFrameEntry);
         }
         else if (pFrameEntry->channel == 2)
         {
             CanLogCtrlData.Can2.receivedFrames++;
-            m_ComputeBusLoad2(
-                &CanLogCtrlData.Can2,
-                pFrameEntry
-            );
+            m_ComputeBusLoad2(&CanLogCtrlData.Can2, pFrameEntry);
         }
 
         appCanLogStoreToFrameBuffer((void *)pFrameEntry);
-        LastFrameTimestamp = pNewFrame->timestamp;
+        LastFrameTimestamp      = pNewFrame->timestamp;
         LastFrameTimestampValid = true;
 
         CanLogBuffer_IsBlockReady(&BlockIsReady);
-        
+
         if (0 != CanLogCtrlData.CanLog.openRes)
         {
             /* quit */
@@ -1621,25 +1725,23 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         }
         CanLogManager_DrainPortEndHook();
     }
-    
+
     if (true == CanLogCtrlData.emitSyncEntry)
     {
         uint32_t timestamp32 = LastFrameTimestampValid
-            ? LastFrameTimestamp
-            : CLM_ABS_TIME_TO_TIMSTAMP(AbsTime);
+                                   ? LastFrameTimestamp
+                                   : CLM_ABS_TIME_TO_TIMSTAMP(AbsTime);
 
         CanLogCtrlData.emitSyncEntry = false;
-        if (COMM_SUCCESS != CanLogManager_EmitSyncEntry(
-                    &SyncEntry,
-                    AbsTime,
-                    timestamp32))
+        if (COMM_SUCCESS
+            != CanLogManager_EmitSyncEntry(&SyncEntry, AbsTime, timestamp32))
         {
             CanLogFileManager_ErrorHandler();
         }
     }
 
     if (*(CanLogCtrlData.commitLog))
-    {    
+    {
         CanLogBuffer_UsedSlots((uint8_t *)&SlotsToWrite);
 
         if (SlotsToWrite > 0)

@@ -9,7 +9,8 @@
 // In a header file or at the top of your file
 #define MAX_TASKS 10
 
-typedef struct {
+typedef struct
+{
     char name[16];
     uint64_t runtime_us;
     uint32_t percentage;
@@ -17,13 +18,12 @@ typedef struct {
 
 // Global variable you can inspect in GDB
 task_runtime_info_t g_task_stats[MAX_TASKS];
-uint32_t g_num_tasks = 0;
+uint32_t g_num_tasks        = 0;
 uint64_t g_total_runtime_us = 0;
 
 TaskStatus_t task_array[MAX_TASKS];
 
-__attribute__((used))
-uint64_t Profiling_GetTimestamp(void)
+__attribute__((used)) uint64_t Profiling_GetTimestamp(void)
 {
     return FDCAN_GetTimestampHook();
 }
@@ -39,18 +39,22 @@ void force_profiling_link(void)
 void update_task_stats(void)
 {
     UBaseType_t num_tasks = uxTaskGetNumberOfTasks();
-    
-    if (num_tasks <= MAX_TASKS) {
+
+    if (num_tasks <= MAX_TASKS)
+    {
         uint64_t total_runtime;
-        g_num_tasks = uxTaskGetSystemState(task_array, num_tasks, &total_runtime);
-        
+        g_num_tasks =
+            uxTaskGetSystemState(task_array, num_tasks, &total_runtime);
+
         g_total_runtime_us = total_runtime;
-        
-        for (UBaseType_t i = 0; i < num_tasks; i++) {
+
+        for (UBaseType_t i = 0; i < num_tasks; i++)
+        {
             strncpy(g_task_stats[i].name, task_array[i].pcTaskName, 15);
-            g_task_stats[i].name[15] = '\0';
+            g_task_stats[i].name[15]   = '\0';
             g_task_stats[i].runtime_us = task_array[i].ulRunTimeCounter;
-            g_task_stats[i].percentage = (task_array[i].ulRunTimeCounter * 100) / total_runtime;
+            g_task_stats[i].percentage =
+                (task_array[i].ulRunTimeCounter * 100) / total_runtime;
         }
     }
 }

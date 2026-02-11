@@ -28,17 +28,17 @@ static volatile SdCsdRegisterType Csd_Sd1 = {0};
 
 uint8_t MMCAdapter_initialize(void)
 {
-	uint8_t RetVal;
+    uint8_t RetVal;
 
-	// TODO: interface specific selection logic (SPI, SDIO)
-	RetVal = SD_Spi_Initialize(0U);
+    // TODO: interface specific selection logic (SPI, SDIO)
+    RetVal = SD_Spi_Initialize(0U);
 
-	if (0U == RetVal)
-	{
-		RetVal = SD_Spi_ReadCSD(&Csd_Sd1);
-	}
+    if (0U == RetVal)
+    {
+        RetVal = SD_Spi_ReadCSD(&Csd_Sd1);
+    }
 
-	return RetVal;
+    return RetVal;
 }
 
 uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
@@ -55,7 +55,9 @@ uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
 
         if (RES_OK == res)
         {
-            res = (SD_E_OK == SD_Spi_readMultiBlock(sector, buff, count)) ? RES_OK : RES_ERROR;
+            res = (SD_E_OK == SD_Spi_readMultiBlock(sector, buff, count))
+                      ? RES_OK
+                      : RES_ERROR;
         }
         else
         {
@@ -63,7 +65,7 @@ uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)
         }
     }
 
-    return (uint8_t) res;
+    return (uint8_t)res;
 }
 
 uint8_t MMCAdapter_write(const BYTE *buff, LBA_t sector, UINT count)
@@ -79,48 +81,49 @@ uint8_t MMCAdapter_write(const BYTE *buff, LBA_t sector, UINT count)
         res = SD_Spi_hotReset();
 
         if (RES_OK != res)
-        {  
+        {
             res = RES_NOTRDY;
         }
-        else 
+        else
         {
             res = SD_Spi_writeMultiBlock(sector, buff, count);
-            
-            if (SD_E_OK != res) 
+
+            if (SD_E_OK != res)
             {
                 res = RES_ERROR;
             }
         }
     }
 
-    return (uint8_t) res;
+    return (uint8_t)res;
 }
 
 uint8_t MMCAdapter_CtrlSync(void)
 {
-	return RES_OK;
+    return RES_OK;
 }
 
 uint8_t MMCAdapter_GetSectorCount(void *buff)
 {
     uint32_t SectorCount;
 
-    if (NULL == buff ||0 ==  Csd_Sd1.cSize) {
+    if (NULL == buff || 0 == Csd_Sd1.cSize)
+    {
         return RES_ERROR;
     }
 
     // Using your parsed CSD data
-    if (Csd_Sd1.csdStructure >= 1) 
-    {  
+    if (Csd_Sd1.csdStructure >= 1)
+    {
         // CSD v2.0
         // SectorCount = (cSize + 1) * 1024; Capacity = SectorCount * 512 bytes
         SectorCount = (Csd_Sd1.cSize + 1) * 1024;
         memcpy(buff, &SectorCount, sizeof(SectorCount));
-        
+
         return RES_OK;
-    } 
-    else 
-    {  
+    }
+    else
+    {
         // CSD v1.0
         // uint32_t mult = 1 << (Csd_Sd1.cSizeMult + 2);
         // uint32_t blocknr = (Csd_Sd1.cSize + 1) * mult;
@@ -135,23 +138,24 @@ uint8_t MMCAdapter_GetSectorCount(void *buff)
 
 uint8_t MMCAdapter_GetSectorSize(void *buff)
 {
-	uint32_t SectorSize;
+    uint32_t SectorSize;
 
-    if (NULL == buff ||0 ==  Csd_Sd1.cSize) {
+    if (NULL == buff || 0 == Csd_Sd1.cSize)
+    {
         return RES_ERROR;
     }
 
     // Using your parsed CSD data
-    if (Csd_Sd1.csdStructure >= 1) 
-    {  
+    if (Csd_Sd1.csdStructure >= 1)
+    {
         // CSD v2.0
         SectorSize = 1 << Csd_Sd1.sectorSize;
         memcpy(buff, &SectorSize, sizeof(SectorSize));
-        
+
         return RES_OK;
-    } 
-    else 
-    {  
+    }
+    else
+    {
         // CSD v1.0
 
         return RES_ERROR;
@@ -162,21 +166,22 @@ uint8_t MMCAdapter_GetBlockSize(void *buff)
 {
     uint32_t BlockSize;
 
-    if (NULL == buff ||0 ==  Csd_Sd1.cSize) {
+    if (NULL == buff || 0 == Csd_Sd1.cSize)
+    {
         return RES_ERROR;
     }
 
     // Using your parsed CSD data
-    if (Csd_Sd1.csdStructure >= 1) 
-    {  
+    if (Csd_Sd1.csdStructure >= 1)
+    {
         // CSD v2.0
         BlockSize = 1 << Csd_Sd1.readBlLen;
         memcpy(buff, &BlockSize, sizeof(BlockSize));
-        
+
         return RES_OK;
-    } 
-    else 
-    {  
+    }
+    else
+    {
         // CSD v1.0
 
         return RES_ERROR;
@@ -188,11 +193,12 @@ uint8_t MMCAdapter_CtrlTrim(void *buff)
     LBA_t StartSector, EndSector;
     LBA_t *Buf;
 
-    if (!Csd_Sd1.eraseBlkEn || NULL == buff) {
+    if (!Csd_Sd1.eraseBlkEn || NULL == buff)
+    {
         return RES_ERROR;
     }
-    
-    Buf = (LBA_t *) buff;
+
+    Buf = (LBA_t *)buff;
 
     memcpy(&StartSector, &Buf[0], sizeof(StartSector));
     memcpy(&EndSector, &Buf[1], sizeof(EndSector));
@@ -201,35 +207,35 @@ uint8_t MMCAdapter_CtrlTrim(void *buff)
     SD_Spi_SendCommand(SD_SPI_CMD33, EndSector);
     SD_Spi_SendCommand(SD_SPI_CMD38, 0);
 
-	return RES_OK;
+    return RES_OK;
 }
 
 uint8_t MMCAdapter_MmcGetSdstat(void *buff)
 {
-	(void) buff;
-	return RES_ERROR;
+    (void)buff;
+    return RES_ERROR;
 }
 
 uint8_t MMCAdapter_MmcGetOcr(void *buff)
 {
-	(void) buff;
-	return RES_ERROR;
+    (void)buff;
+    return RES_ERROR;
 }
 
 uint8_t MMCAdapter_MmcGetCid(void *buff)
 {
-	(void) buff;
-	return RES_ERROR;
+    (void)buff;
+    return RES_ERROR;
 }
 
 uint8_t MMCAdapter_MmcGetCsd(void *buff)
 {
-	(void) buff;
-	return RES_ERROR;
+    (void)buff;
+    return RES_ERROR;
 }
 
 uint8_t MMCAdapter_MmcGetType(void *buff)
 {
-	(void) buff;
-	return RES_ERROR;
+    (void)buff;
+    return RES_ERROR;
 }

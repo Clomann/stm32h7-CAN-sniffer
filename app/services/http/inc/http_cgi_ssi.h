@@ -21,7 +21,7 @@
 #define __HTTP_CGI_SSI_H
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 // #ifndef APP_UPDATE_SETTING_DEFINED
@@ -30,13 +30,18 @@
 
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
-/* Exported constants --------------------------------------------------------*/   
+/* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 void http_server_init(void);
 
 /* Shim functions ------------------------------------------------------- */
-void http_app_set_setting(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
+void http_app_set_setting(
+    int iIndex,
+    int iNumParams,
+    char *pcParam[],
+    char *pcValue[]
+);
 int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen);
 
 #ifdef __cplusplus
@@ -44,7 +49,3 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen);
 #endif
 
 #endif /* __HTTP_CGI_SSI_H */
-
-
-
-

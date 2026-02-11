@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include <stdint.h>
 
@@ -9,7 +9,8 @@
 
 typedef uint8_t RuntimeChecksErrorType;
 
-typedef struct {
+typedef struct
+{
     RuntimeChecksErrorType err;
 } RuntimeChecksContextType;
 

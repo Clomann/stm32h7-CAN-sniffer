@@ -31,7 +31,7 @@
 /* Retention data (RAM_D3, survives reset) */
 #define RAM_D3_SECTION __attribute__((section(".ram_d3")))
 
-#define COMM_FACTORY_SECTION  __attribute__((section(".comm_factory")))
+#define COMM_FACTORY_SECTION __attribute__((section(".comm_factory")))
 
 #else /* PC/Test build */
 

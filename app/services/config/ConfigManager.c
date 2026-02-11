@@ -295,7 +295,7 @@ ConfigResultType ConfigManager_UpdateConfig(
     if (needsUpdate)
     {
         ConfigResultType result = ConfigManager_SaveConfig(manager, config);
-        
+
         return result;
     }
 

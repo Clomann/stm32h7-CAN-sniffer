@@ -7,37 +7,37 @@
 #include <string.h>
 #include <stdlib.h>
 
-static FRESULT mock_file_open_result = FR_OK;
-static uint32_t mock_file_size       = 1000;
-static bool mock_file_closed         = false;
-static bool mock_file_open_failed    = false;
-static uint64_t mock_total_bytes_written = 0;
-static uint64_t mock_total_frames_written = 0;
+static FRESULT mock_file_open_result        = FR_OK;
+static uint32_t mock_file_size              = 1000;
+static bool mock_file_closed                = false;
+static bool mock_file_open_failed           = false;
+static uint64_t mock_total_bytes_written    = 0;
+static uint64_t mock_total_frames_written   = 0;
 static uint32_t mock_last_block_frame_count = 0;
-static uint32_t mock_write_call_count = 0;
+static uint32_t mock_write_call_count       = 0;
 
 static const char mock_meta_filename[] = "/logs_meta.json";
 static char mock_meta_file_content[128];
-static uint32_t mock_meta_file_len = 0;
-static bool mock_meta_file_present = false;
-static bool mock_current_is_meta = false;
+static uint32_t mock_meta_file_len    = 0;
+static bool mock_meta_file_present    = false;
+static bool mock_current_is_meta      = false;
 static FatFsDeviceType *mock_meta_dev = NULL;
 
 void reset_filehandler_stubs(void)
 {
-    mock_file_open_result = FR_OK;
-    mock_file_size        = 1000;
-    mock_file_closed      = false;
-    mock_file_open_failed = false;
-    mock_total_bytes_written = 0;
-    mock_total_frames_written = 0;
+    mock_file_open_result       = FR_OK;
+    mock_file_size              = 1000;
+    mock_file_closed            = false;
+    mock_file_open_failed       = false;
+    mock_total_bytes_written    = 0;
+    mock_total_frames_written   = 0;
     mock_last_block_frame_count = 0;
-    mock_write_call_count = 0;
-    mock_meta_file_len = 0;
-    mock_meta_file_present = false;
-    mock_current_is_meta = false;
-    mock_meta_dev = NULL;
-    mock_meta_file_content[0] = '\0';
+    mock_write_call_count       = 0;
+    mock_meta_file_len          = 0;
+    mock_meta_file_present      = false;
+    mock_current_is_meta        = false;
+    mock_meta_dev               = NULL;
+    mock_meta_file_content[0]   = '\0';
 }
 
 void set_file_open_result(FRESULT result)
@@ -75,14 +75,14 @@ void test_filehandler_set_meta_content(const char *data, uint32_t len)
 
     memcpy(mock_meta_file_content, data, len);
     mock_meta_file_content[len] = '\0';
-    mock_meta_file_len = len;
-    mock_meta_file_present = true;
+    mock_meta_file_len          = len;
+    mock_meta_file_present      = true;
 }
 
 void test_filehandler_clear_meta_content(void)
 {
-    mock_meta_file_len = 0;
-    mock_meta_file_present = false;
+    mock_meta_file_len        = 0;
+    mock_meta_file_present    = false;
     mock_meta_file_content[0] = '\0';
 }
 
@@ -141,7 +141,7 @@ static uint32_t test_count_valid_entries(const uint8_t *data, uint32_t length)
     }
 
     uint32_t offset = header->header_size;
-    uint32_t count = 0U;
+    uint32_t count  = 0U;
 
     while ((offset + sizeof(CanLogEntryHeaderType)) <= length)
     {
@@ -192,7 +192,8 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
 
 FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name)
 {
-    mock_current_is_meta = (name != NULL) && (strcmp(name, mock_meta_filename) == 0);
+    mock_current_is_meta =
+        (name != NULL) && (strcmp(name, mock_meta_filename) == 0);
     if (mock_current_is_meta && !mock_meta_file_present)
     {
         return FR_NO_FILE;
@@ -260,8 +261,8 @@ FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *data, uint32_t length)
 
         memcpy(mock_meta_file_content, data, length);
         mock_meta_file_content[length] = '\0';
-        mock_meta_file_len = length;
-        mock_meta_file_present = true;
+        mock_meta_file_len             = length;
+        mock_meta_file_present         = true;
         return FR_OK;
     }
 
@@ -273,10 +274,8 @@ FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *data, uint32_t length)
 
         if (length >= sizeof(CanLogBlockHeaderType))
         {
-            uint32_t count = test_count_valid_entries(
-                (const uint8_t *)data,
-                length
-            );
+            uint32_t count =
+                test_count_valid_entries((const uint8_t *)data, length);
             if (count > 0U)
             {
                 mock_last_block_frame_count = count;
@@ -295,7 +294,8 @@ FRESULT FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t length)
     {
         if (dev == mock_meta_dev)
         {
-            uint32_t to_copy = (length < mock_meta_file_len) ? length : mock_meta_file_len;
+            uint32_t to_copy =
+                (length < mock_meta_file_len) ? length : mock_meta_file_len;
             memcpy(data, mock_meta_file_content, to_copy);
         }
         else
@@ -356,13 +356,14 @@ FRESULT FatFS_SD_FileIterator_Close(FatFS_FileIterator *it)
 
 FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
 {
-    mock_current_is_meta = (name != NULL) && (strcmp(name, mock_meta_filename) == 0);
+    mock_current_is_meta =
+        (name != NULL) && (strcmp(name, mock_meta_filename) == 0);
     if (mock_current_is_meta)
     {
-        mock_meta_file_len = 0;
-        mock_meta_file_present = true;
+        mock_meta_file_len        = 0;
+        mock_meta_file_present    = true;
         mock_meta_file_content[0] = '\0';
-        mock_meta_dev = dev;
+        mock_meta_dev             = dev;
     }
     else
     {

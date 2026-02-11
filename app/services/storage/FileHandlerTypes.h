@@ -5,14 +5,16 @@
 
 #include "ff.h"
 
-typedef struct {
+typedef struct
+{
     uint32_t readTargetSize;
     FIL file;
     uint32_t fflags;
     uint32_t writeIndex;
 } FatFsDeviceType;
 
-typedef struct {
+typedef struct
+{
     DIR dir;
     FILINFO fno;
     const char *prefix;
