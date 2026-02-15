@@ -7,6 +7,9 @@ IndentWidth: 4
 UseTab: Never
 BreakBeforeBinaryOperators: NonAssignment
 
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+
 # C conventions
 PointerAlignment: Right
 SpaceAfterCStyleCast: false

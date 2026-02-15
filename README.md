@@ -121,7 +121,7 @@ The following tool versions are used to develop, debug and run the program on th
 | GNU Tools for STM32 | 13.3.1 | build/ debug |
 | OpenOCD | 0.12.0 | download/ debug |
 | Cppcheck | 2.17.1 | develop |
-| clang-format | 20.1.8 | develop |
+| clang-format | 18.1.8 | develop |
 
 ## Build the code
 
@@ -324,6 +324,14 @@ The docker-compose helper only provides a local Kroki + Mermaid renderer; the ac
 > https://doctoolchain.org/docToolchain/v2.0.x/020_tutorial/170_kroki-configuration.html
 
 ### Formatting tooling
+
+To create the file list passed to clang-format, run following command from the project root:
+
+```sh
+find adapters app dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
+```
+
+After that, you can apply formatting using:
 
 ```sh
 clang-format -i --files=tools/clang/clang_files.txt
