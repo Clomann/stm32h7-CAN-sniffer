@@ -17,8 +17,8 @@ uint8_t __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
     return (uint8_t)0;
 }
 
-uint8_t __attribute__((weak))
-Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+uint8_t __attribute__((weak)) Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi
+)
 {
     wTransferState = TRANSFER_COMPLETE;
     return (uint8_t)0;

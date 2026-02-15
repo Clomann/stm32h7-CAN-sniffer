@@ -77,10 +77,8 @@ static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
 
 uint8_t aTxSpiCmd[7];
 
-ALIGN_32BYTES(
-    const uint8_t
-    __attribute__((used, section(".dma_buffer.ro"))) aTxSpiInit[18]
-) = {
+ALIGN_32BYTES(const uint8_t __attribute__((used, section(".dma_buffer.ro"))
+) aTxSpiInit[18]) = {
     0xFF,
     0xFF,
     0xFF,
@@ -581,8 +579,8 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
                     HAL_Delay(10);
 
                     counter++;
-                } while (response.byte != 0x00
-                         && 0 == RetVal); // Wait for idle state to clear
+                } while (response.byte != 0x00 && 0 == RetVal
+                ); // Wait for idle state to clear
 
                 // TODO: if OpComd is rejected, retry with CMD1
                 {

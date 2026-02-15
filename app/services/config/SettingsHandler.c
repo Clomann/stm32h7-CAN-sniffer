@@ -237,8 +237,7 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
 
 static int IpStringToIntArray(const char *ip, uint8_t len, uint8_t *arr)
 {
-    char element[4U] = {
-        0
+    char element[4U] = {0
     }; // Buffer for each segment (max 3 digits + null terminator)
     uint32_t ValTmp;
     uint8_t CharCount = 0U;

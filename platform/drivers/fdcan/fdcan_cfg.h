@@ -11,8 +11,8 @@
 #define FDCAN_MESSAGE_RAM_SIZE 0x2800U /* check stm32h7xx_hal_fdcan.c */
 #define FDCAN_RAM_RX_SIZE      (FDCAN_MESSAGE_RAM_SIZE - 4UL)
 #define FDCAN_RAM_RX_SECTION_SIZE                                              \
-    (FDCAN_RAM_RX_SIZE / FDCAN_MAX_INSTANCES                                   \
-     / 4UL) /*!< RAM available for each driver to store rx frames */
+    (FDCAN_RAM_RX_SIZE / FDCAN_MAX_INSTANCES / 4UL                             \
+    ) /*!< RAM available for each driver to store rx frames */
 #define FDCAN_RAM_RX_ELEMENTS  (64U)
 #define FDCAN_RAM_TX_ELEMENTS  (4U)
 #define FDCAN_IRQ_NOTIFICATION FDCAN_IT_RX_FIFO0_WATERMARK

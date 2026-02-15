@@ -20,11 +20,8 @@
      * CACHE_LINE_SIZE)
 
 #define DRV_ALIGNED_ARRAY(_name_, _size_)                                      \
-    ALIGN_32BYTES(                                                             \
-        uint8_t __attribute__((                                                \
-            section(".dma_buffer")                                             \
-        )) _name_[(DRV_BUFFER_ALIGNED_SIZE(_size_))]                           \
-    )
+    ALIGN_32BYTES(uint8_t __attribute__((section(".dma_buffer"))               \
+    ) _name_[(DRV_BUFFER_ALIGNED_SIZE(_size_))])
 
 typedef struct CommDriver CommDriver;
 

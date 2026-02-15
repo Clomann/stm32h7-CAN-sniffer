@@ -19,12 +19,10 @@
 #endif
 
 #define SW_RX_FRAME_BUFFER_SIZE                                                \
-    (                                                                          \
-        10U * FDCAN_RAM_RX_ELEMENTS                                            \
+    (10U * FDCAN_RAM_RX_ELEMENTS                                               \
     ) /* software Rx frame buffer size in number of FDCAN_ClassicFrameType elements */
 #define SW_TX_FRAME_BUFFER_SIZE                                                \
-    (                                                                          \
-        FDCAN_RAM_TX_ELEMENTS                                                  \
+    (FDCAN_RAM_TX_ELEMENTS                                                     \
     ) /* software Tx frame buffer size in number of FDCAN_ClassicFrameType elements */
 
 typedef enum

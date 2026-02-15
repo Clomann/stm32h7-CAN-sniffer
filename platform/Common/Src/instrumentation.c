@@ -25,9 +25,8 @@ typedef struct
 static ErrorContextType ErrorContext = {.file = __FILE_NAME__, .code = 0};
 
 static lwrb_t FileHandlerTraceBuffer;
-static InstrumentationTimeTraceType __attribute__((
-    section(".ram_d3")
-)) FileHandlerTraceData[INSTR_TRACE_COUNT_MAX] = {0};
+static InstrumentationTimeTraceType __attribute__((section(".ram_d3"))
+) FileHandlerTraceData[INSTR_TRACE_COUNT_MAX] = {0};
 
 static bool InstrumentationReady    = false;
 static uint64_t last_sd_write_start = 0;

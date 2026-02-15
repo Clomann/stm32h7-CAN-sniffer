@@ -33,21 +33,19 @@ static CommDriverConfigType Fdcan1Config = {
     .config = DRIVER_CFG2,
     .devNbr = COMM_DEVICE_NUMBER_1
 };
-static FDCAN_ClassicFrameType Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {
-    0
+static FDCAN_ClassicFrameType Fdcan1RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0
 };
-static FDCAN_ClassicFrameType Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {
-    0
+static FDCAN_ClassicFrameType Fdcan1TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0
 };
-static RingBuffer Fdcan1RxRingBuffer = {
-    .startAddress = &Fdcan1RxFrameBuffer[0],
-    .head         = 0,
-    .tail         = 0,
-    .bufferLength =
+static RingBuffer Fdcan1RxRingBuffer                                       = {
+                                          .startAddress = &Fdcan1RxFrameBuffer[0],
+                                          .head         = 0,
+                                          .tail         = 0,
+                                          .bufferLength =
         sizeof(Fdcan1RxFrameBuffer) / sizeof(Fdcan1RxFrameBuffer[0]),
-    .elementSize = sizeof(Fdcan1RxFrameBuffer[0]),
-    .stride      = sizeof(Fdcan1RxFrameBuffer[0]),
-    .isFull      = false
+                                          .elementSize = sizeof(Fdcan1RxFrameBuffer[0]),
+                                          .stride      = sizeof(Fdcan1RxFrameBuffer[0]),
+                                          .isFull      = false
 };
 
 static RingBuffer Fdcan1TxRingBuffer = {
@@ -69,21 +67,19 @@ static CommDriverConfigType Fdcan2Config = {
     .config = DRIVER_CFG2,
     .devNbr = COMM_DEVICE_NUMBER_2
 };
-static FDCAN_ClassicFrameType Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {
-    0
+static FDCAN_ClassicFrameType Fdcan2RxFrameBuffer[SW_RX_FRAME_BUFFER_SIZE] = {0
 };
-static FDCAN_ClassicFrameType Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {
-    0
+static FDCAN_ClassicFrameType Fdcan2TxFrameBuffer[SW_TX_FRAME_BUFFER_SIZE] = {0
 };
-static RingBuffer Fdcan2RxRingBuffer = {
-    .startAddress = &Fdcan2RxFrameBuffer[0],
-    .head         = 0,
-    .tail         = 0,
-    .bufferLength =
+static RingBuffer Fdcan2RxRingBuffer                                       = {
+                                          .startAddress = &Fdcan2RxFrameBuffer[0],
+                                          .head         = 0,
+                                          .tail         = 0,
+                                          .bufferLength =
         sizeof(Fdcan2RxFrameBuffer) / sizeof(Fdcan2RxFrameBuffer[0]),
-    .elementSize = sizeof(Fdcan2RxFrameBuffer[0]),
-    .stride      = sizeof(Fdcan2RxFrameBuffer[0]),
-    .isFull      = false
+                                          .elementSize = sizeof(Fdcan2RxFrameBuffer[0]),
+                                          .stride      = sizeof(Fdcan2RxFrameBuffer[0]),
+                                          .isFull      = false
 };
 
 static RingBuffer Fdcan2TxRingBuffer = {

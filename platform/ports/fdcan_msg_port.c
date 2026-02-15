@@ -172,8 +172,7 @@ size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds)
     if (Index > 0)
     {
         *dst          = &Page.frames[Page.count - Index].frame;
-        BytesReceived = sizeof(
-            Page.frames[Page.count - Index].frame
+        BytesReceived = sizeof(Page.frames[Page.count - Index].frame
         ); // Page.frames[Page.count - Index].size;
         Index--;
     }

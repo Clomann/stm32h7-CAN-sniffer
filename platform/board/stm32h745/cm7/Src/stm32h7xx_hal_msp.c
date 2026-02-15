@@ -154,8 +154,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef *hspi)
         /* Associate the initialized DMA handle to the the SPI handle */
         __HAL_LINKDMA(hspi, hdmarx, hdma_rx);
 
-        HAL_NVIC_SetPriorityGrouping(
-            NVIC_PRIORITYGROUP_4
+        HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4
         ); // demanded by FreeRTOS
 
         /*##-4- Configure the NVIC for DMA #########################################*/

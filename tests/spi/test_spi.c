@@ -67,8 +67,7 @@ int main(void)
 
     RUN_TEST(test_SPI_CreateDriver_sets_interface_and_core_fields);
     RUN_TEST(test_SPI_CreateDriver_bad_cfg_size_calls_error_handler);
-    RUN_TEST(
-        test_SPI_CreateDriver_two_instances_unique_and_share_interface_ptr
+    RUN_TEST(test_SPI_CreateDriver_two_instances_unique_and_share_interface_ptr
     );
     RUN_TEST(test_SPI_Init_calls_hal_and_sets_state);
     RUN_TEST(test_SPI_Send_calls_abs_with_msg_length);

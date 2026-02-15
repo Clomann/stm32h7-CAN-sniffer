@@ -63,8 +63,7 @@ typedef struct __attribute__((packed))
 
 typedef struct
 {
-    _Alignas(
-        CanLogEntryType
+    _Alignas(CanLogEntryType
     ) uint8_t raw[sizeof(CanLogEntryType) + CANLOG_ENTRY_MAX_DATA_LENGTH];
 } CanLogEntryStackBufferType;
 
