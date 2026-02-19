@@ -26,9 +26,10 @@ typedef uint8_t SpiDriverNumberType;
 typedef uint8_t SpiPriorityType;
 
 #define SPI_ASSIGN_SLOT(_array_)                                               \
-    {.used_len = 0U,                                                           \
-     .max_len  = sizeof(_array_) / sizeof(_array_[0]),                         \
-     .data     = _array_}
+    {                                                                          \
+        .used_len = 0U, .max_len = sizeof(_array_) / sizeof(_array_[0]),       \
+        .data = _array_                                                        \
+    }
 
 #define SPI_SLOT_META_BYTES ((uint32_t)offsetof(SpiSlotType, data))
 

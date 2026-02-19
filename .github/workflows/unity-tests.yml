@@ -7,14 +7,14 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y cmake gcc make clang-format-18
 
     - name: Show clang-format version
-      run: clang-format --version
+      run: clang-format-18 --version
 
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
     - name: Check formatting (clang-format)
       run: |
         find adapters app dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
-        clang-format --dry-run --Werror --files=./tools/clang/clang_files.txt
+        clang-format-18 -style=file --dry-run --Werror --files=./tools/clang/clang_files.txt
 
     - name: Build tests
       run: cmake --build build
