@@ -32,9 +32,7 @@ This project implements the software for a device that logs CAN traffic on two C
 - [Architecture](#architecture)
     - [Software](#software)
     - [Hardware](#hardware)
-    - [Tooling](#tooling)
-        - [Documentation tooling](#documentation-tooling)
-        - [Formatting tooling](#formatting-tooling)
+- [Contributing](#contributing)
 - [Future work](#future-work)
 
 <!-- /TOC -->
@@ -299,43 +297,9 @@ flowchart TD
 ```
 > _Performance chart placeholder – add logic-analyzer capture showing CAN ISR latency and SD write timing (e.g., 1 Mbit/s @ 100 % bus load, block flush duration). See [arc42 measurement instrumentation](doc/arc42-template-EN.md#measurement-instrumentation) for the exact probe points._
 
-## Tooling
+# Contributing
 
-### Documentation tooling
-
-Mermaid diagrams live under doc/images/*.md.
-
-To regenerate the .svg outputs:
-
-1. Create/activate a virtual environment in dev/scripts:
-    > python -m venv .venv && source .venv/bin/activate
-2. Install the converter’s dependencies (inside dev/scripts): 
-    > pip install -r requirements.txt
-3. Start up docker from within dev/scripts
-    > docker-compose -f docker-compose.yaml up -d
-4. Run 
-    > python convert_mermaid.py --root ../doc/images
-    
-    The script scans for .md sources and emits .md.svg files with the same name.
-
-The docker-compose helper only provides a local Kroki + Mermaid renderer; the actual export still requires running `convert_mermaid.py` from inside `doc/scripts`.
-
-> NOTE: Usage of the Memaid CLI can be found here: 
-> https://doctoolchain.org/docToolchain/v2.0.x/020_tutorial/170_kroki-configuration.html
-
-### Formatting tooling
-
-To create the file list passed to clang-format, run following command from the project root:
-
-```sh
-find adapters app dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
-```
-
-After that, you can apply formatting using:
-
-```sh
-clang-format -i --files=tools/clang/clang_files.txt
-```
+Contributor workflows and tooling live in `CONTRIBUTING.md`.
 
 # Future work
 
