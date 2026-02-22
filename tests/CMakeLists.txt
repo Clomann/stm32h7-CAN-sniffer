@@ -18,6 +18,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Unity)
 
+# Build mbedTLS for MCUboot unit tests (no programs/tests needed)
+set(BOOTLOADER_MBEDTLS_CONFIG "mbedtls_config.h")
+set(BOOTLOADER_MBEDTLS_DEFS
+    MBEDTLS_PLATFORM_MS_TIME_ALT
+    MBEDTLS_CONFIG_FILE=\"${BOOTLOADER_MBEDTLS_CONFIG}\"
+)
+
+set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedTLS tests" FORCE)
+set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedTLS programs" FORCE)
+add_subdirectory(${REPO_ROOT}/libs/mbedtls ${CMAKE_BINARY_DIR}/mbedtls)
+
+foreach(_mbedtls_target mbedcrypto mbedx509 mbedtls)
+    if(TARGET ${_mbedtls_target})
+        target_compile_definitions(${_mbedtls_target} PUBLIC ${BOOTLOADER_MBEDTLS_DEFS})
+        target_include_directories(${_mbedtls_target} PUBLIC ${REPO_ROOT}/bootloader)
+    endif()
+endforeach()
+
 enable_testing()
 set(CTEST_OUTPUT_ON_FAILURE ON)
 
@@ -174,11 +192,72 @@ target_include_directories(test_app PRIVATE
     ${unity_SOURCE_DIR}/src
 )
 
+# ===== bootloader =====
+set(mcuboot_bootutil_SRCS
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/boot_record.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_area.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_find_key.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_img_hash.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_img_security_cnt.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_loader.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_misc.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/bootutil_public.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/caps.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/ed25519_psa.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/encrypted.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/fault_injection_hardening_delay_rng_mbedtls.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/fault_injection_hardening.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/image_ecdsa.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/image_ed25519.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/image_rsa.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/image_validate.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/loader.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/ram_load.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/swap_misc.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/swap_move.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/swap_offset.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/swap_scratch.c
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/tlv.c
+)
+
+add_library(mcuboot_bootutil STATIC
+    ${mcuboot_bootutil_SRCS}
+)
+
+target_include_directories(mcuboot_bootutil PUBLIC
+    ${REPO_ROOT}/bootloader
+    ${REPO_ROOT}/bootloader/flash_map_backend
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/include
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/include/bootutil
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/include/bootutil/crypto
+    ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src
+    ${REPO_ROOT}/libs/mbedtls/include
+)
+
+target_link_libraries(mcuboot_bootutil PUBLIC mbedcrypto)
+target_compile_definitions(mcuboot_bootutil PUBLIC ${BOOTLOADER_MBEDTLS_DEFS})
+
+add_executable(test_bootloader
+    ${REPO_ROOT}/tests/bootloader/test_bootloader.c
+    ${REPO_ROOT}/bootloader/bootloader.c
+    ${REPO_ROOT}/tests/bootloader/bootloader_test_stubs.c
+)
+
+target_include_directories(test_bootloader PRIVATE
+    ${unity_SOURCE_DIR}/src
+    ${REPO_ROOT}/bootloader
+    ${REPO_ROOT}/bootloader/flash_map_backend
+)
+
+target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity)
+target_compile_definitions(test_bootloader PRIVATE ${BOOTLOADER_MBEDTLS_DEFS})
+
 # --- Register tests with CTest ---
 add_test(NAME FDCAN_Test COMMAND test_fdcan)
 add_test(NAME BUFFER_Test COMMAND test_buffer)
 add_test(NAME SPI_Test COMMAND test_spi)
 add_test(NAME APP_Test COMMAND test_app)
+add_test(NAME BOOTLOADER_Test COMMAND test_bootloader)
 
 # --- Create a custom "test_all" build target ---
 add_custom_target(tests DEPENDS 
@@ -186,4 +265,5 @@ add_custom_target(tests DEPENDS
     test_buffer
     test_spi
     test_app
+    test_bootloader
 )

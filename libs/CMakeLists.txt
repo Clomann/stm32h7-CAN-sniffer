@@ -192,6 +192,151 @@ list(APPEND sources_SRCS
     #    ${PROJ_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_ll_pwr.c
     #    ${PROJ_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_ll_rcc.c
     #    ${PROJ_PATH}/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_ll_utils.c
+
+
+    # MCUboot deps
+    ${PROJ_PATH}/bootloader/bootloader.c
+    ${PROJ_PATH}/bootloader/mcu_port.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/boot_record.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_area.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_area.h
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_find_key.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_img_hash.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_img_security_cnt.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_loader.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_loader.h
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_misc.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_misc.h
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_priv.h
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_public.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/caps.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/ed25519_psa.c
+    # ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/encrypted_psa.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/encrypted.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/fault_injection_hardening_delay_rng_mbedtls.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/fault_injection_hardening.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/image_ecdsa.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/image_ed25519.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/image_rsa.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/image_validate.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/loader.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/ram_load.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/swap_misc.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/swap_move.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/swap_offset.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/swap_priv.h
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/swap_scratch.c
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/tlv.c
+
+    # MbedTLS deps
+    # ${PROJ_PATH}/libs/mbedtls/library/x509_create.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509_crt.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_client.c
+    # ${PROJ_PATH}/libs/mbedtls/library/aes.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_slot_management.c
+    # ${PROJ_PATH}/libs/mbedtls/library/bignum_mod_raw.c
+    # ${PROJ_PATH}/libs/mbedtls/library/block_cipher.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_driver_wrappers_no_static.c
+    # ${PROJ_PATH}/libs/mbedtls/library/camellia.c
+    # ${PROJ_PATH}/libs/mbedtls/library/constant_time.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pk_wrap.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pk.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pkcs7.c
+    # ${PROJ_PATH}/libs/mbedtls/library/aesce.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls13_client.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls12_client.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_util.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ecdh.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509_crl.c
+    # ${PROJ_PATH}/libs/mbedtls/library/cipher_wrap.c
+    # ${PROJ_PATH}/libs/mbedtls/library/chacha20.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_rsa.c
+    # ${PROJ_PATH}/libs/mbedtls/library/des.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_cookie.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ctr_drbg.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_mac.c
+    # ${PROJ_PATH}/libs/mbedtls/library/aesni.c
+    # ${PROJ_PATH}/libs/mbedtls/library/dhm.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_cache.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_ciphersuites.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ecp_curves_new.c
+    # ${PROJ_PATH}/libs/mbedtls/library/hmac_drbg.c
+    # ${PROJ_PATH}/libs/mbedtls/library/rsa.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_ticket.c
+    # ${PROJ_PATH}/libs/mbedtls/library/asn1parse.c
+    # ${PROJ_PATH}/libs/mbedtls/library/mps_trace.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pkwrite.c
+    # ${PROJ_PATH}/libs/mbedtls/library/gcm.c
+    # ${PROJ_PATH}/libs/mbedtls/library/sha1.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_client.c
+    # ${PROJ_PATH}/libs/mbedtls/library/asn1write.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ccm.c
+    # ${PROJ_PATH}/libs/mbedtls/library/version_features.c
+    # ${PROJ_PATH}/libs/mbedtls/library/aria.c
+    # ${PROJ_PATH}/libs/mbedtls/library/lms.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_cipher.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pk_ecc.c
+    # ${PROJ_PATH}/libs/mbedtls/library/entropy_poll.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509write_csr.c
+    # ${PROJ_PATH}/libs/mbedtls/library/platform.c
+    # ${PROJ_PATH}/libs/mbedtls/library/cmac.c
+    # ${PROJ_PATH}/libs/mbedtls/library/bignum.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pkparse.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_ffdh.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_msg.c
+    # ${PROJ_PATH}/libs/mbedtls/library/debug.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ripemd160.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pkcs5.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls13_generic.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509write.c
+    # ${PROJ_PATH}/libs/mbedtls/library/bignum_mod.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pem.c
+    # ${PROJ_PATH}/libs/mbedtls/library/oid.c
+    # ${PROJ_PATH}/libs/mbedtls/library/error.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_pake.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509_csr.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_its_file.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto.c
+    # ${PROJ_PATH}/libs/mbedtls/library/rsa_alt_helpers.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_debug_helpers_generated.c
+    ${PROJ_PATH}/libs/mbedtls/library/platform_util.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_se.c
+    # ${PROJ_PATH}/libs/mbedtls/library/base64.c
+    # ${PROJ_PATH}/libs/mbedtls/library/memory_buffer_alloc.c
+    # ${PROJ_PATH}/libs/mbedtls/library/mps_reader.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_aead.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ecp.c
+    # ${PROJ_PATH}/libs/mbedtls/library/lmots.c
+    # ${PROJ_PATH}/libs/mbedtls/library/version.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509.c
+    # ${PROJ_PATH}/libs/mbedtls/library/bignum_core.c
+    # ${PROJ_PATH}/libs/mbedtls/library/chachapoly.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls13_keys.c
+    ${PROJ_PATH}/libs/mbedtls/library/sha256.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ecp_curves.c
+    # ${PROJ_PATH}/libs/mbedtls/library/md5.c
+    # ${PROJ_PATH}/libs/mbedtls/library/timing.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_ecp.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_storage.c
+    # ${PROJ_PATH}/libs/mbedtls/library/poly1305.c
+    # ${PROJ_PATH}/libs/mbedtls/library/x509write_crt.c
+    # ${PROJ_PATH}/libs/mbedtls/library/hkdf.c
+    # ${PROJ_PATH}/libs/mbedtls/library/sha3.c
+    # ${PROJ_PATH}/libs/mbedtls/library/threading.c
+    # ${PROJ_PATH}/libs/mbedtls/library/padlock.c
+    # ${PROJ_PATH}/libs/mbedtls/library/psa_crypto_hash.c
+    # ${PROJ_PATH}/libs/mbedtls/library/pkcs12.c
+    # ${PROJ_PATH}/libs/mbedtls/library/entropy.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls13_server.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ssl_tls12_server.c
+    # ${PROJ_PATH}/libs/mbedtls/library/net_sockets.c
+    # ${PROJ_PATH}/libs/mbedtls/library/sha512.c
+    # ${PROJ_PATH}/libs/mbedtls/library/md.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ecjpake.c
+    # ${PROJ_PATH}/libs/mbedtls/library/cipher.c
+    # ${PROJ_PATH}/libs/mbedtls/library/ecdsa.c
+    # ${PROJ_PATH}/libs/mbedtls/library/nist_kw.c
 )
 
 # Include directories
@@ -218,6 +363,16 @@ list(APPEND include_path_DIRS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/apps
     ${STM32_HAL_PATH}Middlewares/Third_Party/LwIP/src/apps/http/
+
+    # MCUboot deps
+    ${PROJ_PATH}/bootloader
+    ${PROJ_PATH}/bootloader/flash_map_backend
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include/bootutil
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include/bootutil/crypto
+
+    #mbedtls
+    ${PROJ_PATH}/libs/mbedtls/include
 )
 
 endif() 
