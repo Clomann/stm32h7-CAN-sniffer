@@ -1,6 +1,17 @@
 #include "bootutil.h"
 #include "bootloader.h"
 
+#if defined(__GNUC__)
+#define WEAK __attribute__((weak))
+#else
+#define WEAK
+#endif
+
+WEAK void boot_platform_do_boot(const struct boot_rsp *rsp)
+{
+    (void)rsp;
+}
+
 int bootloader_run(void)
 {
     struct boot_rsp rsp;
@@ -8,11 +19,15 @@ int bootloader_run(void)
 
     if (rv == 0)
     {
-        // 'rsp' contains the start address of the image
-        // your_platform_do_boot(&rsp);
+        boot_platform_do_boot(&rsp);
     }
 
     return rv;
+}
+
+int bootloader_main(void)
+{
+    return bootloader_run();
 }
 
 void example_assert_handler(const char *file, int line)

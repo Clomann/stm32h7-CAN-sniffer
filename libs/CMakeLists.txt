@@ -196,7 +196,10 @@ list(APPEND sources_SRCS
 
     # MCUboot deps
     ${PROJ_PATH}/bootloader/bootloader.c
-    ${PROJ_PATH}/bootloader/mcu_port.c
+    ${PROJ_PATH}/bootloader/hal/bootloader_flash.c
+    ${PROJ_PATH}/bootloader/hal/bootloader_uart.c
+    ${PROJ_PATH}/bootloader/hal/bootloader_hsm.c
+    ${PROJ_PATH}/bootloader/mcuboot_port.c
     ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/boot_record.c
     ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_area.c
     ${PROJ_PATH}/libs/mcuboot/boot/bootutil/src/bootutil_area.h
