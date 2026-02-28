@@ -8,9 +8,8 @@
 //! there is not slot
 #define FLASH_SLOT_DOES_NOT_EXIST 255
 
-//! NB: MCUboot expects this define to exist but it's only used
-//! if MCUBOOT_SWAP_USING_SCRATCH=1 is set
-#define FLASH_AREA_IMAGE_SCRATCH FLASH_SLOT_DOES_NOT_EXIST
+//! Scratch area used when MCUBOOT_SWAP_USING_SCRATCH=1
+#define FLASH_AREA_IMAGE_SCRATCH 3
 
 //! The slot we will use to track the bootloader allocation
 #define FLASH_AREA_BOOTLOADER 0

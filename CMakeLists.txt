@@ -145,6 +145,7 @@ if(CORE STREQUAL "CM7")
     #
     set(sources_SRCS                    # Modified
         ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/main.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/boot_platform.c
         ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/stm32h7xx_hal_msp.c
         ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/stm32h7xx_it.c
         ${PROJ_PATH}/app/cores/cm7/Src/Core0Task0.c
@@ -163,6 +164,7 @@ if(CORE STREQUAL "CM7")
 
         ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
         ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
+        ${PROJ_PATH}/bootloader/startup/startup_stm32h745zitx_boot.s
         ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
     )
 

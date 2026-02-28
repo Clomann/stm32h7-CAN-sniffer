@@ -1,5 +1,5 @@
 #include "bootloader.h"
-#include "flash/flash.h"
+#include "flash.h"
 
 #include <assert.h>
 
