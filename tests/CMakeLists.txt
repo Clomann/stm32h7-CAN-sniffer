@@ -240,6 +240,7 @@ target_compile_definitions(mcuboot_bootutil PUBLIC ${BOOTLOADER_MBEDTLS_DEFS})
 add_executable(test_bootloader
     ${REPO_ROOT}/tests/bootloader/test_bootloader.c
     ${REPO_ROOT}/bootloader/bootloader.c
+    ${REPO_ROOT}/bootloader/mcuboot_port.c
     ${REPO_ROOT}/tests/bootloader/bootloader_test_stubs.c
 )
 
