@@ -32,12 +32,13 @@
 */
 
 /* Entry Point */
-ENTRY(Boot_Reset_Handler)
+ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
 PROVIDE(_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1));
 
 _Boot_Flash_Size     = 0x20000 ; /* required amount of flash for bootloader */
+_Header_Flash_Size   = 0x0 ; /* required amount of flash for image header */
 _App_Flash_Size      = 0x60000 ; /* required amount of flash for app */
 _Scratch_Flash_Size  = 0x0 ; /* overwrite-only: no scratch */
 _Flash_Sector_Size   = 0x20000 ; /* STM32H7 flash sector size (128KB) */
@@ -137,11 +138,13 @@ SECTIONS
   .isr_vector __app_primary_start__ :
   {
     . = ALIGN(4);
+    . = . + _Header_Flash_Size;
+    __app_vector_start__ = .;
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
   } >FLASH_PRIMARY
 
-  ASSERT(__app_primary_start__ == ADDR(.isr_vector), "ISR vector not at app start")
+  ASSERT(__app_vector_start__ == (__app_primary_start__ + _Header_Flash_Size), "Vector table not after MCUboot header")
 
   /* The program code and other data goes into FLASH */
   .text :
