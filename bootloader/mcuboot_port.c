@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "bootloader.h"
+#include "flash.h"
 #include "mcuboot_config/mcuboot_config.h"
 #include "bootutil/bootutil.h"
 #include "flash_map_backend/flash_map_backend.h"
@@ -44,22 +45,22 @@ extern uint8_t __scratch_start__;
 extern uint8_t __scratch_end__;
 extern uint8_t __scratch_size__;
 
-#define BOOTLOADER_START_ADDRESS ((uint32_t)(uintptr_t) & __boot_start__)
-#define BOOTLOADER_SIZE          ((uint32_t)(uintptr_t) & __boot_size__)
-#define BOOTLOADER_OFFSET        ((uint32_t)(uintptr_t) & __boot_off__)
-#define FLASH_DEVICE_BASE_ADDR   ((uint32_t)(uintptr_t) & __flash_base__)
+#define BOOTLOADER_START_ADDRESS ((uint32_t)(uintptr_t)&__boot_start__)
+#define BOOTLOADER_SIZE          ((uint32_t)(uintptr_t)&__boot_size__)
+#define BOOTLOADER_OFFSET        ((uint32_t)(uintptr_t)&__boot_off__)
+#define FLASH_DEVICE_BASE_ADDR   ((uint32_t)(uintptr_t)&__flash_base__)
 #define APPLICATION_PRIMARY_START_ADDRESS                                      \
-    ((uint32_t)(uintptr_t) & __app_primary_start__)
-#define APPLICATION_SIZE           ((uint32_t)(uintptr_t) & __app_primary_size__)
-#define APPLICATION_PRIMARY_OFFSET ((uint32_t)(uintptr_t) & __app_primary_off__)
+    ((uint32_t)(uintptr_t)&__app_primary_start__)
+#define APPLICATION_SIZE           ((uint32_t)(uintptr_t)&__app_primary_size__)
+#define APPLICATION_PRIMARY_OFFSET ((uint32_t)(uintptr_t)&__app_primary_off__)
 #define APPLICATION_SECONDARY_START_ADDRESS                                    \
-    ((uint32_t)(uintptr_t) & __app_secondary_start__)
+    ((uint32_t)(uintptr_t)&__app_secondary_start__)
 #define APPLICATION_SECONDARY_SIZE                                             \
-    ((uint32_t)(uintptr_t) & __app_secondary_size__)
+    ((uint32_t)(uintptr_t)&__app_secondary_size__)
 #define APPLICATION_SECONDARY_OFFSET                                           \
-    ((uint32_t)(uintptr_t) & __app_secondary_off__)
-#define SCRATCH_START_ADDRESS ((uint32_t)(uintptr_t) & __scratch_start__)
-#define SCRATCH_SIZE          ((uint32_t)(uintptr_t) & __scratch_size__)
+    ((uint32_t)(uintptr_t)&__app_secondary_off__)
+#define SCRATCH_START_ADDRESS ((uint32_t)(uintptr_t)&__scratch_start__)
+#define SCRATCH_SIZE          ((uint32_t)(uintptr_t)&__scratch_size__)
 #else
 #define BOOTLOADER_START_ADDRESS          0x0
 #define BOOTLOADER_SIZE                   (1U * FLASH_SECTOR_SIZE)
@@ -299,6 +300,19 @@ flash_area_erase(const struct flash_area *fa, uint32_t off, uint32_t len)
         return -1;
     }
 
+    if ( off > UINT32_MAX - len
+        || off + len > fa->fa_size
+        || (off % FLASH_SECTOR_SIZE) != 0)
+    {
+        MCUBOOT_LOG_ERR(
+            "%s: Eraseing outside of sector: 0x%x Length: 0x%x",
+            __func__,
+            (int)off,
+            (int)len
+        );
+        return -1;
+    }
+
     const uint32_t start_addr = FLASH_DEVICE_BASE_ADDR + fa->fa_off + off;
     MCUBOOT_LOG_DBG(
         "%s: Addr: 0x%08x Length: %d",
@@ -330,13 +344,26 @@ flash_area_erase(const struct flash_area *fa, uint32_t off, uint32_t len)
 
 WEAK uint32_t flash_area_align(const struct flash_area *area)
 {
+    FlashStatusType res = 0;
+    FlashInfoType info;
+
+    (void)area;
     // the smallest unit a flash write can occur along.
     // Note: Image trailers will be scaled by this size
-    return 4;
+    res = Flash_GetInfo(&info);
+
+    if (FLASH_E_OK != res)
+    {
+        return -1;
+    }
+    else {
+        return info.write_alignment;
+    }
 }
 
 WEAK uint8_t flash_area_erased_val(const struct flash_area *area)
 {
+    (void)area;
     // the value a byte reads when erased on storage.
     return 0xff;
 }
@@ -417,10 +444,34 @@ WEAK int flash_area_get_sector(
     struct flash_sector *fs
 )
 {
-    (void)fa;
-    (void)off;
-    (void)fs;
-    return -1;
+    int res = -1;
+    FlashSectorInfoType sector = {0};
+    uint32_t sector_abs_addr = 0;
+
+    if (fa == NULL || fs == NULL || off < 0) {
+        return -1;
+    }
+
+    if ((uint32_t)off >= fa->fa_size) {
+        return -1;
+    }
+
+    sector_abs_addr = FLASH_DEVICE_BASE_ADDR + fa->fa_off + off;
+
+    if (FLASH_E_OK == Flash_GetSectorByAddr(sector_abs_addr, &sector))
+    {
+        // Note: Offset here is relative to flash area, not device
+        fs->fs_off  = sector.off - fa->fa_off;
+        fs->fs_size = sector.size;
+
+        res = 0;
+    }
+    else
+    {
+        res = -1;
+    }
+
+    return res;
 }
 
 WEAK int flash_area_id_from_multi_image_slot(int image_index, int slot)
@@ -461,6 +512,8 @@ WEAK int flash_area_id_from_image_offset(uint32_t offset)
 
 WEAK void example_assert_handler(const char *file, int line)
 {
+    (void)file;
+    (void)line;
     EXAMPLE_LOG("ASSERT: File: %s Line: %d", file, line);
     __builtin_trap();
 }
