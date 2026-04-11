@@ -19,10 +19,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Unity)
 
 # Build mbedTLS for MCUboot unit tests (no programs/tests needed)
-set(BOOTLOADER_MBEDTLS_CONFIG "mbedtls_config.h")
+set(BOOTLOADER_MBEDTLS_CONFIG "${REPO_ROOT}/bootloader/mbedtls_config.h")
+set(MBEDTLS_CONFIG_FILE "${BOOTLOADER_MBEDTLS_CONFIG}"
+    CACHE FILEPATH "Mbed TLS config file" FORCE)
 set(BOOTLOADER_MBEDTLS_DEFS
     MBEDTLS_PLATFORM_MS_TIME_ALT
-    MBEDTLS_CONFIG_FILE=\"${BOOTLOADER_MBEDTLS_CONFIG}\"
+    MBEDTLS_CONFIG_FILE=\"${MBEDTLS_CONFIG_FILE}\"
 )
 
 set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedTLS tests" FORCE)
@@ -225,13 +227,13 @@ add_library(mcuboot_bootutil STATIC
 )
 
 target_include_directories(mcuboot_bootutil PUBLIC
+    ${REPO_ROOT}/tests/bootloader
     ${REPO_ROOT}/bootloader
     ${REPO_ROOT}/bootloader/flash_map_backend
     ${REPO_ROOT}/libs/mcuboot/boot/bootutil/include
     ${REPO_ROOT}/libs/mcuboot/boot/bootutil/include/bootutil
     ${REPO_ROOT}/libs/mcuboot/boot/bootutil/include/bootutil/crypto
     ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src
-    ${REPO_ROOT}/libs/mbedtls/include
 )
 
 target_link_libraries(mcuboot_bootutil PUBLIC mbedcrypto)
@@ -239,19 +241,51 @@ target_compile_definitions(mcuboot_bootutil PUBLIC ${BOOTLOADER_MBEDTLS_DEFS})
 
 add_executable(test_bootloader
     ${REPO_ROOT}/tests/bootloader/test_bootloader.c
+    ${REPO_ROOT}/tests/bootloader/logging_stub.c
+    ${REPO_ROOT}/tests/bootloader/bootloader_test_stubs.c
+    ${REPO_ROOT}/tests/bootloader/hal_flash_stubs.c
+    ${REPO_ROOT}/tests/bootloader/flash_write_wrapper.c
+    ${REPO_ROOT}/bootloader/hal/bootloader_flash.c
+    ${REPO_ROOT}/platform/drivers/flash/flash.c
     ${REPO_ROOT}/bootloader/bootloader.c
     ${REPO_ROOT}/bootloader/mcuboot_port.c
-    ${REPO_ROOT}/tests/bootloader/bootloader_test_stubs.c
 )
+
+set(BOOTLOADER_TEST_ELF "${REPO_ROOT}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_app.elf")
+set(BOOTLOADER_TEST_MARKERS_H "${CMAKE_BINARY_DIR}/image_test_markers.h")
+
+add_custom_command(
+    OUTPUT ${BOOTLOADER_TEST_MARKERS_H}
+    COMMAND ${CMAKE_COMMAND}
+            -DELF=${BOOTLOADER_TEST_ELF}
+            -DOUT=${BOOTLOADER_TEST_MARKERS_H}
+            -P ${REPO_ROOT}/tests/cmake/gen_image_markers.cmake
+    DEPENDS ${BOOTLOADER_TEST_ELF}
+    COMMENT "Generating image markers header from ${BOOTLOADER_TEST_ELF}"
+    VERBATIM
+)
+
+add_custom_target(bootloader_image_markers DEPENDS ${BOOTLOADER_TEST_MARKERS_H})
+add_dependencies(test_bootloader bootloader_image_markers)
 
 target_include_directories(test_bootloader PRIVATE
     ${unity_SOURCE_DIR}/src
+    ${CMAKE_BINARY_DIR}
+    ${REPO_ROOT}/tests/bootloader
+    ${REPO_ROOT}/bootloader/mcuboot_config
     ${REPO_ROOT}/bootloader
     ${REPO_ROOT}/bootloader/flash_map_backend
 )
 
 target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity)
 target_compile_definitions(test_bootloader PRIVATE ${BOOTLOADER_MBEDTLS_DEFS})
+
+set_source_files_properties(
+    ${REPO_ROOT}/platform/drivers/flash/flash.c
+    PROPERTIES
+    COMPILE_DEFINITIONS "Flash_Write=Flash_Write_impl"
+    COMPILE_OPTIONS "-include;${REPO_ROOT}/tests/bootloader/memcpy_override.h"
+)
 
 # --- Register tests with CTest ---
 add_test(NAME FDCAN_Test COMMAND test_fdcan)
