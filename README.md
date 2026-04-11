@@ -126,8 +126,18 @@ The following tool versions are used to develop, debug and run the program on th
 To create the software, you can use the following command from the repo's root directory:
 
 ```sh
-cmake --preset "Debug" -B ./build/
-``` 
+cmake --preset "Release_CM4" -B ./build/application && make -C ./build/application -B
+```
+
+and
+
+```sh
+cmake --preset "Release_CM7" -B ./build/application && make -C ./build/application -B
+```
+
+```sh
+cmake --preset "Release_CM7_Boot" -B ./build/bootloader && make -C ./build/bootloader -B   
+```
 
 Running this command might take a while because the following dependencies are pulled while generating the configuration:
 

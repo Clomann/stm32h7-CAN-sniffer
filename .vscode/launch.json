@@ -9,13 +9,21 @@
             "preLaunchCommands": [
                 "set mem inaccessible-by-default off",
                 "set breakpoint pending on",
-                "set remote hardware-breakpoint-limit unlimited"
+                "set remote hardware-breakpoint-limit unlimited",
+                "monitor reset halt",
+                "monitor program _bin/Release/SPI_FullDuplex_ComDMA_CM7_boot.elf verify",
+                "monitor program _bin/Release/SPI_FullDuplex_ComDMA_CM7_app-signed.bin 0x08020000 verify",
+                "monitor reset run"
+            ],
+            "postAttachCommands": [
+                "symbol-file _bin/Release/SPI_FullDuplex_ComDMA_CM7_boot.elf",
+                "add-symbol-file _bin/Release/SPI_FullDuplex_ComDMA_CM7_app.elf 0x080206a0"
             ],
             "useHardwareBreakpoints": true,
             "gdbTarget": "localhost:3333",
             "cwd": "${workspaceFolder}",
             "device": "STM32H745ZITx_M7",
-            "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM7.elf"
+            "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM7_app.elf"
         },
         {
             "name": "Debug CM4 (Attach)",
@@ -31,7 +39,7 @@
             "gdbTarget": "localhost:3334",
             "cwd": "${workspaceFolder}",
             "device": "STM32H745ZITx_M4",
-            "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf"
+            "executable": "${workspaceFolder}/_bin/Debug/SPI_FullDuplex_ComDMA_CM4_app.elf"
         },
         {
             "name": "Release CM7 (Attach)",
@@ -41,13 +49,21 @@
             "preLaunchCommands": [
                 "set mem inaccessible-by-default off",
                 "set breakpoint pending on",
-                "set remote hardware-breakpoint-limit unlimited"
+                "set remote hardware-breakpoint-limit unlimited",
+                "monitor reset halt",
+                "monitor program ${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_boot.elf verify",
+                "monitor program ${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_app-signed.bin 0x08020000 verify",
+                "monitor reset run"
+            ],
+            "postAttachCommands": [
+                "symbol-file ${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_boot.elf",
+                "add-symbol-file ${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_app.elf 0x080206a0"
             ],
             "useHardwareBreakpoints": true,
             "gdbTarget": "localhost:3333",
             "cwd": "${workspaceFolder}",
             "device": "STM32H745ZITx_M7",
-            "executable": "${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7.elf"
+            "executable": "${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_app.elf"
         },
         {
             "name": "Release CM4 (Attach)",
@@ -63,13 +79,33 @@
             "gdbTarget": "localhost:3334",
             "cwd": "${workspaceFolder}",
             "device": "STM32H745ZITx_M4",
-            "executable": "${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM4.elf"
+            "executable": "${workspaceFolder}/_bin/Release/SPI_FullDuplex_ComDMA_CM4_app.elf"
         },
         {
-            "name": "Debug (LLDB)",
+            "name": "Debug fdcan (LLDB)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/build/test_spi",
+            "program": "${workspaceFolder}/tests/build/test_fdcan",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "stdio": [null, null, null]
+        },
+        {
+            "name": "Debug app (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/test_app",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "stdio": [null, null, null]
+        },
+        {
+            "name": "Debug bootloader (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/test_bootloader",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,

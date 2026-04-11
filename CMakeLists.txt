@@ -7,17 +7,24 @@ set(CPU_PARAMETERS "" CACHE STRING "Target CPU/ABI flags (list)")
 set(DUAL_CORE "" CACHE STRING "Configure two target cofiguration (true/false).")
 set(BUILD_TARGET "app" CACHE STRING "Build target: app, bootloader, or both")
 set_property(CACHE BUILD_TARGET PROPERTY STRINGS app bootloader both)
+set(FW_USE_PRINTF_FLOAT ON CACHE BOOL "Enable printf float formatting (requires FW_USE_MALLOC)")
+set(FW_USE_MALLOC ${FW_USE_PRINTF_FLOAT} CACHE BOOL "Enable newlib heap (malloc/free) via sysmem.c")
+set(FW_LINKER_TRACE OFF CACHE BOOL "Enable linker --trace output and symbol tracing")
+
 set(IS_APP_BUILD FALSE)
 set(IS_BOOTLOADER_BUILD FALSE)
 set(IS_BOTH_BUILD FALSE)
 if(BUILD_TARGET STREQUAL "app")
     set(IS_APP_BUILD TRUE)
+    message(STATUS "Building application only.")
 elseif(BUILD_TARGET STREQUAL "bootloader")
     set(IS_BOOTLOADER_BUILD TRUE)
+    message(STATUS "Building bootloader only.")
 elseif(BUILD_TARGET STREQUAL "both")
     set(IS_APP_BUILD TRUE)
     set(IS_BOOTLOADER_BUILD TRUE)
     set(IS_BOTH_BUILD TRUE)
+    message(STATUS "Building application and bootloader.")
 else()
     message(FATAL_ERROR "Unknown BUILD_TARGET='${BUILD_TARGET}'. Use app, bootloader, or both.")
 endif()
@@ -29,6 +36,14 @@ endif()
 
 if(NOT DEFINED CORE)
   message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
+endif()
+
+find_program(PYTHON_EXE NAMES python3 python py)
+
+if(NOT PYTHON_EXE AND IS_APP_BUILD)
+    message(WARNING "No Python interpreter found - skipping signing step!")
+else(CORE STREQUAL "CM7" AND IS_APP_BUILD)
+    message(STATUS "Target will be signed.")
 endif()
 
 # Setup compiler settings
@@ -81,7 +96,6 @@ if(CORE STREQUAL "CM7" AND NOT CPU_PARAMETERS)
         "TARGET_STM32H7"
         "LWIP_HEAP_SIZE=${LWIP_HEAP_SIZE}"
         "MBEDTLS_PLATFORM_MS_TIME_ALT"
-        "MBEDTLS_CONFIG_FILE=\"mbedtls_config.h\""
     )
 
 elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
@@ -106,7 +120,6 @@ elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
         "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
         "TARGET_STM32H7"
         "MBEDTLS_PLATFORM_MS_TIME_ALT"
-        "MBEDTLS_CONFIG_FILE=\"mbedtls_config.h\""
     )
 else()
   message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
@@ -197,9 +210,14 @@ elseif(CORE STREQUAL "CM4")
         ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
 
         ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/syscalls.c
-        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/sysmem.c
         ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/startup/startup_stm32h745zitx.s
     )
+
+    if(FW_USE_MALLOC)
+        list(APPEND sources_SRCS
+            ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/sysmem.c
+        )
+    endif()
 
     #
     # Include directories
@@ -281,7 +299,33 @@ function(configure_firmware_target target_name)
         # -Wl,--gc-sections,--print-gc-sections
     )
 
+    if(FW_USE_MALLOC)
+        # target_link_options(${target_name} PRIVATE
+        #     --specs=nano.specs
+        # )
+    else()
+        target_link_options(${target_name} PRIVATE
+            --specs=nosys.specs
+        )
+    endif()
 
+    if(FW_USE_PRINTF_FLOAT AND NOT FW_USE_MALLOC)
+        message(FATAL_ERROR "USE_PRINTF_FLOAT requires FW_USE_MALLOC=ON (newlib-nano float formatting uses malloc)")
+    endif()
+
+    if(FW_LINKER_TRACE)
+        target_link_options(${target_name} PRIVATE
+            -Wl,--trace
+            -Wl,--trace-symbol=malloc
+            -Wl,--trace-symbol=_sbrk
+        )
+    endif()
+
+    if(FW_USE_PRINTF_FLOAT)
+        target_link_options(${target_name} PRIVATE
+            -u _printf_float                # STDIO float formatting support
+        )
+    endif()
 
     # Execute post-build to print size
     add_custom_command(TARGET ${target_name} POST_BUILD
@@ -299,6 +343,22 @@ function(configure_firmware_target target_name)
         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${target_name}>
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${target_name}> $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
     )
+
+    if(PYTHON_EXE AND CORE STREQUAL "CM7" AND IS_APP_BUILD)
+        message(STATUS "Found Python: ${PYTHON_EXE}")
+        add_custom_command(
+            TARGET ${target_name}
+            POST_BUILD
+            COMMAND ${PYTHON_EXE} ${CMAKE_SOURCE_DIR}/libs/mcuboot/scripts/imgtool.py sign
+            --header-size 0x400
+            --align 4
+            --slot-size 0x60000
+            --overwrite-only
+            --version 0.4.0
+            ${CMAKE_SOURCE_DIR}/_bin/Release/${target_name}.bin
+            ${CMAKE_SOURCE_DIR}/_bin/Release/${target_name}-signed.bin
+        )
+    endif()
 endfunction()
 
 if(IS_BOTH_BUILD)

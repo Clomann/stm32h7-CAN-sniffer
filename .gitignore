@@ -6,6 +6,7 @@ build/*
 _bin/
 .DS_Store
 .cache
+.certs/**/*
 _deps/
 tests/_deps
 tests/build/

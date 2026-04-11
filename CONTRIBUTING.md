@@ -29,7 +29,7 @@ The docker-compose helper only provides a local Kroki + Mermaid renderer; the ac
 To create the file list passed to clang-format, run the following command from the project root:
 
 ```sh
-find adapters app dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
+find adapters app bootloader dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
 ```
 
 After that, you can apply formatting using:
@@ -48,7 +48,7 @@ docker run --rm -v "$PWD:/repo" -w /repo catthehacker/ubuntu:act-latest \
   bash -lc '
     sudo apt-get update >/dev/null &&
     sudo apt-get install -y clang-format-18 >/dev/null &&
-    find adapters app dev middleware platform tests \
+    find adapters app bootloader dev middleware platform tests \
       -path "dev/scripts/env" -prune -o \
       -path "*/_deps" -prune -o \
       -path "*/build" -prune -o \
@@ -64,4 +64,38 @@ To pre-check the GitHub action locally, run:
 
 ```sh
 act -v -W .github/workflows/unity-tests.yml -j build-and-test
+```
+
+### Sign image using MCUboot
+
+Use the imgtool.py provided in the mcuboot repository.
+
+The following command generates a new ECDSA-P256 private key file:
+
+```sh
+python3 ./libs/mcuboot/scripts/imgtool.py keygen -k .certs/root-ecdsa-p256-app.pem -t ecdsa-p256
+```
+
+Get the public key from the previously generaed private key:
+
+```sh
+python3 ./libs/mcuboot/scripts/imgtool.py getpub -k .certs/root-ecdsa-p256-app.pem > .certs/key-ecdsa-p256-app.c
+```
+
+Finally, sign the binary file:
+
+```sh
+python3 ./libs/mcuboot/scripts/imgtool.py sign \
+  --header-size 0x400 \
+  --align 4 \
+  --slot-size 0x60000 \
+  --overwrite-only \
+  --version 0.4.0 \
+  ./_bin/Release/SPI_FullDuplex_ComDMA_CM7_app.bin ./_bin/Release/SPI_FullDuplex_ComDMA_CM7_app-signed.bin
+```
+
+### Testing
+
+```sh
+cmake -S tests -B ./tests/build/ && make -C ./tests/build/ && ctest --test-dir ./tests/build
 ```
