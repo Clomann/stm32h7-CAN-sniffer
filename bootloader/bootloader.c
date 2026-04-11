@@ -1,5 +1,6 @@
 #include "bootutil.h"
 #include "bootloader.h"
+#include "mbedtls/memory_buffer_alloc.h"
 
 #if defined(__GNUC__)
 #define WEAK __attribute__((weak))
@@ -7,15 +8,45 @@
 #define WEAK
 #endif
 
+static unsigned char mbedtls_heap[16U * 1024U];
+
+static BtlErrorType bootloader_init(void);
+
 WEAK void boot_platform_do_boot(const struct boot_rsp *rsp)
 {
     (void)rsp;
+    (void)0;
 }
 
-int bootloader_run(void)
+void *boot_static_calloc(size_t num, size_t size)
+{
+    (void)num;
+    (void)size;
+    return NULL;
+}
+
+void boot_static_free(void *ptr)
+{
+    (void)ptr;
+}
+
+static BtlErrorType bootloader_init(void)
+{
+    BtlErrorType rv;
+
+    rv = boot_internal_flash_init();
+    
+    return rv;
+}
+
+BtlErrorType bootloader_run(void)
 {
     struct boot_rsp rsp;
-    int rv = boot_go(&rsp);
+    BtlErrorType rv;
+
+    (void) bootloader_init();
+    
+    rv = boot_go(&rsp);
 
     if (rv == 0)
     {
@@ -25,8 +56,10 @@ int bootloader_run(void)
     return rv;
 }
 
-int bootloader_main(void)
+BtlErrorType bootloader_main(void)
 {
+    mbedtls_memory_buffer_alloc_init(mbedtls_heap, sizeof(mbedtls_heap));
+
     return bootloader_run();
 }
 

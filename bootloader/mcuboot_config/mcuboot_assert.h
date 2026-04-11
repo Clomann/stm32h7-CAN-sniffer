@@ -5,6 +5,7 @@
 
 extern void example_assert_handler(const char *file, int line);
 
+#undef assert
 #define assert(exp)                                                            \
     do                                                                         \
     {                                                                          \
