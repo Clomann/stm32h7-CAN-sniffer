@@ -37,6 +37,11 @@ uint8_t SpiAbs_SendReceiveMsg(
     uint16_t TxBytes
 );
 uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t *pResponse);
+uint8_t SpiAbs_PollForIdle(
+    enum SPIABS_DEVICE dev,
+    uint8_t *pResponse,
+    uint32_t max_retries
+);
 uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t *data, uint16_t bytes);
 
 uint8_t SpiAbs_Receive_Spi1_Task0(uint8_t *data, uint16_t bytes);
