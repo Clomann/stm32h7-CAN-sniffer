@@ -21,6 +21,11 @@ enum
     TRANSFER_ERROR
 };
 
+/* Transfers at or below this byte count use blocking polling mode instead of
+ * DMA to avoid the DMA setup overhead that dominates short transactions. */
+#define SPI_POLLING_THRESHOLD  8U
+#define SPI_POLLING_TIMEOUT_MS 100U
+
 /* SPI handler declaration */
 static SPI_HandleTypeDef *pSpiHandle1;
 
@@ -173,36 +178,50 @@ uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     Spi_Lock(0);
 
-    memcpy(aTxBuffer, buffer, len);
-
-    if (!is_in_dma_nocache((void *)aTxBuffer, len))
+    if (len <= SPI_POLLING_THRESHOLD)
     {
-        SCB_CleanDCache_by_Addr((uint32_t *)aTxBuffer, len);
+        RetVal = HAL_SPI_Transmit(handle, buffer, len, SPI_POLLING_TIMEOUT_MS);
+
+        if (RetVal != HAL_OK)
+        {
+            Spi_ErrorHandlerHook();
+            Spi_Unlock(0);
+            return HAL_ERROR;
+        }
     }
-
-    RetVal = HAL_SPI_Transmit_DMA(handle, aTxBuffer, len);
-
-    if (RetVal == HAL_BUSY)
+    else
     {
-    }
-    else if (RetVal != HAL_OK)
-    {
-        /* Transfer error in transmission process */
-        Spi_ErrorHandlerHook();
-        Spi_Unlock(0);
-        return HAL_ERROR;
-    }
+        memcpy(aTxBuffer, buffer, len);
 
-    if (m_NotifyTransferIssued(handle) != 0)
-    {
-        // Handle timeout
-        Spi_Unlock(0);
-        return HAL_TIMEOUT;
-    }
+        if (!is_in_dma_nocache((void *)aTxBuffer, len))
+        {
+            SCB_CleanDCache_by_Addr((uint32_t *)aTxBuffer, len);
+        }
 
-    if (!is_in_dma_nocache((void *)aTxBuffer, len))
-    {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)aTxBuffer, len);
+        RetVal = HAL_SPI_Transmit_DMA(handle, aTxBuffer, len);
+
+        if (RetVal == HAL_BUSY)
+        {
+        }
+        else if (RetVal != HAL_OK)
+        {
+            /* Transfer error in transmission process */
+            Spi_ErrorHandlerHook();
+            Spi_Unlock(0);
+            return HAL_ERROR;
+        }
+
+        if (m_NotifyTransferIssued(handle) != 0)
+        {
+            // Handle timeout
+            Spi_Unlock(0);
+            return HAL_TIMEOUT;
+        }
+
+        if (!is_in_dma_nocache((void *)aTxBuffer, len))
+        {
+            SCB_InvalidateDCache_by_Addr((uint32_t *)aTxBuffer, len);
+        }
     }
 
     Spi_Unlock(0);
@@ -223,38 +242,59 @@ uint8_t Spi_SendReceiveMsg(
 
     Spi_Lock(0);
 
-    if (!is_in_dma_nocache((void *)pTxBuffer, TxBytes))
+    if (TxBytes <= SPI_POLLING_THRESHOLD)
     {
-        SCB_CleanDCache_by_Addr((uint32_t *)pTxBuffer, TxBytes);
+        RetVal = HAL_SPI_TransmitReceive(
+            handle,
+            (uint8_t *)pTxBuffer,
+            pRxBuffer,
+            TxBytes,
+            SPI_POLLING_TIMEOUT_MS
+        );
+
+        if (RetVal != HAL_OK)
+        {
+            Spi_ErrorHandlerHook();
+            Spi_Unlock(0);
+            return HAL_ERROR;
+        }
     }
-
-    RetVal = HAL_SPI_TransmitReceive_DMA(handle, pTxBuffer, aRxBuffer, TxBytes);
-
-    if (RetVal == HAL_BUSY)
+    else
     {
-    }
-    else if (RetVal != HAL_OK)
-    {
-        /* Transfer error in transmission process */
-        Spi_ErrorHandlerHook();
-        Spi_Unlock(0);
-        return HAL_ERROR;
-    }
+        if (!is_in_dma_nocache((void *)pTxBuffer, TxBytes))
+        {
+            SCB_CleanDCache_by_Addr((uint32_t *)pTxBuffer, TxBytes);
+        }
 
-    if (m_NotifyTransferIssued(handle) != 0)
-    {
-        // Handle timeout
-        Spi_Unlock(0);
-        Spi_NotifyRxData(handle, 1);
-        return HAL_TIMEOUT;
-    }
+        RetVal =
+            HAL_SPI_TransmitReceive_DMA(handle, pTxBuffer, aRxBuffer, TxBytes);
 
-    if (!is_in_dma_nocache((void *)aRxBuffer, TxBytes))
-    {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)aRxBuffer, TxBytes);
-    }
+        if (RetVal == HAL_BUSY)
+        {
+        }
+        else if (RetVal != HAL_OK)
+        {
+            /* Transfer error in transmission process */
+            Spi_ErrorHandlerHook();
+            Spi_Unlock(0);
+            return HAL_ERROR;
+        }
 
-    memcpy(pRxBuffer, aRxBuffer, TxBytes);
+        if (m_NotifyTransferIssued(handle) != 0)
+        {
+            // Handle timeout
+            Spi_Unlock(0);
+            Spi_NotifyRxData(handle, 1);
+            return HAL_TIMEOUT;
+        }
+
+        if (!is_in_dma_nocache((void *)aRxBuffer, TxBytes))
+        {
+            SCB_InvalidateDCache_by_Addr((uint32_t *)aRxBuffer, TxBytes);
+        }
+
+        memcpy(pRxBuffer, aRxBuffer, TxBytes);
+    }
 
     Spi_Unlock(0);
 
@@ -269,32 +309,46 @@ uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     Spi_Lock(0);
 
-    RetVal = HAL_SPI_Receive_DMA(handle, aRxBuffer, len);
-
-    if (RetVal == HAL_BUSY)
+    if (len <= SPI_POLLING_THRESHOLD)
     {
-    }
-    else if (RetVal != HAL_OK)
-    {
-        /* Transfer error in transmission process */
-        Spi_ErrorHandlerHook();
-        Spi_Unlock(0);
-        return HAL_ERROR;
-    }
+        RetVal = HAL_SPI_Receive(handle, buffer, len, SPI_POLLING_TIMEOUT_MS);
 
-    if (m_NotifyTransferIssued(handle) != 0)
-    {
-        // Handle timeout
-        Spi_Unlock(0);
-        return HAL_TIMEOUT;
+        if (RetVal != HAL_OK)
+        {
+            Spi_ErrorHandlerHook();
+            Spi_Unlock(0);
+            return HAL_ERROR;
+        }
     }
-
-    if (!is_in_dma_nocache((void *)aRxBuffer, len))
+    else
     {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)aRxBuffer, len);
-    }
+        RetVal = HAL_SPI_Receive_DMA(handle, aRxBuffer, len);
 
-    memcpy(buffer, aRxBuffer, len);
+        if (RetVal == HAL_BUSY)
+        {
+        }
+        else if (RetVal != HAL_OK)
+        {
+            /* Transfer error in transmission process */
+            Spi_ErrorHandlerHook();
+            Spi_Unlock(0);
+            return HAL_ERROR;
+        }
+
+        if (m_NotifyTransferIssued(handle) != 0)
+        {
+            // Handle timeout
+            Spi_Unlock(0);
+            return HAL_TIMEOUT;
+        }
+
+        if (!is_in_dma_nocache((void *)aRxBuffer, len))
+        {
+            SCB_InvalidateDCache_by_Addr((uint32_t *)aRxBuffer, len);
+        }
+
+        memcpy(buffer, aRxBuffer, len);
+    }
 
     Spi_Unlock(0);
 
