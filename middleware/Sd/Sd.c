@@ -831,7 +831,6 @@ uint8_t
 SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 {
     uint8_t res;
-    uint32_t readResponseAttempts;
     uint32_t tokenPollCount;
     uint16_t Crc = 0U;
     Spi_R1Response resp;
@@ -902,14 +901,11 @@ SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 
     if (stopTransmission)
     {
-        readResponseAttempts = 0;
-        do
-        { //Waiting for the end of the state BUSY
-            SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-        } while ((resp.byte != 0xFF)
-                 && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
-
-        if ((readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+        if ((SpiAbs_PollForIdle(
+                 SPIABS_DEVICE_1,
+                 &resp.byte,
+                 SD_MAX_READ_RESPONSE_ATTEMPTS
+             ) != 0)
             && (0 == res))
         {
             res = SD_E_CMD_NO_GOING_IDLE;
@@ -1059,7 +1055,6 @@ uint8_t
 SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 {
     uint8_t res;
-    uint32_t readResponseAttempts;
     uint16_t Crc = 0U;
     Spi_R1Response resp;
     bool TransmissionStarted     = false;
@@ -1123,15 +1118,11 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
             if (0 == res)
             {
-                readResponseAttempts = 0;
-                do
-                { //Waiting for the end of the state BUSY
-                    SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-                } while ((resp.byte != 0xFF)
-                         && (++readResponseAttempts
-                             < SD_MAX_READ_RESPONSE_ATTEMPTS));
-
-                if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+                if (SpiAbs_PollForIdle(
+                        SPIABS_DEVICE_1,
+                        &resp.byte,
+                        SD_MAX_READ_RESPONSE_ATTEMPTS
+                    ) != 0)
                 {
                     res = SD_E_CMD_NO_GOING_IDLE;
                 }
@@ -1159,15 +1150,11 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
         if (0 == res)
         {
-            readResponseAttempts = 0;
-            do
-            { //Waiting for the end of the state BUSY
-                SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-            } while ((resp.byte != 0xFF)
-                     && (++readResponseAttempts
-                         < SD_MAX_READ_RESPONSE_ATTEMPTS * 20U));
-
-            if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS * 20U)
+            if (SpiAbs_PollForIdle(
+                    SPIABS_DEVICE_1,
+                    &resp.byte,
+                    SD_MAX_READ_RESPONSE_ATTEMPTS * 20U
+                ) != 0)
             {
                 res = SD_E_CMD_NO_GOING_IDLE;
             }
