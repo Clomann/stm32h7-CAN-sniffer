@@ -44,11 +44,14 @@ BtlErrorType bootloader_run(void)
     struct boot_rsp rsp;
     BtlErrorType rv;
 
-    (void)bootloader_init();
+    rv = bootloader_init();
 
-    rv = boot_go(&rsp);
+    if (BTL_E_OK == rv)
+    {
+        rv = boot_go(&rsp);
+    }
 
-    if (rv == 0)
+    if (BTL_E_OK == rv)
     {
         boot_platform_do_boot(&rsp);
     }
