@@ -82,9 +82,11 @@
 /*!< Uncomment the following line if you need to relocate your vector Table in
      Internal SRAM. */
 /* #define VECT_TAB_SRAM */
+#ifndef VECT_TAB_OFFSET
 #define VECT_TAB_OFFSET                                                        \
     0x00000000UL /*!< Vector Table base offset field.
                                       This value must be a multiple of 0x200. */
+#endif
 /******************************************************************************/
 
 /**
@@ -232,9 +234,20 @@ void SystemInit(void)
         D1_AXISRAM_BASE
         | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal SRAM */
 #else
-    SCB->VTOR =
-        FLASH_BANK1_BASE
-        | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal FLASH */
+    extern uint32_t __app_vector_start__ __attribute__((weak));
+    uint32_t app_vector_addr = (uint32_t)&__app_vector_start__;
+    if (app_vector_addr != 0UL)
+    {
+        SCB->VTOR =
+            app_vector_addr &
+            SCB_VTOR_TBLOFF_Msk; /* Vector Table from linker layout */
+    }
+    else
+    {
+        SCB->VTOR =
+            FLASH_BANK1_BASE
+            | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal FLASH */
+    }
 #endif
 
 #else
