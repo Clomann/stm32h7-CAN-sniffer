@@ -26,11 +26,8 @@ static void test_flash_init_once(void)
     }
 }
 
-static int test_flash_bounds_ok_uintptr(
-    uintptr_t addr,
-    size_t len,
-    uint32_t *off_out
-)
+static int
+test_flash_bounds_ok_uintptr(uintptr_t addr, size_t len, uint32_t *off_out)
 {
     if (addr < (uintptr_t)TEST_FLASH_BASE)
     {
@@ -42,8 +39,7 @@ static int test_flash_bounds_ok_uintptr(
         return 0;
     }
 
-    const uint64_t off =
-        (uint64_t)(addr - (uintptr_t)TEST_FLASH_BASE);
+    const uint64_t off = (uint64_t)(addr - (uintptr_t)TEST_FLASH_BASE);
     if (off + len > (uint64_t)TEST_FLASH_SIZE)
     {
         return 0;
@@ -67,16 +63,10 @@ void *test_flash_memcpy(void *dst, const void *src, size_t len)
 
     uint32_t src_off = 0;
     uint32_t dst_off = 0;
-    const int src_is_flash = test_flash_bounds_ok_uintptr(
-        (uintptr_t)src,
-        len,
-        &src_off
-    );
-    const int dst_is_flash = test_flash_bounds_ok_uintptr(
-        (uintptr_t)dst,
-        len,
-        &dst_off
-    );
+    const int src_is_flash =
+        test_flash_bounds_ok_uintptr((uintptr_t)src, len, &src_off);
+    const int dst_is_flash =
+        test_flash_bounds_ok_uintptr((uintptr_t)dst, len, &dst_off);
 
     if (src_is_flash && dst_is_flash)
     {
@@ -88,8 +78,7 @@ void *test_flash_memcpy(void *dst, const void *src, size_t len)
         {
             for (size_t i = len; i > 0; --i)
             {
-                test_flash[dst_off + i - 1u] =
-                    test_flash[src_off + i - 1u];
+                test_flash[dst_off + i - 1u] = test_flash[src_off + i - 1u];
             }
         }
         else
@@ -122,7 +111,7 @@ void *test_flash_memcpy(void *dst, const void *src, size_t len)
         return dst;
     }
 
-    uint8_t *dst_bytes = (uint8_t *)dst;
+    uint8_t *dst_bytes       = (uint8_t *)dst;
     const uint8_t *src_bytes = (const uint8_t *)src;
     for (size_t i = 0; i < len; ++i)
     {
@@ -131,7 +120,6 @@ void *test_flash_memcpy(void *dst, const void *src, size_t len)
     return dst;
 }
 
-
 void test_flash_reset(void)
 {
     memset(test_flash, 0xff, sizeof(test_flash));
@@ -139,7 +127,8 @@ void test_flash_reset(void)
     (void)Flash_Init();
 }
 
-static int test_flash_write_padded(uint32_t addr, const uint8_t *data, size_t len)
+static int
+test_flash_write_padded(uint32_t addr, const uint8_t *data, size_t len)
 {
     if (!test_flash_initialized)
     {
@@ -153,10 +142,10 @@ static int test_flash_write_padded(uint32_t addr, const uint8_t *data, size_t le
         prog_size = info.prog_size_min;
     }
 
-    size_t remaining = len;
+    size_t remaining      = len;
     const uint8_t *cursor = data;
-    const size_t chunk = 512u;
-    uint8_t *buf = malloc(chunk + prog_size);
+    const size_t chunk    = 512u;
+    uint8_t *buf          = malloc(chunk + prog_size);
     if (buf == NULL)
     {
         return -1;
@@ -211,7 +200,7 @@ int test_flash_load_area_from_file(uint8_t area_id, const char *path)
     }
 
     uint8_t buf[512];
-    size_t n = 0;
+    size_t n      = 0;
     uint32_t addr = fa->fa_off;
 
     while ((n = fread(buf, 1, sizeof(buf), f)) > 0u)

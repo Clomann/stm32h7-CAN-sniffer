@@ -35,7 +35,7 @@ static BtlErrorType bootloader_init(void)
     BtlErrorType rv;
 
     rv = boot_internal_flash_init();
-    
+
     return rv;
 }
 
@@ -44,8 +44,8 @@ BtlErrorType bootloader_run(void)
     struct boot_rsp rsp;
     BtlErrorType rv;
 
-    (void) bootloader_init();
-    
+    (void)bootloader_init();
+
     rv = boot_go(&rsp);
 
     if (rv == 0)

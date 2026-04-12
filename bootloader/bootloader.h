@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define BTL_E_OK 0U
+#define BTL_E_OK     0U
 #define BTL_E_NOT_OK 1U
 
 typedef uint8_t BtlErrorType;

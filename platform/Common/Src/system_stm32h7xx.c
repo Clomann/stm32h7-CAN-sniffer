@@ -238,9 +238,8 @@ void SystemInit(void)
     uint32_t app_vector_addr = (uint32_t)&__app_vector_start__;
     if (app_vector_addr != 0UL)
     {
-        SCB->VTOR =
-            app_vector_addr &
-            SCB_VTOR_TBLOFF_Msk; /* Vector Table from linker layout */
+        SCB->VTOR = app_vector_addr
+                    & SCB_VTOR_TBLOFF_Msk; /* Vector Table from linker layout */
     }
     else
     {

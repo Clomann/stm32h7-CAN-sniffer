@@ -45,22 +45,22 @@ extern uint8_t __scratch_start__;
 extern uint8_t __scratch_end__;
 extern uint8_t __scratch_size__;
 
-#define BOOTLOADER_START_ADDRESS ((uint32_t)(uintptr_t)&__boot_start__)
-#define BOOTLOADER_SIZE          ((uint32_t)(uintptr_t)&__boot_size__)
-#define BOOTLOADER_OFFSET        ((uint32_t)(uintptr_t)&__boot_off__)
-#define FLASH_DEVICE_BASE_ADDR   ((uint32_t)(uintptr_t)&__flash_base__)
+#define BOOTLOADER_START_ADDRESS ((uint32_t)(uintptr_t) & __boot_start__)
+#define BOOTLOADER_SIZE          ((uint32_t)(uintptr_t) & __boot_size__)
+#define BOOTLOADER_OFFSET        ((uint32_t)(uintptr_t) & __boot_off__)
+#define FLASH_DEVICE_BASE_ADDR   ((uint32_t)(uintptr_t) & __flash_base__)
 #define APPLICATION_PRIMARY_START_ADDRESS                                      \
-    ((uint32_t)(uintptr_t)&__app_primary_start__)
-#define APPLICATION_SIZE           ((uint32_t)(uintptr_t)&__app_primary_size__)
-#define APPLICATION_PRIMARY_OFFSET ((uint32_t)(uintptr_t)&__app_primary_off__)
+    ((uint32_t)(uintptr_t) & __app_primary_start__)
+#define APPLICATION_SIZE           ((uint32_t)(uintptr_t) & __app_primary_size__)
+#define APPLICATION_PRIMARY_OFFSET ((uint32_t)(uintptr_t) & __app_primary_off__)
 #define APPLICATION_SECONDARY_START_ADDRESS                                    \
-    ((uint32_t)(uintptr_t)&__app_secondary_start__)
+    ((uint32_t)(uintptr_t) & __app_secondary_start__)
 #define APPLICATION_SECONDARY_SIZE                                             \
-    ((uint32_t)(uintptr_t)&__app_secondary_size__)
+    ((uint32_t)(uintptr_t) & __app_secondary_size__)
 #define APPLICATION_SECONDARY_OFFSET                                           \
-    ((uint32_t)(uintptr_t)&__app_secondary_off__)
-#define SCRATCH_START_ADDRESS ((uint32_t)(uintptr_t)&__scratch_start__)
-#define SCRATCH_SIZE          ((uint32_t)(uintptr_t)&__scratch_size__)
+    ((uint32_t)(uintptr_t) & __app_secondary_off__)
+#define SCRATCH_START_ADDRESS ((uint32_t)(uintptr_t) & __scratch_start__)
+#define SCRATCH_SIZE          ((uint32_t)(uintptr_t) & __scratch_size__)
 #else
 #define BOOTLOADER_START_ADDRESS          0x0
 #define BOOTLOADER_SIZE                   (1U * FLASH_SECTOR_SIZE)
@@ -300,8 +300,7 @@ flash_area_erase(const struct flash_area *fa, uint32_t off, uint32_t len)
         return -1;
     }
 
-    if ( off > UINT32_MAX - len
-        || off + len > fa->fa_size
+    if (off > UINT32_MAX - len || off + len > fa->fa_size
         || (off % FLASH_SECTOR_SIZE) != 0)
     {
         MCUBOOT_LOG_ERR(
@@ -356,7 +355,8 @@ WEAK uint32_t flash_area_align(const struct flash_area *area)
     {
         return -1;
     }
-    else {
+    else
+    {
         return info.write_alignment;
     }
 }
@@ -444,15 +444,17 @@ WEAK int flash_area_get_sector(
     struct flash_sector *fs
 )
 {
-    int res = -1;
+    int res                    = -1;
     FlashSectorInfoType sector = {0};
-    uint32_t sector_abs_addr = 0;
+    uint32_t sector_abs_addr   = 0;
 
-    if (fa == NULL || fs == NULL || off < 0) {
+    if (fa == NULL || fs == NULL || off < 0)
+    {
         return -1;
     }
 
-    if ((uint32_t)off >= fa->fa_size) {
+    if ((uint32_t)off >= fa->fa_size)
+    {
         return -1;
     }
 

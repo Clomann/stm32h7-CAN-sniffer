@@ -14,11 +14,8 @@ extern uintptr_t g_flash_write_src_full;
 extern uint32_t g_flash_write_src_low;
 extern int g_flash_write_active;
 
-static int test_flash_bounds_ok_uintptr(
-    uintptr_t addr,
-    size_t len,
-    uint32_t *off_out
-)
+static int
+test_flash_bounds_ok_uintptr(uintptr_t addr, size_t len, uint32_t *off_out)
 {
     if (addr < (uintptr_t)TEST_FLASH_BASE)
     {
@@ -30,8 +27,7 @@ static int test_flash_bounds_ok_uintptr(
         return 0;
     }
 
-    const uint64_t off =
-        (uint64_t)(addr - (uintptr_t)TEST_FLASH_BASE);
+    const uint64_t off = (uint64_t)(addr - (uintptr_t)TEST_FLASH_BASE);
     if (off + len > (uint64_t)TEST_FLASH_SIZE)
     {
         return 0;
@@ -85,10 +81,8 @@ HAL_FLASH_Program(uint32_t TypeProgram, uint32_t Address, uint32_t DataAddress)
     return HAL_OK;
 }
 
-HAL_StatusTypeDef HAL_FLASHEx_Erase(
-    FLASH_EraseInitTypeDef *pEraseInit,
-    uint32_t *SectorError
-)
+HAL_StatusTypeDef
+HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef *pEraseInit, uint32_t *SectorError)
 {
     if (pEraseInit == NULL)
     {
@@ -110,8 +104,8 @@ HAL_StatusTypeDef HAL_FLASHEx_Erase(
     }
 
     const uint64_t start_addr =
-        (uint64_t)bank_base + ((uint64_t)pEraseInit->Sector
-                               * (uint64_t)TEST_FLASH_SECTOR_SIZE);
+        (uint64_t)bank_base
+        + ((uint64_t)pEraseInit->Sector * (uint64_t)TEST_FLASH_SECTOR_SIZE);
     const size_t total_len =
         (size_t)pEraseInit->NbSectors * (size_t)TEST_FLASH_SECTOR_SIZE;
 

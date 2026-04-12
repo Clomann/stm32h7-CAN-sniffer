@@ -15,12 +15,12 @@ BtlErrorType boot_internal_flash_init(void)
     BtlErrorType rv;
 
     FlashRes = Flash_Init();
-    
+
     if (FLASH_E_OK == FlashRes)
     {
         rv = BTL_E_OK;
     }
-    else 
+    else
     {
         rv = BTL_E_NOT_OK;
     }
@@ -28,8 +28,8 @@ BtlErrorType boot_internal_flash_init(void)
     return rv;
 }
 
-
-WEAK BtlErrorType boot_internal_flash_read(uint32_t addr, void *dst, uint32_t len)
+WEAK BtlErrorType
+boot_internal_flash_read(uint32_t addr, void *dst, uint32_t len)
 {
     BtlErrorType rv;
 
@@ -37,11 +37,11 @@ WEAK BtlErrorType boot_internal_flash_read(uint32_t addr, void *dst, uint32_t le
     {
         rv = BTL_E_OK;
     }
-    else 
+    else
     {
         rv = BTL_E_NOT_OK;
     }
-    
+
     return rv;
 }
 

@@ -38,7 +38,8 @@ typedef struct
     uint32_t prog_size_min; // smallest program granularity in bytes
     uint32_t page_size; // 0 if not meaningful on this part
     uint32_t sector_size; // 0 if not meaningful on this part
-    uint32_t source_alignment; /*!< Source alignment minimum required in bytes */
+    uint32_t
+        source_alignment; /*!< Source alignment minimum required in bytes */
     bool requires_explicit_erase;
 } FlashInfoType;
 
