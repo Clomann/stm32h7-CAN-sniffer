@@ -62,6 +62,8 @@ set(LWIP_HEAP_SIZE 0x1ffe8)
 
 message("Build type: "              ${CMAKE_BUILD_TYPE})
 
+include(${PROJ_PATH}/cmake/mcuboot_signing.cmake)
+
 #
 # Core project settings
 #
@@ -346,17 +348,18 @@ function(configure_firmware_target target_name)
 
     if(PYTHON_EXE AND CORE STREQUAL "CM7" AND IS_APP_BUILD)
         message(STATUS "Found Python: ${PYTHON_EXE}")
-        add_custom_command(
+        mcuboot_add_imgtool_sign_command(
             TARGET ${target_name}
-            POST_BUILD
-            COMMAND ${PYTHON_EXE} ${CMAKE_SOURCE_DIR}/libs/mcuboot/scripts/imgtool.py sign
-            --header-size 0x400
-            --align 4
-            --slot-size 0x60000
-            --overwrite-only
-            --version 0.4.0
-            ${CMAKE_SOURCE_DIR}/_bin/Release/${target_name}.bin
-            ${CMAKE_SOURCE_DIR}/_bin/Release/${target_name}-signed.bin
+            INPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
+            OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed.bin
+            PYTHON ${PYTHON_EXE}
+            IMGTOOL ${CMAKE_SOURCE_DIR}/libs/mcuboot/scripts/imgtool.py
+            HEADER_SIZE 0x400
+            ALIGN 4
+            SLOT_SIZE 0x60000
+            VERSION 0.4.0
+            OVERWRITE_ONLY
+            COMMENT "Signing image ${target_name}.bin"
         )
     endif()
 endfunction()

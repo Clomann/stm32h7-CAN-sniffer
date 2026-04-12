@@ -37,7 +37,6 @@ ENTRY(Boot_Reset_Handler)
 PROVIDE(_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1));
 
 _Boot_Flash_Size     = 0x20000 ; /* required amount of flash for bootloader */
-_Header_Flash_Size   = 0x200 ; /* required amount of flash for image header */
 _App_Flash_Size      = 0x60000 ; /* required amount of flash for app */
 _Scratch_Flash_Size  = 0x0 ; /* overwrite-only: no scratch */
 _Flash_Sector_Size   = 0x20000 ; /* STM32H7 flash sector size (128KB) */

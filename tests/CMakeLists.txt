@@ -4,8 +4,10 @@ project(UnitTests C)
 set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps")  # persistent folder
 
 # Resolve repo root one level up from tests/
-set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 message(STATUS "Repo root: ${REPO_ROOT}")
+
+include(${REPO_ROOT}/cmake/mcuboot_signing.cmake)
 
 add_compile_options(-O0 -g3 -Wall -Wextra)
 
@@ -242,6 +244,7 @@ target_compile_definitions(mcuboot_bootutil PUBLIC ${BOOTLOADER_MBEDTLS_DEFS})
 add_executable(test_bootloader
     ${REPO_ROOT}/tests/bootloader/test_bootloader.c
     ${REPO_ROOT}/tests/bootloader/logging_stub.c
+    ${REPO_ROOT}/tests/bootloader/boot_platform_stub.c
     ${REPO_ROOT}/tests/bootloader/bootloader_test_stubs.c
     ${REPO_ROOT}/tests/bootloader/hal_flash_stubs.c
     ${REPO_ROOT}/tests/bootloader/flash_write_wrapper.c
@@ -252,7 +255,11 @@ add_executable(test_bootloader
 )
 
 set(BOOTLOADER_TEST_ELF "${REPO_ROOT}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_app.elf")
+set(BOOTLOADER_TEST_BIN "${CMAKE_BINARY_DIR}/SPI_FullDuplex_ComDMA_CM7_app.bin")
+set(BOOTLOADER_TEST_SIGNED_BIN "${CMAKE_BINARY_DIR}/SPI_FullDuplex_ComDMA_CM7_app-signed.bin")
 set(BOOTLOADER_TEST_MARKERS_H "${CMAKE_BINARY_DIR}/image_test_markers.h")
+set(BOOTLOADER_TEST_IMGTOOL "${REPO_ROOT}/libs/mcuboot/scripts/imgtool.py")
+set(BOOTLOADER_TEST_LOG_PATH "${REPO_ROOT}/tests/build/bootloader_test.log")
 
 add_custom_command(
     OUTPUT ${BOOTLOADER_TEST_MARKERS_H}
@@ -265,8 +272,36 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(bootloader_image_markers DEPENDS ${BOOTLOADER_TEST_MARKERS_H})
-add_dependencies(test_bootloader bootloader_image_markers)
+add_custom_command(
+    OUTPUT ${BOOTLOADER_TEST_BIN}
+    COMMAND ${CMAKE_OBJCOPY} -O binary ${BOOTLOADER_TEST_ELF} ${BOOTLOADER_TEST_BIN}
+    DEPENDS ${BOOTLOADER_TEST_ELF}
+    COMMENT "Generating bootloader test app bin from ${BOOTLOADER_TEST_ELF}"
+    VERBATIM
+)
+
+mcuboot_add_imgtool_sign_command(
+    INPUT ${BOOTLOADER_TEST_BIN}
+    OUTPUT ${BOOTLOADER_TEST_SIGNED_BIN}
+    IMGTOOL ${BOOTLOADER_TEST_IMGTOOL}
+    HEADER_SIZE 0x400
+    ALIGN 4
+    SLOT_SIZE 0x60000
+    VERSION 0.4.0
+    OVERWRITE_ONLY
+    REQUIRE_CLICK
+    DEPENDS ${BOOTLOADER_TEST_BIN} ${BOOTLOADER_TEST_IMGTOOL}
+    COMMENT "Signing bootloader test image ${BOOTLOADER_TEST_BIN}"
+)
+
+add_custom_target(
+    bootloader_test_image_artifacts
+    DEPENDS
+        ${BOOTLOADER_TEST_MARKERS_H}
+        ${BOOTLOADER_TEST_SIGNED_BIN}
+)
+
+add_dependencies(test_bootloader bootloader_test_image_artifacts)
 
 target_include_directories(test_bootloader PRIVATE
     ${unity_SOURCE_DIR}/src
@@ -278,7 +313,13 @@ target_include_directories(test_bootloader PRIVATE
 )
 
 target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity)
-target_compile_definitions(test_bootloader PRIVATE ${BOOTLOADER_MBEDTLS_DEFS})
+target_compile_definitions(
+    test_bootloader
+    PRIVATE
+        ${BOOTLOADER_MBEDTLS_DEFS}
+        IMAGE_TEST_SIGNED_BIN_PATH="${BOOTLOADER_TEST_SIGNED_BIN}"
+        IMAGE_TEST_LOG_PATH="${BOOTLOADER_TEST_LOG_PATH}"
+)
 
 set_source_files_properties(
     ${REPO_ROOT}/platform/drivers/flash/flash.c

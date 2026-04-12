@@ -14,6 +14,7 @@ tests/build/
 
 CMakeCache.txt
 *.cmake
+!cmake/mcuboot_signing.cmake
 CMakeFiles/*
 */CMakeFiles/*
 
