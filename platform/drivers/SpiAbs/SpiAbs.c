@@ -176,19 +176,71 @@ uint8_t SpiAbs_Init_Spi1()
     return res;
 }
 
+/* Forward declarations — defined later in this file */
+typedef struct
+{
+    uint8_t *data;
+    uint16_t bytes;
+    uint8_t status;
+    uint8_t done;
+} TaskContextType;
+
+void SpiAbs_Send_Spi1_CompleteCallback_Task0(
+    void *context,
+    uint32_t status,
+    const uint8_t *data,
+    uint32_t len
+);
+
+void SpiAbs_Receive_Spi1_CompleteCallback_Task0(
+    void *context,
+    uint32_t status,
+    const uint8_t *data,
+    uint32_t len
+);
+
+uint8_t SpiAbs_ReceiveWithCallback(
+    enum SPIABS_DEVICE dev,
+    SpiTransactionType *transaction,
+    const uint8_t *data,
+    uint16_t bytes
+);
+
+uint8_t SpiAbs_SendWithCallback(
+    enum SPIABS_DEVICE dev,
+    SpiTransactionType *transaction,
+    const uint8_t *pTxBuffer,
+    uint16_t TxBytes
+);
+
 uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 {
     uint8_t res;
+    volatile SpiTransactionType transaction             = {0};
+    volatile TaskContextType context =
+        {.done = 0, .status = 0, .data = resp, .bytes = 1};
 
-    switch (dev)
+    if (dev != SPIABS_DEVICE_1)
     {
-    case SPIABS_DEVICE_1:
-        res = (uint8_t)SpiAbs_Receive_Spi1_Task0(resp, 1);
-        break;
-    case SPIABS_DEVICE_2:
-    default:
-        res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
+        return SPIABS_E_INVALID_PARAMETER;
     }
+
+    transaction.id        = 1U;
+    transaction.prio      = SPI_PRIORITY_LOW;
+    transaction.timeout   = 100U;
+    transaction.direction = SPI_DIR_TX_RX;
+    transaction.use_poll  = 1U;
+    transaction.callback  = SpiAbs_Receive_Spi1_CompleteCallback_Task0;
+    transaction.context   = (void *)&context;
+
+    res = SpiAbs_ReceiveWithCallback(dev, &transaction, aRxSpiDummy, 1U);
+
+    while (1 != context.done)
+    {
+        __NOP();
+    }
+
+    __DMB();
 
     return res;
 }
@@ -196,16 +248,31 @@ uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 {
     uint8_t res;
+    volatile SpiTransactionType transaction             = {0};
+    volatile TaskContextType context =
+        {.done = 0, .status = 0, .data = aRxSpiSink, .bytes = 1};
 
-    switch (dev)
+    if (dev != SPIABS_DEVICE_1)
     {
-    case SPIABS_DEVICE_1:
-        res = (uint8_t)SpiAbs_Send_Spi1_Task0(data, 1);
-        break;
-    case SPIABS_DEVICE_2:
-    default:
-        res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
+        return SPIABS_E_INVALID_PARAMETER;
     }
+
+    transaction.id        = 1U;
+    transaction.prio      = SPI_PRIORITY_LOW;
+    transaction.timeout   = 100U;
+    transaction.direction = SPI_DIR_TX_RX;
+    transaction.use_poll  = 1U;
+    transaction.callback  = SpiAbs_Send_Spi1_CompleteCallback_Task0;
+    transaction.context   = (void *)&context;
+
+    res = SpiAbs_SendWithCallback(dev, &transaction, data, 1U);
+
+    while (1 != context.done)
+    {
+        __NOP();
+    }
+
+    __DMB();
 
     return res;
 }
@@ -383,14 +450,6 @@ uint8_t SpiAbs_SendReceiveMsg(
     // if it was set
     return res;
 }
-
-typedef struct
-{
-    uint8_t *data;
-    uint16_t bytes;
-    uint8_t status;
-    uint8_t done;
-} TaskContextType;
 
 void SpiAbs_Send_Spi1_CompleteCallback_Task0(
     void *context,
