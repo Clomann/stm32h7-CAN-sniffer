@@ -102,7 +102,7 @@ ALIGN_32BYTES(const uint8_t __attribute__((used, section(".dma_buffer.ro"))
 static uint8_t
 SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
 {
-    uint8_t RetVal;
+    uint8_t RetVal = SD_E_OK;
 
     // first dummy byte to give SD card some idle time
     buffer[0] = 0xFF;
@@ -244,7 +244,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[4] = 0xFF;
         buffer[5] = 0xFF;
         buffer[6] = 0xFF;
-        RetVal    = 1;
+        RetVal    = SD_E_NOT_OK;
     }
 
     return RetVal;
@@ -344,11 +344,21 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
 
 uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
 {
-    SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
+    uint8_t res = SD_E_OK;
 
-    SpiAbs_Send_Spi1_Task0((uint8_t *)aTxSpiCmd, COUNTOF(aTxSpiCmd));
+    res = SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
 
-    return 0;
+    if (SD_E_OK == res)
+    {
+        res = SpiAbs_Send_Spi1_Task0((uint8_t *)aTxSpiCmd, COUNTOF(aTxSpiCmd));
+
+        if (SPIABS_E_OK != res)
+        {
+            res = SD_E_SEND;
+        }
+    }
+
+    return res;
 }
 
 uint8_t
@@ -406,24 +416,45 @@ uint8_t SD_Spi_WaitTillIdle()
 uint8_t SD_Spi_GoIdleState(Spi_R1Response *pResponse)
 {
     uint8_t i;
+    uint8_t res = SD_E_OK;
+
+    if (pResponse == NULL) {
+        return SD_E_INV_PARAM;
+    }
+
+    pResponse->byte = 0xFF;
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
     for (i = 0U; i < SD_SPI_PRE_CMD_CLOCKS; i++)
     {
-        SpiAbs_readByte(SPIABS_DEVICE_1, &pResponse->byte); // Ensure idle state
+        res = SpiAbs_readByte(SPIABS_DEVICE_1, &pResponse->byte); // Ensure idle state
+
+        if (SPIABS_E_OK != res)
+        {
+            return SD_E_NOT_OK;
+        }
     }
 
     // assert chip select
     SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
-    SD_Spi_SendCommand(SD_SPI_CMD0, 0x00000000);
-    SpiAbs_PollForResponse(SPIABS_DEVICE_1, &pResponse->byte);
+    res = SD_Spi_SendCommand(SD_SPI_CMD0, 0x00000000);
+    
+    if (SD_E_OK == res)
+    {
+        res = SpiAbs_PollForResponse(SPIABS_DEVICE_1, &pResponse->byte);
+
+        if (SPIABS_E_OK != res)
+        {
+            res = SD_E_RESPONSE;
+        }
+    }
 
     // deassert chip select
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
-
-    return 0;
+    
+    return res;
 }
 
 // uint8_t SD_Spi_SendWakeUp(Spi_R1Response * pResponse)
@@ -546,7 +577,12 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
     HAL_Delay(100);
     SD_Spi_PowerUp();
     HAL_Delay(300);
-    SD_Spi_GoIdleState(&response);
+    RetVal = SD_Spi_GoIdleState(&response);
+
+    if (SD_E_OK != RetVal)
+    {
+        return RetVal;
+    }
 
     if (0x01 == response.byte)
     {

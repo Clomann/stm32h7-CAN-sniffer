@@ -50,18 +50,23 @@
 #define SD_DEF_CRC_ERROR_TOKEN         0x0B
 #define SD_DEF_WRITE_ERROR_TOKEN       0x0D
 
-#define SD_E_OK 0U
-
+#define SD_E_OK        0U
+#define SD_E_NOT_OK    1U
 /*!< The card did not send R1 after receiving a command */
-#define SD_E_CMD_NO_R1 1U
+#define SD_E_CMD_NO_R1 2U
 /*!< The card sent 0xFF after receiving a command */
-#define SD_E_CMD_NO_DATA_RESP_TOKEN 2U
+#define SD_E_CMD_NO_DATA_RESP_TOKEN 3U
 /*!< The card did never sent 0xFF */
-#define SD_E_CMD_NO_GOING_IDLE 3U
+#define SD_E_CMD_NO_GOING_IDLE 4U
 /*!< The card did never sent start data token */
-#define SD_E_CMD_NO_START_TOKEN 4U
+#define SD_E_CMD_NO_START_TOKEN 5U
 /*!< The card did never sent start data token */
-#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 5U
+#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 6U
+/*!< The card did never sent start data token */
+#define SD_E_INV_PARAM    7U
+#define SD_E_NOT_IDLE     8U
+#define SD_E_SEND         9U
+#define SD_E_RESPONSE      10U
 
 /**
  * Enumeration listing the implemented SPI commands.
