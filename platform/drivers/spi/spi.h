@@ -103,6 +103,8 @@ typedef struct
     uint8_t token;        /* used by SPI_DIR_POLL_BYTE: byte value to match */
     uint8_t invert;       /* used by SPI_DIR_POLL_BYTE: 0 = exit when byte != token
                            *                            1 = exit when byte == token */
+    uint8_t use_poll;     /* 1 = use blocking HAL polling instead of DMA for
+                           *     TX_ONLY / RX_ONLY / TX_RX transfers          */
     SpiCompleteionCallbackType callback;
     void *context;
 } SpiTransactionType;

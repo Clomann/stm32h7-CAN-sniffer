@@ -389,23 +389,63 @@ void SPI_Poll(CommDriver *drv)
     switch (Transaction->direction)
     {
     case SPI_DIR_TX_ONLY:
-        // length = bytes to transmit
-        res = Spi_Send(&instance->hspi, txSlot->data, Transaction->length);
+        if (Transaction->use_poll)
+        {
+            res = (comm_status_t)HAL_SPI_Transmit(
+                &instance->hspi,
+                txSlot->data,
+                Transaction->length,
+                Transaction->timeout
+            );
+            Spi_NotifyRxData(&instance->hspi, res != HAL_OK ? 1U : 0U);
+            res = COMM_SUCCESS;
+        }
+        else
+        {
+            res = Spi_Send(&instance->hspi, txSlot->data, Transaction->length);
+        }
         break;
 
     case SPI_DIR_RX_ONLY:
-        // length = bytes to receive
-        res = Spi_Receive(&instance->hspi, rxSlot->data, Transaction->length);
+        if (Transaction->use_poll)
+        {
+            res = (comm_status_t)HAL_SPI_Receive(
+                &instance->hspi,
+                rxSlot->data,
+                Transaction->length,
+                Transaction->timeout
+            );
+            Spi_NotifyRxData(&instance->hspi, res != HAL_OK ? 1U : 0U);
+            res = COMM_SUCCESS;
+        }
+        else
+        {
+            res = Spi_Receive(&instance->hspi, rxSlot->data, Transaction->length);
+        }
         break;
 
     case SPI_DIR_TX_RX:
-        // length = bytes for both TX and RX (typical SPI)
-        res = Spi_SendReceiveMsg(
-            &instance->hspi,
-            (uint8_t *)txSlot->data,
-            (uint8_t *)rxSlot->data,
-            Transaction->length
-        );
+        if (Transaction->use_poll)
+        {
+            res = (comm_status_t)HAL_SPI_TransmitReceive(
+                &instance->hspi,
+                txSlot->data,
+                rxSlot->data,
+                Transaction->length,
+                Transaction->timeout
+            );
+            Spi_NotifyRxData(&instance->hspi, res != HAL_OK ? 1U : 0U);
+            res = COMM_SUCCESS;
+        }
+        else
+        {
+            res = Spi_SendReceiveMsg(
+                &instance->hspi,
+                (uint8_t *)txSlot->data,
+                (uint8_t *)rxSlot->data,
+                Transaction->length
+            );
+        }
         break;
 
     case SPI_DIR_POLL_BYTE:
