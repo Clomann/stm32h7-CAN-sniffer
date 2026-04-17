@@ -7,6 +7,9 @@ _bin/
 .DS_Store
 .cache
 .certs/**/*
+!.certs/.keep
+.keys/**/*
+!.keys/.keep
 _deps/
 tests/_deps
 tests/build/
@@ -15,6 +18,7 @@ tests/build/
 CMakeCache.txt
 *.cmake
 !cmake/mcuboot_signing.cmake
+!cmake/mcuboot_keys.cmake
 CMakeFiles/*
 */CMakeFiles/*
 
