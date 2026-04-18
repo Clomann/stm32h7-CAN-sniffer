@@ -31,7 +31,7 @@
 /* #define MCUBOOT_SIGN_RSA */
 
 /* Uncomment for ECDSA signatures using curve P-256. */
-/* #define MCUBOOT_SIGN_EC256 */
+#define MCUBOOT_SIGN_EC256
 
 /*
  * Public key handling
@@ -100,7 +100,9 @@
 /* Uncomment to use AES-KW for key encryption */
 /* #define MCUBOOT_ENCRYPT_KW */
 /* Uncomment to use ECIES-P256 for key encryption */
-/* #define MCUBOOT_ENCRYPT_EC256 */
+#if defined(MCUBOOT_ENABLE_ENCRYPTION)
+#define MCUBOOT_ENCRYPT_EC256
+#endif
 /* Uncomment to use ECIES-X25519 for key encryption */
 /* #define MCUBOOT_ENCRYPT_X25519 */
 

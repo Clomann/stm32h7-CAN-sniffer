@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps")
+set(IMGTOOL "${CMAKE_SOURCE_DIR}/libs/mcuboot/scripts/imgtool.py")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/mcuboot_keys.cmake)
+mcuboot_keys_init(ROOT_DIR ${CMAKE_SOURCE_DIR})
 
 # Let callers override this: -DCPU_PARAMETERS=";-mthumb;-mcpu=cortex-m7;..."
 set(CPU_PARAMETERS "" CACHE STRING "Target CPU/ABI flags (list)")
@@ -346,21 +349,38 @@ function(configure_firmware_target target_name)
         COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${target_name}> $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
     )
 
-    if(PYTHON_EXE AND CORE STREQUAL "CM7" AND IS_APP_BUILD)
+    if(PYTHON_EXE)
         message(STATUS "Found Python: ${PYTHON_EXE}")
-        mcuboot_add_imgtool_sign_command(
-            TARGET ${target_name}
-            INPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
-            OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed.bin
-            PYTHON ${PYTHON_EXE}
-            IMGTOOL ${CMAKE_SOURCE_DIR}/libs/mcuboot/scripts/imgtool.py
-            HEADER_SIZE 0x400
-            ALIGN 4
-            SLOT_SIZE 0x60000
-            VERSION 0.4.0
-            OVERWRITE_ONLY
-            COMMENT "Signing image ${target_name}.bin"
-        )
+
+        if (CORE STREQUAL "CM7" AND IS_APP_BUILD)
+            set(_mcuboot_sign_common_args
+                TARGET ${target_name}
+                INPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
+                PYTHON ${PYTHON_EXE}
+                IMGTOOL ${IMGTOOL}
+                HEADER_SIZE 0x400
+                ALIGN 4
+                SLOT_SIZE 0x60000
+                VERSION 0.4.0
+                OVERWRITE_ONLY
+                COMMENT "Signing image ${target_name}.bin"
+            )
+
+            set(_mcuboot_sign_plain_args
+                ${_mcuboot_sign_common_args}
+                OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed.bin
+            )
+            mcuboot_keys_append_signing_key_arg(_mcuboot_sign_plain_args)
+            mcuboot_add_imgtool_sign_command(${_mcuboot_sign_plain_args})
+
+            set(_mcuboot_sign_encrypted_args
+                ${_mcuboot_sign_common_args}
+                OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed-encrypted.bin
+            )
+            mcuboot_keys_append_signing_key_arg(_mcuboot_sign_encrypted_args)
+            mcuboot_keys_append_encryption_pubkey_arg(_mcuboot_sign_encrypted_args)
+            mcuboot_add_imgtool_sign_command(${_mcuboot_sign_encrypted_args})
+        endif()
     endif()
 endfunction()
 

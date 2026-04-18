@@ -18,6 +18,8 @@ function(mcuboot_add_imgtool_sign_command)
         ALIGN
         SLOT_SIZE
         VERSION
+        KEY
+        ENCRYPT_PUBKEY
         COMMENT
     )
     set(multiValueArgs DEPENDS)
@@ -107,6 +109,12 @@ function(mcuboot_add_imgtool_sign_command)
     endif()
     if(MCBS_PAD_HEADER)
         list(APPEND _cmd --pad-header)
+    endif()
+    if(MCBS_KEY)
+        list(APPEND _cmd -k ${MCBS_KEY})
+    endif()
+    if(MCBS_ENCRYPT_PUBKEY)
+        list(APPEND _cmd -E ${MCBS_ENCRYPT_PUBKEY})
     endif()
 
     list(APPEND _cmd
