@@ -29,7 +29,8 @@
 #include <mcuboot_config/mcuboot_config.h>
 
 #if !defined(MCUBOOT_HW_KEY)
-#if defined(MCUBOOT_SIGN_RSA) || defined(MCUBOOT_SIGN_EC256) || defined(MCUBOOT_SIGN_ED25519)
+#if defined(MCUBOOT_SIGN_RSA) || defined(MCUBOOT_SIGN_EC256)                   \
+    || defined(MCUBOOT_SIGN_ED25519)
 #define HAVE_KEYS
 #if defined(MCUBOOT_SIGN_RSA)
 extern const unsigned char rsa_pub_key[];
@@ -67,16 +68,15 @@ const int bootutil_key_cnt = 1;
 #endif /* HAVE_KEYS */
 #else
 unsigned int pub_key_len;
-struct bootutil_key bootutil_keys[1] = {
-    {
-        .key = 0,
-        .len = &pub_key_len,
-    }
-};
-const int bootutil_key_cnt = 1;
+struct bootutil_key bootutil_keys[1] = {{
+    .key = 0,
+    .len = &pub_key_len,
+}};
+const int bootutil_key_cnt           = 1;
 #endif /* !MCUBOOT_HW_KEY */
 
-#if defined(MCUBOOT_ENCRYPT_RSA) || defined(MCUBOOT_ENCRYPT_X25519) || defined(MCUBOOT_ENCRYPT_EC256)
+#if defined(MCUBOOT_ENCRYPT_RSA) || defined(MCUBOOT_ENCRYPT_X25519)            \
+    || defined(MCUBOOT_ENCRYPT_EC256)
 extern const unsigned char enc_priv_key[];
 extern unsigned int enc_priv_key_len;
 const struct bootutil_key bootutil_enc_key = {

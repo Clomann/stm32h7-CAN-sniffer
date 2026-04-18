@@ -21,14 +21,17 @@ extern void *test_flash_memcpy(void *dst, const void *src, size_t len);
 #endif
 
 #ifndef IMAGE_TEST_SIGNED_BIN_PATH
-#define IMAGE_TEST_SIGNED_BIN_PATH "tests/build/SPI_FullDuplex_ComDMA_CM7_app-signed.bin"
+#define IMAGE_TEST_SIGNED_BIN_PATH                                             \
+    "tests/build/SPI_FullDuplex_ComDMA_CM7_app-signed.bin"
 #endif
 
 #ifndef IMAGE_TEST_SIGNED_ENCRYPTED_BIN_PATH
-#define IMAGE_TEST_SIGNED_ENCRYPTED_BIN_PATH "tests/build/SPI_FullDuplex_ComDMA_CM7_app-signed-encrypted.bin"
+#define IMAGE_TEST_SIGNED_ENCRYPTED_BIN_PATH                                   \
+    "tests/build/SPI_FullDuplex_ComDMA_CM7_app-signed-encrypted.bin"
 #endif
 
-static void load_image_or_fail(uint8_t area_id, const char *path, const char *what)
+static void
+load_image_or_fail(uint8_t area_id, const char *path, const char *what)
 {
     FILE *f = fopen(path, "rb");
     TEST_ASSERT_NOT_NULL_MESSAGE(f, what);
@@ -50,20 +53,18 @@ static void load_image_or_fail(uint8_t area_id, const char *path, const char *wh
     fclose(f);
 
     const struct flash_area *fa = NULL;
-    const int open_rc = flash_area_open(area_id, &fa);
+    const int open_rc           = flash_area_open(area_id, &fa);
     TEST_ASSERT_EQUAL_MESSAGE(0, open_rc, what);
     TEST_ASSERT_NOT_NULL_MESSAGE(fa, what);
     TEST_ASSERT_TRUE_MESSAGE((uint32_t)file_size <= fa->fa_size, what);
 
-    (void)test_flash_memcpy((void *)(uintptr_t)fa->fa_off, buf, (size_t)file_size);
+    (void
+    )test_flash_memcpy((void *)(uintptr_t)fa->fa_off, buf, (size_t)file_size);
 
     uint8_t *verify = (uint8_t *)malloc((size_t)file_size);
     TEST_ASSERT_NOT_NULL_MESSAGE(verify, what);
-    const int read_rc = boot_internal_flash_read(
-        fa->fa_off,
-        verify,
-        (uint32_t)file_size
-    );
+    const int read_rc =
+        boot_internal_flash_read(fa->fa_off, verify, (uint32_t)file_size);
     TEST_ASSERT_EQUAL_MESSAGE(0, read_rc, what);
     TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(
         buf,
@@ -84,7 +85,8 @@ static void load_signed_primary_or_fail(void)
     load_image_or_fail(
         FLASH_AREA_IMAGE_PRIMARY(0),
         IMAGE_TEST_SIGNED_BIN_PATH,
-        "Signed primary image not found. Ensure bootloader test signing step completed."
+        "Signed primary image not found. Ensure bootloader test signing step "
+        "completed."
     );
 }
 
@@ -93,7 +95,8 @@ static void load_signed_secondary_or_fail(void)
     load_image_or_fail(
         FLASH_AREA_IMAGE_SECONDARY(0),
         IMAGE_TEST_SIGNED_BIN_PATH,
-        "Signed secondary image not found. Ensure bootloader test signing step completed."
+        "Signed secondary image not found. Ensure bootloader test signing step "
+        "completed."
     );
 }
 
@@ -103,7 +106,8 @@ static void load_encrypted_secondary_or_fail(void)
     load_image_or_fail(
         FLASH_AREA_IMAGE_SECONDARY(0),
         IMAGE_TEST_SIGNED_ENCRYPTED_BIN_PATH,
-        "Signed+encrypted secondary image not found. Ensure bootloader test signing step completed."
+        "Signed+encrypted secondary image not found. Ensure bootloader test "
+        "signing step completed."
     );
 }
 #endif
@@ -124,7 +128,7 @@ static void assert_boot_success_and_reset_vector(void)
      * 1) vector table at image_off + ih_hdr_size (default imgtool flow)
      * 2) vector table at image_off + 2*ih_hdr_size (--pad-header input)
      */
-    uint32_t reset_word = 0u;
+    uint32_t reset_word           = 0u;
     const uint32_t expected_reset = IMAGE_TEST_RESET_HANDLER_ADDR & ~1u;
 
     read_rc = boot_internal_flash_read(

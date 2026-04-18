@@ -76,6 +76,7 @@ bootloader/bootloader.h
 bootloader/mcuboot_config/mcuboot_config.h
 bootloader/mcuboot_config/mcuboot_logging.h
 bootloader/mcuboot_config/mcuboot_assert.h
+bootloader/mcuboot_config/keys.c
 bootloader/sysmem.c
 bootloader/os/os_malloc.h
 bootloader/bootutil_log.h
