@@ -8,6 +8,8 @@ get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 message(STATUS "Repo root: ${REPO_ROOT}")
 
 include(${REPO_ROOT}/cmake/mcuboot_signing.cmake)
+include(${REPO_ROOT}/cmake/mcuboot_keys.cmake)
+mcuboot_keys_init(ROOT_DIR ${REPO_ROOT})
 
 add_compile_options(-O0 -g3 -Wall -Wextra)
 
@@ -239,7 +241,9 @@ target_include_directories(mcuboot_bootutil PUBLIC
 )
 
 target_link_libraries(mcuboot_bootutil PUBLIC mbedcrypto)
-target_compile_definitions(mcuboot_bootutil PUBLIC ${BOOTLOADER_MBEDTLS_DEFS})
+set(BOOTLOADER_TEST_COMPILE_DEFS ${BOOTLOADER_MBEDTLS_DEFS})
+mcuboot_keys_append_compile_defs(BOOTLOADER_TEST_COMPILE_DEFS)
+target_compile_definitions(mcuboot_bootutil PUBLIC ${BOOTLOADER_TEST_COMPILE_DEFS})
 
 add_executable(test_bootloader
     ${REPO_ROOT}/tests/bootloader/test_bootloader.c
@@ -257,9 +261,32 @@ add_executable(test_bootloader
 set(BOOTLOADER_TEST_ELF "${REPO_ROOT}/_bin/Release/SPI_FullDuplex_ComDMA_CM7_app.elf")
 set(BOOTLOADER_TEST_BIN "${CMAKE_BINARY_DIR}/SPI_FullDuplex_ComDMA_CM7_app.bin")
 set(BOOTLOADER_TEST_SIGNED_BIN "${CMAKE_BINARY_DIR}/SPI_FullDuplex_ComDMA_CM7_app-signed.bin")
+set(BOOTLOADER_TEST_SIGNED_ENCRYPTED_BIN "${CMAKE_BINARY_DIR}/SPI_FullDuplex_ComDMA_CM7_app-signed-encrypted.bin")
 set(BOOTLOADER_TEST_MARKERS_H "${CMAKE_BINARY_DIR}/image_test_markers.h")
 set(BOOTLOADER_TEST_IMGTOOL "${REPO_ROOT}/libs/mcuboot/scripts/imgtool.py")
 set(BOOTLOADER_TEST_LOG_PATH "${REPO_ROOT}/tests/build/bootloader_test.log")
+set(BOOTLOADER_TEST_GEN_KEYS_DIR "${CMAKE_BINARY_DIR}/generated/keys")
+set(BOOTLOADER_TEST_SIGN_KEY_C "${BOOTLOADER_TEST_GEN_KEYS_DIR}/autogen_sign_pub.c")
+set(BOOTLOADER_TEST_ENC_KEY_C "${BOOTLOADER_TEST_GEN_KEYS_DIR}/autogen_enc_priv.c")
+
+find_program(BOOTLOADER_TEST_PYTHON_EXE NAMES python3 python py)
+mcuboot_keys_generate_sources(
+    GENERATE_DIR ${BOOTLOADER_TEST_GEN_KEYS_DIR}
+    SIGN_OUT ${BOOTLOADER_TEST_SIGN_KEY_C}
+    ENC_OUT ${BOOTLOADER_TEST_ENC_KEY_C}
+    PYTHON ${BOOTLOADER_TEST_PYTHON_EXE}
+    IMGTOOL ${BOOTLOADER_TEST_IMGTOOL}
+)
+
+set(_bootloader_key_sources
+    ${REPO_ROOT}/bootloader/mcuboot_config/keys.c
+)
+mcuboot_keys_append_generated_sources(
+    _bootloader_key_sources
+    ${BOOTLOADER_TEST_SIGN_KEY_C}
+    ${BOOTLOADER_TEST_ENC_KEY_C}
+)
+target_sources(test_bootloader PRIVATE ${_bootloader_key_sources})
 
 add_custom_command(
     OUTPUT ${BOOTLOADER_TEST_MARKERS_H}
@@ -280,9 +307,8 @@ add_custom_command(
     VERBATIM
 )
 
-mcuboot_add_imgtool_sign_command(
+set(_bootloader_test_sign_common_args
     INPUT ${BOOTLOADER_TEST_BIN}
-    OUTPUT ${BOOTLOADER_TEST_SIGNED_BIN}
     IMGTOOL ${BOOTLOADER_TEST_IMGTOOL}
     HEADER_SIZE 0x400
     ALIGN 4
@@ -294,11 +320,27 @@ mcuboot_add_imgtool_sign_command(
     COMMENT "Signing bootloader test image ${BOOTLOADER_TEST_BIN}"
 )
 
+set(_bootloader_test_sign_plain_args
+    ${_bootloader_test_sign_common_args}
+    OUTPUT ${BOOTLOADER_TEST_SIGNED_BIN}
+)
+mcuboot_keys_append_signing_key_arg(_bootloader_test_sign_plain_args)
+mcuboot_add_imgtool_sign_command(${_bootloader_test_sign_plain_args})
+
+set(_bootloader_test_sign_encrypted_args
+    ${_bootloader_test_sign_common_args}
+    OUTPUT ${BOOTLOADER_TEST_SIGNED_ENCRYPTED_BIN}
+)
+mcuboot_keys_append_signing_key_arg(_bootloader_test_sign_encrypted_args)
+mcuboot_keys_append_encryption_pubkey_arg(_bootloader_test_sign_encrypted_args)
+mcuboot_add_imgtool_sign_command(${_bootloader_test_sign_encrypted_args})
+
 add_custom_target(
     bootloader_test_image_artifacts
     DEPENDS
         ${BOOTLOADER_TEST_MARKERS_H}
         ${BOOTLOADER_TEST_SIGNED_BIN}
+        ${BOOTLOADER_TEST_SIGNED_ENCRYPTED_BIN}
 )
 
 add_dependencies(test_bootloader bootloader_test_image_artifacts)
@@ -316,8 +358,9 @@ target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity)
 target_compile_definitions(
     test_bootloader
     PRIVATE
-        ${BOOTLOADER_MBEDTLS_DEFS}
+        ${BOOTLOADER_TEST_COMPILE_DEFS}
         IMAGE_TEST_SIGNED_BIN_PATH="${BOOTLOADER_TEST_SIGNED_BIN}"
+        IMAGE_TEST_SIGNED_ENCRYPTED_BIN_PATH="${BOOTLOADER_TEST_SIGNED_ENCRYPTED_BIN}"
         IMAGE_TEST_LOG_PATH="${BOOTLOADER_TEST_LOG_PATH}"
 )
 

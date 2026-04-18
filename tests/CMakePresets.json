@@ -1,0 +1,74 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "default",
+            "hidden": true,
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "tests-default",
+            "inherits": "default",
+            "displayName": "Unit Tests (Encryption OFF)",
+            "cacheVariables": {
+                "MCUBOOT_ENABLE_ENCRYPTION": "OFF"
+            }
+        },
+        {
+            "name": "tests-encryption",
+            "inherits": "default",
+            "displayName": "Unit Tests (Encryption ON)",
+            "cacheVariables": {
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "tests-build-default",
+            "configurePreset": "tests-default",
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        {
+            "name": "tests-build-encryption",
+            "configurePreset": "tests-encryption",
+            "jobs": 4,
+            "cleanFirst": true
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "tests-default-workflow",
+            "description": "Configure + build unit tests with encryption OFF",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "tests-default"
+                },
+                {
+                    "type": "build",
+                    "name": "tests-build-default"
+                }
+            ]
+        },
+        {
+            "name": "tests-encryption-workflow",
+            "description": "Configure + build unit tests with encryption ON",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "tests-encryption"
+                },
+                {
+                    "type": "build",
+                    "name": "tests-build-encryption"
+                }
+            ]
+        }
+    ]
+}
