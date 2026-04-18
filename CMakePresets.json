@@ -64,7 +64,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CORE": "CM7",
-                "DUAL_CORE": "true"
+                "DUAL_CORE": "true",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
             }
         },
         {
@@ -74,7 +75,8 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "CORE": "CM7",
                 "DUAL_CORE": "true",
-                "BUILD_TARGET": "bootloader"
+                "BUILD_TARGET": "bootloader",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
             }
         },
         {
@@ -84,7 +86,8 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "CORE": "CM7",
                 "DUAL_CORE": "true",
-                "BUILD_TARGET": "both"
+                "BUILD_TARGET": "both",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
             }
         },
         {

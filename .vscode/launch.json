@@ -105,7 +105,7 @@
             "name": "Debug bootloader (LLDB)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/build/test_bootloader",
+            "program": "${workspaceFolder}/tests/build/tests-encryption/test_bootloader",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,
