@@ -7,7 +7,7 @@ set(MCUBOOT_PYTHON ""
 )
 
 function(mcuboot_add_imgtool_sign_command)
-    set(options REQUIRE_CLICK OVERWRITE_ONLY PAD_HEADER)
+    set(options REQUIRE_CLICK OVERWRITE_ONLY PAD PAD_HEADER)
     set(oneValueArgs
         TARGET
         OUTPUT
@@ -106,6 +106,9 @@ function(mcuboot_add_imgtool_sign_command)
 
     if(MCBS_OVERWRITE_ONLY)
         list(APPEND _cmd --overwrite-only)
+    endif()
+    if(MCBS_PAD)
+        list(APPEND _cmd --pad)
     endif()
     if(MCBS_PAD_HEADER)
         list(APPEND _cmd --pad-header)

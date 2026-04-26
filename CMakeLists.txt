@@ -375,10 +375,13 @@ function(configure_firmware_target target_name)
 
             set(_mcuboot_sign_encrypted_args
                 ${_mcuboot_sign_common_args}
-                OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed-encrypted.bin
+                PAD
+                OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed-encrypted-padded.bin
             )
+
             mcuboot_keys_append_signing_key_arg(_mcuboot_sign_encrypted_args)
             mcuboot_keys_append_encryption_pubkey_arg(_mcuboot_sign_encrypted_args)
+
             mcuboot_add_imgtool_sign_command(${_mcuboot_sign_encrypted_args})
         endif()
     endif()
