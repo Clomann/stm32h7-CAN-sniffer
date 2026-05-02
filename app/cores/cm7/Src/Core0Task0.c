@@ -2,6 +2,7 @@
 #include "Core0TasksCfg.h"
 #include "TasksHooks.h"
 
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -37,6 +38,7 @@
 #include "CanCtrl.h"
 #include "WebInterface.h"
 #include "RuntimeChecks.h"
+#include "Iap.h"
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -425,6 +427,7 @@ static void appConfigSetDefaults(AppConfigType *config)
 
 static void Core0Task0Main(void *parameters)
 {
+    IapErrorType IapRes;
     static UBaseType_t MinUnusedStack;
 
     /* Unused parameters. */
@@ -441,6 +444,15 @@ static void Core0Task0Main(void *parameters)
 
     /* initialialize port early to allow for taskless SPI communication */
     SpiTask_PortInit();
+
+    IapRes = Iap_Init();
+    
+    if (IAP_E_OK != IapRes)
+    {
+        (void)Iap_DeInit();
+
+        Error_Handler();
+    }
 
     http_init();
 

@@ -14,6 +14,7 @@ endif()
 list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/IapFlashAdapter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/IapWriter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/Iap.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest/IapIngestAdapter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest/UpdateIngestRegistry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest/UpdateIngestPipeline.c
