@@ -52,8 +52,10 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
         - [Level 1: HTTP Subsystem Architecture](#level-1-http-subsystem-architecture)
         - [Level 2: HTTP Application Layer](#level-2-http-application-layer)
         - [Level 3: LwIP Integration](#level-3-lwip-integration)
+    - [Firmware Update (IAP) Building Block view](#firmware-update-iap-building-block-view)
 - [Runtime View](#runtime-view)
     - [Configuration Management Scenarios](#configuration-management-scenarios)
+    - [Firmware update scenarios](#firmware-update-scenarios)
     - [Ethernet requests processing](#ethernet-requests-processing)
     - [Log file](#log-file)
     - [CAN frame logging](#can-frame-logging)
@@ -74,6 +76,7 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
     - [System Scenarios](#system-scenarios)
         - [Scenario 1: End-to-end CAN message logging](#scenario-1-end-to-end-can-message-logging)
         - [Scenario 2: Configuration load/apply flow](#scenario-2-configuration-loadapply-flow)
+        - [Scenario 3: Firmware update upload/apply flow](#scenario-3-firmware-update-uploadapply-flow)
     - [CAN Logging Subsystem System scenarios](#can-logging-subsystem-system-scenarios)
         - [Scenario 1: CAN frame capture to buffer](#scenario-1-can-frame-capture-to-buffer)
         - [Scenario 2: Block-based flush to file](#scenario-2-block-based-flush-to-file)
@@ -89,6 +92,7 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
     - [Architecture and design concepts](#architecture-and-design-concepts)
         - [CAN frame logging](#can-frame-logging)
         - [SPI](#spi)
+        - [Firmware update path (IAP)](#firmware-update-path-iap)
         - [Concurrency & Interrupt Priorities](#concurrency--interrupt-priorities)
             - [Interrupts](#interrupts)
             - [Tasks](#tasks)
@@ -105,6 +109,8 @@ STM32H7 CAN sniffer. The STM32H7 CAN sniffer is a small CAN data logger device.
     - [SPI ring-buffer data management](#spi-ring-buffer-data-management)
     - [Chunked log files](#chunked-log-files)
     - [HTTP stack selection](#http-stack-selection)
+    - [Firmware update artifact contract](#firmware-update-artifact-contract)
+    - [Firmware activation strategy](#firmware-activation-strategy)
     - [CAN timestamp reconstruction strategy](#can-timestamp-reconstruction-strategy)
 - [Risks and Technical Debts](#risks-and-technical-debts)
     - [Risks](#risks)
@@ -125,6 +131,7 @@ The CAN sniffer shall implement following functions:
 - implement a small server which allows to:
   - download and delete log files with CAN traces
   - configure the CAN sniffer remotely via the network (e. g. CAN ID filters, baudrate, etc.)
+  - upload a firmware image through the web UI and trigger a controlled restart to apply updates
 
 The CAN sniffer shall be able to capture all CAN frames at 100 % bus load reliably and store them persistently without losing any frames.
 
@@ -168,6 +175,8 @@ The following table states some constraints towards the system:
 | The system shall use [ff15a]( http://elm-chan.org/fsw/ff/) FatFS | save time on making a file system available |
 | Use STM32H7 | A NUCLEO-144 STM32H745 board is already available for the author and matches the required peripherals |
 | Implementation in C | many third party code and examples are in C and it is the authors preference |
+| Bootloader integration | Firmware updates must stay compatible with the MCUboot image model and slot-based boot flow |
+| Update artifact policy | Web-based firmware update accepts only signed, bootloader-compatible padded images |
 
 # Context and Scope
 
@@ -218,6 +227,7 @@ The following table shows which measures are taken to reach the quality goals.
 |-|-|-|
 | Modifiability | separation of concerns (low coupling and high cohesion), opaque driver design, dependency inversion by letting drivers access data of the app layer through callback functions | |
 | Reliability / Determinism | Use of NVIC for latency-critical drivers (e.g. CAN), prioritized task scheduling for critical code paths, error detection and correction for SD card access | |
+| Safe firmware update | Stream upload through an ingest pipeline, write/verify into the inactive image slot, and reboot only after controlled handover to bootloader | |
 | Portability | Use of STM32 HAL where applicable, conditional compilation for dual/single-core configs | | 
 
 > **Note**: Portability in this context means portability across the STM32H7 family that support the needed peripherals and not portability accross toolchains. Thus, the code is allowed to use GCC specific commands (see function requirements)
@@ -500,6 +510,18 @@ Frame entries embed: 32-bit timestamp (us, low bits), CAN ID, channel, DLC/flags
 ### Level 3: LwIP Integration
 ![Diagram: LwIP stack, DHCP, TCP services](images/drivers/lwip_integration.md.svg)
 
+## Firmware Update (IAP) Building Block view
+
+The firmware update path is implemented as a small chain of components. It keeps application logic and bootloader logic separated.
+
+![IAP ingest pipeline](images/iap_ingest_pipeline.md.svg)
+
+- HTTP upload handlers stream data into *UpdateIngestPipeline*.
+- *UpdateIngestPipeline* gets the active ingest implementation from *UpdateIngestRegistry*.
+- *IapIngestAdapter* handles incoming chunking and checks continuous chunk sequence.
+- *IapWriter* erases/writes/verifies the inactive slot through storage callbacks.
+- The application requests reset only after successful finalize; the bootloader decides image activation during reboot.
+
 # Runtime View
 
 This section describes the behavioral aspects of the software components.
@@ -513,6 +535,12 @@ This section describes the behavioral aspects of the software components.
 **Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack. SD card management requests write `formatting_requested.txt` with log sizing parameters and are applied on the next boot when `log_config.json` is rewritten.
 
 ![Remote update flow](images/config-management_remote-update.md.svg)
+
+## Firmware update scenarios
+
+**Upload and verification (success).** The web handler streams firmware bytes to *UpdateIngestPipeline* (`begin/push/finish`). The ingest adapter handles chunk boundaries. *IapWriter* checks bounds and sequence, writes to the inactive slot, and verifies by readback. If finalize succeeds, the app requests a controlled reset so the bootloader can process the uploaded image.
+
+**Rejected or interrupted upload (failure).** If size, sequence, alignment, or backend checks fail, the ingest path returns an error and aborts the active session. The running image stays unchanged and the client can retry.
 
 ## Ethernet requests processing
 
@@ -724,6 +752,13 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 - **Outcome**: Configuration changes survive reboots; HTTP clients see immediate feedback.
 - **Key risks**: SD removal or parse failure; exposed via *lastError* and UI diagnostics.
 
+### Scenario 3: Firmware update upload/apply flow
+
+- **Trigger**: User uploads a signed padded firmware image via the web UI.
+- **Flow**: HTTP POST stream -> *UpdateIngestPipeline* -> *IapIngestAdapter* -> *IapWriter* writes and verifies in secondary slot -> application performs controlled reset.
+- **Outcome**: Current application keeps running until reboot; bootloader applies the uploaded image in the next boot sequence.
+- **Key risks**: Interrupted upload or invalid artifact; mitigated through strict ingest validation and explicit abort/retry behavior.
+
 ## CAN Logging Subsystem (System scenarios)
 
 ### Scenario 1: CAN frame capture to buffer
@@ -786,6 +821,7 @@ This section describes the runtime behavior of the SPI driver, from initial tran
   - on-board Ethernet PHY, external SD-card adapter via SPI
   - two external TJA1050 CAN transceivers
   - and optional USB for power/debug.
+  - internal flash partitioning includes bootloader and two image slots used for upgrade flow.
 - **Core assignment**
   - CM7: runs FreeRTOS, networking, config/UI tasks, logging pipeline, SD bridge.
   - CM4: currently idle placeholder for future extensions (e.g., dedicated acquisition or diagnostics); kept in reset unless explicitly built.
@@ -829,6 +865,15 @@ This three-layer approach ensures **minimal ISR latency**, isolates RTOS schedul
 The SPI driver design aims at decoupling the driver from the application and RTOS. Thus, an abstraction layer is used to handle all driver specific objects in a layered architecture. Using weak callback definitions lets the driver run either blocking in standalone mode or lets the caller inject their own functions (e. g. semaphore handling within the port layer):
 
 ![](images/spi_driver_design_layers.md.svg)
+
+### Firmware update path (IAP)
+
+The IAP path uses one ingest path for upload data and keeps responsibilities separated:
+
+- ingress source (currently HTTP) calls one ingest API
+- ingest adapter handles chunking and backend alignment constraints
+- writer checks slot bounds, sequence, and readback verification
+- reset is requested only after complete verified write; boot decision stays in bootloader.
 
 ### Concurrency & Interrupt Priorities
 
@@ -1017,6 +1062,26 @@ Cons:
 - Fast bring-up, DHCP support, and a proven networking stack.
 - Need to adhere to LwIP’s threading model (callbacks in *Core0Task0*), and keep an eye on upstream fixes/security advisories.
 
+## Firmware update artifact contract
+
+**Context.** MCUboot update behavior depends on image metadata and trailer markers. Accepting arbitrary binaries in web upload leads to late and unclear failures.
+
+**Decision.** The web update path accepts only signed padded MCUboot-compatible image artifacts.
+
+**Consequences.**
+- Runtime validation in the app stays simple.
+- Wrong or ad-hoc binaries are rejected early with clear client-facing error status.
+
+## Firmware activation strategy
+
+**Context.** The application receives and writes update data. Image selection and activation are bootloader responsibilities.
+
+**Decision.** The application performs ingest and verification in the secondary slot, then requests a controlled reboot. The app does not use bootloader pending APIs at runtime.
+
+**Consequences.**
+- Clear split of responsibilities between app and bootloader.
+- Activation happens only on reboot boundary.
+
 ## CAN timestamp reconstruction strategy
 
 **Problem.** FDCAN hardware exposes only a 16-bit timestamp per frame, overflowing every ~65 ms. The logger requires a stable 64-bit microsecond-grade timeline to order frames across long captures and log files.
@@ -1042,7 +1107,7 @@ Cons:
 | SD-card wear due to continuous logging. | High | High | recommend SD cards that implement wear-leveling (e.g. industrial grade). |
 | Mini-server blocks IRQs may increase CAN ISR latency > 6 µs. | Medium | Medium | set ethernet tasks to low-priority thread, use zero-copy lwIP, benchmark latency with logic analyzer. |
 | Fragmentation from malloc in drivers; STM32H7 has no MMU. | Medium | Medium | static pools for frames, SPI messages. |
-| No firmware-update plan | High | Low | Add DFU over USB & Ethernet |
+| Interrupted or invalid firmware upload causes update failure and user confusion. | Medium | Medium | Keep strict ingest checks, explicit abort/retry handling, and clear web UI status reporting. |
 | intransparent/ inconsistent low-level driver layout. | Low | High | use well defined interface and driver pattern |
 | No Power-Failure safe write on FAT32. Last trace may be corrupted. | Medium | Low | Add detection mechanism (e. g. transactional write with begin/ commit flags) |
 | failures in complex third-party software | High | Low | use well tested and well documented third-party software only |
@@ -1071,6 +1136,12 @@ Cons:
 | *fdcan_msg_port* | Lock-free queue bridging CanBridgeTask and the logging pipeline. |
 | *FileHandler* | FatFS helper that centralizes mount, read/write, and buffering logic. |
 | *FreeRTOS* | Real-time operating system used to schedule application tasks with priorities. |
+| *IAP* | In-application programming flow that uploads firmware while the current app is running. |
+| *IapWriter* | Service that writes firmware to the inactive slot and verifies it by readback. |
 | *LwIP/httpd* | Lightweight TCP/IP stack and embedded HTTP server providing the web UI. |
+| *MCUboot* | Bootloader framework that validates/selects images during boot and performs upgrade actions. |
+| *Primary slot* | Flash slot containing the currently active application image. |
+| *Secondary slot* | Flash slot used as the firmware update target before reboot. |
 | *SdBridgeTask* | Task that serializes SD-card access and executes block flushes. |
 | *SpiTask* | Task that arbitrates SPI bus access and completes DMA transfers for SD/logging. |
+| *UpdateIngestPipeline* | Source-independent ingest API (`begin/push/finish/abort`) used by firmware upload paths. |
