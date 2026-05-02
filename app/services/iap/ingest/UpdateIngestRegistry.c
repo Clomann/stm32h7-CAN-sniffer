@@ -11,14 +11,14 @@ UpdateIngestRegistry_Register(const UpdateIngestVTableType *vtable, void *ctx)
     if (vtable == NULL || vtable->begin == NULL || vtable->write_chunk == NULL
         || vtable->finalize == NULL || vtable->abort == NULL)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     }
 
     UpdateIngestRegistry_ActiveBinding.vtable = vtable;
     UpdateIngestRegistry_ActiveBinding.ctx    = ctx;
     UpdateIngestRegistry_HasBinding           = 1u;
 
-    return UPDATE_INGEST_E_OK;
+    return IAP_UPDATE_INGEST_E_OK;
 }
 
 UpdateIngestStatusType UpdateIngestRegistry_Get(UpdateIngestBindingType *binding
@@ -26,16 +26,16 @@ UpdateIngestStatusType UpdateIngestRegistry_Get(UpdateIngestBindingType *binding
 {
     if (binding == NULL)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     }
 
     if (UpdateIngestRegistry_HasBinding == 0u)
     {
-        return UPDATE_INGEST_E_UNAVAILABLE;
+        return IAP_UPDATE_INGEST_E_UNAVAILABLE;
     }
 
     *binding = UpdateIngestRegistry_ActiveBinding;
-    return UPDATE_INGEST_E_OK;
+    return IAP_UPDATE_INGEST_E_OK;
 }
 
 void UpdateIngestRegistry_Clear(void)

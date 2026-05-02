@@ -12,7 +12,8 @@
 typedef uint8_t IapErrorType;
 
 /** @brief IAP service operation succeeded. */
-#define IAP_E_OK     ((IapErrorType)0)
+#define IAP_E_OK ((IapErrorType)0)
+
 /** @brief IAP service operation failed. */
 #define IAP_E_NOT_OK ((IapErrorType)1)
 

@@ -1,87 +1,218 @@
 #include "IapIngestAdapter.h"
+#include "UpdateIngestRegistry.h"
+#include <stdint.h>
+#include <string.h>
 
-static UpdateIngestStatusType
-IapIngestAdapter_MapWriterStatus(IapWriterStatusType writer_status)
+static UpdateIngestStatusType MapWriterStatus(IapWriterStatusType writer_status)
 {
     switch (writer_status)
     {
     case IAP_WRITER_E_OK:
-        return UPDATE_INGEST_E_OK;
+        return IAP_UPDATE_INGEST_E_OK;
     case IAP_WRITER_E_PARAM:
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     case IAP_WRITER_E_STATE:
-        return UPDATE_INGEST_E_STATE;
+        return IAP_UPDATE_INGEST_E_STATE;
     case IAP_WRITER_E_SEQUENCE:
-        return UPDATE_INGEST_E_SEQUENCE;
+        return IAP_UPDATE_INGEST_E_SEQUENCE;
     case IAP_WRITER_E_RANGE:
-        return UPDATE_INGEST_E_RANGE;
+        return IAP_UPDATE_INGEST_E_RANGE;
     case IAP_WRITER_E_ALIGN:
-        return UPDATE_INGEST_E_ALIGN;
+        return IAP_UPDATE_INGEST_E_ALIGN;
     case IAP_WRITER_E_STORAGE:
     case IAP_WRITER_E_VERIFY:
     default:
-        return UPDATE_INGEST_E_BACKEND;
+        return IAP_UPDATE_INGEST_E_BACKEND;
     }
+}
+
+static UpdateIngestStatusType Begin(void *ctx, size_t image_size)
+{
+    IapIngestAdapterContextType *context = (IapIngestAdapterContextType *)ctx;
+
+    if (context == NULL || context->writer == NULL)
+    {
+        return IAP_UPDATE_INGEST_E_PARAM;
+    }
+
+    memset(context->pending, 0x0, sizeof(context->pending));
+    context->pending_len = 0;
+
+    return MapWriterStatus(IapWriter_Begin(context->writer, image_size));
 }
 
 static UpdateIngestStatusType
-IapIngestAdapter_Begin(void *ctx, size_t image_size)
+CheckOffsetSequence(IapIngestAdapterContextType *ctx, uint32_t offset)
 {
-    IapIngestAdapterContextType *context = (IapIngestAdapterContextType *)ctx;
+    uint32_t writer_off;
+    uint32_t expected_off;
 
-    if (context == NULL || context->writer == NULL)
+    writer_off   = IapWriter_GetReceivedSize(ctx->writer);
+    expected_off = writer_off + ctx->pending_len;
+
+    if (offset != expected_off)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_SEQUENCE;
     }
 
-    return IapIngestAdapter_MapWriterStatus(
-        IapWriter_Begin(context->writer, image_size)
-    );
+    return IAP_UPDATE_INGEST_E_OK;
 }
 
-static UpdateIngestStatusType IapIngestAdapter_WriteChunk(
-    void *ctx,
-    uint32_t offset,
-    const uint8_t *data,
-    size_t len
-)
+static UpdateIngestStatusType
+WriteChunk(void *ctx, uint32_t offset, const uint8_t *data, size_t len)
 {
+    uint32_t free_len                    = 0;
+    uint32_t remain_len                  = 0;
+    uint32_t updated_len                 = 0;
+    uint32_t updated_offset              = 0;
+    uint32_t alignment                   = 0;
+    UpdateIngestStatusType res           = IAP_UPDATE_INGEST_E_OK;
+    uint32_t algined_len                 = 0;
     IapIngestAdapterContextType *context = (IapIngestAdapterContextType *)ctx;
 
-    if (context == NULL || context->writer == NULL)
+    if (context == NULL || context->writer == NULL || data == NULL
+        || NULL == context->writer->storage_ops.get_property)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     }
 
-    return IapIngestAdapter_MapWriterStatus(
-        IapWriter_WriteChunk(context->writer, offset, data, len)
+    if (0 == len)
+    {
+        return IAP_UPDATE_INGEST_E_PARAM;
+    }
+
+    res = context->writer->storage_ops.get_property(
+        context->writer->storage_ops.ctx,
+        IAP_WRITER_STORAGE_PROP_ALIGNMET,
+        &alignment,
+        sizeof(alignment)
     );
+
+    if (IAP_WRITER_STORAGE_E_OK != res || 0 == alignment
+        || IAP_INGEST_ADAPTER_ALIGN_MAX < alignment)
+    {
+        return IAP_UPDATE_INGEST_E_BACKEND;
+    }
+
+    res = CheckOffsetSequence(context, offset);
+    if (IAP_UPDATE_INGEST_E_OK != res)
+    {
+        return res;
+    }
+
+    updated_len = len;
+
+    // check if pending buffer is partially filled -> fill until full
+    if (context->pending_len > 0 && len > 0)
+    {
+        if (context->pending_len > alignment)
+        {
+            return IAP_UPDATE_INGEST_E_STATE;
+        }
+
+        free_len = alignment - context->pending_len;
+
+        if (len >= free_len)
+        {
+            memcpy(&context->pending[context->pending_len], &data[0], free_len);
+            updated_len    = len - free_len;
+            updated_offset = offset - context->pending_len;
+            context->pending_len += free_len;
+        }
+        else
+        {
+            memcpy(&context->pending[context->pending_len], &data[0], len);
+            updated_len    = 0;
+            updated_offset = offset - context->pending_len;
+            context->pending_len += len;
+        }
+    }
+
+    // write the pendinng buffer that was just filled completely
+    if (context->pending_len == alignment)
+    {
+        res = MapWriterStatus(IapWriter_WriteChunk(
+            context->writer,
+            updated_offset,
+            context->pending,
+            context->pending_len
+        ));
+
+        context->pending_len = 0;
+
+        if (IAP_UPDATE_INGEST_E_OK != res)
+        {
+            return res;
+        }
+    }
+
+    // handle the main part of the chunk until unaligned remainder
+    if (updated_len >= alignment)
+    {
+        algined_len = updated_len - updated_len % alignment;
+    }
+
+    // pending buffer is supposed to be empty here
+    if (0 == context->pending_len)
+    {
+        remain_len = updated_len - algined_len;
+
+        if (remain_len > 0)
+        {
+            memcpy(
+                &context->pending[context->pending_len],
+                &data[free_len + algined_len],
+                remain_len
+            );
+            context->pending_len += remain_len;
+            updated_len = updated_len - remain_len; // should yield be 0 here
+        }
+    }
+
+    if (algined_len == 0)
+    {
+        return IAP_UPDATE_INGEST_E_OK;
+    }
+
+    // finally actually write main chunk
+    return MapWriterStatus(IapWriter_WriteChunk(
+        context->writer,
+        offset + free_len,
+        &data[free_len],
+        algined_len
+    ));
 }
 
-static UpdateIngestStatusType IapIngestAdapter_Finalize(void *ctx)
+static UpdateIngestStatusType Finalize(void *ctx)
 {
     IapIngestAdapterContextType *context = (IapIngestAdapterContextType *)ctx;
 
     if (context == NULL || context->writer == NULL)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     }
 
-    return IapIngestAdapter_MapWriterStatus(
-        IapWriter_FinalizeAndVerify(context->writer)
-    );
+    if (context->pending_len != 0)
+    {
+        return IAP_UPDATE_INGEST_E_ALIGN;
+    }
+
+    return MapWriterStatus(IapWriter_FinalizeAndVerify(context->writer));
 }
 
-static UpdateIngestStatusType IapIngestAdapter_Abort(void *ctx)
+static UpdateIngestStatusType Abort(void *ctx)
 {
     IapIngestAdapterContextType *context = (IapIngestAdapterContextType *)ctx;
 
     if (context == NULL || context->writer == NULL)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     }
 
-    return IapIngestAdapter_MapWriterStatus(IapWriter_Abort(context->writer));
+    memset(context->pending, 0x0, sizeof(context->pending));
+    context->pending_len = 0;
+
+    return MapWriterStatus(IapWriter_Abort(context->writer));
 }
 
 UpdateIngestStatusType IapIngestAdapter_Init(
@@ -91,20 +222,20 @@ UpdateIngestStatusType IapIngestAdapter_Init(
 {
     if (context == NULL || writer == NULL)
     {
-        return UPDATE_INGEST_E_PARAM;
+        return IAP_UPDATE_INGEST_E_PARAM;
     }
 
     context->writer = writer;
-    return UPDATE_INGEST_E_OK;
+    return IAP_UPDATE_INGEST_E_OK;
 }
 
 const UpdateIngestVTableType *IapIngestAdapter_GetVTable(void)
 {
     static const UpdateIngestVTableType vtable = {
-        .begin       = IapIngestAdapter_Begin,
-        .write_chunk = IapIngestAdapter_WriteChunk,
-        .finalize    = IapIngestAdapter_Finalize,
-        .abort       = IapIngestAdapter_Abort,
+        .begin       = Begin,
+        .write_chunk = WriteChunk,
+        .finalize    = Finalize,
+        .abort       = Abort,
     };
 
     return &vtable;

@@ -19,6 +19,7 @@ typedef uint8_t IapWriterStatusType;
 #define IAP_WRITER_E_SEQUENCE ((IapWriterStatusType)5u)
 #define IAP_WRITER_E_STORAGE  ((IapWriterStatusType)6u)
 #define IAP_WRITER_E_VERIFY   ((IapWriterStatusType)7u)
+#define IAP_WRITER_E_CONFIG   ((IapWriterStatusType)8u)
 /* Backward-compatibility alias. */
 #define IAP_WRITER_E_FLASH IAP_WRITER_E_STORAGE
 
@@ -41,6 +42,7 @@ typedef uint16_t IapWriterStoragePropertyIdType;
 
 #define IAP_WRITER_STORAGE_PROP_ERASE_SIZE ((IapWriterStoragePropertyIdType)1u)
 #define IAP_WRITER_STORAGE_PROP_PROG_SIZE  ((IapWriterStoragePropertyIdType)2u)
+#define IAP_WRITER_STORAGE_PROP_ALIGNMET   ((IapWriterStoragePropertyIdType)3u)
 
 /**
  * @brief Storage erase callback used by IAP writer.
@@ -117,6 +119,13 @@ typedef struct
     IapWriterStorageGetPropertyFn get_property;
 } IapWriterStorageOpsType;
 
+/**
+ * @brief IAP target-slot and storage-granularity configuration.
+ *
+ * @note `slot_addr` and `slot_size` are integration-provided slot boundaries.
+ *       Granularity/alignment values can be provided directly or resolved from
+ *       `Iap<peripheral>Adapter` property callbacks.
+ */
 typedef struct
 {
     uint32_t slot_addr;
@@ -124,15 +133,13 @@ typedef struct
     /**
      * @brief Erase granularity in bytes.
      *
-     * Set to 0 to resolve from storage ops via
-     * `IAP_WRITER_STORAGE_PROP_ERASE_SIZE`.
+     * Set to 0 to resolve from `Iap<peripheral>Adapter`.
      */
     uint32_t erase_size;
     /**
      * @brief Program granularity in bytes.
      *
-     * Set to 0 to resolve from storage ops via
-     * `IAP_WRITER_STORAGE_PROP_PROG_SIZE`.
+     * Set to 0 to resolve from `Iap<peripheral>Adapter`.
      */
     uint32_t prog_size;
 } IapWriterConfigType;
@@ -153,7 +160,8 @@ typedef struct
  * @brief Initialize an IAP writer context.
  *
  * @param context     Writer context to initialize.
- * @param config      Slot and alignment configuration.
+ * @param config      Slot boundaries and optional granularity/alignment
+ *                    values.
  * @param storage_ops Storage operation callbacks used by the writer.
  *
  * @return IAP_WRITER_E_OK on success, error code otherwise.

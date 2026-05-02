@@ -9,14 +9,14 @@
 
 typedef uint8_t UpdateIngestStatusType;
 
-#define UPDATE_INGEST_E_OK          ((UpdateIngestStatusType)0u)
-#define UPDATE_INGEST_E_PARAM       ((UpdateIngestStatusType)1u)
-#define UPDATE_INGEST_E_STATE       ((UpdateIngestStatusType)2u)
-#define UPDATE_INGEST_E_UNAVAILABLE ((UpdateIngestStatusType)3u)
-#define UPDATE_INGEST_E_SEQUENCE    ((UpdateIngestStatusType)4u)
-#define UPDATE_INGEST_E_RANGE       ((UpdateIngestStatusType)5u)
-#define UPDATE_INGEST_E_ALIGN       ((UpdateIngestStatusType)6u)
-#define UPDATE_INGEST_E_BACKEND     ((UpdateIngestStatusType)7u)
+#define IAP_UPDATE_INGEST_E_OK          ((UpdateIngestStatusType)0u)
+#define IAP_UPDATE_INGEST_E_PARAM       ((UpdateIngestStatusType)1u)
+#define IAP_UPDATE_INGEST_E_STATE       ((UpdateIngestStatusType)2u)
+#define IAP_UPDATE_INGEST_E_UNAVAILABLE ((UpdateIngestStatusType)3u)
+#define IAP_UPDATE_INGEST_E_SEQUENCE    ((UpdateIngestStatusType)4u)
+#define IAP_UPDATE_INGEST_E_RANGE       ((UpdateIngestStatusType)5u)
+#define IAP_UPDATE_INGEST_E_ALIGN       ((UpdateIngestStatusType)6u)
+#define IAP_UPDATE_INGEST_E_BACKEND     ((UpdateIngestStatusType)7u)
 
 /**
  * @brief Callback invoked when a new image upload starts.
@@ -86,7 +86,7 @@ typedef struct
  * @param vtable Callback table to register.
  * @param ctx    Opaque context passed to callbacks.
  *
- * @return UPDATE_INGEST_E_OK on success, error code otherwise.
+ * @return IAP_UPDATE_INGEST_E_OK on success, error code otherwise.
  */
 UpdateIngestStatusType
 UpdateIngestRegistry_Register(const UpdateIngestVTableType *vtable, void *ctx);
@@ -96,7 +96,7 @@ UpdateIngestRegistry_Register(const UpdateIngestVTableType *vtable, void *ctx);
  *
  * @param binding Output binding structure.
  *
- * @return UPDATE_INGEST_E_OK when a binding is available, error otherwise.
+ * @return IAP_UPDATE_INGEST_E_OK when a binding is available, error otherwise.
  */
 UpdateIngestStatusType UpdateIngestRegistry_Get(UpdateIngestBindingType *binding
 );
