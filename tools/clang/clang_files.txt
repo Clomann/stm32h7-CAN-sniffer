@@ -10,6 +10,7 @@ app/services/config/SettingsHandler.h
 app/services/storage/FileHandler.c
 app/services/storage/FileHandler.h
 app/services/storage/FileHandlerTypes.h
+app/services/iap/Iap.h
 app/services/iap/IapWriter.h
 app/services/iap/IapFlashAdapter.c
 app/services/iap/ingest/UpdateIngestRegistry.c
@@ -20,6 +21,8 @@ app/services/iap/ingest/UpdateIngestPipeline.c
 app/services/iap/ingest/IapIngestAdapter.h
 app/services/iap/IapFlashAdapter.h
 app/services/iap/IapWriter.c
+app/services/iap/Iap.c
+app/services/iap/IapCfg.h
 app/services/http/WebInterface.c
 app/services/http/inc/ethernetif.h
 app/services/http/inc/fs_custom.h
