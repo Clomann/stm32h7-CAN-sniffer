@@ -158,6 +158,7 @@ static IapWriterStorageStatusType RamFlashSim_GetProperty(
         out_value = context->erase_size;
         break;
     case IAP_WRITER_STORAGE_PROP_PROG_SIZE:
+    case IAP_WRITER_STORAGE_PROP_ALIGNMET:
         out_value = context->prog_size;
         break;
     default:

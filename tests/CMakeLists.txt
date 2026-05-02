@@ -225,6 +225,11 @@ target_include_directories(test_iap PRIVATE
 )
 
 target_link_libraries(test_iap PRIVATE unity test_flash_memory)
+target_compile_definitions(
+    test_iap
+    PRIVATE
+        IAP_TEST_IMAGE_PATH="${REPO_ROOT}/tests/app/InAppProgramming/artifacts/SPI_FullDuplex_ComDMA_CM7_app-signed-encrypted-padded.bin"
+)
 
 # ===== bootloader =====
 set(mcuboot_bootutil_SRCS
