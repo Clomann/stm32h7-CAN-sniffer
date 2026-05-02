@@ -10,8 +10,10 @@
 #include "flash.h"
 #include "flash_test_config.h"
 #include "flash_map_backend/flash_map_backend.h"
+#include "TestFlashMemory.h"
 uint8_t test_flash[TEST_FLASH_SIZE];
 int test_flash_initialized;
+TestFlashMemoryType g_test_flash_memory;
 
 uintptr_t g_flash_write_src_full;
 uint32_t g_flash_write_src_low;
@@ -21,35 +23,15 @@ static void test_flash_init_once(void)
 {
     if (!test_flash_initialized)
     {
-        memset(test_flash, 0xff, sizeof(test_flash));
+        TestFlashMemory_Init(
+            &g_test_flash_memory,
+            test_flash,
+            sizeof(test_flash),
+            TEST_FLASH_BASE
+        );
+        TestFlashMemory_Reset(&g_test_flash_memory, 0xFF);
         test_flash_initialized = 1;
     }
-}
-
-static int
-test_flash_bounds_ok_uintptr(uintptr_t addr, size_t len, uint32_t *off_out)
-{
-    if (addr < (uintptr_t)TEST_FLASH_BASE)
-    {
-        return 0;
-    }
-
-    if (addr > UINT32_MAX)
-    {
-        return 0;
-    }
-
-    const uint64_t off = (uint64_t)(addr - (uintptr_t)TEST_FLASH_BASE);
-    if (off + len > (uint64_t)TEST_FLASH_SIZE)
-    {
-        return 0;
-    }
-
-    if (off_out != NULL)
-    {
-        *off_out = (uint32_t)off;
-    }
-    return 1;
 }
 
 void *test_flash_memcpy(void *dst, const void *src, size_t len)
@@ -58,71 +40,19 @@ void *test_flash_memcpy(void *dst, const void *src, size_t len)
     {
         return dst;
     }
-
     test_flash_init_once();
-
-    uint32_t src_off = 0;
-    uint32_t dst_off = 0;
-    const int src_is_flash =
-        test_flash_bounds_ok_uintptr((uintptr_t)src, len, &src_off);
-    const int dst_is_flash =
-        test_flash_bounds_ok_uintptr((uintptr_t)dst, len, &dst_off);
-
-    if (src_is_flash && dst_is_flash)
-    {
-        if (src_off == dst_off)
-        {
-            return dst;
-        }
-        if (src_off < dst_off)
-        {
-            for (size_t i = len; i > 0; --i)
-            {
-                test_flash[dst_off + i - 1u] = test_flash[src_off + i - 1u];
-            }
-        }
-        else
-        {
-            for (size_t i = 0; i < len; ++i)
-            {
-                test_flash[dst_off + i] = test_flash[src_off + i];
-            }
-        }
-        return dst;
-    }
-
-    if (src_is_flash)
-    {
-        uint8_t *dst_bytes = (uint8_t *)dst;
-        for (size_t i = 0; i < len; ++i)
-        {
-            dst_bytes[i] = test_flash[src_off + i];
-        }
-        return dst;
-    }
-
-    if (dst_is_flash)
-    {
-        const uint8_t *src_bytes = (const uint8_t *)src;
-        for (size_t i = 0; i < len; ++i)
-        {
-            test_flash[dst_off + i] = src_bytes[i];
-        }
-        return dst;
-    }
-
-    uint8_t *dst_bytes       = (uint8_t *)dst;
-    const uint8_t *src_bytes = (const uint8_t *)src;
-    for (size_t i = 0; i < len; ++i)
-    {
-        dst_bytes[i] = src_bytes[i];
-    }
-    return dst;
+    return TestFlashMemory_Memcpy(&g_test_flash_memory, dst, src, len);
 }
 
 void test_flash_reset(void)
 {
-    memset(test_flash, 0xff, sizeof(test_flash));
+    TestFlashMemory_Init(
+        &g_test_flash_memory,
+        test_flash,
+        sizeof(test_flash),
+        TEST_FLASH_BASE
+    );
+    TestFlashMemory_Reset(&g_test_flash_memory, 0xFF);
     test_flash_initialized = 1;
     (void)Flash_Init();
 }

@@ -45,6 +45,13 @@ endforeach()
 enable_testing()
 set(CTEST_OUTPUT_ON_FAILURE ON)
 
+add_library(test_flash_memory STATIC
+    ${REPO_ROOT}/tests/common/flash_sim/TestFlashMemory.c
+)
+target_include_directories(test_flash_memory PUBLIC
+    ${REPO_ROOT}/tests/common/flash_sim
+)
+
 # ===== fdcan =====
 
 add_library(fdcan STATIC
@@ -348,13 +355,14 @@ add_dependencies(test_bootloader bootloader_test_image_artifacts)
 target_include_directories(test_bootloader PRIVATE
     ${unity_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}
+    ${REPO_ROOT}/tests/common/flash_sim
     ${REPO_ROOT}/tests/bootloader
     ${REPO_ROOT}/bootloader/mcuboot_config
     ${REPO_ROOT}/bootloader
     ${REPO_ROOT}/bootloader/flash_map_backend
 )
 
-target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity)
+target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity test_flash_memory)
 target_compile_definitions(
     test_bootloader
     PRIVATE
