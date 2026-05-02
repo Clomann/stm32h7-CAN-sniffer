@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "UpdateIngestPipeline.h"
 #include "IapIngestAdapter.h"
 #include "IapWriter.h"
 #include "RamFlashSim.h"
@@ -87,7 +88,7 @@ int main(void)
 
 static void test_IapPipeline_EndToEnd_MainFlow(void)
 {
-    UpdateIngestBindingType binding;
+    UpdateIngestPipelineContextType pipeline;
     uint8_t erased_probe[256];
     uint8_t verify[32];
     uint8_t expected[32];
@@ -135,12 +136,9 @@ static void test_IapPipeline_EndToEnd_MainFlow(void)
         sizeof(erased_probe)
     );
 
-    TEST_ASSERT_EQUAL(UPDATE_INGEST_E_OK, UpdateIngestRegistry_Get(&binding));
-    TEST_ASSERT_NOT_NULL(binding.vtable);
-
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->begin(binding.ctx, sizeof(verify))
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Begin(&pipeline, (uint32_t)sizeof(verify))
     );
 
     TEST_ASSERT_EQUAL_UINT32(
@@ -161,21 +159,16 @@ static void test_IapPipeline_EndToEnd_MainFlow(void)
     TestAssertAllEq(erased_probe, sizeof(erased_probe), 0xFF);
 
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->write_chunk(binding.ctx, 0u, chunk0, sizeof(chunk0))
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Push(&pipeline, chunk0, sizeof(chunk0))
     );
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->write_chunk(
-            binding.ctx,
-            (uint32_t)sizeof(chunk0),
-            chunk1,
-            sizeof(chunk1)
-        )
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Push(&pipeline, chunk1, sizeof(chunk1))
     );
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->finalize(binding.ctx)
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Finish(&pipeline)
     );
 
     memcpy(&expected[0], chunk0, sizeof(chunk0));
@@ -195,48 +188,42 @@ static void test_IapPipeline_EndToEnd_MainFlow(void)
 
 static void test_IapPipeline_Negative_OutOfBoundsChunk(void)
 {
-    UpdateIngestBindingType binding;
+    UpdateIngestPipelineContextType pipeline;
     uint8_t data[32];
 
     memset(data, 0xA5, sizeof(data));
 
-    TEST_ASSERT_EQUAL(UPDATE_INGEST_E_OK, UpdateIngestRegistry_Get(&binding));
-    TEST_ASSERT_NOT_NULL(binding.vtable);
-
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->begin(binding.ctx, 16u)
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Begin(&pipeline, 16u)
     );
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_RANGE,
-        binding.vtable->write_chunk(binding.ctx, 0u, data, sizeof(data))
+        UPDATE_INGEST_PIPELINE_E_RANGE,
+        UpdateIngestPipeline_Push(&pipeline, data, sizeof(data))
     );
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_STATE,
-        binding.vtable->finalize(binding.ctx)
+        UPDATE_INGEST_PIPELINE_E_STATE,
+        UpdateIngestPipeline_Finish(&pipeline)
     );
 }
 
 static void test_IapPipeline_Negative_IncompleteFinalize(void)
 {
-    UpdateIngestBindingType binding;
+    UpdateIngestPipelineContextType pipeline;
     uint8_t chunk[16];
 
     memset(chunk, 0x3C, sizeof(chunk));
 
-    TEST_ASSERT_EQUAL(UPDATE_INGEST_E_OK, UpdateIngestRegistry_Get(&binding));
-    TEST_ASSERT_NOT_NULL(binding.vtable);
-
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->begin(binding.ctx, 32u)
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Begin(&pipeline, 32u)
     );
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_OK,
-        binding.vtable->write_chunk(binding.ctx, 0u, chunk, sizeof(chunk))
+        UPDATE_INGEST_PIPELINE_E_OK,
+        UpdateIngestPipeline_Push(&pipeline, chunk, sizeof(chunk))
     );
     TEST_ASSERT_EQUAL(
-        UPDATE_INGEST_E_STATE,
-        binding.vtable->finalize(binding.ctx)
+        UPDATE_INGEST_PIPELINE_E_STATE,
+        UpdateIngestPipeline_Finish(&pipeline)
     );
 }
