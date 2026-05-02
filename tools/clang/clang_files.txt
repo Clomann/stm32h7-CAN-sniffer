@@ -10,6 +10,8 @@ app/services/config/SettingsHandler.h
 app/services/storage/FileHandler.c
 app/services/storage/FileHandler.h
 app/services/storage/FileHandlerTypes.h
+app/services/iap/IapWriter.h
+app/services/iap/IapWriter.c
 app/services/http/WebInterface.c
 app/services/http/inc/ethernetif.h
 app/services/http/inc/fs_custom.h
@@ -162,6 +164,9 @@ tests/app/CanLogManager/stubs/fdcan_msg_port.c
 tests/app/CanLogManager/test_CanLogManager.h
 tests/app/CanLogManager/test_CanLogManager.c
 tests/app/test_definitions.h
+tests/app/InAppProgramming/stubs/RamFlashSim.h
+tests/app/InAppProgramming/stubs/RamFlashSim.c
+tests/app/InAppProgramming/test_iap.c
 tests/app/test_app.c
 tests/test_template.c
 tests/bootloader/boot_platform_stub.h
@@ -183,6 +188,8 @@ tests/bootloader/stm32h7xx_hal.h
 tests/bootloader/stm32h745xx.h
 tests/bootloader/bootloader_test_stubs.h
 tests/bootloader/flash_test_config.h
+tests/common/flash_sim/TestFlashMemory.h
+tests/common/flash_sim/TestFlashMemory.c
 tests/spi/test_spi.c
 tests/spi/stubs/Spi_Cmds.c
 tests/spi/stubs/SpiAbs.c

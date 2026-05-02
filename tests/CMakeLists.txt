@@ -205,6 +205,23 @@ target_include_directories(test_app PRIVATE
     ${unity_SOURCE_DIR}/src
 )
 
+# ===== iap =====
+add_executable(test_iap
+    ${REPO_ROOT}/tests/app/InAppProgramming/test_iap.c
+    ${REPO_ROOT}/tests/app/InAppProgramming/stubs/RamFlashSim.c
+    ${REPO_ROOT}/app/services/iap/IapWriter.c
+)
+
+target_include_directories(test_iap PRIVATE
+    ${unity_SOURCE_DIR}/src
+    ${REPO_ROOT}/tests/app/InAppProgramming/stubs
+    ${REPO_ROOT}/tests/common/flash_sim
+    ${REPO_ROOT}/app/services/iap
+    ${REPO_ROOT}/platform/drivers/flash
+)
+
+target_link_libraries(test_iap PRIVATE unity test_flash_memory)
+
 # ===== bootloader =====
 set(mcuboot_bootutil_SRCS
     ${REPO_ROOT}/libs/mcuboot/boot/bootutil/src/boot_record.c
@@ -384,6 +401,7 @@ add_test(NAME FDCAN_Test COMMAND test_fdcan)
 add_test(NAME BUFFER_Test COMMAND test_buffer)
 add_test(NAME SPI_Test COMMAND test_spi)
 add_test(NAME APP_Test COMMAND test_app)
+add_test(NAME IAP_Test COMMAND test_iap)
 add_test(NAME BOOTLOADER_Test COMMAND test_bootloader)
 
 # --- Create a custom "test_all" build target ---
@@ -392,5 +410,6 @@ add_custom_target(tests DEPENDS
     test_buffer
     test_spi
     test_app
+    test_iap
     test_bootloader
 )

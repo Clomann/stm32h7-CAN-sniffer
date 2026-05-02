@@ -12,6 +12,8 @@ list(APPEND sources_SRCS
 endif()
 
 list(APPEND sources_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/IapFlashAdapter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/IapWriter.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/storage/FileHandler.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/HttpAbs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/logging/CanLogBuffer.c
@@ -39,6 +41,7 @@ list(APPEND include_path_DIRS
 endif()
 
 list(APPEND include_path_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap
     ${CMAKE_CURRENT_SOURCE_DIR}/services/config
     ${CMAKE_CURRENT_SOURCE_DIR}/services/logging
     ${CMAKE_CURRENT_SOURCE_DIR}/services/storage
