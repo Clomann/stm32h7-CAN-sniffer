@@ -2,6 +2,8 @@ adapters/fatfs_sd/MmcAdapter.h
 adapters/fatfs_sd/DiskIoFacade.c
 adapters/fatfs_sd/MmcAdapter.c
 adapters/fatfs_sd/DiskIoFacade.h
+app/services/update/UpdateIngestRegistry.c
+app/services/update/UpdateIngestRegistry.h
 app/services/config/ConfigManagerTypes.h
 app/services/config/ConfigManager.h
 app/services/config/SettingsHandler.c
@@ -11,7 +13,11 @@ app/services/storage/FileHandler.c
 app/services/storage/FileHandler.h
 app/services/storage/FileHandlerTypes.h
 app/services/iap/IapWriter.h
+app/services/iap/IapFlashAdapter.c
+app/services/iap/IapIngestAdapter.c
+app/services/iap/IapFlashAdapter.h
 app/services/iap/IapWriter.c
+app/services/iap/IapIngestAdapter.h
 app/services/http/WebInterface.c
 app/services/http/inc/ethernetif.h
 app/services/http/inc/fs_custom.h
@@ -105,7 +111,6 @@ platform/drivers/comm/CommHandle/CommTypes.h
 platform/drivers/comm/CommHandle/CommMessages.h
 platform/drivers/flash/flash.c
 platform/drivers/flash/flash.h
-platform/drivers/flash/flash_port_stm32h745.c
 platform/drivers/spi/spi.c
 platform/drivers/spi/SpiCfg.h
 platform/drivers/spi/Spi_Cmds.c

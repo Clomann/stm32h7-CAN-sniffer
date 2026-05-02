@@ -209,7 +209,9 @@ target_include_directories(test_app PRIVATE
 add_executable(test_iap
     ${REPO_ROOT}/tests/app/InAppProgramming/test_iap.c
     ${REPO_ROOT}/tests/app/InAppProgramming/stubs/RamFlashSim.c
+    ${REPO_ROOT}/app/services/iap/IapIngestAdapter.c
     ${REPO_ROOT}/app/services/iap/IapWriter.c
+    ${REPO_ROOT}/app/services/update/UpdateIngestRegistry.c
 )
 
 target_include_directories(test_iap PRIVATE
@@ -217,6 +219,7 @@ target_include_directories(test_iap PRIVATE
     ${REPO_ROOT}/tests/app/InAppProgramming/stubs
     ${REPO_ROOT}/tests/common/flash_sim
     ${REPO_ROOT}/app/services/iap
+    ${REPO_ROOT}/app/services/update
     ${REPO_ROOT}/platform/drivers/flash
 )
 
