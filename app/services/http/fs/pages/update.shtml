@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STM32H7 CAN Sniffer - Firmware Update</title>
+    <style>
+        :root {
+            --primary-color: #334155;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --accent-color: #3b82f6;
+            --ok-color: #166534;
+            --warn-color: #92400e;
+            --err-color: #b91c1c;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            padding: 2rem 0;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 2rem;
+        }
+
+        .header-content {
+            flex: 1;
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            color: var(--text-primary);
+        }
+
+        .header .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .logo {
+            height: 80px;
+            flex-shrink: 0;
+        }
+
+        .logo img {
+            height: 100%;
+            width: auto;
+            display: block;
+        }
+
+        .nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .nav-link {
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            font-size: 0.9rem;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .card-description {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+
+        .hint {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.2rem 0.65rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            background: #f3f4f6;
+            color: var(--text-secondary);
+        }
+
+        .status-ok {
+            background: #ecfdf3;
+            color: var(--ok-color);
+            border-color: #bbf7d0;
+        }
+
+        .status-warn {
+            background: #fffbeb;
+            color: var(--warn-color);
+            border-color: #fde68a;
+        }
+
+        .status-err {
+            background: #fef2f2;
+            color: var(--err-color);
+            border-color: #fecaca;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--bg-color);
+            border-color: var(--primary-color);
+        }
+
+        button:disabled {
+            opacity: 1;
+            cursor: not-allowed;
+            background-color: var(--bg-color) !important;
+            color: var(--text-secondary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #475569;
+            border-color: #475569;
+        }
+
+        .btn-danger {
+            background-color: #b91c1c;
+            color: white;
+            border-color: #b91c1c;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background-color: #991b1b;
+            border-color: #991b1b;
+        }
+
+        .progress-wrap {
+            margin-top: 0.75rem;
+        }
+
+        .progress-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+        }
+
+        .progress-bar {
+            height: 10px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-color);
+            transition: width 0.15s linear;
+        }
+
+        .precheck-list {
+            margin-top: 0.75rem;
+            list-style: none;
+            display: grid;
+            gap: 0.4rem;
+        }
+
+        .precheck-item {
+            padding: 0.5rem 0.65rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            background: #f9fafb;
+        }
+
+        .precheck-item.pass {
+            border-color: #bbf7d0;
+            background: #ecfdf3;
+            color: var(--ok-color);
+        }
+
+        .precheck-item.fail {
+            border-color: #fecaca;
+            background: #fef2f2;
+            color: var(--err-color);
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .logo {
+                height: 64px;
+            }
+
+            .nav {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .nav-link {
+                white-space: nowrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <h1>Firmware Update</h1>
+                <div class="subtitle">Upload signed padded image and apply by controlled reboot</div>
+            </div>
+            <a href="/index.html" class="logo">
+                <img src="files/logo.png" alt="Logo">
+            </a>
+        </div>
+
+        <nav class="nav">
+            <a href="/index.html" class="nav-link">Home</a>
+            <a href="/can.shtml" class="nav-link">CAN Setup</a>
+            <a href="/can_trace.shtml" class="nav-link">CAN Trace</a>
+            <a href="/update.shtml" class="nav-link">Update</a>
+        </nav>
+
+        <div class="card">
+            <div class="card-header">Image Selection & Pre-Check</div>
+            <div class="card-description">
+                Select the firmware image file. The page performs a simple local pre-check before upload.
+            </div>
+
+            <input type="file" id="fw-file" accept=".bin,application/octet-stream">
+            <div class="hint">Expected input: signed padded MCUboot image (<span class="mono">.bin</span>).</div>
+
+            <div class="row">
+                <span class="status-chip" id="precheck-summary">No file selected</span>
+                <span class="mono" id="file-info">-</span>
+            </div>
+
+            <ul class="precheck-list" id="precheck-list"></ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Upload</div>
+            <div class="card-description">
+                Upload runs as raw binary stream to <span class="mono">/iap/upload</span>.
+            </div>
+
+            <div class="btn-group">
+                <button id="upload-btn" class="btn-primary" disabled>Upload Firmware</button>
+            </div>
+
+            <div class="progress-wrap">
+                <div class="progress-line">
+                    <span id="upload-state">Idle</span>
+                    <span id="upload-percent">0%</span>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-fill" id="upload-progress"></div>
+                </div>
+                <div class="hint" id="upload-metrics">Remaining time: -</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Apply (Reboot)</div>
+            <div class="card-description">
+                Apply is only allowed after upload and verification, and only while CAN logger is stopped.
+            </div>
+
+            <div class="row">
+                <span class="status-chip" id="logger-state">Logger state: unknown</span>
+                <span class="status-chip" id="image-state">Image state: unknown</span>
+            </div>
+
+            <div class="btn-group">
+                <button id="apply-btn" class="btn-danger" disabled>Apply Update (Reboot)</button>
+            </div>
+
+            <div class="hint" id="apply-message">Waiting for status…</div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const IAP_STATUS_URL = "/iap/status";
+        const IAP_PREPARE_URL = "/iap/prepare";
+        const IAP_UPLOAD_URL = "/iap/upload";
+        const IAP_APPLY_URL = "/iap/apply";
+        const PRECHECK_ALIGNMENT = 32;
+        const MCUBOOT_MAGIC = [0x3d, 0xb8, 0xf3, 0x96];
+        const MCUBOOT_HDR_SIZE_OFFSET = 8;
+        const MCUBOOT_EXPECTED_HDR_SIZE = 0x0400;
+        const TX_PHASE_MAX_PERCENT = 95;
+        const DEVICE_STALL_TIMEOUT_MS = 60 * 1000;
+
+        const fileInput = document.getElementById("fw-file");
+        const uploadBtn = document.getElementById("upload-btn");
+        const applyBtn = document.getElementById("apply-btn");
+
+        const precheckSummary = document.getElementById("precheck-summary");
+        const precheckList = document.getElementById("precheck-list");
+        const fileInfo = document.getElementById("file-info");
+
+        const uploadState = document.getElementById("upload-state");
+        const uploadPercent = document.getElementById("upload-percent");
+        const uploadProgress = document.getElementById("upload-progress");
+        const uploadMetrics = document.getElementById("upload-metrics");
+
+        const loggerState = document.getElementById("logger-state");
+        const imageState = document.getElementById("image-state");
+        const applyMessage = document.getElementById("apply-message");
+
+        let selectedFile = null;
+        let precheckOk = false;
+        let uploadInProgress = false;
+        let loggerActive = true;
+        let uploadAccepted = false;
+        let imageVerified = false;
+        let applyReady = false;
+        let activeUploadXhr = null;
+        let uploadAbortedByWatchdog = false;
+        let deviceProgressWatchActive = false;
+        let lastDeviceReceived = -1;
+        let lastDeviceProgressTs = 0;
+        let statusPollInFlight = false;
+        let statusPollTimerId = null;
+
+        function setChip(el, text, stateClass) {
+            el.textContent = text;
+            el.className = "status-chip";
+            if (stateClass) {
+                el.classList.add(stateClass);
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (!Number.isFinite(bytes) || bytes < 0) {
+                return "-";
+            }
+            if (bytes < 1024) {
+                return `${bytes} B`;
+            }
+            if (bytes < 1024 * 1024) {
+                return `${(bytes / 1024).toFixed(1)} KiB`;
+            }
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+        }
+
+        function formatDuration(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) {
+                return "-";
+            }
+            const sec = Math.round(seconds);
+            if (sec < 60) {
+                return `${sec}s`;
+            }
+            const min = Math.floor(sec / 60);
+            const rem = sec % 60;
+            return `${min}m ${rem}s`;
+        }
+
+        function updateUploadPercent(percent) {
+            const clampedPercent = Math.min(100, Math.max(0, percent));
+            uploadProgress.style.width = `${clampedPercent.toFixed(1)}%`;
+            uploadPercent.textContent = `${clampedPercent.toFixed(1)}%`;
+        }
+
+        function updateUploadProgress(loaded, total, maxPercent = 100) {
+            const safeTotal = total > 0 ? total : 1;
+            const percent = (loaded / safeTotal) * maxPercent;
+            updateUploadPercent(percent);
+        }
+
+        function resetDeviceProgressWatch() {
+            deviceProgressWatchActive = true;
+            lastDeviceReceived = -1;
+            lastDeviceProgressTs = Date.now();
+            uploadAbortedByWatchdog = false;
+        }
+
+        function stopDeviceProgressWatch() {
+            deviceProgressWatchActive = false;
+            lastDeviceReceived = -1;
+            lastDeviceProgressTs = 0;
+            activeUploadXhr = null;
+            uploadAbortedByWatchdog = false;
+        }
+
+        function checkDeviceProgressWatch(uploadStateText, uploadReceived) {
+            if (
+                !uploadInProgress
+                || !deviceProgressWatchActive
+                || activeUploadXhr === null
+                || uploadStateText !== "in_progress"
+                || !Number.isFinite(uploadReceived)
+            ) {
+                return;
+            }
+
+            if (lastDeviceReceived < 0 || uploadReceived > lastDeviceReceived) {
+                lastDeviceReceived = uploadReceived;
+                lastDeviceProgressTs = Date.now();
+                return;
+            }
+
+            if ((Date.now() - lastDeviceProgressTs) >= DEVICE_STALL_TIMEOUT_MS) {
+                uploadAbortedByWatchdog = true;
+                deviceProgressWatchActive = false;
+                activeUploadXhr.abort();
+            }
+        }
+
+        function formatBackendUploadError(status) {
+            if (!status || typeof status !== "object") {
+                return "";
+            }
+            const uploadStateText = typeof status.upload_state === "string"
+                ? status.upload_state
+                : "unknown";
+            const verifyStateText = typeof status.verify_state === "string"
+                ? status.verify_state
+                : "unknown";
+            if (uploadStateText !== "error" && verifyStateText !== "error") {
+                return "";
+            }
+            const errorReason = typeof status.error_reason === "string"
+                ? status.error_reason
+                : "unknown";
+            const ingestStatus = Number(status.ingest_status);
+            if (errorReason === "none") {
+                return "Backend reported upload/verify failure.";
+            }
+            if (Number.isFinite(ingestStatus)) {
+                return `Backend error: ${errorReason} (ingest_status=${ingestStatus}).`;
+            }
+            return `Backend error: ${errorReason}.`;
+        }
+
+        function refreshApplyButton() {
+            let disabled = true;
+            let reason = "";
+
+            if (uploadInProgress) {
+                reason = "Upload in progress.";
+                disabled = true;
+            } else if (loggerActive) {
+                reason = "Stop CAN logger before apply.";
+                disabled = true;
+            } else if (!imageVerified) {
+                reason = "Upload and verify firmware first.";
+                disabled = true;
+            } else if (!applyReady) {
+                reason = "Image not ready for apply yet.";
+                disabled = true;
+            } else {
+                reason = "";
+                disabled = false;
+            }
+
+            applyBtn.disabled = disabled;
+            applyBtn.title = reason;
+            if (reason && !uploadInProgress) {
+                applyMessage.textContent = reason;
+            }
+        }
+
+        function renderChecks(checks) {
+            precheckList.innerHTML = "";
+            checks.forEach((c) => {
+                const li = document.createElement("li");
+                let label = c.pass ? "PASS" : "FAIL";
+                let klass = c.pass ? "pass" : "fail";
+
+                if (!c.pass && c.required === false) {
+                    label = "WARN";
+                    klass = "pass";
+                }
+
+                li.className = `precheck-item ${klass}`;
+                li.textContent = `${label} - ${c.label}`;
+                precheckList.appendChild(li);
+            });
+        }
+
+        async function runPrecheck(file) {
+            const buf = new Uint8Array(await file.arrayBuffer());
+            const checks = [];
+
+            checks.push({
+                label: "File size is non-zero",
+                pass: buf.length > 0,
+                required: true
+            });
+            checks.push({
+                label: `File size aligned to ${PRECHECK_ALIGNMENT} bytes`,
+                pass: (buf.length % PRECHECK_ALIGNMENT) === 0,
+                required: true
+            });
+            checks.push({
+                label: "MCUboot header magic at offset 0",
+                pass: buf.length >= 4
+                    && buf[0] === MCUBOOT_MAGIC[0]
+                    && buf[1] === MCUBOOT_MAGIC[1]
+                    && buf[2] === MCUBOOT_MAGIC[2]
+                    && buf[3] === MCUBOOT_MAGIC[3],
+                required: true
+            });
+
+            const imageHdrSize = buf.length >= (MCUBOOT_HDR_SIZE_OFFSET + 2)
+                ? (buf[MCUBOOT_HDR_SIZE_OFFSET] | (buf[MCUBOOT_HDR_SIZE_OFFSET + 1] << 8))
+                : 0;
+            checks.push({
+                label: "MCUboot header size field is 0x0400",
+                pass: imageHdrSize === MCUBOOT_EXPECTED_HDR_SIZE,
+                required: true
+            });
+            checks.push({
+                label: "Image contains payload after header",
+                pass: buf.length > MCUBOOT_EXPECTED_HDR_SIZE,
+                required: true
+            });
+
+            const trailerWindowLen = Math.min(16, buf.length);
+            let trailerAllFF = true;
+            for (let i = buf.length - trailerWindowLen; i < buf.length; i++) {
+                if (i >= 0 && buf[i] !== 0xFF) {
+                    trailerAllFF = false;
+                    break;
+                }
+            }
+            checks.push({
+                label: "Trailer marker area not all 0xFF",
+                pass: buf.length >= 16 && !trailerAllFF,
+                required: true
+            });
+
+            const padWindowStart = buf.length > 160 ? buf.length - 160 : 0;
+            const padWindowEnd = buf.length > 16 ? buf.length - 16 : buf.length;
+            let ffCount = 0;
+            let padLen = 0;
+            for (let i = padWindowStart; i < padWindowEnd; i++) {
+                padLen++;
+                if (buf[i] === 0xFF) {
+                    ffCount++;
+                }
+            }
+            const ffRatio = padLen > 0 ? (ffCount / padLen) : 0;
+            checks.push({
+                label: "Padding pattern present near end of image",
+                pass: ffRatio > 0.50,
+                required: false
+            });
+
+            const isOk = checks.every((c) => (c.required ? c.pass : true));
+            renderChecks(checks);
+
+            if (isOk) {
+                setChip(precheckSummary, "Pre-check passed", "status-ok");
+            } else {
+                setChip(precheckSummary, "Pre-check failed", "status-err");
+            }
+
+            precheckOk = isOk;
+            uploadBtn.disabled = !isOk || uploadInProgress;
+            uploadBtn.title = isOk ? "" : "Fix pre-check errors first.";
+        }
+
+        async function pollIapStatus() {
+            if (statusPollInFlight) {
+                return null;
+            }
+
+            statusPollInFlight = true;
+            try {
+                const resp = await fetch(IAP_STATUS_URL, { cache: "no-store" });
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+                const status = await resp.json();
+                const uploadReceived = Number(
+                    status.upload_received !== undefined
+                        ? status.upload_received
+                        : status.received
+                );
+                const uploadTotal = Number(
+                    status.upload_total !== undefined
+                        ? status.upload_total
+                        : status.total
+                );
+                const verifyProcessed = Number(status.verify_processed);
+                const verifyTotal = Number(status.verify_total);
+                const uploadStateText = typeof status.upload_state === "string"
+                    ? status.upload_state
+                    : "unknown";
+                const verifyStateText = typeof status.verify_state === "string"
+                    ? status.verify_state
+                    : "unknown";
+
+                loggerActive = Boolean(status.logger_active);
+                uploadAccepted = Boolean(status.upload_ready);
+                imageVerified = Boolean(status.verified);
+                applyReady = status.apply_ready !== undefined
+                    ? Boolean(status.apply_ready)
+                    : (!loggerActive && imageVerified);
+
+                checkDeviceProgressWatch(uploadStateText, uploadReceived);
+
+                setChip(
+                    loggerState,
+                    loggerActive ? "Logger: running" : "Logger: stopped",
+                    loggerActive ? "status-warn" : "status-ok"
+                );
+
+                if (uploadStateText === "error" || verifyStateText === "error") {
+                    setChip(imageState, "Image: error", "status-err");
+                    uploadState.textContent = "Upload failed";
+                    uploadMetrics.textContent = "Remaining time: -";
+                    if (!uploadInProgress) {
+                        const errorReason = typeof status.error_reason === "string"
+                            ? status.error_reason
+                            : "unknown";
+                        const ingestStatus = Number(status.ingest_status);
+                        if (errorReason === "none") {
+                            applyMessage.textContent = "Upload or verification failed.";
+                        } else if (Number.isFinite(ingestStatus)) {
+                            applyMessage.textContent =
+                                `Upload failed (${errorReason}, ingest_status=${ingestStatus}).`;
+                        } else {
+                            applyMessage.textContent = `Upload failed (${errorReason}).`;
+                        }
+                    }
+                } else if (imageVerified) {
+                    setChip(imageState, "Image: verified", "status-ok");
+                    uploadState.textContent = "Image verified";
+                    updateUploadPercent(100);
+                    uploadMetrics.textContent = "Remaining time: 0s";
+                    if (!uploadInProgress && loggerActive) {
+                        applyMessage.textContent = "Image verified. Stop logger to apply.";
+                    } else if (!uploadInProgress) {
+                        applyMessage.textContent = "Image verified. Apply will reboot the device.";
+                    }
+                } else if (
+                    uploadAccepted
+                    && (verifyStateText === "pending" || verifyStateText === "in_progress")
+                ) {
+                    setChip(imageState, "Image: verifying", "status-warn");
+                    uploadState.textContent = "Verifying image…";
+                    if (
+                        Number.isFinite(verifyProcessed)
+                        && Number.isFinite(verifyTotal)
+                        && verifyTotal > 0
+                    ) {
+                        const verifyPhase = verifyProcessed / verifyTotal;
+                        const blendedPercent = TX_PHASE_MAX_PERCENT
+                            + verifyPhase * (100 - TX_PHASE_MAX_PERCENT);
+                        updateUploadPercent(blendedPercent);
+                        uploadMetrics.textContent =
+                            `Verified ${formatBytes(verifyProcessed)} / ${formatBytes(verifyTotal)} on device`;
+                    } else {
+                        updateUploadPercent(TX_PHASE_MAX_PERCENT);
+                        uploadMetrics.textContent = "Device is verifying image…";
+                    }
+                } else if (uploadStateText === "in_progress") {
+                    setChip(imageState, "Image: upload in progress", "status-warn");
+                    if (
+                        Number.isFinite(uploadReceived)
+                        && Number.isFinite(uploadTotal)
+                        && uploadTotal > 0
+                    ) {
+                        updateUploadProgress(uploadReceived, uploadTotal, TX_PHASE_MAX_PERCENT);
+                        uploadMetrics.textContent =
+                            `Received ${formatBytes(uploadReceived)} / ${formatBytes(uploadTotal)} on device`;
+                    }
+                } else if (uploadAccepted) {
+                    setChip(imageState, "Image: uploaded", "status-warn");
+                } else {
+                    setChip(imageState, "Image: idle", "status-warn");
+                }
+
+                refreshApplyButton();
+                return status;
+            } catch (e) {
+                setChip(loggerState, "Logger: unknown", "status-err");
+                setChip(imageState, "Image: unknown", "status-err");
+                applyBtn.disabled = true;
+                applyBtn.title = "Status unavailable.";
+                applyMessage.textContent = "Failed to read IAP status.";
+                return null;
+            } finally {
+                statusPollInFlight = false;
+            }
+        }
+
+        function startStatusPolling() {
+            if (statusPollTimerId !== null) {
+                return;
+            }
+            statusPollTimerId = setInterval(pollIapStatus, 10000);
+        }
+
+        function stopStatusPolling() {
+            if (statusPollTimerId === null) {
+                return;
+            }
+            clearInterval(statusPollTimerId);
+            statusPollTimerId = null;
+        }
+
+        fileInput.addEventListener("change", async () => {
+            selectedFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            precheckList.innerHTML = "";
+            precheckOk = false;
+            uploadBtn.disabled = true;
+            uploadBtn.title = "";
+
+            if (!selectedFile) {
+                setChip(precheckSummary, "No file selected", "");
+                fileInfo.textContent = "-";
+                return;
+            }
+
+            fileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)})`;
+
+            try {
+                await runPrecheck(selectedFile);
+            } catch (e) {
+                console.error(e);
+                setChip(precheckSummary, "Pre-check failed", "status-err");
+                fileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)})`;
+                uploadBtn.disabled = true;
+                uploadBtn.title = "Pre-check failed.";
+            }
+        });
+
+        uploadBtn.addEventListener("click", async () => {
+            if (!selectedFile || !precheckOk || uploadInProgress) {
+                return;
+            }
+
+            uploadInProgress = true;
+            uploadAccepted = false;
+            imageVerified = false;
+            applyReady = false;
+            stopStatusPolling();
+            uploadBtn.disabled = true;
+            uploadBtn.title = "Upload running.";
+            applyMessage.textContent = "Upload running…";
+            uploadState.textContent = "Uploading…";
+            setChip(imageState, "Image: upload in progress", "status-warn");
+            updateUploadPercent(0);
+            uploadMetrics.textContent = "Preparing flash slot…";
+            refreshApplyButton();
+
+            try {
+                const prepareResp = await fetch(IAP_PREPARE_URL, { cache: "no-store" });
+                const prepareJson = await prepareResp.json();
+                if (!prepareResp.ok || !prepareJson.ok) {
+                uploadInProgress = false;
+                stopDeviceProgressWatch();
+                startStatusPolling();
+                uploadState.textContent = "Prepare failed";
+                    uploadMetrics.textContent = "Remaining time: -";
+                    uploadBtn.disabled = !precheckOk;
+                    uploadBtn.title = precheckOk ? "" : "Fix pre-check errors first.";
+                    setChip(imageState, "Image: error", "status-err");
+                    if (prepareJson && prepareJson.reason === "logger_running") {
+                        applyMessage.textContent = "Stop CAN logger before preparing upload.";
+                    } else if (prepareJson && prepareJson.reason) {
+                        applyMessage.textContent = `Prepare failed (${prepareJson.reason}).`;
+                    } else {
+                        applyMessage.textContent = "Prepare failed.";
+                    }
+                    refreshApplyButton();
+                    return;
+                }
+            } catch (e) {
+                uploadInProgress = false;
+                stopDeviceProgressWatch();
+                startStatusPolling();
+                uploadState.textContent = "Prepare failed (network error)";
+                uploadMetrics.textContent = "Remaining time: -";
+                uploadBtn.disabled = !precheckOk;
+                uploadBtn.title = precheckOk ? "" : "Fix pre-check errors first.";
+                setChip(imageState, "Image: error", "status-err");
+                applyMessage.textContent = "Prepare request failed.";
+                refreshApplyButton();
+                return;
+            }
+
+            uploadState.textContent = "Uploading…";
+            uploadMetrics.textContent = "Remaining time: estimating…";
+
+            const xhr = new XMLHttpRequest();
+            const startTs = performance.now();
+            activeUploadXhr = xhr;
+            resetDeviceProgressWatch();
+
+            xhr.open("POST", IAP_UPLOAD_URL, true);
+            xhr.setRequestHeader("Content-Type", "application/octet-stream");
+            xhr.timeout = 0;
+
+            xhr.upload.onprogress = (ev) => {
+                if (!ev.lengthComputable) {
+                    return;
+                }
+                updateUploadProgress(ev.loaded, ev.total, TX_PHASE_MAX_PERCENT);
+                const elapsedS = (performance.now() - startTs) / 1000.0;
+                const speed = ev.loaded / Math.max(elapsedS, 0.001);
+                const remainingB = Math.max(ev.total - ev.loaded, 0);
+                const etaS = remainingB / Math.max(speed, 1);
+                uploadMetrics.textContent =
+                    `Uploaded ${formatBytes(ev.loaded)} / ${formatBytes(ev.total)} · ETA ${formatDuration(etaS)}`;
+            };
+
+            xhr.onerror = async () => {
+                const stalled = uploadAbortedByWatchdog;
+                uploadInProgress = false;
+                stopDeviceProgressWatch();
+                startStatusPolling();
+                if (stalled) {
+                    uploadState.textContent = "Upload failed (stalled)";
+                    applyMessage.textContent =
+                        "Upload aborted: device received bytes did not change for 60s.";
+                } else {
+                    uploadState.textContent = "Upload failed (network error)";
+                    applyMessage.textContent = "Upload failed (connection dropped).";
+                    const status = await pollIapStatus();
+                    const backendError = formatBackendUploadError(status);
+                    if (backendError) {
+                        applyMessage.textContent = backendError;
+                    }
+                }
+                uploadMetrics.textContent = "Remaining time: -";
+                uploadBtn.disabled = false;
+                uploadBtn.title = "";
+                setChip(imageState, "Image: error", "status-err");
+                refreshApplyButton();
+            };
+
+            xhr.onabort = () => {
+                const stalled = uploadAbortedByWatchdog;
+                uploadInProgress = false;
+                stopDeviceProgressWatch();
+                startStatusPolling();
+                if (stalled) {
+                    uploadState.textContent = "Upload failed (stalled)";
+                    applyMessage.textContent =
+                        "Upload aborted: device received bytes did not change for 60s.";
+                } else {
+                    uploadState.textContent = "Upload aborted";
+                    applyMessage.textContent = "Upload aborted.";
+                }
+                uploadMetrics.textContent = "Remaining time: -";
+                uploadBtn.disabled = false;
+                uploadBtn.title = "";
+                setChip(imageState, "Image: error", "status-err");
+                refreshApplyButton();
+            };
+
+            xhr.ontimeout = () => {
+                uploadInProgress = false;
+                stopDeviceProgressWatch();
+                startStatusPolling();
+                uploadState.textContent = "Upload failed (timeout)";
+                uploadMetrics.textContent = "Remaining time: -";
+                uploadBtn.disabled = false;
+                uploadBtn.title = "";
+                setChip(imageState, "Image: error", "status-err");
+                applyMessage.textContent = "Upload timed out.";
+                refreshApplyButton();
+            };
+
+            xhr.onload = async () => {
+                uploadInProgress = false;
+                stopDeviceProgressWatch();
+                startStatusPolling();
+
+                if (xhr.status >= 200 && xhr.status < 400) {
+                    uploadState.textContent = "Upload complete, waiting for verification…";
+                    updateUploadPercent(TX_PHASE_MAX_PERCENT);
+                    uploadMetrics.textContent = "Device is preparing verification…";
+                    applyMessage.textContent = "Upload complete. Waiting for backend status…";
+                    await pollIapStatus();
+                    if (imageVerified) {
+                        uploadState.textContent = "Image verified";
+                        updateUploadPercent(100);
+                        uploadMetrics.textContent = "Remaining time: 0s";
+                        applyMessage.textContent = "Image ready. Apply will reboot the device.";
+                    } else {
+                        uploadState.textContent = "Upload accepted, backend still processing";
+                    }
+                } else {
+                    uploadState.textContent = `Upload failed (HTTP ${xhr.status})`;
+                    applyMessage.textContent = "Upload failed.";
+                }
+
+                uploadBtn.disabled = !precheckOk;
+                uploadBtn.title = precheckOk ? "" : "Fix pre-check errors first.";
+                refreshApplyButton();
+            };
+
+            xhr.send(selectedFile);
+        });
+
+        applyBtn.addEventListener("click", async () => {
+            if (applyBtn.disabled) {
+                return;
+            }
+
+            applyBtn.disabled = true;
+            applyBtn.title = "Apply request in progress.";
+            applyMessage.textContent = "Requesting reboot…";
+
+            try {
+                const resp = await fetch(IAP_APPLY_URL, { cache: "no-store" });
+                const json = await resp.json();
+
+                if (json.ok) {
+                    applyMessage.textContent = "Reboot requested. Connection may drop now.";
+                    setChip(imageState, "Image: apply requested", "status-warn");
+                } else if (json.reason === "logger_running") {
+                    applyMessage.textContent = "Rejected: stop CAN logger first.";
+                } else if (json.reason === "image_not_verified" || json.reason === "upload_not_ready") {
+                    applyMessage.textContent = "Rejected: image is not verified.";
+                } else {
+                    applyMessage.textContent = "Apply rejected.";
+                }
+            } catch (e) {
+                applyMessage.textContent = "Apply request failed.";
+            }
+
+            await pollIapStatus();
+        });
+
+        startStatusPolling();
+        pollIapStatus();
+
+        const currentPath = window.location.pathname;
+        document.querySelectorAll(".nav-link").forEach((link) => {
+            link.classList.remove("active");
+            const linkPath = new URL(link.href).pathname;
+            if (currentPath === linkPath) {
+                link.classList.add("active");
+            } else if (linkPath === "/can.shtml" && (currentPath === "/cancontrol.cgi" || currentPath === "/can.cgi")) {
+                link.classList.add("active");
+            }
+        });
+    });
+    </script>
+</body>
+</html>
