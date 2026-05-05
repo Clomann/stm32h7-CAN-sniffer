@@ -10,6 +10,7 @@ set(CPU_PARAMETERS "" CACHE STRING "Target CPU/ABI flags (list)")
 set(DUAL_CORE "" CACHE STRING "Configure two target cofiguration (true/false).")
 set(BUILD_TARGET "app" CACHE STRING "Build target: app, bootloader, or both")
 set_property(CACHE BUILD_TARGET PROPERTY STRINGS app bootloader both)
+set(APP_VERSION "auto" CACHE STRING "Application version string exposed via HTTP API (use 'auto' for git describe)")
 set(FW_USE_PRINTF_FLOAT ON CACHE BOOL "Enable printf float formatting (requires FW_USE_MALLOC)")
 set(FW_USE_MALLOC ${FW_USE_PRINTF_FLOAT} CACHE BOOL "Enable newlib heap (malloc/free) via sysmem.c")
 set(FW_LINKER_TRACE OFF CACHE BOOL "Enable linker --trace output and symbol tracing")
@@ -42,6 +43,7 @@ if(NOT DEFINED CORE)
 endif()
 
 find_program(PYTHON_EXE NAMES python3 python py)
+find_program(GIT_EXE NAMES git)
 
 if(NOT PYTHON_EXE AND IS_APP_BUILD)
     message(WARNING "No Python interpreter found - skipping signing step!")
@@ -129,6 +131,28 @@ elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
 else()
   message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
 endif()
+
+set(APP_VERSION_RESOLVED "${APP_VERSION}")
+if(APP_VERSION STREQUAL "auto" OR APP_VERSION STREQUAL "")
+    set(APP_VERSION_RESOLVED "0.0.0-unknown")
+    if(GIT_EXE)
+        execute_process(
+            COMMAND ${GIT_EXE} -C ${CMAKE_SOURCE_DIR} describe --long --tags --dirty --always
+            RESULT_VARIABLE APP_VERSION_GIT_RC
+            OUTPUT_VARIABLE APP_VERSION_GIT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(APP_VERSION_GIT_RC EQUAL 0 AND NOT APP_VERSION_GIT STREQUAL "")
+            set(APP_VERSION_RESOLVED "${APP_VERSION_GIT}")
+        endif()
+    endif()
+endif()
+
+message(STATUS "App version: ${APP_VERSION_RESOLVED}")
+
+string(REPLACE "\"" "\\\"" APP_VERSION_ESCAPED "${APP_VERSION_RESOLVED}")
+list(APPEND symbols_SYMB "APP_VERSION=\"${APP_VERSION_ESCAPED}\"")
 
 # push flags to all targets
 add_compile_options(${CPU_PARAMETERS})
