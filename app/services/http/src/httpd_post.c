@@ -4,6 +4,7 @@
 
 #include "httpd_post.h"
 #include "UpdateIngestPipeline.h"
+#include "WebInterface.h"
 
 #include "lwip/tcp.h"
 #include "lwip/apps/httpd.h"
@@ -17,6 +18,8 @@ typedef struct
     u32_t content_len;
     u8_t phase; /* 0 = key, 1 = value               */
     u8_t mode;
+    u8_t iap_failed;
+    u8_t iap_fail_status;
     UpdateIngestPipelineContextType iap_pipeline;
 } HttpdPostStateType;
 
@@ -29,6 +32,25 @@ typedef struct
 } HttpdPostStateMapType;
 
 static HttpdPostStateMapType conn_map[MEMP_NUM_PARALLEL_HTTPD_CONNS];
+static void *current_connection;
+static void *valid_connection;
+
+typedef struct
+{
+    uint8_t state;
+    uint32_t received;
+    uint32_t total;
+    uint8_t error_reason;
+    uint8_t ingest_status;
+} HttpdIapUploadStatusType;
+
+static HttpdIapUploadStatusType HttpdIapUploadStatus = {
+    .state         = HTTPD_IAP_UPLOAD_STATE_IDLE,
+    .received      = 0u,
+    .total         = 0u,
+    .error_reason  = HTTPD_IAP_UPLOAD_ERROR_NONE,
+    .ingest_status = UPDATE_INGEST_PIPELINE_E_OK,
+};
 
 /**
  * @brief URL-encoded key/value POST mode (`/can.cgi` configuration path).
@@ -39,6 +61,20 @@ static HttpdPostStateMapType conn_map[MEMP_NUM_PARALLEL_HTTPD_CONNS];
  * @brief Binary IAP upload POST mode (`/iap/upload` path).
  */
 #define HTTPD_POST_MODE_IAP_BIN ((u8_t)1u)
+
+static void
+HttpdPost_SetIapUploadStatus(uint8_t state, uint32_t received, uint32_t total)
+{
+    HttpdIapUploadStatus.state    = state;
+    HttpdIapUploadStatus.received = received;
+    HttpdIapUploadStatus.total    = total;
+}
+
+static void HttpdPost_SetIapUploadError(uint8_t reason, uint8_t ingest_status)
+{
+    HttpdIapUploadStatus.error_reason  = reason;
+    HttpdIapUploadStatus.ingest_status = ingest_status;
+}
 
 static HttpdPostStateType *map_lookup(void *conn)
 {
@@ -109,9 +145,6 @@ static void consume_byte(HttpdPostStateType *ps, char c)
 #else
 #define USER_PASS_BUFSIZE 16
 
-static void *current_connection;
-static void *valid_connection;
-
 err_t httpd_post_begin(
     void *connection,
     const char *uri,
@@ -165,13 +198,41 @@ err_t httpd_post_begin(
 
         if (mode == HTTPD_POST_MODE_IAP_BIN)
         {
+            UpdateIngestPipelineStatusType ingest_begin_status =
+                UPDATE_INGEST_PIPELINE_E_OK;
+
             /* Binary mode requires a known positive content size and ingest begin. */
-            if (content_len <= 0
-                || UpdateIngestPipeline_Begin(
-                       &ps->iap_pipeline,
-                       (u32_t)content_len
-                   ) != UPDATE_INGEST_PIPELINE_E_OK)
+            WebInterface_ResetFirmwareVerifyHook();
+            HttpdPost_SetIapUploadStatus(
+                HTTPD_IAP_UPLOAD_STATE_IN_PROGRESS,
+                0u,
+                (content_len > 0) ? (uint32_t)content_len : 0u
+            );
+            HttpdPost_SetIapUploadError(
+                HTTPD_IAP_UPLOAD_ERROR_NONE,
+                UPDATE_INGEST_PIPELINE_E_OK
+            );
+
+            if (content_len > 0)
             {
+                ingest_begin_status = UpdateIngestPipeline_Begin(
+                    &ps->iap_pipeline,
+                    (u32_t)content_len
+                );
+            }
+
+            if (content_len <= 0
+                || ingest_begin_status != UPDATE_INGEST_PIPELINE_E_OK)
+            {
+                HttpdPost_SetIapUploadStatus(
+                    HTTPD_IAP_UPLOAD_STATE_ERROR,
+                    0u,
+                    (content_len > 0) ? (uint32_t)content_len : 0u
+                );
+                HttpdPost_SetIapUploadError(
+                    HTTPD_IAP_UPLOAD_ERROR_BEGIN,
+                    (uint8_t)ingest_begin_status
+                );
                 map_free(connection);
                 current_connection = NULL;
                 return ERR_VAL;
@@ -235,30 +296,68 @@ err_t httpd_post_receive_data(void *connection, struct pbuf *p)
             }
             else
             {
-                /* IAP path: forward raw bytes to ingest pipeline. */
-                if (UpdateIngestPipeline_Push(
-                        &ps->iap_pipeline,
-                        (const uint8_t *)q->payload,
-                        q->len
-                    )
-                    != UPDATE_INGEST_PIPELINE_E_OK)
+                UpdateIngestPipelineStatusType ingest_push_status =
+                    UPDATE_INGEST_PIPELINE_E_OK;
+                uint32_t remaining = 0u;
+                u16_t push_len     = q->len;
+
+                if (ps->iap_failed != 0u)
                 {
-                    (void)UpdateIngestPipeline_Abort(&ps->iap_pipeline);
-                    ret = ERR_VAL;
-                    break;
+                    continue;
                 }
+
+                /* IAP path: forward raw bytes to ingest pipeline. */
+                if (ps->received < ps->content_len)
+                {
+                    remaining = ps->content_len - ps->received;
+                }
+
+                if (remaining == 0u)
+                {
+                    continue;
+                }
+
+                if ((uint32_t)push_len > remaining)
+                {
+                    push_len = (u16_t)remaining;
+                }
+
+                ingest_push_status = UpdateIngestPipeline_Push(
+                    &ps->iap_pipeline,
+                    (const uint8_t *)q->payload,
+                    push_len
+                );
+                if (ingest_push_status != UPDATE_INGEST_PIPELINE_E_OK)
+                {
+                    ps->iap_failed      = 1u;
+                    ps->iap_fail_status = (uint8_t)ingest_push_status;
+                    HttpdPost_SetIapUploadStatus(
+                        HTTPD_IAP_UPLOAD_STATE_ERROR,
+                        ps->received,
+                        ps->content_len
+                    );
+                    HttpdPost_SetIapUploadError(
+                        HTTPD_IAP_UPLOAD_ERROR_PUSH,
+                        (uint8_t)ingest_push_status
+                    );
+                    (void)UpdateIngestPipeline_Abort(&ps->iap_pipeline);
+                    continue;
+                }
+
+                ps->received += push_len;
+                HttpdPost_SetIapUploadStatus(
+                    HTTPD_IAP_UPLOAD_STATE_IN_PROGRESS,
+                    ps->received,
+                    ps->content_len
+                );
             }
         }
 
 #if LWIP_HTTPD_POST_MANUAL_WND
         httpd_post_data_recved(connection, recved);
 #endif
-        if (ret != ERR_VAL)
-        {
-            /* not returning ERR_OK aborts the connection, so return ERR_OK unless the
-                connection is unknown */
-            ret = ERR_OK;
-        }
+        /* Always keep the POST socket alive and let finished() close flow cleanly. */
+        ret = ERR_OK;
     }
     else
     {
@@ -304,14 +403,62 @@ void httpd_post_finished(
                     httpd_post_cb(ps->key, ps->val);
                 }
             }
-            /* IAP path: finalize upload stream after full body received. */
-            else if (UpdateIngestPipeline_Finish(&ps->iap_pipeline)
-                     != UPDATE_INGEST_PIPELINE_E_OK)
+            else if (ps->iap_failed != 0u)
             {
-                map_free(connection);
-                current_connection = NULL;
-                valid_connection   = NULL;
-                return;
+                HttpdPost_SetIapUploadStatus(
+                    HTTPD_IAP_UPLOAD_STATE_ERROR,
+                    ps->received,
+                    ps->content_len
+                );
+                HttpdPost_SetIapUploadError(
+                    HTTPD_IAP_UPLOAD_ERROR_PUSH,
+                    ps->iap_fail_status
+                );
+            }
+            /* IAP path: finalize only when full body was forwarded. */
+            else if (ps->received != ps->content_len)
+            {
+                (void)UpdateIngestPipeline_Abort(&ps->iap_pipeline);
+                HttpdPost_SetIapUploadStatus(
+                    HTTPD_IAP_UPLOAD_STATE_ERROR,
+                    ps->received,
+                    ps->content_len
+                );
+                HttpdPost_SetIapUploadError(
+                    HTTPD_IAP_UPLOAD_ERROR_INCOMPLETE,
+                    UPDATE_INGEST_PIPELINE_E_STATE
+                );
+            }
+            else
+            {
+                UpdateIngestPipelineStatusType ingest_finish_status =
+                    UpdateIngestPipeline_Finish(&ps->iap_pipeline);
+
+                if (ingest_finish_status != UPDATE_INGEST_PIPELINE_E_OK)
+                {
+                    HttpdPost_SetIapUploadStatus(
+                        HTTPD_IAP_UPLOAD_STATE_ERROR,
+                        ps->received,
+                        ps->content_len
+                    );
+                    HttpdPost_SetIapUploadError(
+                        HTTPD_IAP_UPLOAD_ERROR_FINISH,
+                        (uint8_t)ingest_finish_status
+                    );
+                }
+                else
+                {
+                    WebInterface_RequestFirmwareVerifyHook();
+                    HttpdPost_SetIapUploadStatus(
+                        HTTPD_IAP_UPLOAD_STATE_READY,
+                        ps->content_len,
+                        ps->content_len
+                    );
+                    HttpdPost_SetIapUploadError(
+                        HTTPD_IAP_UPLOAD_ERROR_NONE,
+                        UPDATE_INGEST_PIPELINE_E_OK
+                    );
+                }
             }
 
             map_free(connection);
@@ -332,3 +479,53 @@ void httpd_post_finished(
     }
 }
 #endif
+
+void HttpdPost_GetIapUploadState(
+    uint8_t *state,
+    uint32_t *received,
+    uint32_t *total
+)
+{
+    if (state != NULL)
+    {
+        *state = HttpdIapUploadStatus.state;
+    }
+    if (received != NULL)
+    {
+        *received = HttpdIapUploadStatus.received;
+    }
+    if (total != NULL)
+    {
+        *total = HttpdIapUploadStatus.total;
+    }
+}
+
+void HttpdPost_GetIapUploadError(uint8_t *reason, uint8_t *ingest_status)
+{
+    if (reason != NULL)
+    {
+        *reason = HttpdIapUploadStatus.error_reason;
+    }
+    if (ingest_status != NULL)
+    {
+        *ingest_status = HttpdIapUploadStatus.ingest_status;
+    }
+}
+
+uint8_t HttpdPost_IsIapUploadReady(void)
+{
+    return (HttpdIapUploadStatus.state == HTTPD_IAP_UPLOAD_STATE_READY) ? 1u
+                                                                        : 0u;
+}
+
+void HttpdPost_ClearIapUploadReady(void)
+{
+    if (HttpdIapUploadStatus.state == HTTPD_IAP_UPLOAD_STATE_READY)
+    {
+        HttpdPost_SetIapUploadStatus(HTTPD_IAP_UPLOAD_STATE_IDLE, 0u, 0u);
+        HttpdPost_SetIapUploadError(
+            HTTPD_IAP_UPLOAD_ERROR_NONE,
+            UPDATE_INGEST_PIPELINE_E_OK
+        );
+    }
+}
