@@ -9,6 +9,7 @@ list(APPEND sources_SRCS
     ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/main.c
     ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/utils_mpu.c
     ${PROJ_PATH}/platform/Common/Src/instrumentation.c
+    ${PROJ_PATH}/platform/Common/Src/FwUpdateHandoff.c
     ${PROJ_PATH}/middleware/freertos/freertos_interface.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s

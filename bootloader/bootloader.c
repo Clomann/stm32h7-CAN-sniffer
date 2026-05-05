@@ -8,7 +8,7 @@
 #define WEAK
 #endif
 
-static unsigned char mbedtls_heap[16U * 1024U];
+static unsigned char mbedtls_heap[128U * 1024U];
 
 static BtlErrorType bootloader_init(void);
 
@@ -48,6 +48,7 @@ BtlErrorType bootloader_run(void)
 
     if (BTL_E_OK == rv)
     {
+        boot_activate_pending_if_image_present();
         rv = boot_go(&rsp);
     }
 

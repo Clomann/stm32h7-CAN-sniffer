@@ -7,10 +7,13 @@
 #include "flash.h"
 #include "mcuboot_config/mcuboot_config.h"
 #include "bootutil/bootutil.h"
+#include "bootutil/bootutil_public.h"
+#include "bootutil/image.h"
 #include "flash_map_backend/flash_map_backend.h"
 #include "mbedtls/platform_time.h"
 #include "sysflash/sysflash.h"
 #include "mcuboot_config/mcuboot_logging.h"
+#include "FwUpdateHandoff.h"
 
 #if defined(__GNUC__)
 #define WEAK __attribute__((weak))
@@ -523,4 +526,35 @@ WEAK void example_assert_handler(const char *file, int line)
 WEAK mbedtls_ms_time_t mbedtls_ms_time(void)
 {
     return 0;
+}
+
+void boot_activate_pending_if_image_present(void)
+{
+    int res;
+    const struct flash_area *fap;
+    uint32_t magic = 0u;
+    uint8_t apply_requested;
+
+    apply_requested = FwUpdateHandoff_IsApplyRequested();
+    if (apply_requested == 0u)
+    {
+        return;
+    }
+
+    (void)FwUpdateHandoff_ClearApplyRequest();
+
+    if (flash_area_open(FLASH_AREA_IMAGE_SECONDARY(0), &fap) != 0)
+    {
+        return;
+    }
+
+    res = flash_area_read(fap, 0u, &magic, sizeof(magic));
+    flash_area_close(fap);
+
+    if (magic == IMAGE_MAGIC)
+    {
+        res = boot_set_pending_multi(0, 1);
+    }
+
+    (void)res;
 }

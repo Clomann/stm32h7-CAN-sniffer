@@ -27,3 +27,5 @@ void boot_internal_flash_erase_sector(const uint32_t addr);
 void *boot_static_calloc(size_t num, size_t size);
 
 void boot_static_free(void *ptr);
+
+void boot_activate_pending_if_image_present(void);

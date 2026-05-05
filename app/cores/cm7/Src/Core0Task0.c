@@ -39,6 +39,7 @@
 #include "WebInterface.h"
 #include "RuntimeChecks.h"
 #include "Iap.h"
+#include "FwUpdateHandoff.h"
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -580,6 +581,8 @@ static void Core0Task0Main(void *parameters)
         {
             if (0 == AppCtrlData.runCanTracer && 0u != Iap_IsVerified())
             {
+                FwUpdateHandoffStatusType handoff_status =
+                    FW_UPDATE_HANDOFF_E_OK;
 
                 if (RES_OK == AppCtrlData.mountRes)
                 {
@@ -588,8 +591,12 @@ static void Core0Task0Main(void *parameters)
                 }
 
                 AppCtrlData.applyFirmwareUpdate = 0;
-                vTaskDelay(pdMS_TO_TICKS(50));
-                NVIC_SystemReset();
+                handoff_status = FwUpdateHandoff_RequestApply();
+                if (handoff_status == FW_UPDATE_HANDOFF_E_OK)
+                {
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    NVIC_SystemReset();
+                }
             }
             else
             {

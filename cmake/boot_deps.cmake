@@ -66,6 +66,7 @@ endif()
 
 list(APPEND sources_SRCS
     ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/boot_platform.c
+    ${PROJ_PATH}/platform/Common/Src/FwUpdateHandoff.c
     ${PROJ_PATH}/platform/drivers/flash/flash.c
     ${PROJ_PATH}/bootloader/irq_handlers.c
     ${PROJ_PATH}/bootloader/syscalls.c
