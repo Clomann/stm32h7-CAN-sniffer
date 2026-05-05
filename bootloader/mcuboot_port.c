@@ -163,6 +163,11 @@ struct boot_status;
 struct image_header;
 struct boot_swap_state;
 
+static void Error_Handler(int code)
+{
+    (void)code;
+}
+
 static const struct flash_area *prv_lookup_flash_area(uint8_t id)
 {
     for (size_t i = 0; i < ARRAY_SIZE(s_flash_areas); i++)
@@ -189,6 +194,9 @@ WEAK int flash_area_open(uint8_t id, const struct flash_area **area_outp)
 WEAK void flash_area_close(const struct flash_area *area)
 {
     (void)area;
+
+    Error_Handler(0);
+
 }
 
 WEAK int flash_area_read(
@@ -367,6 +375,9 @@ WEAK uint32_t flash_area_align(const struct flash_area *area)
 WEAK uint8_t flash_area_erased_val(const struct flash_area *area)
 {
     (void)area;
+
+    Error_Handler(0);
+
     // the value a byte reads when erased on storage.
     return 0xff;
 }
@@ -438,6 +449,9 @@ flash_area_to_sectors(int fa_id, int *count, struct flash_area *sectors)
     (void)fa_id;
     (void)count;
     (void)sectors;
+
+    Error_Handler(0);
+
     return -1;
 }
 
@@ -504,14 +518,23 @@ WEAK int flash_area_id_from_image_slot(int slot)
 
 WEAK int flash_area_id_to_multi_image_slot(int image_index, int area_id)
 {
-    (void)image_index;
-    (void)area_id;
+    if (area_id == FLASH_AREA_IMAGE_PRIMARY(image_index))
+    {
+        return BOOT_SLOT_PRIMARY;
+    }
+    if (area_id == FLASH_AREA_IMAGE_SECONDARY(image_index))
+    {
+        return BOOT_SLOT_SECONDARY;
+    }
     return -1;
 }
 
 WEAK int flash_area_id_from_image_offset(uint32_t offset)
 {
     (void)offset;
+
+    Error_Handler(0);
+
     return -1;
 }
 
@@ -525,6 +548,8 @@ WEAK void example_assert_handler(const char *file, int line)
 
 WEAK mbedtls_ms_time_t mbedtls_ms_time(void)
 {
+    Error_Handler(0);
+
     return 0;
 }
 
