@@ -222,21 +222,28 @@ IapWriter_Begin(IapWriterContextType *context, size_t image_size)
         return IAP_WRITER_E_RANGE;
     }
 
-    storage_status = context->storage_ops.erase(
-        context->storage_ops.ctx,
-        context->config.slot_addr,
-        erase_len
-    );
-    if (storage_status != IAP_WRITER_STORAGE_E_OK)
+    if (!context->slot_prepared)
     {
-        return IapWriter_MapStorageError(storage_status);
+        storage_status = context->storage_ops.erase(
+            context->storage_ops.ctx,
+            context->config.slot_addr,
+            erase_len
+        );
+        if (storage_status != IAP_WRITER_STORAGE_E_OK)
+        {
+            return IapWriter_MapStorageError(storage_status);
+        }
     }
 
     context->expected_size = (uint32_t)image_size;
     context->received_size = 0u;
     context->payload_hash  = IAP_WRITER_FNV1A_OFFSET_BASIS;
+    context->verify_hash   = IAP_WRITER_FNV1A_OFFSET_BASIS;
+    context->verify_offset = 0u;
     context->active        = true;
     context->finalized     = false;
+    context->verify_active = false;
+    context->slot_prepared = false;
 
     return IAP_WRITER_E_OK;
 }
@@ -296,12 +303,8 @@ IapWriterStatusType IapWriter_WriteChunk(
     return IAP_WRITER_E_OK;
 }
 
-IapWriterStatusType IapWriter_FinalizeAndVerify(IapWriterContextType *context)
+IapWriterStatusType IapWriter_Finalize(IapWriterContextType *context)
 {
-    uint8_t verify_buf[IAP_WRITER_VERIFY_BUF_SIZE];
-    uint32_t verify_hash = IAP_WRITER_FNV1A_OFFSET_BASIS;
-    uint32_t offset      = 0u;
-
     if (context == NULL || !context->initialized)
     {
         return IAP_WRITER_E_PARAM;
@@ -317,37 +320,131 @@ IapWriterStatusType IapWriter_FinalizeAndVerify(IapWriterContextType *context)
         return IAP_WRITER_E_STATE;
     }
 
-    while (offset < context->expected_size)
+    context->verify_hash   = IAP_WRITER_FNV1A_OFFSET_BASIS;
+    context->verify_offset = 0u;
+    context->verify_active = false;
+    context->active        = false;
+    context->finalized     = true;
+    return IAP_WRITER_E_OK;
+}
+
+IapWriterStatusType IapWriter_VerifyStep(
+    IapWriterContextType *context,
+    size_t max_step_bytes,
+    uint32_t *processed_bytes,
+    uint32_t *total_bytes,
+    uint8_t *done
+)
+{
+    uint8_t verify_buf[IAP_WRITER_VERIFY_BUF_SIZE];
+    size_t chunk_len = 0u;
+    IapWriterStorageStatusType storage_status;
+
+    if (context == NULL || !context->initialized || processed_bytes == NULL
+        || total_bytes == NULL || done == NULL || max_step_bytes == 0u)
     {
-        const uint32_t remaining = context->expected_size - offset;
-        const size_t chunk_len   = (remaining > IAP_WRITER_VERIFY_BUF_SIZE)
-                                       ? IAP_WRITER_VERIFY_BUF_SIZE
-                                       : (size_t)remaining;
-
-        const IapWriterStorageStatusType storage_status =
-            context->storage_ops.read(
-                context->storage_ops.ctx,
-                context->config.slot_addr + offset,
-                verify_buf,
-                chunk_len
-            );
-        if (storage_status != IAP_WRITER_STORAGE_E_OK)
-        {
-            return IapWriter_MapStorageError(storage_status);
-        }
-
-        verify_hash = IapWriter_HashBytes(verify_hash, verify_buf, chunk_len);
-        offset += (uint32_t)chunk_len;
+        return IAP_WRITER_E_PARAM;
     }
 
-    if (verify_hash != context->payload_hash)
+    if (context->active || !context->finalized)
+    {
+        return IAP_WRITER_E_STATE;
+    }
+
+    if (!context->verify_active)
+    {
+        context->verify_hash   = IAP_WRITER_FNV1A_OFFSET_BASIS;
+        context->verify_offset = 0u;
+        context->verify_active = true;
+    }
+
+    if (context->verify_offset > context->expected_size)
+    {
+        return IAP_WRITER_E_STATE;
+    }
+
+    *total_bytes = context->expected_size;
+
+    if (context->verify_offset == context->expected_size)
+    {
+        *processed_bytes = context->verify_offset;
+        *done            = 1u;
+
+        if (context->verify_hash != context->payload_hash)
+        {
+            return IAP_WRITER_E_VERIFY;
+        }
+
+        context->verify_active = false;
+        return IAP_WRITER_E_OK;
+    }
+
+    chunk_len = max_step_bytes;
+    if (chunk_len > IAP_WRITER_VERIFY_BUF_SIZE)
+    {
+        chunk_len = IAP_WRITER_VERIFY_BUF_SIZE;
+    }
+
+    if ((uint32_t)chunk_len > (context->expected_size - context->verify_offset))
+    {
+        chunk_len = (size_t)(context->expected_size - context->verify_offset);
+    }
+
+    storage_status = context->storage_ops.read(
+        context->storage_ops.ctx,
+        context->config.slot_addr + context->verify_offset,
+        verify_buf,
+        chunk_len
+    );
+    if (storage_status != IAP_WRITER_STORAGE_E_OK)
+    {
+        return IapWriter_MapStorageError(storage_status);
+    }
+
+    context->verify_hash =
+        IapWriter_HashBytes(context->verify_hash, verify_buf, chunk_len);
+    context->verify_offset += (uint32_t)chunk_len;
+    *processed_bytes = context->verify_offset;
+    *done = (context->verify_offset == context->expected_size) ? 1u : 0u;
+
+    if (*done != 0u && context->verify_hash != context->payload_hash)
     {
         return IAP_WRITER_E_VERIFY;
     }
 
-    context->active    = false;
-    context->finalized = true;
+    if (*done != 0u)
+    {
+        context->verify_active = false;
+    }
+
     return IAP_WRITER_E_OK;
+}
+
+IapWriterStatusType IapWriter_FinalizeAndVerify(IapWriterContextType *context)
+{
+    uint8_t done               = 0u;
+    uint32_t processed_bytes   = 0u;
+    uint32_t total_bytes       = 0u;
+    IapWriterStatusType status = IAP_WRITER_E_OK;
+
+    status = IapWriter_Finalize(context);
+    if (status != IAP_WRITER_E_OK)
+    {
+        return status;
+    }
+
+    do
+    {
+        status = IapWriter_VerifyStep(
+            context,
+            IAP_WRITER_VERIFY_BUF_SIZE,
+            &processed_bytes,
+            &total_bytes,
+            &done
+        );
+    } while (status == IAP_WRITER_E_OK && done == 0u);
+
+    return status;
 }
 
 IapWriterStatusType IapWriter_Abort(IapWriterContextType *context)
@@ -362,6 +459,10 @@ IapWriterStatusType IapWriter_Abort(IapWriterContextType *context)
     context->expected_size = 0u;
     context->received_size = 0u;
     context->payload_hash  = 0u;
+    context->verify_hash   = 0u;
+    context->verify_offset = 0u;
+    context->verify_active = false;
+    context->slot_prepared = false;
 
     return IAP_WRITER_E_OK;
 }
@@ -384,4 +485,14 @@ uint32_t IapWriter_GetReceivedSize(const IapWriterContextType *context)
     }
 
     return context->received_size;
+}
+
+uint8_t IapWriter_IsFinalized(const IapWriterContextType *context)
+{
+    if (context == NULL)
+    {
+        return 0u;
+    }
+
+    return (context->finalized) ? 1u : 0u;
 }

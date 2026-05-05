@@ -151,9 +151,13 @@ typedef struct
     uint32_t expected_size;
     uint32_t received_size;
     uint32_t payload_hash;
+    uint32_t verify_hash;
+    uint32_t verify_offset;
     bool initialized;
     bool active;
     bool finalized;
+    bool verify_active;
+    bool slot_prepared;
 } IapWriterContextType;
 
 /**
@@ -201,6 +205,34 @@ IapWriterStatusType IapWriter_WriteChunk(
 );
 
 /**
+ * @brief Finalize current write session without readback verification.
+ *
+ * @param context Writer context in active state.
+ *
+ * @return IAP_WRITER_E_OK on success, error code otherwise.
+ */
+IapWriterStatusType IapWriter_Finalize(IapWriterContextType *context);
+
+/**
+ * @brief Execute one incremental readback verification step.
+ *
+ * @param context         Writer context in finalized state.
+ * @param max_step_bytes  Maximum bytes to verify in this call.
+ * @param processed_bytes Number of verified bytes after this call.
+ * @param total_bytes     Total expected image bytes.
+ * @param done            Set to 1 when verification completed.
+ *
+ * @return IAP_WRITER_E_OK on success, error code otherwise.
+ */
+IapWriterStatusType IapWriter_VerifyStep(
+    IapWriterContextType *context,
+    size_t max_step_bytes,
+    uint32_t *processed_bytes,
+    uint32_t *total_bytes,
+    uint8_t *done
+);
+
+/**
  * @brief Finalize current session and verify written content by readback.
  *
  * @param context Writer context in active state.
@@ -235,3 +267,12 @@ uint32_t IapWriter_GetExpectedSize(const IapWriterContextType *context);
  * @return Received size in bytes, or 0 if context is invalid.
  */
 uint32_t IapWriter_GetReceivedSize(const IapWriterContextType *context);
+
+/**
+ * @brief Check whether current image write was finalized.
+ *
+ * @param context Writer context.
+ *
+ * @return 1 if finalized, otherwise 0.
+ */
+uint8_t IapWriter_IsFinalized(const IapWriterContextType *context);

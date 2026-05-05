@@ -6,6 +6,7 @@
 #include "ingest/UpdateIngestRegistry.h"
 #include "ingest/UpdateIngestPipeline.h"
 #include "ingest/IapIngestAdapter.h"
+#include <stddef.h>
 #include <stdint.h>
 
 #include "IapCfg.h"
@@ -24,6 +25,21 @@ static IapFlashAdapterContextType IapFlashAdapterContext  = {0};
 
 static IapIngestAdapterContextType IapIngestAdapterContext;
 static const UpdateIngestVTableType *UpdateIngestVTable;
+
+#define IAP_VERIFY_STEP_BYTES ((size_t)1024u)
+
+typedef struct
+{
+    IapVerifyStateType state;
+    uint32_t processed;
+    uint32_t total;
+} IapVerifyRuntimeType;
+
+static IapVerifyRuntimeType IapVerifyRuntime = {
+    .state     = IAP_VERIFY_STATE_IDLE,
+    .processed = 0u,
+    .total     = 0u,
+};
 
 IapErrorType Iap_Init(void)
 {
@@ -104,6 +120,131 @@ IapErrorType Iap_DeInit(void)
     IapErrorType res = IAP_E_OK;
 
     UpdateIngestRegistry_Clear();
+    Iap_VerifyReset();
 
     return res;
+}
+
+void Iap_VerifyReset(void)
+{
+    IapVerifyRuntime.state     = IAP_VERIFY_STATE_IDLE;
+    IapVerifyRuntime.processed = 0u;
+    IapVerifyRuntime.total     = 0u;
+}
+
+void Iap_VerifyRequest(void)
+{
+    if (0u == IapWriter_IsFinalized(&IapWriterContext))
+    {
+        IapVerifyRuntime.state     = IAP_VERIFY_STATE_ERROR;
+        IapVerifyRuntime.processed = 0u;
+        IapVerifyRuntime.total = IapWriter_GetExpectedSize(&IapWriterContext);
+        return;
+    }
+
+    IapVerifyRuntime.state     = IAP_VERIFY_STATE_PENDING;
+    IapVerifyRuntime.processed = 0u;
+    IapVerifyRuntime.total     = IapWriter_GetExpectedSize(&IapWriterContext);
+}
+
+void Iap_VerifyPoll(void)
+{
+    uint8_t done               = 0u;
+    uint32_t processed         = 0u;
+    uint32_t total             = 0u;
+    IapWriterStatusType status = IAP_WRITER_E_OK;
+
+    if (IapVerifyRuntime.state == IAP_VERIFY_STATE_PENDING)
+    {
+        if (0u == IapWriter_IsFinalized(&IapWriterContext))
+        {
+            IapVerifyRuntime.state = IAP_VERIFY_STATE_ERROR;
+            return;
+        }
+        IapVerifyRuntime.state = IAP_VERIFY_STATE_VERIFYING;
+    }
+
+    if (IapVerifyRuntime.state != IAP_VERIFY_STATE_VERIFYING)
+    {
+        return;
+    }
+
+    status = IapWriter_VerifyStep(
+        &IapWriterContext,
+        IAP_VERIFY_STEP_BYTES,
+        &processed,
+        &total,
+        &done
+    );
+    if (status != IAP_WRITER_E_OK)
+    {
+        IapVerifyRuntime.state = IAP_VERIFY_STATE_ERROR;
+        return;
+    }
+
+    IapVerifyRuntime.processed = processed;
+    IapVerifyRuntime.total     = total;
+    if (done != 0u)
+    {
+        IapVerifyRuntime.state = IAP_VERIFY_STATE_VERIFIED;
+    }
+}
+
+void Iap_GetVerifyStatus(
+    IapVerifyStateType *state,
+    uint32_t *processed,
+    uint32_t *total
+)
+{
+    if (state != NULL)
+    {
+        *state = IapVerifyRuntime.state;
+    }
+    if (processed != NULL)
+    {
+        *processed = IapVerifyRuntime.processed;
+    }
+    if (total != NULL)
+    {
+        *total = IapVerifyRuntime.total;
+    }
+}
+
+uint8_t Iap_IsVerified(void)
+{
+    return (IapVerifyRuntime.state == IAP_VERIFY_STATE_VERIFIED) ? 1u : 0u;
+}
+
+IapPrepareStatusType Iap_PrepareUploadSlot(void)
+{
+    IapWriterStorageStatusType storage_status = IAP_WRITER_STORAGE_E_OK;
+
+    if (!IapWriterContext.initialized)
+    {
+        return IAP_PREPARE_E_PARAM;
+    }
+
+    if (IapWriterContext.active)
+    {
+        return IAP_PREPARE_E_STATE;
+    }
+
+    if (IapWriterContext.storage_ops.erase == NULL)
+    {
+        return IAP_PREPARE_E_PARAM;
+    }
+
+    storage_status = IapWriterContext.storage_ops.erase(
+        IapWriterContext.storage_ops.ctx,
+        IapWriterContext.config.slot_addr,
+        IapWriterContext.config.slot_size
+    );
+    if (storage_status != IAP_WRITER_STORAGE_E_OK)
+    {
+        return IAP_PREPARE_E_BACKEND;
+    }
+
+    IapWriterContext.slot_prepared = true;
+    Iap_VerifyReset();
+    return IAP_PREPARE_E_OK;
 }

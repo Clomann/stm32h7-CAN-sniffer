@@ -62,6 +62,12 @@ UpdateIngestPipelineStatusType UpdateIngestPipeline_Push(
         return UPDATE_INGEST_PIPELINE_E_PARAM;
     }
 
+    if (context->received_size > context->expected_size
+        || len_u32 > (context->expected_size - context->received_size))
+    {
+        return UPDATE_INGEST_PIPELINE_E_RANGE;
+    }
+
     status = context->binding.vtable->write_chunk(
         context->binding.ctx,
         context->received_size,

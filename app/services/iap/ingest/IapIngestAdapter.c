@@ -65,7 +65,7 @@ WriteChunk(void *ctx, uint32_t offset, const uint8_t *data, size_t len)
     uint32_t remain_len                  = 0;
     uint32_t updated_len                 = 0;
     uint32_t updated_offset              = 0;
-    uint32_t alignment                   = 0;
+    uint32_t prog_size                   = 0;
     UpdateIngestStatusType res           = IAP_UPDATE_INGEST_E_OK;
     uint32_t algined_len                 = 0;
     IapIngestAdapterContextType *context = (IapIngestAdapterContextType *)ctx;
@@ -83,13 +83,13 @@ WriteChunk(void *ctx, uint32_t offset, const uint8_t *data, size_t len)
 
     res = context->writer->storage_ops.get_property(
         context->writer->storage_ops.ctx,
-        IAP_WRITER_STORAGE_PROP_ALIGNMET,
-        &alignment,
-        sizeof(alignment)
+        IAP_WRITER_STORAGE_PROP_PROG_SIZE,
+        &prog_size,
+        sizeof(prog_size)
     );
 
-    if (IAP_WRITER_STORAGE_E_OK != res || 0 == alignment
-        || IAP_INGEST_ADAPTER_ALIGN_MAX < alignment)
+    if (IAP_WRITER_STORAGE_E_OK != res || 0 == prog_size
+        || IAP_INGEST_ADAPTER_ALIGN_MAX < prog_size)
     {
         return IAP_UPDATE_INGEST_E_BACKEND;
     }
@@ -105,12 +105,12 @@ WriteChunk(void *ctx, uint32_t offset, const uint8_t *data, size_t len)
     // check if pending buffer is partially filled -> fill until full
     if (context->pending_len > 0 && len > 0)
     {
-        if (context->pending_len > alignment)
+        if (context->pending_len > prog_size)
         {
             return IAP_UPDATE_INGEST_E_STATE;
         }
 
-        free_len = alignment - context->pending_len;
+        free_len = prog_size - context->pending_len;
 
         if (len >= free_len)
         {
@@ -129,7 +129,7 @@ WriteChunk(void *ctx, uint32_t offset, const uint8_t *data, size_t len)
     }
 
     // write the pendinng buffer that was just filled completely
-    if (context->pending_len == alignment)
+    if (context->pending_len == prog_size)
     {
         res = MapWriterStatus(IapWriter_WriteChunk(
             context->writer,
@@ -147,9 +147,9 @@ WriteChunk(void *ctx, uint32_t offset, const uint8_t *data, size_t len)
     }
 
     // handle the main part of the chunk until unaligned remainder
-    if (updated_len >= alignment)
+    if (updated_len >= prog_size)
     {
-        algined_len = updated_len - updated_len % alignment;
+        algined_len = updated_len - updated_len % prog_size;
     }
 
     // pending buffer is supposed to be empty here
@@ -197,7 +197,7 @@ static UpdateIngestStatusType Finalize(void *ctx)
         return IAP_UPDATE_INGEST_E_ALIGN;
     }
 
-    return MapWriterStatus(IapWriter_FinalizeAndVerify(context->writer));
+    return MapWriterStatus(IapWriter_Finalize(context->writer));
 }
 
 static UpdateIngestStatusType Abort(void *ctx)
