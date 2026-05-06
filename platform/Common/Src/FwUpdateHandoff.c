@@ -6,7 +6,11 @@
 
 #include "flash.h"
 
-extern uint8_t __scratch_end__;
+#if defined(__GNUC__)
+#define WEAK __attribute__((weak))
+#else
+#define WEAK
+#endif
 
 #define FW_UPDATE_HANDOFF_MAGIC         (0x46574844u) /* "FWHD" */
 #define FW_UPDATE_HANDOFF_VERSION       (1u)
@@ -54,7 +58,11 @@ FwUpdateHandoff_GetMarkerLocation(uint32_t *address, uint32_t *sector_size)
         return FW_UPDATE_HANDOFF_E_FLASH;
     }
 
-    marker_address = (uint32_t)(uintptr_t)&__scratch_end__;
+    if (FW_UPDATE_HANDOFF_E_OK != FwUpdateHandoff_GetMarkerAddress_Hook(&marker_address))
+    {
+        return FW_UPDATE_HANDOFF_E_STATE;
+    }
+    
     if (marker_address < info.base_addr
         || marker_address > (UINT32_MAX - info.sector_size)
         || (marker_address + info.sector_size) > info.end_addr
@@ -184,4 +192,12 @@ uint8_t FwUpdateHandoff_IsApplyRequested(void)
     }
 
     return FwUpdateHandoff_RecordIsValid(&record);
+}
+
+WEAK
+uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
+{
+    (void) address;
+
+    return FW_UPDATE_HANDOFF_E_STATE;
 }

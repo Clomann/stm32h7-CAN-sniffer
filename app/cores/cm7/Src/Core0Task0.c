@@ -41,6 +41,8 @@
 #include "Iap.h"
 #include "FwUpdateHandoff.h"
 
+extern uint8_t __scratch_end__;
+
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
 typedef struct
@@ -738,4 +740,16 @@ uint8_t WebInterface_PrepareFirmwareUploadHook(void)
 void WebInterface_RequestFirmwareApplyHook(void)
 {
     AppCtrlData.applyFirmwareUpdate = 1;
+}
+
+uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
+{
+    if (NULL == address)
+    {
+        return FW_UPDATE_HANDOFF_E_PARAM;
+    }
+
+    *address = (uint32_t)(uintptr_t) & __scratch_end__;
+
+    return FW_UPDATE_HANDOFF_E_OK;
 }

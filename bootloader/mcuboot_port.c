@@ -163,6 +163,18 @@ struct boot_status;
 struct image_header;
 struct boot_swap_state;
 
+uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
+{
+    if (NULL == address)
+    {
+        return FW_UPDATE_HANDOFF_E_PARAM;
+    }
+
+    *address = (uint32_t)(SCRATCH_START_ADDRESS + SCRATCH_SIZE);
+
+    return FW_UPDATE_HANDOFF_E_OK;
+}
+
 static void Error_Handler(int code)
 {
     (void)code;

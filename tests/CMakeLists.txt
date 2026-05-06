@@ -287,6 +287,7 @@ add_executable(test_bootloader
     ${REPO_ROOT}/tests/bootloader/flash_write_wrapper.c
     ${REPO_ROOT}/bootloader/hal/bootloader_flash.c
     ${REPO_ROOT}/platform/drivers/flash/flash.c
+    ${REPO_ROOT}/platform/Common/Src/FwUpdateHandoff.c
     ${REPO_ROOT}/bootloader/bootloader.c
     ${REPO_ROOT}/bootloader/mcuboot_port.c
 )
@@ -386,6 +387,7 @@ target_include_directories(test_bootloader PRIVATE
     ${REPO_ROOT}/bootloader/mcuboot_config
     ${REPO_ROOT}/bootloader
     ${REPO_ROOT}/bootloader/flash_map_backend
+    ${REPO_ROOT}/platform/Common/Inc
 )
 
 target_link_libraries(test_bootloader PRIVATE mcuboot_bootutil unity test_flash_memory)

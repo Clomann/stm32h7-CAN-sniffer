@@ -33,3 +33,5 @@ FwUpdateHandoffStatusType FwUpdateHandoff_ClearApplyRequest(void);
  * @return 1 if a valid apply request is present, otherwise 0.
  */
 uint8_t FwUpdateHandoff_IsApplyRequested(void);
+
+uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address);
