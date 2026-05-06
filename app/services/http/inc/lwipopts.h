@@ -145,7 +145,9 @@ extern uint8_t __lwip_heap_end[];
 #define HTTPD_USE_MEM_POOL                1U
 #define MEMP_NUM_PARALLEL_HTTPD_CONNS     8U
 #define MEMP_NUM_PARALLEL_HTTPD_SSI_CONNS 8U
-#define LWIP_HTTPD_POST_MANUAL_WND        0U
+#define LWIP_HTTPD_POST_MANUAL_WND        1U
+/* Keep long-running firmware uploads alive while still releasing failed sockets quickly. */
+#define HTTPD_MAX_RETRIES 180U
 
 // mDNS to use .local hostname
 

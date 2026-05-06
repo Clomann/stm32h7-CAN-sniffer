@@ -108,8 +108,6 @@ LWIP_MEMPOOL_DECLARE(
     "Zero-copy RX PBUF pool"
 )
 
-uint8_t Buffer[4096] = {0};
-
 /* Variable Definitions */
 static uint8_t RxAllocStatus;
 
@@ -467,11 +465,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     TxConfig.Length   = p->tot_len;
     TxConfig.TxBuffer = Txbuffer;
     TxConfig.pData    = p;
-    memcpy(
-        Buffer,
-        (uint8_t *)TxConfig.TxBuffer[0].buffer,
-        TxConfig.TxBuffer[0].len
-    );
+
     pbuf_ref(p);
 
     HAL_ETH_Transmit_IT(&heth, &TxConfig);
@@ -540,10 +534,6 @@ void ethernetif_input(void *argument)
                     if (netif->input(p, netif) != ERR_OK)
                     {
                         pbuf_free(p);
-                    }
-                    else
-                    {
-                        memcpy(Buffer, (uint8_t *)p->payload, p->tot_len);
                     }
                 }
             } while (p != NULL);

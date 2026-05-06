@@ -24,6 +24,7 @@ jobs:
         git submodule sync --recursive
         git submodule update --init --recursive libs/coreJSON
         git submodule update --init --depth 1 libs/STM32_HAL/STM32H7
+        git submodule update --init --depth 1 libs/mcuboot 
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/STM32H7xx_Nucleo
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/lan8742
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/CMSIS/Device/ST/STM32H7xx

@@ -1,5 +1,23 @@
 # Sources
+if (CORE STREQUAL "CM7")
 list(APPEND sources_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/Core0Task0.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/Core0Task1.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/SdBridgeTask.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/CanBridgeTask.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/CanSendTask.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/CanCtrl.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src/SpiTask.c
+)
+endif()
+
+list(APPEND sources_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/IapFlashAdapter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/IapWriter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/Iap.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest/IapIngestAdapter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest/UpdateIngestRegistry.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest/UpdateIngestPipeline.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/storage/FileHandler.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/HttpAbs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/logging/CanLogBuffer.c
@@ -19,7 +37,16 @@ list(APPEND sources_SRCS
 )
 
 # Include directories
+if (CORE STREQUAL "CM7")
 list(APPEND include_path_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/cores/cm7/Src
+)
+endif()
+
+list(APPEND include_path_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/iap/ingest
     ${CMAKE_CURRENT_SOURCE_DIR}/services/config
     ${CMAKE_CURRENT_SOURCE_DIR}/services/logging
     ${CMAKE_CURRENT_SOURCE_DIR}/services/storage

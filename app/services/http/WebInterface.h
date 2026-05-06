@@ -26,3 +26,47 @@ void WebInterface_RequestFormattingHook(
     uint32_t log_file_size,
     uint32_t log_file_count
 );
+
+/**
+ * @brief Reset firmware verification state in the application layer.
+ */
+void WebInterface_ResetFirmwareVerifyHook(void);
+
+/**
+ * @brief Request firmware image verification for the currently staged update.
+ */
+void WebInterface_RequestFirmwareVerifyHook(void);
+
+/**
+ * @brief Query current firmware verification progress.
+ *
+ * @param[out] state Current verification state.
+ * @param[out] processed Number of bytes already verified.
+ * @param[out] total Total number of bytes to verify.
+ */
+void WebInterface_GetFirmwareVerifyStatusHook(
+    uint8_t *state,
+    uint32_t *processed,
+    uint32_t *total
+);
+
+/**
+ * @brief Check whether the staged firmware image is verified.
+ *
+ * @retval 1 Firmware image is verified.
+ * @retval 0 Firmware image is not verified.
+ */
+uint8_t WebInterface_IsFirmwareVerifiedHook(void);
+
+/**
+ * @brief Prepare the firmware upload target before receiving data.
+ *
+ * @retval 1 Upload target is ready.
+ * @retval 0 Preparation failed.
+ */
+uint8_t WebInterface_PrepareFirmwareUploadHook(void);
+
+/**
+ * @brief Request applying the verified firmware image on next reboot.
+ */
+void WebInterface_RequestFirmwareApplyHook(void);

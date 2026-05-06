@@ -26,12 +26,27 @@
       }
     },
     {
-      "label": "Flash CM7",
+      "label": "Flash CM7 Boot",
       "type": "shell",
       "command": "STM32_Programmer_CLI",
       "args": [
         "-c", "port=SWD",
-        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM7.elf", "0x08000000",
+        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM7_boot.elf", "0x08000000",
+        "-rst"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flash CM7 App",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c", "port=SWD",
+        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM7_app-signed.bin", "0x08020000",
         "-rst"
       ],
       "presentation": {
@@ -46,7 +61,7 @@
       "command": "STM32_Programmer_CLI",
       "args": [
         "-c", "port=SWD",
-        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf", "0x08100000",
+        "-d", "_bin/Debug/SPI_FullDuplex_ComDMA_CM4_app.elf", "0x08100000",
         "-rst"
       ],
       "presentation": {
@@ -56,12 +71,27 @@
       "problemMatcher": []
     },
     {
-      "label": "Flash CM7 (Release)",
+      "label": "Flash CM7 Boot (Release)",
       "type": "shell",
       "command": "STM32_Programmer_CLI",
       "args": [
         "-c", "port=SWD",
-        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM7.elf", "0x08000000",
+        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM7_boot.elf", "0x08000000",
+        "-rst"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flash CM7 App (Release)",
+      "type": "shell",
+      "command": "STM32_Programmer_CLI",
+      "args": [
+        "-c", "port=SWD",
+        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM7_app-signed.bin", "0x08020000",
         "-rst"
       ],
       "presentation": {
@@ -76,7 +106,7 @@
       "command": "STM32_Programmer_CLI",
       "args": [
         "-c", "port=SWD",
-        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM4.elf", "0x08100000",
+        "-d", "_bin/Release/SPI_FullDuplex_ComDMA_CM4_app.elf", "0x08100000",
         "-rst"
       ],
       "presentation": {
@@ -97,7 +127,8 @@
         "-c", "reset_config srst_only srst_nogate connect_deassert_srst",
         "-c", "init; \
             targets stm32h7x.cpu0; cortex_m vector_catch reset; \
-            targets stm32h7x.cpu1; cortex_m vector_catch reset; \
+            if {[catch {targets stm32h7x.cpu1; cortex_m vector_catch reset}]} {echo \"CM4 not available\"}; \
+            targets stm32h7x.cpu0; \
             mmw 0x580244A0 0x8 0x0; \
             reset run"
       ],
@@ -123,18 +154,28 @@
       }
     },
     {
+      "label": "Flash CM7 Boot & App",
+      "dependsOn": ["Flash CM7 Boot", "Flash CM7 App"],
+      "dependsOrder": "sequence"
+    },
+    {
       "label": "Flash CM7 & CM4",
-      "dependsOn": ["Flash CM7", "Flash CM4"],
+      "dependsOn": ["Flash CM7 Boot & App", "Flash CM4"],
       "dependsOrder": "sequence"
     },
     {
       "label": "Flash CM7 & CM4 and start OpenOCD",
-      "dependsOn": ["Flash CM7 & CM4", "Start OpenOCD"],
+      "dependsOn": ["Start OpenOCD"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "Flash CM7 Boot & App (Release)",
+      "dependsOn": ["Flash CM7 Boot (Release)", "Flash CM7 App (Release)"],
       "dependsOrder": "sequence"
     },
     {
       "label": "Flash CM7 & CM4 (Release)",
-      "dependsOn": ["Flash CM7 (Release)", "Flash CM4 (Release)"],
+      "dependsOn": ["Flash CM7 Boot & App (Release)", "Flash CM4 (Release)"],
       "dependsOrder": "sequence"
     },
     {

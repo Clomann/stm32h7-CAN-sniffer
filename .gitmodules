@@ -7,6 +7,9 @@
 [submodule "libs/lwip-tcpip"]
 	path = libs/lwip-tcpip
 	url = https://github.com/lwip-tcpip/lwip.git
+[submodule "libs/mbedtls"]
+	path = libs/mbedtls
+	url = https://github.com/zephyrproject-rtos/mbedtls.git
 [submodule "libs/mcuboot"]
 	path = libs/mcuboot
 	url = https://github.com/mcu-tools/mcuboot.git

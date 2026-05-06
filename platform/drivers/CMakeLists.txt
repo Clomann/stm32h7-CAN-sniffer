@@ -2,6 +2,7 @@ set(DRIVERS_BASE ${CMAKE_CURRENT_LIST_DIR})
 
 # Sources
 list(APPEND sources_SRCS
+    ${CMAKE_CURRENT_LIST_DIR}/flash/flash.c
     ${CMAKE_CURRENT_LIST_DIR}/spi/spi.c
     ${CMAKE_CURRENT_LIST_DIR}/spi/Spi_Cmds.c
     ${CMAKE_CURRENT_LIST_DIR}/SpiAbs/SpiAbs.c
@@ -18,6 +19,7 @@ list(APPEND sources_SRCS
 # Include directories
 list(APPEND include_path_DIRS
     ${CMAKE_CURRENT_LIST_DIR}/
+    ${CMAKE_CURRENT_LIST_DIR}/flash
     ${CMAKE_CURRENT_LIST_DIR}/spi
     ${CMAKE_CURRENT_LIST_DIR}/SpiAbs
     ${CMAKE_CURRENT_LIST_DIR}/CanAbs

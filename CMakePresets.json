@@ -8,7 +8,8 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "toolchainFile": "${sourceDir}/gcc-arm-none-eabi.cmake",
             "cacheVariables": {
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "APP_VERSION": "auto"
             }
         },
         {
@@ -30,6 +31,26 @@
             }
         },
         {
+            "name": "Debug_CM7_Boot",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CORE": "CM7",
+                "DUAL_CORE": "true",
+                "BUILD_TARGET": "bootloader"
+            }
+        },
+        {
+            "name": "Debug_CM7_Both",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CORE": "CM7",
+                "DUAL_CORE": "true",
+                "BUILD_TARGET": "both"
+            }
+        },
+        {
             "name": "Debug_CM4",
             "inherits": "default",
             "cacheVariables": {
@@ -38,14 +59,36 @@
                 "DUAL_CORE": "true"
             }
         },
-
         {
             "name": "Release_CM7",
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CORE": "CM7",
-                "DUAL_CORE": "true"
+                "DUAL_CORE": "true",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
+            }
+        },
+        {
+            "name": "Release_CM7_Boot",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CORE": "CM7",
+                "DUAL_CORE": "true",
+                "BUILD_TARGET": "bootloader",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
+            }
+        },
+        {
+            "name": "Release_CM7_Both",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CORE": "CM7",
+                "DUAL_CORE": "true",
+                "BUILD_TARGET": "both",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON"
             }
         },
         {
@@ -72,6 +115,18 @@
             "cleanFirst": true
         },
         { 
+            "name": "debug-build-cm7-boot", 
+            "configurePreset": "Debug_CM7_Boot", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "debug-build-cm7-both", 
+            "configurePreset": "Debug_CM7_Both", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
             "name": "debug-build-cm4", 
             "configurePreset": "Debug_CM4", 
             "jobs": 4,
@@ -80,6 +135,18 @@
         { 
             "name": "release-build-cm7", 
             "configurePreset": "Release_CM7", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "release-build-cm7-boot", 
+            "configurePreset": "Release_CM7_Boot", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "release-build-cm7-both", 
+            "configurePreset": "Release_CM7_Both", 
             "jobs": 4,
             "cleanFirst": true
         },
@@ -120,6 +187,34 @@
             ]
         },
         {
+            "description": "Developer workflow (CM7, bootloader only)",
+            "name": "debug-cm7-boot",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Debug_CM7_Boot"
+                },
+                { 
+                    "type": "build",
+                    "name": "debug-build-cm7-boot"
+                }
+            ]
+        },
+        {
+            "description": "Developer workflow (CM7, app+boot)",
+            "name": "debug-cm7-both",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Debug_CM7_Both"
+                },
+                { 
+                    "type": "build",
+                    "name": "debug-build-cm7-both"
+                }
+            ]
+        },
+        {
             "description": "Developer workflow",
             "name": "debug-cm4",
             "steps": [
@@ -144,6 +239,34 @@
                 { 
                     "type": "build",
                     "name": "release-build-cm7"
+                }
+            ]
+        },
+        {
+            "description": "Release workflow (CM7, bootloader only)",
+            "name": "release-cm7-boot",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Release_CM7_Boot"
+                },
+                { 
+                    "type": "build",
+                    "name": "release-build-cm7-boot"
+                }
+            ]
+        },
+        {
+            "description": "Release workflow (CM7, app+boot)",
+            "name": "release-cm7-both",
+            "steps": [
+                { 
+                    "type": "configure",
+                    "name": "Release_CM7_Both"
+                },
+                { 
+                    "type": "build",
+                    "name": "release-build-cm7-both"
                 }
             ]
         },

@@ -8,7 +8,6 @@ list(APPEND sources_SRCS
     ${PROJ_PATH}/libs/ff15a/source/ffunicode.c
 
     ${PROJ_PATH}/libs/coreJSON/source/core_json.c
-
     # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/bridgeif_fdb.c 
     # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/bridgeif.c 
     # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/ethernet.c 
@@ -56,7 +55,9 @@ list(APPEND sources_SRCS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/tcp.c 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/timeouts.c 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/udp.c
+)
 
+list(APPEND sources_SRCS
     ${STM32_HAL_PATH}/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.c
     ${STM32_HAL_PATH}/Drivers/BSP/Components/lan8742/lan8742.c
 
@@ -210,7 +211,9 @@ list(APPEND include_path_DIRS
     ${PROJ_PATH}/libs/ff15a/source/
 
     ${PROJ_PATH}/libs/coreJSON/source/include/
+)
 
+list(APPEND include_path_DIRS
     # LwIP dependencies
     # ${PROJ_PATH}/libs/lwip-tcpip/src/include
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include
@@ -218,6 +221,18 @@ list(APPEND include_path_DIRS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/apps
     ${STM32_HAL_PATH}Middlewares/Third_Party/LwIP/src/apps/http/
+)
+
+list(APPEND include_path_DIRS
+    # MCUboot deps
+    ${PROJ_PATH}/bootloader
+    ${PROJ_PATH}/bootloader/flash_map_backend
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include/bootutil
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include/bootutil/crypto
+
+    #mbedtls
+    ${PROJ_PATH}/libs/mbedtls/include
 )
 
 endif() 

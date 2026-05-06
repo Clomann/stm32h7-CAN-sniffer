@@ -2,6 +2,7 @@
 #include "Core0TasksCfg.h"
 #include "TasksHooks.h"
 
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -37,6 +38,10 @@
 #include "CanCtrl.h"
 #include "WebInterface.h"
 #include "RuntimeChecks.h"
+#include "Iap.h"
+#include "FwUpdateHandoff.h"
+
+extern uint8_t __scratch_end__;
 
 TASK_VARIABLES(CORE0_TASK2_FUNCTION, CORE0_TASK2_STACK_SIZE)
 
@@ -47,6 +52,7 @@ typedef struct
     uint8_t mountRes;
     bool runCanTracer;
     bool applyConfig;
+    bool applyFirmwareUpdate;
     bool commitLog;
 } AppControlDataType;
 
@@ -55,9 +61,10 @@ static AppConfigType AppConfig;
 static CanCtrlDataType CanCtrlData;
 
 static AppControlDataType AppCtrlData = {
-    .mountRes     = 1,
-    .runCanTracer = 0,
-    .commitLog    = 0
+    .mountRes            = 1,
+    .runCanTracer        = 0,
+    .applyFirmwareUpdate = 0,
+    .commitLog           = 0
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -425,6 +432,7 @@ static void appConfigSetDefaults(AppConfigType *config)
 
 static void Core0Task0Main(void *parameters)
 {
+    IapErrorType IapRes;
     static UBaseType_t MinUnusedStack;
 
     /* Unused parameters. */
@@ -441,6 +449,15 @@ static void Core0Task0Main(void *parameters)
 
     /* initialialize port early to allow for taskless SPI communication */
     SpiTask_PortInit();
+
+    IapRes = Iap_Init();
+
+    if (IAP_E_OK != IapRes)
+    {
+        (void)Iap_DeInit();
+
+        Error_Handler();
+    }
 
     http_init();
 
@@ -516,6 +533,7 @@ static void Core0Task0Main(void *parameters)
     while (run)
     {
         http_poll();
+        Iap_VerifyPoll();
 
         if (SettingsHandler_Poll(&AppConfig))
         {
@@ -559,6 +577,33 @@ static void Core0Task0Main(void *parameters)
         else
         {
             AppCtrlData.applyConfig = 0;
+        }
+
+        if (0 != AppCtrlData.applyFirmwareUpdate)
+        {
+            if (0 == AppCtrlData.runCanTracer && 0u != Iap_IsVerified())
+            {
+                FwUpdateHandoffStatusType handoff_status =
+                    FW_UPDATE_HANDOFF_E_OK;
+
+                if (RES_OK == AppCtrlData.mountRes)
+                {
+                    FatFS_SD_Unmount();
+                    AppCtrlData.mountRes = RES_NOTRDY;
+                }
+
+                AppCtrlData.applyFirmwareUpdate = 0;
+                handoff_status = FwUpdateHandoff_RequestApply();
+                if (handoff_status == FW_UPDATE_HANDOFF_E_OK)
+                {
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    NVIC_SystemReset();
+                }
+            }
+            else
+            {
+                AppCtrlData.applyFirmwareUpdate = 0;
+            }
         }
 
         MinUnusedStack = uxTaskGetStackHighWaterMark(NULL);
@@ -661,4 +706,50 @@ void WebInterface_RequestFormattingHook(
 )
 {
     FatFS_SD_Formatting_Request(cluster_size, log_file_size, log_file_count);
+}
+
+void WebInterface_ResetFirmwareVerifyHook(void)
+{
+    Iap_VerifyReset();
+}
+
+void WebInterface_RequestFirmwareVerifyHook(void)
+{
+    Iap_VerifyRequest();
+}
+
+void WebInterface_GetFirmwareVerifyStatusHook(
+    uint8_t *state,
+    uint32_t *processed,
+    uint32_t *total
+)
+{
+    Iap_GetVerifyStatus((IapVerifyStateType *)state, processed, total);
+}
+
+uint8_t WebInterface_IsFirmwareVerifiedHook(void)
+{
+    return Iap_IsVerified();
+}
+
+uint8_t WebInterface_PrepareFirmwareUploadHook(void)
+{
+    return (Iap_PrepareUploadSlot() == IAP_PREPARE_E_OK) ? 1u : 0u;
+}
+
+void WebInterface_RequestFirmwareApplyHook(void)
+{
+    AppCtrlData.applyFirmwareUpdate = 1;
+}
+
+uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
+{
+    if (NULL == address)
+    {
+        return FW_UPDATE_HANDOFF_E_PARAM;
+    }
+
+    *address = (uint32_t)(uintptr_t) & __scratch_end__;
+
+    return FW_UPDATE_HANDOFF_E_OK;
 }
