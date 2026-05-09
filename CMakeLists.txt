@@ -239,7 +239,7 @@ elseif(CORE STREQUAL "CM4")
         ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
 
         ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/syscalls.c
-        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/startup/startup_stm32h745zitx.s
+        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/Startup/startup_stm32h745zitx.s
     )
 
     if(FW_USE_MALLOC)

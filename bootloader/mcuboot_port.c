@@ -208,7 +208,6 @@ WEAK void flash_area_close(const struct flash_area *area)
     (void)area;
 
     Error_Handler(0);
-
 }
 
 WEAK int flash_area_read(

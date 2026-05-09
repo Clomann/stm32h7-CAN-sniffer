@@ -11,7 +11,12 @@ jobs:
 
     steps:
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y cmake gcc make clang-format-18
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake gcc make clang-format-18 python3-venv \
+          gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
+          libstdc++-arm-none-eabi-newlib
 
     - name: Show clang-format version
       run: clang-format-18 --version
@@ -25,13 +30,49 @@ jobs:
         git submodule update --init --recursive libs/coreJSON
         git submodule update --init --depth 1 libs/STM32_HAL/STM32H7
         git submodule update --init --depth 1 libs/mcuboot 
+        git submodule update --init --recursive libs/mbedtls 
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/STM32H7xx_Nucleo
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/lan8742
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/CMSIS/Device/ST/STM32H7xx
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/Common
 
+    - name: Setup Python venv
+      run: |
+        python3 -m venv .venv
+        echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
+        echo "MCUBOOT_PYTHON=${GITHUB_WORKSPACE}/.venv/bin/python" >> "$GITHUB_ENV"
+
+    - name: Install imgtool dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r ./libs/mcuboot/scripts/requirements.txt
+
+    - name: Generate temporary MCUboot test keys
+      run: |
+        rm -f .keys/*.pem
+        mkdir -p .keys
+        python ./libs/mcuboot/scripts/imgtool.py keygen -k .keys/sign-ecdsa-p256.priv.pem -t ecdsa-p256
+        python ./libs/mcuboot/scripts/imgtool.py keygen -k .keys/enc-ecies-p256.priv.pem -t ecdsa-p256
+        python ./libs/mcuboot/scripts/imgtool.py getpub -k .keys/enc-ecies-p256.priv.pem -e pem -o .keys/enc-ecies-p256.pub.pem
+        grep -q "BEGIN PUBLIC KEY" .keys/enc-ecies-p256.pub.pem
+
+    - name: Configure and build Release CM4
+      run: |
+        cmake --preset Release_CM4
+        cmake --build --preset release-build-cm4
+
+    - name: Configure and build Release CM7 Boot
+      run: |
+        cmake --preset Release_CM7_Boot
+        cmake --build --preset release-build-cm7-boot
+
+    - name: Configure and build Release CM7
+      run: |
+        cmake --preset Release_CM7
+        cmake --build --preset release-build-cm7
+
     - name: Configure with CMake
-      run: cmake -S tests -B build
+      run: cmake -S tests -B build -DMCUBOOT_PYTHON="${MCUBOOT_PYTHON}" -DCMAKE_OBJCOPY="$(command -v arm-none-eabi-objcopy)"
 
     - name: Check formatting (clang-format)
       run: |
