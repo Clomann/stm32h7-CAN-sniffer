@@ -749,7 +749,7 @@ uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
         return FW_UPDATE_HANDOFF_E_PARAM;
     }
 
-    *address = (uint32_t)(uintptr_t) & __scratch_end__;
+    *address = (uint32_t)(uintptr_t)&__scratch_end__;
 
     return FW_UPDATE_HANDOFF_E_OK;
 }

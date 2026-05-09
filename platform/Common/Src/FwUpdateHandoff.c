@@ -58,11 +58,12 @@ FwUpdateHandoff_GetMarkerLocation(uint32_t *address, uint32_t *sector_size)
         return FW_UPDATE_HANDOFF_E_FLASH;
     }
 
-    if (FW_UPDATE_HANDOFF_E_OK != FwUpdateHandoff_GetMarkerAddress_Hook(&marker_address))
+    if (FW_UPDATE_HANDOFF_E_OK
+        != FwUpdateHandoff_GetMarkerAddress_Hook(&marker_address))
     {
         return FW_UPDATE_HANDOFF_E_STATE;
     }
-    
+
     if (marker_address < info.base_addr
         || marker_address > (UINT32_MAX - info.sector_size)
         || (marker_address + info.sector_size) > info.end_addr
@@ -194,10 +195,9 @@ uint8_t FwUpdateHandoff_IsApplyRequested(void)
     return FwUpdateHandoff_RecordIsValid(&record);
 }
 
-WEAK
-uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
+WEAK uint8_t FwUpdateHandoff_GetMarkerAddress_Hook(uint32_t *address)
 {
-    (void) address;
+    (void)address;
 
     return FW_UPDATE_HANDOFF_E_STATE;
 }
