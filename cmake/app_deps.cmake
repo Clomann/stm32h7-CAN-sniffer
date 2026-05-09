@@ -12,7 +12,7 @@ list(APPEND sources_SRCS
     ${PROJ_PATH}/platform/Common/Src/FwUpdateHandoff.c
     ${PROJ_PATH}/middleware/freertos/freertos_interface.c
     ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
-    ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
+    ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/Startup/startup_stm32h745zitx.s
 )
 
 if(FW_USE_MALLOC)
