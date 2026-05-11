@@ -14,9 +14,35 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          cmake gcc make clang-format-18 python3-venv \
-          gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
-          libstdc++-arm-none-eabi-newlib
+          cmake gcc make clang-format-18 python3-venv curl xz-utils coreutils
+        
+        TOOLCHAIN_VER=13.3.rel1
+        TOOLCHAIN_DIR=/opt/arm-gnu-toolchain-${TOOLCHAIN_VER}
+        BASE_URL="https://developer.arm.com/-/media/Files/downloads/gnu/${TOOLCHAIN_VER}/binrel"
+        TARBALL="arm-gnu-toolchain-${TOOLCHAIN_VER}-x86_64-arm-none-eabi.tar.xz"
+        echo Downloading ARM GNU toolchain ...
+        curl -fL "${BASE_URL}/${TARBALL}" -o "/tmp/${TARBALL}"
+        curl -fL "${BASE_URL}/${TARBALL}.sha256asc" -o "/tmp/${TARBALL}.sha256asc"
+
+        set -euo pipefail
+        EXPECTED_SHA="$(awk 'NF{print $1; exit}' "/tmp/${TARBALL}.sha256asc")"
+        ACTUAL_SHA="$(sha256sum "/tmp/${TARBALL}" | awk '{print $1}')"
+        if [ "${ACTUAL_SHA}" = "${EXPECTED_SHA}" ]; then
+          sudo mkdir -p "${TOOLCHAIN_DIR}"
+          sudo tar -xJf "/tmp/${TARBALL}" --strip-components=1 -C "${TOOLCHAIN_DIR}"
+        else
+          echo "Checksum verification failed for ${TARBALL}" >&2
+          echo "expected: ${EXPECTED_SHA}" >&2
+          echo "actual:   ${ACTUAL_SHA}" >&2
+          exit 1
+        fi
+
+        echo "${TOOLCHAIN_DIR}/bin" >> "$GITHUB_PATH"
+
+    - name: Verify compiler in PATH
+      run: |
+        which arm-none-eabi-gcc
+        arm-none-eabi-gcc --version | head -n1
 
     - name: Show clang-format version
       run: clang-format-18 --version
@@ -58,17 +84,17 @@ jobs:
 
     - name: Configure and build Release CM4
       run: |
-        cmake --preset Release_CM4
+        cmake --fresh --preset Release_CM4
         cmake --build --preset release-build-cm4
 
     - name: Configure and build Release CM7 Boot
       run: |
-        cmake --preset Release_CM7_Boot
+        cmake --fresh --preset Release_CM7_Boot
         cmake --build --preset release-build-cm7-boot
 
     - name: Configure and build Release CM7
       run: |
-        cmake --preset Release_CM7
+        cmake --fresh --preset Release_CM7
         cmake --build --preset release-build-cm7
 
     - name: Configure with CMake
