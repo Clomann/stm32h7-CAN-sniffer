@@ -76,6 +76,32 @@ static void HttpdPost_SetIapUploadError(uint8_t reason, uint8_t ingest_status)
     HttpdIapUploadStatus.ingest_status = ingest_status;
 }
 
+static void HttpdPost_ClearSingleIapSession(HttpdPostStateMapType *entry)
+{
+    if (entry == NULL || entry->conn == NULL)
+    {
+        return;
+    }
+
+    if (entry->ps.mode == HTTPD_POST_MODE_IAP_BIN)
+    {
+        if (entry->ps.iap_failed == 0u)
+        {
+            (void)UpdateIngestPipeline_Abort(&entry->ps.iap_pipeline);
+        }
+        if (current_connection == entry->conn)
+        {
+            current_connection = NULL;
+        }
+        if (valid_connection == entry->conn)
+        {
+            valid_connection = NULL;
+        }
+        entry->conn = NULL;
+        (void)memset(&entry->ps, 0, sizeof(entry->ps));
+    }
+}
+
 static HttpdPostStateType *map_lookup(void *conn)
 {
     for (uint32_t i = 0; i < LWIP_ARRAYSIZE(conn_map); i++)
@@ -528,4 +554,18 @@ void HttpdPost_ClearIapUploadReady(void)
             UPDATE_INGEST_PIPELINE_E_OK
         );
     }
+}
+
+void HttpdPost_ResetIapUploadSession(void)
+{
+    for (uint32_t i = 0; i < LWIP_ARRAYSIZE(conn_map); i++)
+    {
+        HttpdPost_ClearSingleIapSession(&conn_map[i]);
+    }
+
+    HttpdPost_SetIapUploadStatus(HTTPD_IAP_UPLOAD_STATE_IDLE, 0u, 0u);
+    HttpdPost_SetIapUploadError(
+        HTTPD_IAP_UPLOAD_ERROR_NONE,
+        UPDATE_INGEST_PIPELINE_E_OK
+    );
 }
