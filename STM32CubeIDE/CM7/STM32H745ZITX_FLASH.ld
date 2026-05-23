@@ -6,7 +6,7 @@
 **
 **
 **  Abstract    : Linker script for STM32H7 series
-**                1024Kbytes FLASH and 192Kbytes RAM_D1
+**                1024Kbytes FLASH and 512Kbytes RAM_D1
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -35,7 +35,7 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-PROVIDE(_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1));
+PROVIDE(_estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM));
 
 _Boot_Flash_Size     = 0x20000 ; /* required amount of flash for bootloader */
 _Header_Flash_Size   = 0x400 ; /* required amount of flash for image header */
@@ -91,48 +91,8 @@ SECTIONS
 
   .boot __boot_start__ :
   {
-    . = ALIGN(4);
-    /* bootloader sources */
-    KEEP(*bootloader*(.isr_vector))
-    *bootloader*(.text .text.* .rodata .rodata.*)
-
-    /* mcuboot sources */
-    *mcuboot*(.text .text.* .rodata .rodata.*)
-
-    . = ALIGN(4);
-
-    __boot_flash_lma_end__ = .;
+    . = . + __boot_size__;
   } >FLASH_BOOT
-
-  .boot_data : AT ( __boot_flash_lma_end__ )
-  {
-    *bootloader*(.data .data.*)
-    *mcuboot*(.data .data.*)
-  } >RAM_D1
-
-  __boot_sidata = LOADADDR(.boot_data);
-  __boot_sdata  = ADDR(.boot_data);
-  __boot_edata  = ADDR(.boot_data) + SIZEOF(.boot_data);
-
-  __boot_flash_lma_end_with_data__ = __boot_flash_lma_end__ + SIZEOF(.boot_data);
-  ASSERT(__boot_flash_lma_end_with_data__ <= __boot_end__, "Bootloader overflow (text+data)")
-
-  . = __boot_end__;
-
-  PROVIDE(__boot_start = __boot_start__);
-  PROVIDE(__boot_end = __boot_end__);
-  PROVIDE(__boot_size = __boot_size__);
-  PROVIDE(__boot_off = __boot_off__);
-  
-  .boot_bss (NOLOAD) :
-  {
-    *bootloader*(.bss .bss.* COMMON)
-    *mcuboot*(.bss .bss.* COMMON)
-  } >RAM_D1
-
-  __boot_sbss   = ADDR(.boot_bss);
-  __boot_ebss   = ADDR(.boot_bss) + SIZEOF(.boot_bss);
-
 
   /* The startup code goes first into FLASH */
   .isr_vector __app_primary_start__ :
@@ -230,8 +190,6 @@ SECTIONS
     . = . + _Scratch_Flash_Size;
   } >FLASH_SCRATCH
 
-  ASSERT(__boot_start__ % _Flash_Sector_Size == 0, "Boot start not sector aligned")
-  ASSERT(__boot_size__ % _Flash_Sector_Size == 0, "Boot size not sector aligned")
   ASSERT(__app_primary_start__ % _Flash_Sector_Size == 0, "Primary start not sector aligned")
   ASSERT(__app_primary_size__ % _Flash_Sector_Size == 0, "Primary size not sector aligned")
   ASSERT(__app_secondary_start__ % _Flash_Sector_Size == 0, "Secondary start not sector aligned")
@@ -252,44 +210,7 @@ SECTIONS
     . = ALIGN(4);
   } >DTCMRAM
 
-  /* Initialized data sections goes into RAM_D1, load LMA copy after code */
-  .data : 
-  {
-    . = ALIGN(4);
-    _sdata = .;        /* create a global symbol at data start */
-
-    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .data .data.*)
-
-    . = ALIGN(32);
-    __dma_ro_start = .;
-    KEEP(*(.dma_buffer.ro))
-    __dma_ro_end = .;
-    . = ALIGN(4);
-    _edata = .;        /* define a global symbol at data end */
-  } >RAM_D1 AT> FLASH_PRIMARY
-
-  /* Uninitialized data section */
-  . = ALIGN(4);
-  .bss :
-  {
-    /* This is used by the startup in order to initialize the .bss section */
-    _sbss = .;         /* define a global symbol at bss start */
-    __bss_start__ = _sbss;
-    
-    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .bss .bss.* COMMON)
-
-    . = ALIGN(4);
-    _ebss = .;         /* define a global symbol at bss end */
-    __bss_end__ = _ebss;
-  } >RAM_D1
-
-  .ram_d1 (NOLOAD): {
-    . = ALIGN(4);
-    *(.ram_d1)
-    . = ALIGN(4);
-  } >RAM_D1
-
-  /* User_heap_stack section, used to check that there is enough RAM_D1 left */
+  /* User_heap_stack section, used to check that there is enough DTCMRAM left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -298,6 +219,12 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
+  } >DTCMRAM
+
+  .ram_d1 (NOLOAD): {
+    . = ALIGN(4);
+    *(.ram_d1)
+    . = ALIGN(4);
   } >RAM_D1
 
   .lwip_sec (NOLOAD): {
@@ -322,6 +249,37 @@ SECTIONS
 
   PROVIDE(__lwip_heap_start = __lwip_heap_start__);
   PROVIDE(__lwip_heap_end   = __lwip_heap_end__);
+
+  /* Initialized data sections goes into RAM_D2, load LMA copy after code */
+  .data : 
+  {
+    . = ALIGN(4);
+    _sdata = .;        /* create a global symbol at data start */
+
+    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .data .data.*)
+
+    . = ALIGN(32);
+    __dma_ro_start = .;
+    KEEP(*(.dma_buffer.ro))
+    __dma_ro_end = .;
+    . = ALIGN(4);
+    _edata = .;        /* define a global symbol at data end */
+  } >RAM_D2 AT> FLASH_PRIMARY
+
+  /* Uninitialized data section */
+  . = ALIGN(4);
+  .bss :
+  {
+    /* This is used by the startup in order to initialize the .bss section */
+    _sbss = .;         /* define a global symbol at bss start */
+    __bss_start__ = _sbss;
+    
+    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .bss .bss.* COMMON)
+
+    . = ALIGN(4);
+    _ebss = .;         /* define a global symbol at bss end */
+    __bss_end__ = _ebss;
+  } >RAM_D2
 
   .ram_d2 (NOLOAD): {
     . = ALIGN(4);
