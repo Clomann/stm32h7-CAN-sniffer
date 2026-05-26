@@ -342,6 +342,23 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
         EXTRACT_CSD_BITS(buf, SD_CSD_ALWAYS1_MSK, SD_CSD_ALWAYS1_START);
 }
 
+static uint8_t SD_Spi_WaitBusy(uint32_t maxAttempts)
+{
+    uint32_t attempts = 0;
+    uint8_t resp;
+
+    do {
+        SpiAbs_readByte(SPIABS_DEVICE_1, &resp);
+        if (resp == 0xFF) break;
+        if (attempts >= 500U)
+        {
+            Sd_Spi_OsTaskDelayHook(2);
+        }
+    } while (++attempts < maxAttempts);
+
+    return (resp == 0xFF) ? 0U : 1U;
+}
+
 uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
 {
     uint8_t res = SD_E_OK;
@@ -970,7 +987,7 @@ SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 DRESULT SD_Spi_hotReset(void)
 {
     uint8_t res;
-    uint32_t readResponseAttempts;
+    uint8_t WaitRes = 0;
     Spi_R1Response resp;
     uint8_t dummy[8];
 
@@ -993,16 +1010,11 @@ DRESULT SD_Spi_hotReset(void)
         return RES_NOTRDY;
     }
 
-    readResponseAttempts = 0;
-    do
-    { // wait for card to go idle
-        SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-    } while ((resp.byte != 0xFF)
-             && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
+    WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS);
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
-    if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+    if (0 != WaitRes)
     {
         res = RES_NOTRDY;
     }
@@ -1154,11 +1166,11 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
             if (0 == res)
             {
-                if (SpiAbs_PollForIdle(
-                        SPIABS_DEVICE_1,
-                        &resp.byte,
-                        SD_MAX_READ_RESPONSE_ATTEMPTS
-                    ) != 0)
+                uint8_t WaitRes = 0;
+
+                WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS);
+                
+                if (0 != WaitRes)
                 {
                     res = SD_E_CMD_NO_GOING_IDLE;
                 }
@@ -1186,11 +1198,11 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
         if (0 == res)
         {
-            if (SpiAbs_PollForIdle(
-                    SPIABS_DEVICE_1,
-                    &resp.byte,
-                    SD_MAX_READ_RESPONSE_ATTEMPTS * 20U
-                ) != 0)
+            uint8_t WaitRes = 0;
+
+            WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS * 20U);
+            
+            if (0 != WaitRes)
             {
                 res = SD_E_CMD_NO_GOING_IDLE;
             }
@@ -1219,7 +1231,6 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
 {
     uint8_t RetVal;
-    uint32_t readResponseAttempts;
     uint16_t Crc = 0U;
     Spi_R1Response resp;
     const uint8_t StartDataToken = SD_DEF_START_DATA_MARKER;
@@ -1265,14 +1276,11 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
 
     if (0 == RetVal)
     {
-        readResponseAttempts = 0;
-        do
-        { //Waiting for the end of the state BUSY
-            SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-        } while ((resp.byte != 0xFF)
-                 && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
+        uint8_t WaitRes = 0;
 
-        if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+        WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS);
+
+        if (0 != WaitRes)
         {
             RetVal = SD_E_CMD_NO_GOING_IDLE;
         }
@@ -1287,4 +1295,12 @@ uint8_t SD_Spi_GetReadBytes(uint8_t *buff)
 {
     memcpy(buff, SPI_CMD_READ_BUFFER, SD_SDHC_SECTOR_SIZE);
     return 0U;
+}
+
+__attribute__((weak))
+uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay)
+{
+    (void) delay;
+
+    return 0;
 }

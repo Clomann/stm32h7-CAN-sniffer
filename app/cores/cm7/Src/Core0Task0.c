@@ -105,6 +105,13 @@ void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
     Error_Handler();
 }
 
+uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay)
+{
+    vTaskDelay(delay);
+
+    return 0;
+}
+
 void FileHandler_ErrorHandler(ErrorContextType *context)
 {
     Error_Handler();
