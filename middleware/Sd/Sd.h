@@ -155,4 +155,6 @@ uint8_t SD_Spi_GetReadBytes(uint8_t *buff);
 
 void Sd_Spi_ErrorHandlerHook(ErrorContextType *context);
 
+uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay);
+
 #endif /* CM7_INC_SD_H_ */
