@@ -62,7 +62,7 @@ MEMORY
   DTCMRAM (xrw)     : ORIGIN = 0x20000000, LENGTH = 128K
   RAM_D1 (xrw)      : ORIGIN = 0x24000000, LENGTH = 512K
   RAM_D2 (xrw)      : ORIGIN = 0x30000000, LENGTH = 288K
-  RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 64K
+  RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 32K /* reserve half of D3 RAM for CM4 */
   ITCMRAM (xrw)     : ORIGIN = 0x00000000, LENGTH = 64K
 }
 
@@ -247,6 +247,8 @@ SECTIONS
     __lwip_sec_end__ = .;
   } >RAM_D2
 
+  PROVIDE(__lwip_sec_start = __lwip_sec_start__);
+  PROVIDE(__lwip_sec_end   = __lwip_sec_end__);
   PROVIDE(__lwip_heap_start = __lwip_heap_start__);
   PROVIDE(__lwip_heap_end   = __lwip_heap_end__);
 
@@ -295,9 +297,6 @@ SECTIONS
 
   PROVIDE(__dma_buffers_start = __dma_buffers_start__);
   PROVIDE(__dma_buffers_end   = __dma_buffers_end__);
-
-  PROVIDE(__lwip_sec_start = __lwip_sec_start__);
-  PROVIDE(__lwip_sec_end   = __lwip_sec_end__);
 
   .ram_d3 (NOLOAD): {
     . = ALIGN(4);
