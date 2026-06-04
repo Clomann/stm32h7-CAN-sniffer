@@ -133,6 +133,18 @@ const uint8_t D1CorePrescTable[16] =
   */
 void SystemInit(void)
 {
+#ifdef CORE_CM7
+    /* If the bootloader jumped here via a software branch (no hardware reset),
+     * the D-cache may still be enabled.  It is disabled before the startup
+     * BSS zero-fill so that the zero-writes go straight to RAM rather than
+     * into D-cache dirty lines that SCB_EnableDCache() would later potentially 
+     * discard. */
+    if (SCB->CCR & SCB_CCR_DC_Msk)
+    {
+        SCB_DisableDCache(); /* cleans dirty lines to RAM, then disables */
+    }
+#endif
+
 /* FPU settings ------------------------------------------------------------*/
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
     SCB->CPACR |=
