@@ -24,6 +24,7 @@ static void spi_port_freertos_init_ll_mutex(void);
 
 uint8_t spi_port_freertos_init(void *handle)
 {
+    uint8_t init_res;
     void *pSpiHandle1;
 
 #if SPI_PORT_USE_LOCKS
@@ -36,10 +37,21 @@ uint8_t spi_port_freertos_init(void *handle)
     }
 
     pCanBridgeTaskHdl = (TaskHandle_t *)handle;
-    pSpiHandle1       = SpiAbs_GetHandle_Spi1();
+    init_res          = SpiAbs_Init_Spi1();
+    if (init_res != COMM_SUCCESS)
+    {
+        return init_res;
+    }
+
+    pSpiHandle1 = SpiAbs_GetHandle_Spi1();
+    if (NULL == pSpiHandle1)
+    {
+        return COMM_ERROR;
+    }
+
     Spi_NotifyRegister((SPI_HandleTypeDef *)pSpiHandle1);
 
-    return SpiAbs_Init_Spi1();
+    return COMM_SUCCESS;
 }
 
 /* Create a semaphore for this SPI handle and remember the pair.        */

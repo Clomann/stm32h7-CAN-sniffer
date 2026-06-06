@@ -133,17 +133,17 @@ static CommDriver *m_GetDriver(enum SPIABS_DEVICE dev)
 
 static SPI_HandleTypeDef *m_GetHandle(enum SPIABS_DEVICE dev)
 {
+    CommDriver *pDrv;
     SPI_HandleTypeDef *hdl;
 
-    switch (dev)
+    pDrv = m_GetDriver(dev);
+
+    if ((NULL == pDrv) || (NULL == pDrv->instance))
     {
-    case SPIABS_DEVICE_1:
-        hdl = (SPI_HandleTypeDef *)(&((SpiInstanceType *)Spi1Driver.instance)
-                                         ->hspi);
-        break;
-    default:
-        hdl = NULL;
+        return NULL;
     }
+
+    hdl = (SPI_HandleTypeDef *)(&((SpiInstanceType *)pDrv->instance)->hspi);
 
     return hdl;
 }
@@ -805,19 +805,35 @@ int SpiAbs_Init(
 )
 {
     unsigned int res = COMM_SUCCESS;
+    comm_status_t comm_res;
+
+    if ((NULL == dev) || (NULL == cfg) || (NULL == tx) || (NULL == rx))
+    {
+        return COMM_NULL_POINTER;
+    }
 
     dev->protocol = DRIVER_SPI;
 
     memset(Spi1TxBins, 0x00, sizeof(Spi1TxBins));
     memset(Spi1RxBins, 0x00, sizeof(Spi1RxBins));
 
-    (void)CommManager_Init(
+    comm_res = CommManager_Init(
         dev,
         (const void *)cfg,
         sizeof(CommDriverConfigType),
         tx,
         rx
     );
+
+    if (COMM_SUCCESS != comm_res)
+    {
+        return (unsigned int)comm_res;
+    }
+
+    if ((NULL == dev->interface) || (NULL == dev->interface->init))
+    {
+        return COMM_ERROR;
+    }
 
     if (dev->interface->init(dev) != COMM_SUCCESS)
     {
