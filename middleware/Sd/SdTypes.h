@@ -86,6 +86,21 @@ typedef struct
     uint8_t always1 : 1; /*!< [0] Always 1 */
 } SdCsdRegisterType;
 
+typedef struct
+{
+    uint8_t spareBlockCount;
+    uint8_t initialBadBlockCount;
+    float goodBlockRatePercent;
+    uint32_t totalEraseCount;
+    float enduranceRemainLifePercent;
+    uint32_t avgEraseCount;
+    uint32_t minEraseCount;
+    uint32_t maxEraseCount;
+    uint32_t powerUpCount;
+    uint32_t abnormalPowerOffCount;
+    uint8_t laterBadBlockCount;
+} SD_KingstonHealthType;
+
 #define DEFAULT_SPEED_MODE                                                     \
     (0x32) /*!< SDSC/SDHC/SDXC in Default Speed mode (25MHz) */
 #define HIGH_SPEED_MODE                                                        \

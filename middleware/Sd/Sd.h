@@ -50,23 +50,25 @@
 #define SD_DEF_CRC_ERROR_TOKEN         0x0B
 #define SD_DEF_WRITE_ERROR_TOKEN       0x0D
 
-#define SD_E_OK        0U
-#define SD_E_NOT_OK    1U
+#define SD_E_OK     0U
+#define SD_E_NOT_OK 1U
+#define SD_E_INV_PARAM 2U
+#define SD_E_NOT_IDLE  3U
+#define SD_E_SEND      4U
+#define SD_E_RESPONSE  5U
+
 /*!< The card did not send R1 after receiving a command */
-#define SD_E_CMD_NO_R1 2U
+#define SD_E_CMD_NO_R1 6U
 /*!< The card sent 0xFF after receiving a command */
-#define SD_E_CMD_NO_DATA_RESP_TOKEN 3U
+#define SD_E_CMD_NO_DATA_RESP_TOKEN 7U
 /*!< The card did never sent 0xFF */
-#define SD_E_CMD_NO_GOING_IDLE 4U
+#define SD_E_CMD_NO_GOING_IDLE 8U
 /*!< The card did never sent start data token */
-#define SD_E_CMD_NO_START_TOKEN 5U
+#define SD_E_CMD_NO_START_TOKEN 9U
 /*!< The card did never sent start data token */
-#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 6U
-/*!< The card did never sent start data token */
-#define SD_E_INV_PARAM    7U
-#define SD_E_NOT_IDLE     8U
-#define SD_E_SEND         9U
-#define SD_E_RESPONSE      10U
+#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 10U
+/*!< Kingston health data signature does not match expected values */
+#define SD_E_HEALTH_NOT_SUPPORTED 11U
 
 /**
  * Enumeration listing the implemented SPI commands.
@@ -129,6 +131,7 @@ enum SD_Spi_Commands
 	activates the card's initialization process.
 	Reserved bits shall be set to '0'.*/
     SD_SPI_ACMD41,
+    SD_SPI_CMD56,
     SD_SPI_CMDn
 };
 
@@ -149,6 +152,19 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
 uint8_t
 SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
+
+/*
+ * Reads internal health registers from a Kingston SDCIT/SDCIT2 industrial
+ * SD card using SD general command CMD56. Use to diagnose FTL state and
+ * remaining endurance.
+ *
+ * @param health  Out: parsed health fields on success.
+ * @return SD_E_OK on success,
+ *         SD_E_HEALTH_NOT_SUPPORTED if signature check fails (wrong card),
+ *         other SD_E_* codes on communication error.
+ */
+uint8_t SD_Spi_ReadKingstonHealth(SD_KingstonHealthType *health);
+
 DRESULT SD_Spi_hotReset(void);
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff);

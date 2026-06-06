@@ -61,7 +61,7 @@
 #define IS_VOLTAGE_2_8_2_9(ocr) (((ocr) >> OCR_VOLTAGE_2_8_2_9_POS) & 0x1)
 #define IS_VOLTAGE_2_7_2_8(ocr) (((ocr) >> OCR_VOLTAGE_2_7_2_8_POS) & 0x1)
 
-#define SD_SPI_PRE_CMD_CLOCKS 8U
+#define SD_KINGSTON_HEALTH_BLOCK_LEN 512U
 
 static ErrorContextType ErrorContext = {.file = __FILE_NAME__};
 
@@ -74,6 +74,13 @@ static volatile uint32_t HotResetCallCount = 0U;
 
 /* Buffer used for transmission */
 static uint8_t SPI_CMD_READ_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
+
+static const uint8_t SD_KingstonFlashId_SDCIT[] =
+    {0x98, 0x3C, 0x98, 0xB3, 0x76, 0x72, 0x08, 0x0E, 0x00};
+static const uint8_t SD_KingstonFlashId_SDCIT2[] =
+    {0x98, 0x3C, 0x98, 0xB3, 0xF6, 0xE3, 0x08, 0x1E, 0x00};
+static const uint8_t SD_KingstonFlashId_SDCE[] =
+    {0x98, 0x3E, 0xA8, 0x03, 0x7A, 0xE4, 0x08, 0x16, 0x00};
 
 uint8_t aTxSpiCmd[7];
 
@@ -229,6 +236,28 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[5] = 0x00;
         buffer[6] = 0x01;
         break;
+    case SD_SPI_CMD56:
+        buffer[1] = 0x40 + 56U;
+        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[3] = (payload >> 16) & 0xFF;
+        buffer[4] = (payload >> 8) & 0xFF;
+        buffer[5] = payload & 0xFF;
+        switch (payload)
+        {
+        case 0x00000001:
+            buffer[6] = 0x45;
+            break;
+        case 0x00000000:
+            buffer[6] = 0x41;
+            break;
+        case 0x00000010:
+            buffer[6] = 0x09;
+            break;
+        default:
+            buffer[6] = 0x01;
+            break; // fallback, may not work
+        }
+        break;
     case SD_SPI_ACMD41:
         buffer[1] = 0x69;
         buffer[2] = (payload >> 24) & 0xFF;
@@ -340,6 +369,302 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
     out->crc = EXTRACT_CSD_BITS(buf, SD_CSD_CRC_MSK, SD_CSD_CRC_START);
     out->always1 =
         EXTRACT_CSD_BITS(buf, SD_CSD_ALWAYS1_MSK, SD_CSD_ALWAYS1_START);
+}
+
+/**
+ * @brief Read a big-endian 16-bit value from a byte buffer.
+ * @param buffer Source byte buffer.
+ * @param offset Start index in @p buffer.
+ * @return Decoded 16-bit value.
+ */
+static uint16_t SD_Spi_ReadBe16(uint8_t const *buffer, uint16_t offset)
+{
+    return (uint16_t)((uint16_t)buffer[offset] << 8U)
+           | (uint16_t)buffer[offset + 1U];
+}
+
+/**
+ * @brief Read a big-endian 32-bit value from a byte buffer.
+ * @param buffer Source byte buffer.
+ * @param offset Start index in @p buffer.
+ * @return Decoded 32-bit value.
+ */
+static uint32_t SD_Spi_ReadBe32(uint8_t const *buffer, uint16_t offset)
+{
+    return ((uint32_t)buffer[offset] << 24U)
+           | ((uint32_t)buffer[offset + 1U] << 16U)
+           | ((uint32_t)buffer[offset + 2U] << 8U)
+           | (uint32_t)buffer[offset + 3U];
+}
+
+/**
+ * @brief Sum a byte range and return the lower 8 bits.
+ * @param buffer Source byte buffer.
+ * @param start Inclusive start index.
+ * @param end_exclusive Exclusive end index.
+ * @return Range sum truncated to 8 bits.
+ */
+static uint8_t
+SD_Spi_SumRangeU8(uint8_t const *buffer, uint16_t start, uint16_t end_exclusive)
+{
+    uint16_t sum = 0U;
+    for (uint16_t i = start; i < end_exclusive; i++)
+    {
+        sum += buffer[i];
+    }
+    return (uint8_t)sum;
+}
+
+/**
+ * @brief Check whether a payload is plausibly valid health data.
+ * @param buffer Payload bytes.
+ * @param len Payload length in bytes.
+ * @return true if payload is neither all 0x00 nor all 0xFF.
+ */
+static bool SD_Spi_IsDataValid(uint8_t const *buffer, uint16_t len)
+{
+    bool only00 = true;
+    bool onlyFF = true;
+
+    for (uint16_t i = 0U; i < len; i++)
+    {
+        if (buffer[i] != 0x00U)
+        {
+            only00 = false;
+        }
+
+        if (buffer[i] != 0xFFU)
+        {
+            onlyFF = false;
+        }
+
+        if ((false == only00) && (false == onlyFF))
+        {
+            break;
+        }
+    }
+
+    return ((false == only00) && (false == onlyFF));
+}
+
+/**
+ * @brief Check whether payload starts with a known Kingston signature.
+ * @param buffer Payload bytes.
+ * @return true if one supported signature matches.
+ */
+static bool SD_Spi_IsKnownKingstonHealthSignature(uint8_t const *buffer)
+{
+    return (
+        (0
+         == memcmp(
+             buffer,
+             SD_KingstonFlashId_SDCIT,
+             sizeof(SD_KingstonFlashId_SDCIT)
+         ))
+        || (0
+            == memcmp(
+                buffer,
+                SD_KingstonFlashId_SDCIT2,
+                sizeof(SD_KingstonFlashId_SDCIT2)
+            ))
+        || (0
+            == memcmp(
+                buffer,
+                SD_KingstonFlashId_SDCE,
+                sizeof(SD_KingstonFlashId_SDCE)
+            ))
+    );
+}
+
+/**
+ * @brief Poll until a non-0xFF byte is received.
+ * @param out Out: received byte.
+ * @param maxAttempts Maximum poll attempts.
+ * @return SD_E_OK on success, SD_E_CMD_NO_R1 on timeout.
+ */
+static uint8_t SD_Spi_WaitNonFF(uint8_t *out, uint32_t maxAttempts)
+{
+    uint32_t attempts = 0U;
+
+    *out = 0xFFU;
+    while (attempts++ < maxAttempts)
+    {
+        SpiAbs_readByte(SPIABS_DEVICE_1, out);
+        if (*out != 0xFFU)
+        {
+            return SD_E_OK;
+        }
+    }
+
+    return SD_E_CMD_NO_R1;
+}
+
+/**
+ * @brief Validate an R1 response returned by a CMD56 transaction.
+ * @param r1 Raw R1 response byte.
+ * @return SD_E_OK for a ready card, SD_E_HEALTH_NOT_SUPPORTED for cards that
+ *         reject CMD56, otherwise SD_E_RESPONSE.
+ */
+static uint8_t SD_Spi_Cmd56_CheckR1(uint8_t r1)
+{
+    Spi_R1Response resp = {.byte = r1};
+
+    if (0x00U == resp.byte)
+    {
+        return SD_E_OK;
+    }
+
+    if (resp.illegal_command != 0U)
+    {
+        return SD_E_HEALTH_NOT_SUPPORTED;
+    }
+
+    return SD_E_RESPONSE;
+}
+
+/**
+ * @brief Send CMD56 and read its immediate R1 response.
+ * @param payload CMD56 argument.
+ * @param r1 Out: R1 response byte.
+ * @return SD_E_OK on success, otherwise SD_E_* error code.
+ */
+static uint8_t SD_Spi_Cmd56_PollR1(uint32_t payload, uint8_t *r1)
+{
+    uint8_t dummy[SD_SPI_PRE_CMD_CLOCKS];
+    uint8_t res;
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+    SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+    SD_Spi_SendCommand(SD_SPI_CMD56, payload);
+    res = SD_Spi_WaitNonFF(r1, SD_MAX_READ_RESPONSE_ATTEMPTS);
+    if (SD_E_OK == res)
+    {
+        res = SD_Spi_Cmd56_CheckR1(*r1);
+    }
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    return res;
+}
+
+/**
+ * @brief Send CMD56 write variant and transmit one helper data block.
+ * @param payload CMD56 argument.
+ * @return SD_E_OK on success, otherwise SD_E_* error code.
+ */
+static uint8_t SD_Spi_Cmd56_PreloadWrite(uint32_t payload)
+{
+    uint8_t res = SD_E_OK;
+    uint8_t r1;
+    Spi_R1Response resp;
+    uint32_t readResponseAttempts;
+    uint8_t tx[1U + SD_SECTOR_LENGTH + 2U];
+    uint8_t dummy[SD_SPI_PRE_CMD_CLOCKS];
+
+    memset(tx, 0, sizeof(tx));
+    tx[0] = SD_DEF_START_DATA_MARKER;
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+    SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+    SD_Spi_SendCommand(SD_SPI_CMD56, payload);
+    res = SD_Spi_WaitNonFF(&r1, SD_MAX_READ_RESPONSE_ATTEMPTS * 20U);
+    if (SD_E_OK != res)
+    {
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        return res;
+    }
+    res = SD_Spi_Cmd56_CheckR1(r1);
+    if (SD_E_OK != res)
+    {
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        return res;
+    }
+
+    SpiAbs_Send_Spi1_Task0(tx, sizeof(tx));
+    SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+    if ((resp.byte & 0x1FU) != SD_DEF_DATA_ACCEPTED_TOKEN)
+    {
+        res = SD_E_CMD_NO_DATA_RESP_TOKEN;
+    }
+
+    if (SD_E_OK == res)
+    {
+        readResponseAttempts = 0U;
+        do
+        {
+            SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+        } while ((resp.byte != 0xFFU)
+                 && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
+
+        if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+        {
+            res = SD_E_CMD_NO_GOING_IDLE;
+        }
+    }
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    return res;
+}
+
+/**
+ * @brief Send CMD56 read variant and receive one 512-byte block.
+ * @param payload CMD56 argument.
+ * @param dataOut Out: received 512-byte payload.
+ * @return SD_E_OK on success, otherwise SD_E_* error code.
+ */
+static uint8_t SD_Spi_Cmd56_ReadBlock(uint32_t payload, uint8_t *dataOut)
+{
+    uint8_t res;
+    uint8_t r1;
+    uint8_t dummy[SD_SPI_PRE_CMD_CLOCKS];
+    uint8_t crc[2];
+    Spi_R1Response resp;
+    uint32_t readAttempts;
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+    SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+    SD_Spi_SendCommand(SD_SPI_CMD56, payload);
+    res = SD_Spi_WaitNonFF(&r1, SD_MAX_READ_RESPONSE_ATTEMPTS * 20U);
+    if (SD_E_OK != res)
+    {
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        return res;
+    }
+
+    res = SD_Spi_Cmd56_CheckR1(r1);
+    if (SD_E_OK != res)
+    {
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        return res;
+    }
+
+    readAttempts = 0U;
+    while (++readAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS)
+    {
+        SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
+        if (resp.byte != 0xFFU)
+        {
+            break;
+        }
+    }
+
+    if (resp.byte != SD_SPI_CMD_START_TOKEN)
+    {
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        return SD_E_CMD_NO_START_TOKEN;
+    }
+
+    SpiAbs_Receive_Spi1_Task0(dataOut, SD_KINGSTON_HEALTH_BLOCK_LEN);
+    SpiAbs_Receive_Spi1_Task0(crc, sizeof(crc));
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+    return SD_E_OK;
 }
 
 static uint8_t SD_Spi_WaitBusy(uint32_t maxAttempts)
@@ -1289,6 +1614,79 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
     return RetVal;
+}
+
+uint8_t SD_Spi_ReadKingstonHealth(SD_KingstonHealthType *health)
+{
+    uint8_t res = SD_E_OK;
+    uint8_t data[SD_KINGSTON_HEALTH_BLOCK_LEN];
+    uint8_t r1;
+
+    if (NULL == health)
+    {
+        return SD_E_NOT_OK;
+    }
+
+    res = SD_Spi_Cmd56_PollR1(1U, &r1);
+    if (SD_E_OK == res)
+    {
+        HAL_Delay(1000U);
+        res = SD_Spi_Cmd56_ReadBlock(0x0U, data);
+    }
+    else
+    {
+        res = SD_Spi_Cmd56_PreloadWrite(0x10U);
+        if (SD_E_OK == res)
+        {
+            HAL_Delay(1000U);
+            res = SD_Spi_Cmd56_ReadBlock(0x21U, data);
+        }
+    }
+
+    if (SD_E_OK != res)
+    {
+        if ((SD_E_CMD_NO_R1 == res) || (SD_E_HEALTH_NOT_SUPPORTED == res))
+        {
+            return SD_E_HEALTH_NOT_SUPPORTED;
+        }
+
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_ReadKingstonHealth"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+        return res;
+    }
+
+    if ((false == SD_Spi_IsDataValid(data, sizeof(data)))
+        || (false == SD_Spi_IsKnownKingstonHealthSignature(data)))
+    {
+        return SD_E_HEALTH_NOT_SUPPORTED;
+    }
+
+    memset(health, 0, sizeof(*health));
+
+    health->spareBlockCount      = (uint8_t)SD_Spi_ReadBe16(data, 16U);
+    health->initialBadBlockCount = SD_Spi_SumRangeU8(data, 32U, 64U);
+    health->goodBlockRatePercent = (float)SD_Spi_ReadBe16(data, 64U) / 100.0f;
+    health->totalEraseCount      = SD_Spi_ReadBe32(data, 80U);
+    health->enduranceRemainLifePercent =
+        (float)SD_Spi_ReadBe16(data, 96U) / 100.0f;
+    health->avgEraseCount = ((uint32_t)SD_Spi_ReadBe16(data, 104U) << 16U)
+                            + SD_Spi_ReadBe16(data, 98U);
+    health->minEraseCount = ((uint32_t)SD_Spi_ReadBe16(data, 106U) << 16U)
+                            + SD_Spi_ReadBe16(data, 100U);
+    health->maxEraseCount = ((uint32_t)SD_Spi_ReadBe16(data, 108U) << 16U)
+                            + SD_Spi_ReadBe16(data, 102U);
+    health->powerUpCount          = SD_Spi_ReadBe32(data, 112U);
+    health->abnormalPowerOffCount = SD_Spi_ReadBe16(data, 128U);
+    health->laterBadBlockCount    = SD_Spi_SumRangeU8(data, 184U, 216U);
+
+    return SD_E_OK;
 }
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff)
