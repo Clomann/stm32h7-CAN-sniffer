@@ -107,9 +107,19 @@ void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
 
 uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay)
 {
-    vTaskDelay(delay);
+    if (0U == delay)
+    {
+        return 0U;
+    }
 
-    return 0;
+    /* vTaskDelay is only valid in normal task context while scheduler runs. */
+    if ((__get_IPSR() == 0U)
+        && (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING))
+    {
+        vTaskDelay(delay);
+    }
+
+    return 0U;
 }
 
 void FileHandler_ErrorHandler(ErrorContextType *context)
