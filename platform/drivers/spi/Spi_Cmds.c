@@ -21,7 +21,6 @@ enum
     TRANSFER_ERROR
 };
 
-
 /* SPI handler declaration */
 static SPI_HandleTypeDef *pSpiHandle1;
 

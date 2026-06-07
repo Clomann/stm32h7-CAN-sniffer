@@ -420,7 +420,8 @@ void SPI_Poll(CommDriver *drv)
         }
         else
         {
-            res = Spi_Receive(&instance->hspi, rxSlot->data, Transaction->length);
+            res =
+                Spi_Receive(&instance->hspi, rxSlot->data, Transaction->length);
         }
         break;
 
@@ -448,8 +449,7 @@ void SPI_Poll(CommDriver *drv)
         }
         break;
 
-    case SPI_DIR_POLL_BYTE:
-    {
+    case SPI_DIR_POLL_BYTE: {
         // Poll single bytes inside the SPI task until a token condition is met
         // or max_retries is exhausted. Calls HAL directly to avoid re-entering
         // the slot machinery from within SPI_Poll.
@@ -457,12 +457,12 @@ void SPI_Poll(CommDriver *drv)
         // Exit condition: invert=0 -> byte != token  (e.g. token=0xFF: any response)
         //                 invert=1 -> byte == token  (e.g. token=0xFF: idle,
         //                                             token=0xFE: specific start token)
-        uint32_t retries  = 0U;
-        uint8_t byte      = Transaction->token;
-        uint8_t dummy     = 0xFFU;
-        uint8_t err       = 1U;
-        uint8_t token     = Transaction->token;
-        uint8_t invert    = Transaction->invert;
+        uint32_t retries = 0U;
+        uint8_t byte     = Transaction->token;
+        uint8_t dummy    = 0xFFU;
+        uint8_t err      = 1U;
+        uint8_t token    = Transaction->token;
+        uint8_t invert   = Transaction->invert;
 
         do
         {
@@ -483,7 +483,7 @@ void SPI_Poll(CommDriver *drv)
             retries++;
         } while (retries < Transaction->max_retries);
 
-        rxSlot->data[0] = byte;
+        rxSlot->data[0]  = byte;
         rxSlot->used_len = 1U;
         Spi_NotifyRxData(&instance->hspi, err);
         res = COMM_SUCCESS; /* poll timeout is not a driver error */

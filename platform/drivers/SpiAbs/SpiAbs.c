@@ -216,7 +216,7 @@ uint8_t SpiAbs_SendWithCallback(
 uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 {
     uint8_t res;
-    volatile SpiTransactionType transaction             = {0};
+    volatile SpiTransactionType transaction = {0};
     volatile TaskContextType context =
         {.done = 0, .status = 0, .data = resp, .bytes = 1};
 
@@ -248,7 +248,7 @@ uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 {
     uint8_t res;
-    volatile SpiTransactionType transaction             = {0};
+    volatile SpiTransactionType transaction = {0};
     volatile TaskContextType context =
         {.done = 0, .status = 0, .data = aRxSpiSink, .bytes = 1};
 
@@ -591,7 +591,7 @@ uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
 {
     uint8_t res;
     CommDriver *pDrv;
-    SPI_Message Msg                  = {0};
+    SPI_Message Msg                         = {0};
     volatile SpiTransactionType transaction = {0};
     volatile TaskContextType context =
         {.done = 0, .status = 0, .data = pResponse, .bytes = 1};
@@ -651,7 +651,7 @@ static uint8_t m_PollForIdle(
 {
     uint8_t res;
     CommDriver *pDrv;
-    SPI_Message Msg                        = {0};
+    SPI_Message Msg                         = {0};
     volatile SpiTransactionType transaction = {0};
     volatile TaskContextType context =
         {.done = 0, .status = 0, .data = pResponse, .bytes = 1};
