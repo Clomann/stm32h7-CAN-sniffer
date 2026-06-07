@@ -395,9 +395,17 @@ static void appHandleFormattingRequest(void)
 
         if (FR_OK == res)
         {
+            uint32_t Count;
             AppCtrlData.mountRes = 1;
 
-            res = FatFS_SD_Format_Fat32(cluster_size);
+            Count       = 0;
+            (void) SD_Spi_EraseAll(&Count);
+            (void) Count;
+
+            if (SD_E_OK == res)
+            {
+                res = FatFS_SD_Format_Fat32(cluster_size);
+            }
         }
 
         if (FR_OK == res)

@@ -62,6 +62,7 @@
 #define IS_VOLTAGE_2_7_2_8(ocr) (((ocr) >> OCR_VOLTAGE_2_7_2_8_POS) & 0x1)
 
 #define SD_SPI_PRE_CMD_CLOCKS 8U
+#define SD_ERASE_CHUNK_BLOCKS 4096U
 
 static ErrorContextType ErrorContext = {.file = __FILE_NAME__};
 
@@ -99,6 +100,30 @@ ALIGN_32BYTES(const uint8_t __attribute__((used, section(".dma_buffer.ro"))
     0xFF
 };
 
+static uint8_t SD_Crc7(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0;
+
+    while (len--)
+    {
+        uint8_t d = *data++;
+
+        for (uint8_t i = 0; i < 8; i++)
+        {
+            crc <<= 1;
+
+            if ((d ^ crc) & 0x80)
+            {
+                crc ^= 0x09;
+            }
+
+            d <<= 1;
+        }
+    }
+
+    return (crc << 1) | 1;   // append end bit
+}
+
 static uint8_t
 SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
 {
@@ -131,7 +156,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD12:
         buffer[1] = 0x4C;
@@ -139,7 +164,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD13:
         buffer[1] = 0x4D;
@@ -147,7 +172,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD16:
         buffer[1] = 0x50;
@@ -155,7 +180,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD17:
         buffer[1] = 0x51;
@@ -163,7 +188,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD18:
         buffer[1] = 0x52;
@@ -171,7 +196,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD24:
         buffer[1] = 0x58;
@@ -179,7 +204,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD25:
         buffer[1] = 0x59;
@@ -187,7 +212,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD32:
         buffer[1] = 0x40 + 32U;
@@ -195,23 +220,23 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD33:
-        buffer[1] = 0x40 + 32U;
+        buffer[1] = 0x40 + 33U;
         buffer[2] = (payload >> 24) & 0xFF;
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD38:
         buffer[1] = 0x40 + 38U;
-        buffer[2] = 0x00;
-        buffer[3] = 0x00;
-        buffer[4] = 0x00;
-        buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[3] = (payload >> 16) & 0xFF;
+        buffer[4] = (payload >> 8) & 0xFF;
+        buffer[5] = payload & 0xFF;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD55:
         buffer[1] = 0x77;
@@ -219,7 +244,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD58:
         buffer[1] = 0x7A;
@@ -227,7 +252,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_ACMD41:
         buffer[1] = 0x69;
@@ -235,7 +260,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     default:
         buffer[1] = 0xFF;
@@ -1289,6 +1314,230 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
     return RetVal;
+}
+
+/**
+ * @brief Compute total 512-byte logical block count for CSD v2 cards.
+ * @param csd Parsed CSD register.
+ * @param totalBlocksOut Out: total logical block count.
+ * @return SD_E_OK on success, otherwise SD_E_* error code.
+ */
+static uint8_t
+SD_Spi_TotalBlocks512(const SdCsdRegisterType *csd, uint32_t *totalBlocksOut)
+{
+    uint64_t totalBlocks64;
+
+    if ((NULL == csd) || (NULL == totalBlocksOut))
+    {
+        return SD_E_NOT_OK;
+    }
+
+    if (1U != csd->csdStructure)
+    {
+        /* Dummy/error path for non-SDHC cards until SDSC CSD-v1 support is added. */
+        *totalBlocksOut = 0U;
+        return SD_E_UNSUPPORTED_CARD_TYPE;
+    }
+
+    totalBlocks64 = ((uint64_t)csd->cSize + 1ULL) * 1024ULL;
+    if (totalBlocks64 > (uint64_t)UINT32_MAX)
+    {
+        *totalBlocksOut = 0U;
+        return SD_E_CAPACITY_OVERFLOW;
+    }
+
+    *totalBlocksOut = (uint32_t)totalBlocks64;
+    return SD_E_OK;
+}
+
+uint8_t SD_Spi_TrimAll(uint32_t *blocks_trimmed)
+{
+    return SD_Spi_EraseAll(blocks_trimmed);
+}
+
+uint8_t SD_Spi_EraseAll(uint32_t *blocks_erased)
+{
+    uint8_t res;
+    uint32_t totalBlocks;
+    uint32_t eraseBlockSize;
+    uint32_t currentBlock;
+    uint32_t chunkLimitBlocks;
+    uint32_t readResponseAttempts;
+    uint8_t dummy[SD_SPI_PRE_CMD_CLOCKS];
+    SdCsdRegisterType csd;
+    Spi_R1Response resp;
+
+    res = SD_E_OK;
+
+    if (NULL != blocks_erased)
+    {
+        *blocks_erased = 0U;
+    }
+
+    memset(dummy, SD_SPI_CMD_DUMMY_DATA, sizeof(dummy));
+    memset(&csd, 0, sizeof(csd));
+
+    res = SD_Spi_ReadCSD(&csd);
+    if (SD_E_OK != res)
+    {
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_EraseAll"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+        return res;
+    }
+
+    res = SD_Spi_TotalBlocks512(&csd, &totalBlocks);
+    if (SD_E_OK != res)
+    {
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_EraseAll"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+        return res;
+    }
+
+    /* SDHC/SDXC path only: use 512-byte block granularity for erase ranges. */
+    eraseBlockSize = 1U;
+    currentBlock   = 0U;
+
+    chunkLimitBlocks = SD_ERASE_CHUNK_BLOCKS;
+    chunkLimitBlocks -= (chunkLimitBlocks % eraseBlockSize);
+    if (0U == chunkLimitBlocks)
+    {
+        chunkLimitBlocks = eraseBlockSize;
+    }
+
+    while (currentBlock < totalBlocks)
+    {
+        uint32_t remainingBlocks = totalBlocks - currentBlock;
+        uint32_t chunkBlocks     = (remainingBlocks > chunkLimitBlocks)
+                                       ? chunkLimitBlocks
+                                       : remainingBlocks;
+        uint32_t startBlock;
+        uint32_t endBlock;
+
+        if ((chunkBlocks % eraseBlockSize) != 0U)
+        {
+            chunkBlocks -= (chunkBlocks % eraseBlockSize);
+        }
+
+        if (0U == chunkBlocks)
+        {
+            res = SD_E_ERASE_END_FAILED;
+            break;
+        }
+
+        startBlock = currentBlock;
+        endBlock   = startBlock + chunkBlocks - 1U;
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+        SpiAbs_CsEnable(SPIABS_DEVICE_1);
+        SD_Spi_SendCommand(SD_SPI_CMD32, startBlock);
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+        if (0x00U != resp.byte)
+        {
+            if ((chunkLimitBlocks > eraseBlockSize) && (0xFFU != resp.byte))
+            {
+                chunkLimitBlocks = eraseBlockSize;
+                continue;
+            }
+
+            res = SD_E_ERASE_START_FAILED;
+            break;
+        }
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+        SpiAbs_CsEnable(SPIABS_DEVICE_1);
+        SD_Spi_SendCommand(SD_SPI_CMD33, endBlock);
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+        if (0x00U != resp.byte)
+        {
+            if ((chunkLimitBlocks > eraseBlockSize) && (0xFFU != resp.byte))
+            {
+                chunkLimitBlocks = eraseBlockSize;
+                continue;
+            }
+
+            res = SD_E_ERASE_END_FAILED;
+            break;
+        }
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+        SpiAbs_CsEnable(SPIABS_DEVICE_1);
+        SD_Spi_SendCommand(SD_SPI_CMD38, 0x00000000U);
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+        if (0x00U != resp.byte)
+        {
+            SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+            if ((chunkLimitBlocks > eraseBlockSize) && (0xFFU != resp.byte))
+            {
+                chunkLimitBlocks = eraseBlockSize;
+                continue;
+            }
+
+            res = SD_E_ERASE_CMD_FAILED;
+            break;
+        }
+
+        readResponseAttempts = 0U;
+        do
+        {
+            SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+        } while ((0xFFU != resp.byte)
+                 && (++readResponseAttempts < SD_ERASE_BUSY_TIMEOUT_ATTEMPTS));
+
+        if (readResponseAttempts >= SD_ERASE_BUSY_TIMEOUT_ATTEMPTS)
+        {
+            SpiAbs_CsDisable(SPIABS_DEVICE_1);
+            res = SD_E_CMD_NO_GOING_IDLE;
+            break;
+        }
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+        currentBlock += chunkBlocks;
+
+        if (NULL != blocks_erased)
+        {
+            *blocks_erased = currentBlock;
+            res            = SD_E_OK;
+        }
+    }
+
+    if (SD_E_OK != res)
+    {
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_EraseAll"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+    }
+
+    return res;
 }
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff)

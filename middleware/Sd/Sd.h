@@ -28,6 +28,15 @@
  */
 #define SD_MAX_READ_RESPONSE_ATTEMPTS (15625U)
 
+/**
+ * @brief Max poll iterations while waiting for CMD38 erase busy to clear.
+ *
+ * MLC NAND block erase takes 2-5 ms per block; with SD_ERASE_CHUNK_BLOCKS
+ * blocks per CMD38 and no FTL-level parallelism, a single chunk can occupy
+ * the bus for several seconds. Sized for a 30 s worst-case per chunk.
+ */
+#define SD_ERASE_BUSY_TIMEOUT_ATTEMPTS (SD_MAX_READ_RESPONSE_ATTEMPTS * 300U)
+
 /*!The sector is the smallest individual reference-able regions on a disk.*/
 #define SD_SDHC_SECTOR_SIZE 512U
 
@@ -52,21 +61,31 @@
 
 #define SD_E_OK        0U
 #define SD_E_NOT_OK    1U
+#define SD_E_INV_PARAM 2U
+#define SD_E_NOT_IDLE  3U
+#define SD_E_SEND      4U
+#define SD_E_RESPONSE  5U
+
 /*!< The card did not send R1 after receiving a command */
-#define SD_E_CMD_NO_R1 2U
+#define SD_E_CMD_NO_R1 6U
 /*!< The card sent 0xFF after receiving a command */
-#define SD_E_CMD_NO_DATA_RESP_TOKEN 3U
+#define SD_E_CMD_NO_DATA_RESP_TOKEN 7U
 /*!< The card did never sent 0xFF */
-#define SD_E_CMD_NO_GOING_IDLE 4U
+#define SD_E_CMD_NO_GOING_IDLE 8U
 /*!< The card did never sent start data token */
-#define SD_E_CMD_NO_START_TOKEN 5U
+#define SD_E_CMD_NO_START_TOKEN 9U
 /*!< The card did never sent start data token */
-#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 6U
-/*!< The card did never sent start data token */
-#define SD_E_INV_PARAM    7U
-#define SD_E_NOT_IDLE     8U
-#define SD_E_SEND         9U
-#define SD_E_RESPONSE      10U
+#define SD_E_CMD_NO_STOP_TRANSMISSION_RESPONSE 10U
+/*!< CMD32 (erase range start) failed */
+#define SD_E_ERASE_START_FAILED 12U
+/*!< CMD33 (erase range end) failed */
+#define SD_E_ERASE_END_FAILED 13U
+/*!< CMD38 (erase execute) failed */
+#define SD_E_ERASE_CMD_FAILED 14U
+/*!< Requested operation is not supported for current card type */
+#define SD_E_UNSUPPORTED_CARD_TYPE 15U
+/*!< Computed card capacity exceeds 32-bit addressable block count */
+#define SD_E_CAPACITY_OVERFLOW 16U
 
 /**
  * Enumeration listing the implemented SPI commands.
@@ -149,6 +168,40 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
 uint8_t
 SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
+
+/*
+ * Trims the entire SD card by issuing sequential ERASE/TRIM ranges
+ * (CMD32 / CMD33 / CMD38) across all blocks.
+ *
+ * This invalidates all card blocks at FTL level without host-side
+ * write amplification from zero-filling.
+ *
+ * WARNING: destroys all data and filesystem structures on the card.
+ * The card must be reformatted (FAT32) before FatFS can use it again.
+ *
+ * @param blocks_trimmed  Out: number of blocks successfully trimmed before
+ *                        any error. NULL is accepted.
+ * @return SD_E_OK on completion, error code on failure.
+ */
+uint8_t SD_Spi_TrimAll(uint32_t *blocks_trimmed);
+
+/*
+ * Erases the entire SD card using the SD erase command sequence
+ * (CMD32 / CMD33 / CMD38), resetting FTL internal state by marking
+ * all physical blocks as free without copy-on-write overhead.
+ *
+ * More effective than a zero-fill for restoring new-card write latency
+ * behaviour after FTL fragmentation has developed.
+ *
+ * WARNING: destroys all data and filesystem structures on the card.
+ * The card must be reformatted (FAT32) before FatFS can use it again.
+ *
+ * @param blocks_erased  Out: number of blocks successfully erased before
+ *                       any error. NULL is accepted.
+ * @return SD_E_OK on completion, error code on failure.
+ */
+uint8_t SD_Spi_EraseAll(uint32_t *blocks_erased);
+
 DRESULT SD_Spi_hotReset(void);
 
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff);
