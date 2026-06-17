@@ -159,25 +159,6 @@ static void CanLogManager_FileLock(void)
 #endif
 }
 
-static bool CanLogManager_FileTryLock(void)
-{
-#if !defined(UNIT_TEST)
-    if (CanLogFileMutex == NULL)
-    {
-        CanLogManager_FileLockInit();
-    }
-
-    if (CanLogFileMutex == NULL)
-    {
-        return false;
-    }
-
-    return (xSemaphoreTake(CanLogFileMutex, 0) == pdTRUE);
-#else
-    return true;
-#endif
-}
-
 static void CanLogManager_FileUnlock(void)
 {
 #if !defined(UNIT_TEST)
@@ -191,7 +172,7 @@ static void CanLogManager_FileUnlock(void)
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
 static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data);
-static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data);
+static unsigned int appCanLogCheckNewFileOpenLocked(void);
 static void appCanLogFillEntry(
     CanLogEntryType *entry,
     FDCAN_ClassicFrameType *frame,
@@ -508,20 +489,13 @@ static CanLogResult appCanLogCloseFile(CanLogControlDataType *data)
 
 #endif
 
-static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
+static unsigned int appCanLogCheckNewFileOpenLocked(void)
 {
     FRESULT FileSizeRes;
     uint32_t FileSize;
     uint32_t log_file_size;
     uint32_t log_file_count;
     uint32_t max_index;
-
-    (void)data;
-
-    if (!CanLogManager_FileTryLock())
-    {
-        return 0U;
-    }
 
     FileSizeRes = FatFS_SD_GetBufferedFileSize(
         &(CanLogCtrlData.CanLog.writeFileDevice),
@@ -584,8 +558,6 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
             CanLogFileManager_ErrorHandler();
         }
     }
-
-    CanLogManager_FileUnlock();
 
     return 0U;
 }
@@ -1318,6 +1290,10 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         CanLogManager_InstrumentationFlushStartHook();
         CanLogManager_FileLock();
         res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
+        if (COMM_SUCCESS == res)
+        {
+            (void)appCanLogCheckNewFileOpenLocked();
+        }
         CanLogManager_FileUnlock();
         CanLogManager_InstrumentationFlushEndHook();
 
@@ -1640,8 +1616,6 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         fdcan_msg_port_flush();
     }
-
-    appCanLogCheckNewFileOpen(data);
 
     (void)LocalFrameCount;
     LocalFrameCount = 0;
