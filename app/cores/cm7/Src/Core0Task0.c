@@ -389,7 +389,7 @@ static void appHandleFormattingRequest(void)
     appCanLogSetFileConfig(log_file_size, log_file_count);
     appCanLogSetClusterSize(cluster_size);
 
-    if (ReformattingRequested)
+    if (ReformattingRequested || FR_NO_FILESYSTEM == AppCtrlData.mountRes)
     {
         res = FatFS_SD_Unmount();
 
@@ -399,7 +399,9 @@ static void appHandleFormattingRequest(void)
             AppCtrlData.mountRes = 1;
 
             Count = 0;
-            (void)SD_Spi_EraseAll(&Count);
+            
+            res = SD_Spi_EraseAll(&Count);
+            
             (void)Count;
 
             if (SD_E_OK == res)

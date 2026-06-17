@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -7,8 +8,40 @@
 
 #include "core_json.h"
 
+#define FATFS_SD_PHYSICAL_DRIVE         0U
+#define FATFS_SD_MBR_SIGNATURE_OFFSET   510U
+#define FATFS_SD_MBR_SIGNATURE_FIRST    0x55U
+#define FATFS_SD_MBR_SIGNATURE_SECOND   0xAAU
+#define FATFS_SD_WHOLE_DRIVE_PERCENTAGE 100U
+#define FATFS_SD_IO_OK                  0U
+
 static FATFS FatFs; /* FatFs work area needed for each volume */
 static ErrorContextType ErrorContext;
+
+static bool FatFS_SD_MbrSignatureIsValid(const BYTE *sector)
+{
+    return (sector[FATFS_SD_MBR_SIGNATURE_OFFSET]
+            == FATFS_SD_MBR_SIGNATURE_FIRST)
+           && (sector[FATFS_SD_MBR_SIGNATURE_OFFSET + 1U]
+               == FATFS_SD_MBR_SIGNATURE_SECOND);
+}
+
+static FRESULT FatFS_SD_RepartitionIfMbrIsMissing(BYTE *work_buffer)
+{
+    const LBA_t partition_table[] = {FATFS_SD_WHOLE_DRIVE_PERCENTAGE, 0U};
+
+    if (MMCAdapter_read(work_buffer, 0U, 1U) != FATFS_SD_IO_OK)
+    {
+        return FR_DISK_ERR;
+    }
+
+    if (FatFS_SD_MbrSignatureIsValid(work_buffer))
+    {
+        return FR_MKFS_ABORTED;
+    }
+
+    return f_fdisk(FATFS_SD_PHYSICAL_DRIVE, partition_table, work_buffer);
+}
 
 /**
  * @brief Hook called before a FatFS write to allow measurement instrumentation.
@@ -380,6 +413,22 @@ FRESULT FatFS_SD_Format_Fat32(uint32_t cluster_size)
     fmt_opt.au_size = cluster_size;
 
     res = f_mkfs(Dir, &fmt_opt, work_buffer, (UINT)sizeof(work_buffer));
+
+    if (FR_MKFS_ABORTED == res)
+    {
+        FRESULT repartition_res;
+
+        repartition_res = FatFS_SD_RepartitionIfMbrIsMissing(work_buffer);
+
+        if (FR_OK == repartition_res)
+        {
+            res = f_mkfs(Dir, &fmt_opt, work_buffer, (UINT)sizeof(work_buffer));
+        }
+        else if (FR_MKFS_ABORTED != repartition_res)
+        {
+            res = repartition_res;
+        }
+    }
 
     return res;
 }
