@@ -30,6 +30,8 @@
 #include "semphr.h"
 #endif
 
+#define CANLOG_INGEST_BATCH_MAX 256
+
 #define CLM_ABS_TIME_TO_TIMSTAMP(x) (uint32_t)(x)
 #define CLM_ABS_TIME_TO_ABS_HIGH(x) ((uint32_t)((x) >> 32U))
 #define CLM_SYNC_EMIT_INTERVAL_US   (30ULL * 60ULL * 1000000ULL)
@@ -1633,7 +1635,8 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
     }
 
-    while (0 < fdcan_msg_port_read(&pNewFrame, 2))
+    while ((CANLOG_INGEST_BATCH_MAX > LocalFrameCount)
+           && (0 < fdcan_msg_port_read(&pNewFrame, 2)))
     {
         CanLogManager_DrainPortStartHook();
         CanLogManager_FrameCount++;
@@ -1749,6 +1752,7 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 
         *(CanLogCtrlData.commitLog) = false;
     }
+
     return RetVal;
 }
 
