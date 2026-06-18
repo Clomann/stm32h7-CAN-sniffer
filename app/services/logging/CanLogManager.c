@@ -1520,11 +1520,12 @@ void m_DecayBusLoad(CanStatusDataType *can, uint32_t currentTime)
     }
 }
 
-void appCanLogHandlerPoll(CanLogControlDataType *data)
+ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 {
-    comm_status_t res = COMM_SUCCESS;
+    ClmErrorType RetVal = CLM_E_OK;
+    comm_status_t res   = COMM_SUCCESS;
     bool IsOffState;
-    uint8_t BlockIsReady;
+    uint8_t BlockIsReady  = 0U;
     uint32_t SlotsToWrite = 0;
     FDCAN_ClassicFrameType *pNewFrame;
     volatile uint64_t AbsTime = 0;
@@ -1700,6 +1701,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogManager_DrainPortEndHook();
     }
 
+    if (BlockIsReady)
+    {
+        RetVal = CLM_E_BLOCK_READY;
+    }
+
     if (true == CanLogCtrlData.emitSyncEntry)
     {
         uint32_t timestamp32 = LastFrameTimestampValid
@@ -1743,6 +1749,7 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         *(CanLogCtrlData.commitLog) = false;
     }
+    return RetVal;
 }
 
 void appCanLogHandlerDeInit(CanLogControlDataType *data)
