@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define CAN_FRAME_BUFFER_ELEMENTS_COUNT 600U
+#define CAN_FRAME_BUFFER_ELEMENTS_COUNT 150U
 #define CAN_FRAME_BUFFER_ENTRY_SIZE                                            \
     (sizeof(PageType) + sizeof(configMESSAGE_BUFFER_LENGTH_TYPE))
 #define CAN_FRAME_BUFFER_SIZE                                                  \
