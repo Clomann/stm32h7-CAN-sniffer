@@ -42,6 +42,10 @@ void CanLogManager_InstrumentationFlushStartHook(void);
 void CanLogManager_InstrumentationFlushEndHook(void);
 void CanLogManager_DrainPortStartHook(void);
 void CanLogManager_DrainPortEndHook(void);
+void CanLogManager_InstrumentationFdcanMsgPortPeakHook(
+    uint32_t timestamp_us,
+    uint32_t used_bytes
+);
 
 typedef struct
 {
@@ -124,16 +128,47 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void)
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
-static uint32_t Rb1BytesHighWater                 = 0U;
-static uint32_t CanLogFileSize                    = MAX_LOG_FILE_SIZE;
-static uint32_t CanLogFileCount                   = MAX_LOG_FILE_COUNT;
-static uint32_t CanLogClusterSize                 = CLUSTER_SIZE;
-static volatile uint32_t CanLogPreallocErrorCount = 0U;
+static uint32_t Rb1BytesHighWater                     = 0U;
+static uint32_t CanLogFileSize                        = MAX_LOG_FILE_SIZE;
+static uint32_t CanLogFileCount                       = MAX_LOG_FILE_COUNT;
+static uint32_t CanLogClusterSize                     = CLUSTER_SIZE;
+static volatile uint32_t CanLogPreallocErrorCount     = 0U;
+static volatile uint32_t FdcanMsgPortPeakCaptureCount = 0U;
+static volatile uint32_t FdcanMsgPortPeakTimestampUs  = 0U;
+static volatile uint32_t FdcanMsgPortPeakUsedBytes    = 0U;
+static volatile uint32_t FdcanMsgPortPeakCanLogBufferUsedBytes   = 0U;
+static volatile uint32_t FdcanMsgPortPeakRb1HighWaterBytes       = 0U;
+static volatile uint32_t FdcanMsgPortPeakFileHeadIndex           = 0U;
+static volatile uint32_t FdcanMsgPortPeakMetaFileIndex           = 0U;
+static volatile uint32_t FdcanMsgPortPeakMetaByteOffset          = 0U;
+static volatile uint64_t FdcanMsgPortPeakCanLogManagerFrameCount = 0U;
+static volatile uint64_t FdcanMsgPortPeakCanLogBufferBlockCount  = 0U;
 
 #if !defined(UNIT_TEST)
 static StaticSemaphore_t CanLogFileMutexBuffer;
 static SemaphoreHandle_t CanLogFileMutex = NULL;
 #endif
+
+void CanLogManager_InstrumentationFdcanMsgPortPeakHook(
+    uint32_t timestamp_us,
+    uint32_t used_bytes
+)
+{
+    uint32_t rb1_used_bytes = 0U;
+
+    (void)CanLogBuffer_UsedBytes(&rb1_used_bytes);
+
+    FdcanMsgPortPeakCaptureCount++;
+    FdcanMsgPortPeakTimestampUs           = timestamp_us;
+    FdcanMsgPortPeakUsedBytes             = used_bytes;
+    FdcanMsgPortPeakCanLogBufferUsedBytes = rb1_used_bytes;
+    FdcanMsgPortPeakRb1HighWaterBytes     = Rb1BytesHighWater;
+    FdcanMsgPortPeakFileHeadIndex         = CanLogCtrlData.CanLog.fileHeadIndex;
+    FdcanMsgPortPeakMetaFileIndex         = LogMetaData.fileIndex;
+    FdcanMsgPortPeakMetaByteOffset        = LogMetaData.byteOffset;
+    FdcanMsgPortPeakCanLogManagerFrameCount = CanLogManager_FrameCount;
+    FdcanMsgPortPeakCanLogBufferBlockCount  = CanLogBuffer_BlockCount;
+}
 
 static void CanLogManager_FileLockInit(void)
 {
