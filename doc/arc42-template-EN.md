@@ -321,7 +321,7 @@ The application layer hosts the FreeRTOS tasks and services that turn the middle
 | **CanBridgeTask** | Pulls frames from *CanAbs* and enqueues them into *fdcan_msg_port* for downstream logging. | *CanAbs*, *fdcan_msg_port*, logging telemetry hooks |
 | **SdBridgeTask** | Flushes *CanLogBuffer* blocks to SD via the log manager hook; dedicated to log writes. | *CanLogManager*, *FileHandler* |
 | **CanSendTask** | Handles optional CAN transmission (test frames / tracer) and propagates run/stop state from the UI/config. | *CanCtrl*, *Core0Task0* control flags |
-| **SpiTask** | Multiplexes SPI clients, coordinates completion via RTOS semaphores/notifications, and drives DMA transfers for SD/logging and other peripherals. | *SpiAbs*, device-specific completion hooks |
+| **SpiTask** | Multiplexes SPI clients, coordinates completion via RTOS semaphores/notifications, and drives SPI transfers for SD/logging and other peripherals. | *SpiAbs*, device-specific completion hooks |
 
 Scheduling: CAN path tasks (*CanBridgeTask*, *Core0Task1*, *SdBridgeTask*, *CanSendTask*) and *SpiTask* run at higher priority than the *Core0Task0* loop to guarantee logging determinism (see [Concurrency & Interrupt Priorities](#concurrency--interrupt-priorities)). HTTP/config work executes inside *Core0Task0*’s periodic loop via *http_poll*, so callbacks must stay short to avoid extending the cycle. All application tasks avoid touching HAL drivers directly and instead rely on the comm/file abstractions, keeping the layer testable.
 
@@ -528,11 +528,11 @@ This section describes the behavioral aspects of the software components.
 
 ## Configuration Management Scenarios
 
-**Boot-time load.** *Core0Task0* mounts the SD card, initializes *ConfigManager*, and issues *ConfigManager_LoadConfig*. The component opens *CONF.TXT*, reads it into the staging buffer, and calls the deserialize hook implemented by *SettingsHandler*. On success the shared *AppConfig* struct is populated and handed to the rest of the system. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if `formatting_requested.txt` exists, it reformats the SD card on boot and rewrites `log_config.json`.
+**Boot-time load.** *Core0Task0* mounts the SD card, initializes *ConfigManager*, and issues *ConfigManager_LoadConfig*. The component opens *CONF.TXT*, reads it into the staging buffer, and calls the deserialize hook implemented by *SettingsHandler*. On success the shared *AppConfig* struct is populated and handed to the rest of the system. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if a reformat was requested or the card comes up without a usable filesystem, the boot path recreates the filesystem and rewrites `log_config.json`.
 
 ![Boot-time load flow](images/config-management_boot-load.md.svg)
 
-**Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack. SD card management requests write `formatting_requested.txt` with log sizing parameters and are applied on the next boot when `log_config.json` is rewritten.
+**Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack. SD card management requests persist the desired log sizing and reformat state for application on the next boot.
 
 ![Remote update flow](images/config-management_remote-update.md.svg)
 
@@ -787,7 +787,7 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: Load settings on boot
 
 - **Trigger**: CM7 boots and mounts the SD card.
-- **Flow**: FileHandler mounts partition, ConfigManager opens *CONF.TXT*, reads into internal buffer, SettingsHandler deserializes JSON into *AppConfig*. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if `formatting_requested.txt` exists, it formats the SD card on boot and rewrites `log_config.json`.
+- **Flow**: FileHandler mounts partition, ConfigManager opens *CONF.TXT*, reads into internal buffer, SettingsHandler deserializes JSON into *AppConfig*. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if a reformat was requested or the card has no usable filesystem, boot recreates the filesystem and rewrites `log_config.json`.
 - **Outcome**: System starts with last persisted CAN baud rates, modes, and IP settings.
 - **Failure handling**: Missing file->defaults applied; mount error->*CONFIG_ERROR_MOUNT_FAILED*.
 
@@ -811,7 +811,7 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: SPI transfer lifecycle
 
 - **Trigger**: Application task enqueues SPI request (e.g., SD block write, SD block read).
-- **Flow**: *SpiTask* assigns a slot via *SpiAbs*, prepares DMA descriptors using HAL, and submits transfer. Completion interrupt calls weak hook -> port layer signals requesting task (semaphore/notification). *SpiTask* dequeues next pending transfer.
+- **Flow**: *SpiTask* assigns a slot via *SpiAbs*, prepares the transfer via HAL, and submits it using the appropriate backend for the request. Completion interrupt calls weak hook -> port layer signals requesting task (semaphore/notification). *SpiTask* dequeues next pending transfer.
 - **Outcome**: Multiple producers share SPI bus without blocking in ISR context; latency predictable due to queueing.
 - **Edge cases**: Timeout/backoff when peripheral not ready, priority inversion avoided by running *SpiTask* at higher priority than producers.
 # Deployment View
@@ -891,14 +891,14 @@ Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL
 
 #### Tasks
 
-| Task | Priority (lower numbers = higher priority) | Notes |
+| Task | Relative priority | Notes |
 | - | - | - |
-| *CanBridgeTask* | *configMAX_PRIORITIES - 1* | Wakes on deferred IRQ notifications; highest priority to drain CAN buffers. |
-| *SpiTask* | *configMAX_PRIORITIES - 2* | Owns SPI bus/DMA; kept just below CAN bridge to feed SD writes. |
-| *CanSendTask* | *configMAX_PRIORITIES - 3* | Handles optional transmission while staying above SD tasks. |
-| *SdBridgeTask* | *configMAX_PRIORITIES - 4* | Flushes log blocks; lower than send but above main loop. |
-| *Core0Task1Main* | *configMAX_PRIORITIES - 4* | CanLogManager poll loop; drains message port and fills log buffer. |
-| *Core0Task0Main* | *configMAX_PRIORITIES - 5* | Main control loop (HTTP poll, config, log control). |
+| *CanBridgeTask* | Highest | Wakes on deferred IRQ notifications and drains CAN buffers first. |
+| *SpiTask* | Very high | Owns the SPI bus and services storage traffic close behind CAN ingest. |
+| *Core0Task1Main* | High | Runs the CanLogManager poll loop and fills the log buffer. |
+| *SdBridgeTask* | Medium-high | Flushes completed log blocks to storage. |
+| *CanSendTask* | Medium | Handles optional transmission without outranking the logging path. |
+| *Core0Task0Main* | Lowest | Main control loop for HTTP polling, config, and general control. |
 
 ## Memory Overview
 
