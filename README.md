@@ -32,6 +32,7 @@ The CAN sniffer can log CAN frames on two channels with the following specs:
     - download of logged data
     - manage SD card logging (format on next restart, log file size/count, cluster size)
     - client-side log data parser
+    - in-app-programming to update the firmware via web GUI
 
 **Web GUI**
 
@@ -311,7 +312,6 @@ Contributor workflows and tooling live in `CONTRIBUTING.md`.
 # Future work
 
 Planned features are:
-- in-app-programming to update the firmware via web GUI
 - Wi-Fi extension
 - SDIO interface to allow for lower-quality SD cards
 - external Realtime-Clock (RTC)
