@@ -391,7 +391,7 @@ void SPI_Poll(CommDriver *drv)
     case SPI_DIR_TX_ONLY:
         if (Transaction->use_poll)
         {
-            res = (comm_status_t)HAL_SPI_Transmit(
+            res = (comm_status_t)Spi_SendPoll(
                 &instance->hspi,
                 txSlot->data,
                 Transaction->length,
@@ -409,7 +409,7 @@ void SPI_Poll(CommDriver *drv)
     case SPI_DIR_RX_ONLY:
         if (Transaction->use_poll)
         {
-            res = (comm_status_t)HAL_SPI_Receive(
+            res = (comm_status_t)Spi_ReceivePoll(
                 &instance->hspi,
                 rxSlot->data,
                 Transaction->length,
@@ -428,7 +428,7 @@ void SPI_Poll(CommDriver *drv)
     case SPI_DIR_TX_RX:
         if (Transaction->use_poll)
         {
-            res = (comm_status_t)HAL_SPI_TransmitReceive(
+            res = (comm_status_t)Spi_SendReceivePoll(
                 &instance->hspi,
                 txSlot->data,
                 rxSlot->data,
@@ -466,7 +466,7 @@ void SPI_Poll(CommDriver *drv)
 
         do
         {
-            HAL_SPI_TransmitReceive(
+            Spi_SendReceivePoll(
                 &instance->hspi,
                 &dummy,
                 &byte,
