@@ -56,6 +56,40 @@ HAL_StatusTypeDef Spi_SendReceiveMsg(
     return HAL_OK;
 }
 
+uint8_t Spi_SendPoll(
+    SPI_HandleTypeDef *handle,
+    const uint8_t *buffer,
+    uint16_t len,
+    uint32_t timeout
+)
+{
+    (void)timeout;
+    return Spi_Send(handle, (uint8_t *)buffer, len);
+}
+
+uint8_t Spi_ReceivePoll(
+    SPI_HandleTypeDef *handle,
+    uint8_t *buffer,
+    uint16_t len,
+    uint32_t timeout
+)
+{
+    (void)timeout;
+    return Spi_Receive(handle, buffer, len);
+}
+
+uint8_t Spi_SendReceivePoll(
+    SPI_HandleTypeDef *handle,
+    const uint8_t *pTxBuffer,
+    uint8_t *pRxBuffer,
+    uint16_t len,
+    uint32_t timeout
+)
+{
+    (void)timeout;
+    return (uint8_t)Spi_SendReceiveMsg(handle, pTxBuffer, pRxBuffer, len);
+}
+
 uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 {
     Spi_Receive_call_count++;
