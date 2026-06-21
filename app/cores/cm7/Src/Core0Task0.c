@@ -399,9 +399,9 @@ static void appHandleFormattingRequest(void)
             AppCtrlData.mountRes = 1;
 
             Count = 0;
-            
+
             res = SD_Spi_EraseAll(&Count);
-            
+
             (void)Count;
 
             if (SD_E_OK == res)

@@ -35,6 +35,25 @@ HAL_StatusTypeDef Spi_SendReceiveMsg(
     uint8_t *pRxBuffer,
     uint16_t TxBytes
 );
+uint8_t Spi_SendPoll(
+    SPI_HandleTypeDef *handle,
+    const uint8_t *buffer,
+    uint16_t len,
+    uint32_t timeout
+);
+uint8_t Spi_ReceivePoll(
+    SPI_HandleTypeDef *handle,
+    uint8_t *buffer,
+    uint16_t len,
+    uint32_t timeout
+);
+uint8_t Spi_SendReceivePoll(
+    SPI_HandleTypeDef *handle,
+    const uint8_t *pTxBuffer,
+    uint8_t *pRxBuffer,
+    uint16_t len,
+    uint32_t timeout
+);
 uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
 uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
 
