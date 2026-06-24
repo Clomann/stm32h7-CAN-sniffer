@@ -133,17 +133,17 @@ static CommDriver *m_GetDriver(enum SPIABS_DEVICE dev)
 
 static SPI_HandleTypeDef *m_GetHandle(enum SPIABS_DEVICE dev)
 {
+    CommDriver *pDrv;
     SPI_HandleTypeDef *hdl;
 
-    switch (dev)
+    pDrv = m_GetDriver(dev);
+
+    if ((NULL == pDrv) || (NULL == pDrv->instance))
     {
-    case SPIABS_DEVICE_1:
-        hdl = (SPI_HandleTypeDef *)(&((SpiInstanceType *)Spi1Driver.instance)
-                                         ->hspi);
-        break;
-    default:
-        hdl = NULL;
+        return NULL;
     }
+
+    hdl = (SPI_HandleTypeDef *)(&((SpiInstanceType *)pDrv->instance)->hspi);
 
     return hdl;
 }
@@ -176,19 +176,71 @@ uint8_t SpiAbs_Init_Spi1()
     return res;
 }
 
+/* Forward declarations — defined later in this file */
+typedef struct
+{
+    uint8_t *data;
+    uint16_t bytes;
+    uint8_t status;
+    uint8_t done;
+} TaskContextType;
+
+void SpiAbs_Send_Spi1_CompleteCallback_Task0(
+    void *context,
+    uint32_t status,
+    const uint8_t *data,
+    uint32_t len
+);
+
+void SpiAbs_Receive_Spi1_CompleteCallback_Task0(
+    void *context,
+    uint32_t status,
+    const uint8_t *data,
+    uint32_t len
+);
+
+uint8_t SpiAbs_ReceiveWithCallback(
+    enum SPIABS_DEVICE dev,
+    SpiTransactionType *transaction,
+    const uint8_t *data,
+    uint16_t bytes
+);
+
+uint8_t SpiAbs_SendWithCallback(
+    enum SPIABS_DEVICE dev,
+    SpiTransactionType *transaction,
+    const uint8_t *pTxBuffer,
+    uint16_t TxBytes
+);
+
 uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 {
     uint8_t res;
+    volatile SpiTransactionType transaction = {0};
+    volatile TaskContextType context =
+        {.done = 0, .status = 0, .data = resp, .bytes = 1};
 
-    switch (dev)
+    if (dev != SPIABS_DEVICE_1)
     {
-    case SPIABS_DEVICE_1:
-        res = (uint8_t)SpiAbs_Receive_Spi1_Task0(resp, 1);
-        break;
-    case SPIABS_DEVICE_2:
-    default:
-        res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
+        return SPIABS_E_INVALID_PARAMETER;
     }
+
+    transaction.id        = 1U;
+    transaction.prio      = SPI_PRIORITY_LOW;
+    transaction.timeout   = 100U;
+    transaction.direction = SPI_DIR_TX_RX;
+    transaction.use_poll  = 1U;
+    transaction.callback  = SpiAbs_Receive_Spi1_CompleteCallback_Task0;
+    transaction.context   = (void *)&context;
+
+    res = SpiAbs_ReceiveWithCallback(dev, &transaction, aRxSpiDummy, 1U);
+
+    while (1 != context.done)
+    {
+        __NOP();
+    }
+
+    __DMB();
 
     return res;
 }
@@ -196,16 +248,31 @@ uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 {
     uint8_t res;
+    volatile SpiTransactionType transaction = {0};
+    volatile TaskContextType context =
+        {.done = 0, .status = 0, .data = aRxSpiSink, .bytes = 1};
 
-    switch (dev)
+    if (dev != SPIABS_DEVICE_1)
     {
-    case SPIABS_DEVICE_1:
-        res = (uint8_t)SpiAbs_Send_Spi1_Task0(data, 1);
-        break;
-    case SPIABS_DEVICE_2:
-    default:
-        res = (uint8_t)SPIABS_E_INVALID_PARAMETER;
+        return SPIABS_E_INVALID_PARAMETER;
     }
+
+    transaction.id        = 1U;
+    transaction.prio      = SPI_PRIORITY_LOW;
+    transaction.timeout   = 100U;
+    transaction.direction = SPI_DIR_TX_RX;
+    transaction.use_poll  = 1U;
+    transaction.callback  = SpiAbs_Send_Spi1_CompleteCallback_Task0;
+    transaction.context   = (void *)&context;
+
+    res = SpiAbs_SendWithCallback(dev, &transaction, data, 1U);
+
+    while (1 != context.done)
+    {
+        __NOP();
+    }
+
+    __DMB();
 
     return res;
 }
@@ -384,14 +451,6 @@ uint8_t SpiAbs_SendReceiveMsg(
     return res;
 }
 
-typedef struct
-{
-    uint8_t *data;
-    uint16_t bytes;
-    uint8_t status;
-    uint8_t done;
-} TaskContextType;
-
 void SpiAbs_Send_Spi1_CompleteCallback_Task0(
     void *context,
     uint32_t status,
@@ -530,38 +589,137 @@ uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t *pResponse)
 
 uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
 {
-    uint8_t NoResponseReceived;
-    uint8_t RetVal;
-    uint8_t counter;
-    const uint8_t RetryCount = 20;
+    uint8_t res;
+    CommDriver *pDrv;
+    SPI_Message Msg                         = {0};
+    volatile SpiTransactionType transaction = {0};
+    volatile TaskContextType context =
+        {.done = 0, .status = 0, .data = pResponse, .bytes = 1};
 
     (void)handle;
 
-    counter            = 0;
-    NoResponseReceived = 1;
+    pDrv = m_GetDriver(SPIABS_DEVICE_1);
 
-    do
+    if (NULL == pDrv)
     {
-        SpiAbs_readByte(SPIABS_DEVICE_1, pResponse);
-
-        if (0xFF != *pResponse)
-        {
-            NoResponseReceived = 0;
-        }
-
-        counter++;
-    } while (NoResponseReceived && (RetryCount > counter));
-
-    if (0 == NoResponseReceived)
-    {
-        RetVal = 0;
-    }
-    else
-    {
-        RetVal = 1;
+        return SPIABS_E_INVALID_PARAMETER;
     }
 
-    return RetVal;
+    transaction.direction   = SPI_DIR_POLL_BYTE;
+    transaction.prio        = SPI_PRIORITY_LOW;
+    transaction.timeout     = 100U;
+    transaction.max_retries = 20U;
+    transaction.token       = 0xFFU; /* exit when byte != 0xFF */
+    transaction.invert      = 0U;
+    transaction.length      = 1U;
+    transaction.callback    = SpiAbs_Receive_Spi1_CompleteCallback_Task0;
+    transaction.context     = (void *)&context;
+
+    Msg.msgBase.protocol = DRIVER_SPI;
+    Msg.msgBase.payload  = aRxSpiDummy;
+    Msg.msgBase.length   = 1U;
+    Msg.transaction      = (void *)&transaction;
+
+    res = SPI_Send(pDrv, &Msg);
+
+    if (COMM_SUCCESS != res)
+    {
+        return res;
+    }
+
+#if SPI_USE_RTOS
+    SpiAbs_TaskSendReceiveCallback();
+#else
+    SPI_Poll(pDrv);
+#endif
+
+    while (1 != context.done)
+    {
+        __NOP();
+    }
+
+    __DMB();
+
+    return (0xFFU == *pResponse) ? 1U : 0U;
+}
+
+static uint8_t m_PollForIdle(
+    SPI_HandleTypeDef *handle,
+    uint8_t *pResponse,
+    uint32_t max_retries
+)
+{
+    uint8_t res;
+    CommDriver *pDrv;
+    SPI_Message Msg                         = {0};
+    volatile SpiTransactionType transaction = {0};
+    volatile TaskContextType context =
+        {.done = 0, .status = 0, .data = pResponse, .bytes = 1};
+
+    (void)handle;
+
+    pDrv = m_GetDriver(SPIABS_DEVICE_1);
+
+    if (NULL == pDrv)
+    {
+        return SPIABS_E_INVALID_PARAMETER;
+    }
+
+    transaction.direction   = SPI_DIR_POLL_BYTE;
+    transaction.prio        = SPI_PRIORITY_LOW;
+    transaction.timeout     = 100U;
+    transaction.max_retries = max_retries;
+    transaction.token       = 0xFFU; /* exit when byte == 0xFF */
+    transaction.invert      = 1U;
+    transaction.length      = 1U;
+    transaction.callback    = SpiAbs_Receive_Spi1_CompleteCallback_Task0;
+    transaction.context     = (void *)&context;
+
+    Msg.msgBase.protocol = DRIVER_SPI;
+    Msg.msgBase.payload  = aRxSpiDummy;
+    Msg.msgBase.length   = 1U;
+    Msg.transaction      = (void *)&transaction;
+
+    res = SPI_Send(pDrv, &Msg);
+
+    if (COMM_SUCCESS != res)
+    {
+        return res;
+    }
+
+#if SPI_USE_RTOS
+    SpiAbs_TaskSendReceiveCallback();
+#else
+    SPI_Poll(pDrv);
+#endif
+
+    while (1 != context.done)
+    {
+        __NOP();
+    }
+
+    __DMB();
+
+    /* err=1 in callback status means timed out (card never went idle) */
+    return (uint8_t)context.status;
+}
+
+uint8_t SpiAbs_PollForIdle(
+    enum SPIABS_DEVICE dev,
+    uint8_t *pResponse,
+    uint32_t max_retries
+)
+{
+    SPI_HandleTypeDef *hdl;
+
+    hdl = m_GetHandle(dev);
+
+    if (NULL == hdl)
+    {
+        return HAL_ERROR;
+    }
+
+    return m_PollForIdle(hdl, pResponse, max_retries);
 }
 
 uint8_t SpiAbs_GoHighSpeed(enum SPIABS_DEVICE dev)
@@ -647,19 +805,35 @@ int SpiAbs_Init(
 )
 {
     unsigned int res = COMM_SUCCESS;
+    comm_status_t comm_res;
+
+    if ((NULL == dev) || (NULL == cfg) || (NULL == tx) || (NULL == rx))
+    {
+        return COMM_NULL_POINTER;
+    }
 
     dev->protocol = DRIVER_SPI;
 
     memset(Spi1TxBins, 0x00, sizeof(Spi1TxBins));
     memset(Spi1RxBins, 0x00, sizeof(Spi1RxBins));
 
-    (void)CommManager_Init(
+    comm_res = CommManager_Init(
         dev,
         (const void *)cfg,
         sizeof(CommDriverConfigType),
         tx,
         rx
     );
+
+    if (COMM_SUCCESS != comm_res)
+    {
+        return (unsigned int)comm_res;
+    }
+
+    if ((NULL == dev->interface) || (NULL == dev->interface->init))
+    {
+        return COMM_ERROR;
+    }
 
     if (dev->interface->init(dev) != COMM_SUCCESS)
     {

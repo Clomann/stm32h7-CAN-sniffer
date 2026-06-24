@@ -55,3 +55,11 @@ uint8_t HttpdPost_IsIapUploadReady(void);
  * @brief Clear the upload-ready flag after it has been consumed.
  */
 void HttpdPost_ClearIapUploadReady(void);
+
+/**
+ * @brief Abort and clear any in-flight IAP POST session state.
+ *
+ * This is used to recover from stale/aborted transport sessions before a
+ * fresh `/iap/upload` attempt starts.
+ */
+void HttpdPost_ResetIapUploadSession(void);

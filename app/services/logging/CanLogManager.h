@@ -35,6 +35,11 @@
 #define CANLOGMANAGER_CLEAR_ALL_LOGS 0U
 #define PREALLOCATE_LOG_FILES        1U
 
+#define CLM_E_OK          ((ClmErrorType)0U)
+#define CLM_E_NOT_OK      ((ClmErrorType)1U)
+#define CLM_E_BATCH_LIMIT ((ClmErrorType)2U)
+#define CLM_E_BLOCK_READY ((ClmErrorType)3U)
+
 FRESULT appCanLogHandlerInit(CanLogControlDataType *data);
 void appCanLogSetFileConfig(uint32_t log_file_size, uint32_t log_file_count);
 void appCanLogSetClusterSize(uint32_t cluster_size);
@@ -55,7 +60,7 @@ uint32_t appCanLogGetMaxLogIndex(void);
  * @note Valid baudrates are 250000, 500000, and 1000000 (bit/s).
  */
 CanLogResult appCanLogSetParam(ClmParameterIdType id, uint32_t value);
-void appCanLogHandlerPoll(CanLogControlDataType *data);
+ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data);
 void appCanLogHandlerDeInit(CanLogControlDataType *data);
 
 /* Initialize the global control data */

@@ -176,7 +176,7 @@ The following table states some constraints towards the system:
 | Use STM32H7 | A NUCLEO-144 STM32H745 board is already available for the author and matches the required peripherals |
 | Implementation in C | many third party code and examples are in C and it is the authors preference |
 | Bootloader integration | Firmware updates must stay compatible with the MCUboot image model and slot-based boot flow |
-| Update artifact policy | Web-based firmware update accepts only signed, bootloader-compatible padded images |
+| Update artifact policy | Web-based firmware update accepts only bootloader-compatible signed update images (release workflow may additionally use encrypted artifacts). |
 
 # Context and Scope
 
@@ -227,7 +227,7 @@ The following table shows which measures are taken to reach the quality goals.
 |-|-|-|
 | Modifiability | separation of concerns (low coupling and high cohesion), opaque driver design, dependency inversion by letting drivers access data of the app layer through callback functions | |
 | Reliability / Determinism | Use of NVIC for latency-critical drivers (e.g. CAN), prioritized task scheduling for critical code paths, error detection and correction for SD card access | |
-| Safe firmware update | Stream upload through an ingest pipeline, write/verify into the inactive image slot, and reboot only after controlled handover to bootloader | |
+| Safe firmware update | Prepare inactive slot, stream upload through an ingest pipeline, verify before apply, and reboot only after a controlled handover request to bootloader | |
 | Portability | Use of STM32 HAL where applicable, conditional compilation for dual/single-core configs | | 
 
 > **Note**: Portability in this context means portability across the STM32H7 family that support the needed peripherals and not portability accross toolchains. Thus, the code is allowed to use GCC specific commands (see function requirements)
@@ -321,7 +321,7 @@ The application layer hosts the FreeRTOS tasks and services that turn the middle
 | **CanBridgeTask** | Pulls frames from *CanAbs* and enqueues them into *fdcan_msg_port* for downstream logging. | *CanAbs*, *fdcan_msg_port*, logging telemetry hooks |
 | **SdBridgeTask** | Flushes *CanLogBuffer* blocks to SD via the log manager hook; dedicated to log writes. | *CanLogManager*, *FileHandler* |
 | **CanSendTask** | Handles optional CAN transmission (test frames / tracer) and propagates run/stop state from the UI/config. | *CanCtrl*, *Core0Task0* control flags |
-| **SpiTask** | Multiplexes SPI clients, coordinates completion via RTOS semaphores/notifications, and drives DMA transfers for SD/logging and other peripherals. | *SpiAbs*, device-specific completion hooks |
+| **SpiTask** | Multiplexes SPI clients, coordinates completion via RTOS semaphores/notifications, and drives SPI transfers for SD/logging and other peripherals. | *SpiAbs*, device-specific completion hooks |
 
 Scheduling: CAN path tasks (*CanBridgeTask*, *Core0Task1*, *SdBridgeTask*, *CanSendTask*) and *SpiTask* run at higher priority than the *Core0Task0* loop to guarantee logging determinism (see [Concurrency & Interrupt Priorities](#concurrency--interrupt-priorities)). HTTP/config work executes inside *Core0Task0*’s periodic loop via *http_poll*, so callbacks must stay short to avoid extending the cycle. All application tasks avoid touching HAL drivers directly and instead rely on the comm/file abstractions, keeping the layer testable.
 
@@ -528,19 +528,19 @@ This section describes the behavioral aspects of the software components.
 
 ## Configuration Management Scenarios
 
-**Boot-time load.** *Core0Task0* mounts the SD card, initializes *ConfigManager*, and issues *ConfigManager_LoadConfig*. The component opens *CONF.TXT*, reads it into the staging buffer, and calls the deserialize hook implemented by *SettingsHandler*. On success the shared *AppConfig* struct is populated and handed to the rest of the system. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if `formatting_requested.txt` exists, it reformats the SD card on boot and rewrites `log_config.json`.
+**Boot-time load.** *Core0Task0* mounts the SD card, initializes *ConfigManager*, and issues *ConfigManager_LoadConfig*. The component opens *CONF.TXT*, reads it into the staging buffer, and calls the deserialize hook implemented by *SettingsHandler*. On success the shared *AppConfig* struct is populated and handed to the rest of the system. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if a reformat was requested or the card comes up without a usable filesystem, the boot path recreates the filesystem and rewrites `log_config.json`.
 
 ![Boot-time load flow](images/config-management_boot-load.md.svg)
 
-**Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack. SD card management requests write `formatting_requested.txt` with log sizing parameters and are applied on the next boot when `log_config.json` is rewritten.
+**Remote update via web UI.** HTTP POST handlers call *consume_param_values*, which updates *AppConfig* in RAM and sets the *updated* flag. The application task polls via *SettingsHandler_Poll*; when dirty it calls *ConfigManager_SaveConfig*, triggering serialization through the hook and an overwrite of *CONF.TXT*. The write-path stays out of the HTTP task, keeping SD latency away from the TCP/IP stack. SD card management requests persist the desired log sizing and reformat state for application on the next boot.
 
 ![Remote update flow](images/config-management_remote-update.md.svg)
 
 ## Firmware update scenarios
 
-**Upload and verification (success).** The web handler streams firmware bytes to *UpdateIngestPipeline* (`begin/push/finish`). The ingest adapter handles chunk boundaries. *IapWriter* checks bounds and sequence, writes to the inactive slot, and verifies by readback. If finalize succeeds, the app requests a controlled reset so the bootloader can process the uploaded image.
+**Upload and verification (success).** The update flow prepares the inactive slot, streams firmware bytes through the ingest path, and verifies the staged image. Apply is only enabled after successful verification and when logging is not active. Once apply is requested, the system performs a controlled reboot so the bootloader can process the uploaded image.
 
-**Rejected or interrupted upload (failure).** If size, sequence, alignment, or backend checks fail, the ingest path returns an error and aborts the active session. The running image stays unchanged and the client can retry.
+**Rejected or interrupted upload (failure).** If validation or storage checks fail, the upload is aborted and an error status is reported to the client. The running image stays unchanged and the client can retry.
 
 ## Ethernet requests processing
 
@@ -754,9 +754,9 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 
 ### Scenario 3: Firmware update upload/apply flow
 
-- **Trigger**: User uploads a signed padded firmware image via the web UI.
-- **Flow**: HTTP POST stream -> *UpdateIngestPipeline* -> *IapIngestAdapter* -> *IapWriter* writes and verifies in secondary slot -> application performs controlled reset.
-- **Outcome**: Current application keeps running until reboot; bootloader applies the uploaded image in the next boot sequence.
+- **Trigger**: User uploads a bootloader-compatible signed firmware image via the web UI.
+- **Flow**: prepare update slot -> upload stream -> staged image verification -> explicit apply request -> controlled reboot.
+- **Outcome**: Current application keeps running until reboot; bootloader activates the staged image in the next boot sequence.
 - **Key risks**: Interrupted upload or invalid artifact; mitigated through strict ingest validation and explicit abort/retry behavior.
 
 ## CAN Logging Subsystem (System scenarios)
@@ -787,7 +787,7 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: Load settings on boot
 
 - **Trigger**: CM7 boots and mounts the SD card.
-- **Flow**: FileHandler mounts partition, ConfigManager opens *CONF.TXT*, reads into internal buffer, SettingsHandler deserializes JSON into *AppConfig*. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if `formatting_requested.txt` exists, it formats the SD card on boot and rewrites `log_config.json`.
+- **Flow**: FileHandler mounts partition, ConfigManager opens *CONF.TXT*, reads into internal buffer, SettingsHandler deserializes JSON into *AppConfig*. *Core0Task0* also loads `log_config.json` (cluster_size, log_file_size, log_file_count) and applies it to *CanLogManager*; if a reformat was requested or the card has no usable filesystem, boot recreates the filesystem and rewrites `log_config.json`.
 - **Outcome**: System starts with last persisted CAN baud rates, modes, and IP settings.
 - **Failure handling**: Missing file->defaults applied; mount error->*CONFIG_ERROR_MOUNT_FAILED*.
 
@@ -811,7 +811,7 @@ This section describes the runtime behavior of the SPI driver, from initial tran
 ### Scenario 1: SPI transfer lifecycle
 
 - **Trigger**: Application task enqueues SPI request (e.g., SD block write, SD block read).
-- **Flow**: *SpiTask* assigns a slot via *SpiAbs*, prepares DMA descriptors using HAL, and submits transfer. Completion interrupt calls weak hook -> port layer signals requesting task (semaphore/notification). *SpiTask* dequeues next pending transfer.
+- **Flow**: *SpiTask* assigns a slot via *SpiAbs*, prepares the transfer via HAL, and submits it using the appropriate backend for the request. Completion interrupt calls weak hook -> port layer signals requesting task (semaphore/notification). *SpiTask* dequeues next pending transfer.
 - **Outcome**: Multiple producers share SPI bus without blocking in ISR context; latency predictable due to queueing.
 - **Edge cases**: Timeout/backoff when peripheral not ready, priority inversion avoided by running *SpiTask* at higher priority than producers.
 # Deployment View
@@ -871,9 +871,10 @@ The SPI driver design aims at decoupling the driver from the application and RTO
 The IAP path uses one ingest path for upload data and keeps responsibilities separated:
 
 - ingress source (currently HTTP) calls one ingest API
-- ingest adapter handles chunking and backend alignment constraints
-- writer checks slot bounds, sequence, and readback verification
-- reset is requested only after complete verified write; boot decision stays in bootloader.
+- update slot can be prepared before upload starts
+- upload and verification status are exposed to the UI
+- apply is allowed only after successful verification
+- reboot is requested only after an explicit apply request; boot decision stays in bootloader.
 
 ### Concurrency & Interrupt Priorities
 
@@ -891,14 +892,14 @@ Following NVIC setup is used (relative to the value of configLIBRARY_MAX_SYSCALL
 
 #### Tasks
 
-| Task | Priority (lower numbers = higher priority) | Notes |
+| Task | Relative priority | Notes |
 | - | - | - |
-| *CanBridgeTask* | *configMAX_PRIORITIES - 1* | Wakes on deferred IRQ notifications; highest priority to drain CAN buffers. |
-| *SpiTask* | *configMAX_PRIORITIES - 2* | Owns SPI bus/DMA; kept just below CAN bridge to feed SD writes. |
-| *CanSendTask* | *configMAX_PRIORITIES - 3* | Handles optional transmission while staying above SD tasks. |
-| *SdBridgeTask* | *configMAX_PRIORITIES - 4* | Flushes log blocks; lower than send but above main loop. |
-| *Core0Task1Main* | *configMAX_PRIORITIES - 4* | CanLogManager poll loop; drains message port and fills log buffer. |
-| *Core0Task0Main* | *configMAX_PRIORITIES - 5* | Main control loop (HTTP poll, config, log control). |
+| *CanBridgeTask* | Highest | Wakes on deferred IRQ notifications and drains CAN buffers first. |
+| *SpiTask* | Very high | Owns the SPI bus and services storage traffic close behind CAN ingest. |
+| *Core0Task1Main* | High | Runs the CanLogManager poll loop and fills the log buffer. |
+| *SdBridgeTask* | Medium-high | Flushes completed log blocks to storage. |
+| *CanSendTask* | Medium | Handles optional transmission without outranking the logging path. |
+| *Core0Task0Main* | Lowest | Main control loop for HTTP polling, config, and general control. |
 
 ## Memory Overview
 
@@ -1066,7 +1067,7 @@ Cons:
 
 **Context.** MCUboot update behavior depends on image metadata and trailer markers. Accepting arbitrary binaries in web upload leads to late and unclear failures.
 
-**Decision.** The web update path accepts only signed padded MCUboot-compatible image artifacts.
+**Decision.** The web update path accepts only signed MCUboot-compatible image artifacts, with optional encryption depending on build/release policy.
 
 **Consequences.**
 - Runtime validation in the app stays simple.
@@ -1076,7 +1077,7 @@ Cons:
 
 **Context.** The application receives and writes update data. Image selection and activation are bootloader responsibilities.
 
-**Decision.** The application performs ingest and verification in the secondary slot, then requests a controlled reboot. The app does not use bootloader pending APIs at runtime.
+**Decision.** The application performs ingest and verification in the secondary slot, stores a persistent apply request, and then performs a controlled reboot. Image activation itself remains a bootloader responsibility.
 
 **Consequences.**
 - Clear split of responsibilities between app and bootloader.
@@ -1117,8 +1118,8 @@ Cons:
 | Origin / Decision | Consequence if left unpaid | Interest | Repayment Plan / Ticket |
 | - | - | - | - |
 | Current CAN driver supports Classical CAN only (no CAN-FD). | Limits usability for higher-bandwidth busses. | High | Abstract frame struct; plan extension of CAN driver; use self describing logs for allowing later extensions |
-| No unit-tests; only on-target tests. | Harder refactor, risk of regression. | Medium | Set up unit-tests |
-| Build system is a custom Makefile. | Onboard new devs slower, CI difficult to maintain. | Medium | Migrate to CMake + arm-none-eabi toolchain file; prepare GitHub Actions. |
+| Unit-test coverage is still incomplete for some runtime integration paths. | Refactors in cross-component flows can regress without early detection. | Medium | Extend tests for update workflow edges and long-running integration behavior. |
+| Build/test workflows for app+bootloader variants remain complex for onboarding. | Setup mistakes can lead to inconsistent local vs CI results. | Medium | Keep simplifying presets and contributor docs for common build/test paths. |
 
 
 # Glossary

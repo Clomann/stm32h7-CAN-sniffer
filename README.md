@@ -17,25 +17,7 @@ This project implements the software for a device that logs CAN traffic on two C
 
 **Table of contents**
 
-<!-- TOC -->
 
-- [Features](#features)
-    - [Measurements](#measurements)
-- [Quick start](#quick-start)
-    - [Run unit tests](#run-unit-tests)
-    - [Verify logging](#verify-logging)
-    - [System overview](#system-overview)
-    - [Prerequisites](#prerequisites)
-    - [Build the code](#build-the-code)
-    - [Download the code](#download-the-code)
-    - [Access the web GUI](#access-the-web-gui)
-- [Architecture](#architecture)
-    - [Software](#software)
-    - [Hardware](#hardware)
-- [Contributing](#contributing)
-- [Future work](#future-work)
-
-<!-- /TOC -->
 
 # Features
 
@@ -50,6 +32,7 @@ The CAN sniffer can log CAN frames on two channels with the following specs:
     - download of logged data
     - manage SD card logging (format on next restart, log file size/count, cluster size)
     - client-side log data parser
+    - in-app-programming to update the firmware via web GUI
 
 **Web GUI**
 
@@ -81,7 +64,22 @@ This section briefly explains how to build and download the firmware using the t
 From the `tests` directory, generate and build the test binaries:
 
 ```sh
-cmake -B ./build/ && make -C ./build/
+cmake --preset Release_CM7 --fresh -B build/application \
+  -DPYTHON_EXE="$PWD/.env/bin/python" \
+  -DMCUBOOT_PYTHON="$PWD/.env/bin/python"
+cmake --build build/application -j
+
+cmake --preset "Release_CM4" -B ./build/application \
+  -DPYTHON_EXE="$PWD/.env/bin/python" \
+  -DMCUBOOT_PYTHON="$PWD/.env/bin/python"
+cmake --build build/application -j
+```
+
+and for the bootloader:
+
+```sh
+cmake --preset "Release_CM7_Boot" -B ./build/bootloader
+cmake --build build/bootloader -j
 ```
 
 Run the tests:
@@ -314,7 +312,6 @@ Contributor workflows and tooling live in `CONTRIBUTING.md`.
 # Future work
 
 Planned features are:
-- in-app-programming to update the firmware via web GUI
 - Wi-Fi extension
 - SDIO interface to allow for lower-quality SD cards
 - external Realtime-Clock (RTC)

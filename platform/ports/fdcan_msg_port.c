@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define CAN_FRAME_BUFFER_ELEMENTS_COUNT 600U
+#define CAN_FRAME_BUFFER_ELEMENTS_COUNT 150U
 #define CAN_FRAME_BUFFER_ENTRY_SIZE                                            \
     (sizeof(PageType) + sizeof(configMESSAGE_BUFFER_LENGTH_TYPE))
 #define CAN_FRAME_BUFFER_SIZE                                                  \
@@ -34,6 +34,12 @@ static MessageBufferHandle_t CanFrameBuffer;
 static StaticMessageBuffer_t MessageBuffer;
 uint8_t MessageBufferStorageArea[CAN_FRAME_BUFFER_SIZE] RAM_DTC_SECTION;
 static uint32_t CanFrameBufferHighWaterBytes = 0U;
+
+__attribute__((weak)) void
+FdcanMsgPort_InstrumentationUsedBytesHook(uint32_t used_bytes)
+{
+    (void)used_bytes;
+}
 
 /**
  * @brief CAN frame page buffer shared between ISR and task context
@@ -65,6 +71,8 @@ static void fdcan_msg_port_update_highwater(void)
     }
 
     used = capacity - space;
+    FdcanMsgPort_InstrumentationUsedBytesHook((uint32_t)used);
+
     if (used > CanFrameBufferHighWaterBytes)
     {
         CanFrameBufferHighWaterBytes = (uint32_t)used;
@@ -162,6 +170,7 @@ size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds)
         if (BytesReceived > 0)
         {
             Index = Page.count;
+            fdcan_msg_port_update_highwater();
         }
         else
         {

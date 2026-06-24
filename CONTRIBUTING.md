@@ -62,7 +62,23 @@ docker run --rm -v "$PWD:/repo" -w /repo catthehacker/ubuntu:act-latest \
 To pre-check the GitHub action locally, run:
 
 ```sh
-act -v -W .github/workflows/unity-tests.yml -j build-and-test
+act -v -W .github/workflows/unity-tests.yml -j build-and-test \
+  --env-file /dev/null \
+  -P ubuntu-24.04=catthehacker/ubuntu:act-latest
+```
+
+You can also pre-build an image and use it for a local container:
+
+```sh
+docker compose -f dev/scripts/docker-compose.act-unity.yaml build
+```
+
+and then run act using this image:
+
+```sh
+act -W .github/workflows/unity-tests.yml -j build-and-test \
+  -P ubuntu-24.04=local/act-unity:ubuntu-24.04 \
+  --pull=false --action-offline-mode --env-file /dev/null
 ```
 
 ### Sign and encrypt image using MCUboot

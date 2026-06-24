@@ -105,6 +105,23 @@ void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
     Error_Handler();
 }
 
+uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay)
+{
+    if (0U == delay)
+    {
+        return 0U;
+    }
+
+    /* vTaskDelay is only valid in normal task context while scheduler runs. */
+    if ((__get_IPSR() == 0U)
+        && (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING))
+    {
+        vTaskDelay(delay);
+    }
+
+    return 0U;
+}
+
 void FileHandler_ErrorHandler(ErrorContextType *context)
 {
     Error_Handler();
@@ -372,15 +389,25 @@ static void appHandleFormattingRequest(void)
     appCanLogSetFileConfig(log_file_size, log_file_count);
     appCanLogSetClusterSize(cluster_size);
 
-    if (ReformattingRequested)
+    if (ReformattingRequested || FR_NO_FILESYSTEM == AppCtrlData.mountRes)
     {
         res = FatFS_SD_Unmount();
 
         if (FR_OK == res)
         {
+            uint32_t Count;
             AppCtrlData.mountRes = 1;
 
-            res = FatFS_SD_Format_Fat32(cluster_size);
+            Count = 0;
+
+            res = SD_Spi_EraseAll(&Count);
+
+            (void)Count;
+
+            if (SD_E_OK == res)
+            {
+                res = FatFS_SD_Format_Fat32(cluster_size);
+            }
         }
 
         if (FR_OK == res)

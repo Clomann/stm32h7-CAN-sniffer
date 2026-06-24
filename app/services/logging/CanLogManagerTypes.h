@@ -7,6 +7,7 @@
 #define CLM_PARAMETER_ID_MAX           3
 
 typedef uint8_t ClmParameterIdType;
+typedef uint8_t ClmErrorType;
 
 typedef enum
 {

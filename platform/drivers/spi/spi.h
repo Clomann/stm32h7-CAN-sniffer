@@ -54,7 +54,11 @@ typedef uint8_t SpiErrorType;
 #define SPI_DIR_TX_RX   0U
 #define SPI_DIR_TX_ONLY 1U
 #define SPI_DIR_RX_ONLY 2U
-// #define SPI_DIR_RX_WITH_CMD      3U
+#define SPI_DIR_POLL_BYTE                                                      \
+    3U /* poll single bytes until token match or max_retries:
+                              *   token=0xFF, invert=0 -> exit when byte != 0xFF
+                              *   token=0xFF, invert=1 -> exit when byte == 0xFF
+                              *   token=X,    invert=1 -> exit when byte == X   */
 // #define SPI_DIR_DUPLEX_STREAMING 4U
 // #define SPI_DIR_BURST_READ       5U
 
@@ -96,6 +100,12 @@ typedef struct
     uint16_t length;
     SpiDirectionType direction;
     SpiPriorityType prio;
+    uint32_t max_retries; /* used by SPI_DIR_POLL_BYTE: max single-byte polls */
+    uint8_t token; /* used by SPI_DIR_POLL_BYTE: byte value to match */
+    uint8_t invert; /* used by SPI_DIR_POLL_BYTE: 0 = exit when byte != token
+                           *                            1 = exit when byte == token */
+    uint8_t use_poll; /* 1 = use blocking HAL polling instead of DMA for
+                           *     TX_ONLY / RX_ONLY / TX_RX transfers          */
     SpiCompleteionCallbackType callback;
     void *context;
 } SpiTransactionType;

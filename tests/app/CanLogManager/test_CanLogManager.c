@@ -516,8 +516,12 @@ void test_FileRotation_WrapsHeadTailAtLimit(void)
     TEST_ASSERT_EQUAL_UINT32(0U, head);
     TEST_ASSERT_EQUAL_UINT32(0U, tail);
 
-    /* First rotation: head advances, tail stays until wrap. */
+    /* Rollover now occurs after a block flush, not on an idle poll. */
     set_file_size(appCanLogGetLogFileSize());
+    mockRunCanTracer = true;
+    set_frames_available(1);
+    appCanLogHandlerPoll(testCtrlData);
+    mockRunCanTracer = false;
     appCanLogHandlerPoll(testCtrlData);
     FsCustom_GetCanLogHeadIndex(&head);
     FsCustom_GetCanLogTailIndex(&tail);
@@ -528,6 +532,10 @@ void test_FileRotation_WrapsHeadTailAtLimit(void)
     for (uint32_t i = 1U; i < file_count; i++)
     {
         set_file_size(appCanLogGetLogFileSize());
+        mockRunCanTracer = true;
+        set_frames_available(1);
+        appCanLogHandlerPoll(testCtrlData);
+        mockRunCanTracer = false;
         appCanLogHandlerPoll(testCtrlData);
     }
 

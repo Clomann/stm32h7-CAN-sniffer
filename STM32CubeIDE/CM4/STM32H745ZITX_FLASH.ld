@@ -43,8 +43,8 @@ _Min_Stack_Size = 0x400 ; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-FLASH (rx)      : ORIGIN = 0x08100000, LENGTH = 1024K
-RAM (xrw)      : ORIGIN = 0x10000000, LENGTH = 288K
+FLASH   (rx)      : ORIGIN = 0x08100000, LENGTH = 1024K
+RAM (xrw)      : ORIGIN = 0x38010000, LENGTH = 32K /* reserve half of D3 RAM for CM7 */
 }
 
 /* Define program headers with explicit permissions */

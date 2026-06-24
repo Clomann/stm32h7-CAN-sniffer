@@ -263,6 +263,43 @@ uint8_t Spi_SendReceiveMsg(
     return RetVal;
 }
 
+uint8_t Spi_SendPoll(
+    SPI_HandleTypeDef *handle,
+    const uint8_t *buffer,
+    uint16_t len,
+    uint32_t timeout
+)
+{
+    return HAL_SPI_Transmit(handle, (uint8_t *)buffer, len, timeout);
+}
+
+uint8_t Spi_ReceivePoll(
+    SPI_HandleTypeDef *handle,
+    uint8_t *buffer,
+    uint16_t len,
+    uint32_t timeout
+)
+{
+    return HAL_SPI_Receive(handle, buffer, len, timeout);
+}
+
+uint8_t Spi_SendReceivePoll(
+    SPI_HandleTypeDef *handle,
+    const uint8_t *pTxBuffer,
+    uint8_t *pRxBuffer,
+    uint16_t len,
+    uint32_t timeout
+)
+{
+    return HAL_SPI_TransmitReceive(
+        handle,
+        (uint8_t *)pTxBuffer,
+        pRxBuffer,
+        len,
+        timeout
+    );
+}
+
 uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 {
     uint8_t RetVal;

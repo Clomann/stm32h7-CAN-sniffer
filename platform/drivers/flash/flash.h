@@ -4,17 +4,16 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef enum
-{
-    FLASH_E_OK = 0,
-    FLASH_E_RANGE,
-    FLASH_E_ALIGN,
-    FLASH_E_BUSY,
-    FLASH_E_PROTECT,
-    FLASH_E_VERIFY,
-    FLASH_E_HW,
-    FLASH_E_PARAM,
-} FlashStatusType;
+typedef uint8_t FlashStatusType;
+
+#define FLASH_E_OK      ((FlashStatusType)0)
+#define FLASH_E_RANGE   ((FlashStatusType)1)
+#define FLASH_E_ALIGN   ((FlashStatusType)2)
+#define FLASH_E_BUSY    ((FlashStatusType)3)
+#define FLASH_E_PROTECT ((FlashStatusType)4)
+#define FLASH_E_VERIFY  ((FlashStatusType)5)
+#define FLASH_E_HW      ((FlashStatusType)6)
+#define FLASH_E_PARAM   ((FlashStatusType)7)
 
 /**
  * @brief Flash sector information.

@@ -322,8 +322,8 @@
         <nav class="nav">
             <a href="/index.html" class="nav-link">Home</a>
             <a href="/can.shtml" class="nav-link">CAN Setup</a>
-            <a href="/can_trace.shtml" class="nav-link">CAN Trace</a>
-            <a href="/update.shtml" class="nav-link">Update</a>
+            <a href="/can_trace.html" class="nav-link">CAN Trace</a>
+            <a href="/update.html" class="nav-link">Update</a>
         </nav>
 
         <div class="card">
@@ -396,6 +396,8 @@
         const MCUBOOT_EXPECTED_HDR_SIZE = 0x0400;
         const TX_PHASE_MAX_PERCENT = 95;
         const DEVICE_STALL_TIMEOUT_MS = 60 * 1000;
+        const NETWORK_RECOVERY_POLLS = 8;
+        const NETWORK_RECOVERY_DELAY_MS = 1000;
 
         const fileInput = document.getElementById("fw-file");
         const uploadBtn = document.getElementById("upload-btn");
@@ -538,6 +540,60 @@
                 return `Backend error: ${errorReason} (ingest_status=${ingestStatus}).`;
             }
             return `Backend error: ${errorReason}.`;
+        }
+
+        function sleepMs(delayMs) {
+            return new Promise((resolve) => {
+                setTimeout(resolve, delayMs);
+            });
+        }
+
+        function isUploadRecoveredAfterTransportDrop(status) {
+            if (!status || typeof status !== "object") {
+                return false;
+            }
+
+            const uploadStateText = typeof status.upload_state === "string"
+                ? status.upload_state
+                : "unknown";
+            const verifyStateText = typeof status.verify_state === "string"
+                ? status.verify_state
+                : "unknown";
+            const uploadReady = Boolean(status.upload_ready);
+            const verified = Boolean(status.verified);
+            const uploadReceived = Number(
+                status.upload_received !== undefined
+                    ? status.upload_received
+                    : status.received
+            );
+            const uploadTotal = Number(
+                status.upload_total !== undefined
+                    ? status.upload_total
+                    : status.total
+            );
+            const fullBodyReceived = Number.isFinite(uploadReceived)
+                && Number.isFinite(uploadTotal)
+                && uploadTotal > 0
+                && uploadReceived >= uploadTotal;
+
+            return uploadReady
+                || verified
+                || uploadStateText === "ready"
+                || verifyStateText === "pending"
+                || verifyStateText === "in_progress"
+                || verifyStateText === "verified"
+                || fullBodyReceived;
+        }
+
+        async function recoverFromUploadTransportDrop() {
+            for (let i = 0; i < NETWORK_RECOVERY_POLLS; i++) {
+                const status = await pollIapStatus();
+                if (isUploadRecoveredAfterTransportDrop(status)) {
+                    return status;
+                }
+                await sleepMs(NETWORK_RECOVERY_DELAY_MS);
+            }
+            return null;
         }
 
         function refreshApplyButton() {
@@ -926,6 +982,18 @@
                     applyMessage.textContent =
                         "Upload aborted: device received bytes did not change for 60s.";
                 } else {
+                    const recoveredStatus = await recoverFromUploadTransportDrop();
+                    if (recoveredStatus) {
+                        uploadState.textContent = "Upload accepted, waiting for verification…";
+                        uploadMetrics.textContent = "Device is preparing verification…";
+                        applyMessage.textContent =
+                            "Upload transport dropped late, but backend continues processing.";
+                        uploadBtn.disabled = !precheckOk;
+                        uploadBtn.title = precheckOk ? "" : "Fix pre-check errors first.";
+                        refreshApplyButton();
+                        return;
+                    }
+
                     uploadState.textContent = "Upload failed (network error)";
                     applyMessage.textContent = "Upload failed (connection dropped).";
                     const status = await pollIapStatus();

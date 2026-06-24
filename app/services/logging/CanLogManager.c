@@ -30,6 +30,8 @@
 #include "semphr.h"
 #endif
 
+#define CANLOG_INGEST_BATCH_MAX 256
+
 #define CLM_ABS_TIME_TO_TIMSTAMP(x) (uint32_t)(x)
 #define CLM_ABS_TIME_TO_ABS_HIGH(x) ((uint32_t)((x) >> 32U))
 #define CLM_SYNC_EMIT_INTERVAL_US   (30ULL * 60ULL * 1000000ULL)
@@ -40,6 +42,10 @@ void CanLogManager_InstrumentationFlushStartHook(void);
 void CanLogManager_InstrumentationFlushEndHook(void);
 void CanLogManager_DrainPortStartHook(void);
 void CanLogManager_DrainPortEndHook(void);
+void CanLogManager_InstrumentationFdcanMsgPortPeakHook(
+    uint32_t timestamp_us,
+    uint32_t used_bytes
+);
 
 typedef struct
 {
@@ -122,16 +128,47 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void)
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
-static uint32_t Rb1BytesHighWater                 = 0U;
-static uint32_t CanLogFileSize                    = MAX_LOG_FILE_SIZE;
-static uint32_t CanLogFileCount                   = MAX_LOG_FILE_COUNT;
-static uint32_t CanLogClusterSize                 = CLUSTER_SIZE;
-static volatile uint32_t CanLogPreallocErrorCount = 0U;
+static uint32_t Rb1BytesHighWater                     = 0U;
+static uint32_t CanLogFileSize                        = MAX_LOG_FILE_SIZE;
+static uint32_t CanLogFileCount                       = MAX_LOG_FILE_COUNT;
+static uint32_t CanLogClusterSize                     = CLUSTER_SIZE;
+static volatile uint32_t CanLogPreallocErrorCount     = 0U;
+static volatile uint32_t FdcanMsgPortPeakCaptureCount = 0U;
+static volatile uint32_t FdcanMsgPortPeakTimestampUs  = 0U;
+static volatile uint32_t FdcanMsgPortPeakUsedBytes    = 0U;
+static volatile uint32_t FdcanMsgPortPeakCanLogBufferUsedBytes   = 0U;
+static volatile uint32_t FdcanMsgPortPeakRb1HighWaterBytes       = 0U;
+static volatile uint32_t FdcanMsgPortPeakFileHeadIndex           = 0U;
+static volatile uint32_t FdcanMsgPortPeakMetaFileIndex           = 0U;
+static volatile uint32_t FdcanMsgPortPeakMetaByteOffset          = 0U;
+static volatile uint64_t FdcanMsgPortPeakCanLogManagerFrameCount = 0U;
+static volatile uint64_t FdcanMsgPortPeakCanLogBufferBlockCount  = 0U;
 
 #if !defined(UNIT_TEST)
 static StaticSemaphore_t CanLogFileMutexBuffer;
 static SemaphoreHandle_t CanLogFileMutex = NULL;
 #endif
+
+void CanLogManager_InstrumentationFdcanMsgPortPeakHook(
+    uint32_t timestamp_us,
+    uint32_t used_bytes
+)
+{
+    uint32_t rb1_used_bytes = 0U;
+
+    (void)CanLogBuffer_UsedBytes(&rb1_used_bytes);
+
+    FdcanMsgPortPeakCaptureCount++;
+    FdcanMsgPortPeakTimestampUs           = timestamp_us;
+    FdcanMsgPortPeakUsedBytes             = used_bytes;
+    FdcanMsgPortPeakCanLogBufferUsedBytes = rb1_used_bytes;
+    FdcanMsgPortPeakRb1HighWaterBytes     = Rb1BytesHighWater;
+    FdcanMsgPortPeakFileHeadIndex         = CanLogCtrlData.CanLog.fileHeadIndex;
+    FdcanMsgPortPeakMetaFileIndex         = LogMetaData.fileIndex;
+    FdcanMsgPortPeakMetaByteOffset        = LogMetaData.byteOffset;
+    FdcanMsgPortPeakCanLogManagerFrameCount = CanLogManager_FrameCount;
+    FdcanMsgPortPeakCanLogBufferBlockCount  = CanLogBuffer_BlockCount;
+}
 
 static void CanLogManager_FileLockInit(void)
 {
@@ -159,25 +196,6 @@ static void CanLogManager_FileLock(void)
 #endif
 }
 
-static bool CanLogManager_FileTryLock(void)
-{
-#if !defined(UNIT_TEST)
-    if (CanLogFileMutex == NULL)
-    {
-        CanLogManager_FileLockInit();
-    }
-
-    if (CanLogFileMutex == NULL)
-    {
-        return false;
-    }
-
-    return (xSemaphoreTake(CanLogFileMutex, 0) == pdTRUE);
-#else
-    return true;
-#endif
-}
-
 static void CanLogManager_FileUnlock(void)
 {
 #if !defined(UNIT_TEST)
@@ -191,7 +209,7 @@ static void CanLogManager_FileUnlock(void)
 static int
 find_highest_suffix(const char *dirPath, const char *prefix, int maxSuffix);
 static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data);
-static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data);
+static unsigned int appCanLogCheckNewFileOpenLocked(void);
 static void appCanLogFillEntry(
     CanLogEntryType *entry,
     FDCAN_ClassicFrameType *frame,
@@ -508,20 +526,13 @@ static CanLogResult appCanLogCloseFile(CanLogControlDataType *data)
 
 #endif
 
-static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
+static unsigned int appCanLogCheckNewFileOpenLocked(void)
 {
     FRESULT FileSizeRes;
     uint32_t FileSize;
     uint32_t log_file_size;
     uint32_t log_file_count;
     uint32_t max_index;
-
-    (void)data;
-
-    if (!CanLogManager_FileTryLock())
-    {
-        return 0U;
-    }
 
     FileSizeRes = FatFS_SD_GetBufferedFileSize(
         &(CanLogCtrlData.CanLog.writeFileDevice),
@@ -584,8 +595,6 @@ static unsigned int appCanLogCheckNewFileOpen(CanLogControlDataType *data)
             CanLogFileManager_ErrorHandler();
         }
     }
-
-    CanLogManager_FileUnlock();
 
     return 0U;
 }
@@ -1318,6 +1327,10 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         CanLogManager_InstrumentationFlushStartHook();
         CanLogManager_FileLock();
         res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
+        if (COMM_SUCCESS == res)
+        {
+            (void)appCanLogCheckNewFileOpenLocked();
+        }
         CanLogManager_FileUnlock();
         CanLogManager_InstrumentationFlushEndHook();
 
@@ -1544,11 +1557,12 @@ void m_DecayBusLoad(CanStatusDataType *can, uint32_t currentTime)
     }
 }
 
-void appCanLogHandlerPoll(CanLogControlDataType *data)
+ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 {
-    comm_status_t res = COMM_SUCCESS;
+    ClmErrorType RetVal = CLM_E_OK;
+    comm_status_t res   = COMM_SUCCESS;
     bool IsOffState;
-    uint8_t BlockIsReady;
+    uint8_t BlockIsReady  = 0U;
     uint32_t SlotsToWrite = 0;
     FDCAN_ClassicFrameType *pNewFrame;
     volatile uint64_t AbsTime = 0;
@@ -1641,8 +1655,6 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         fdcan_msg_port_flush();
     }
 
-    appCanLogCheckNewFileOpen(data);
-
     (void)LocalFrameCount;
     LocalFrameCount = 0;
 
@@ -1658,7 +1670,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
     }
 
-    while (0 < fdcan_msg_port_read(&pNewFrame, 2))
+    while ((CANLOG_INGEST_BATCH_MAX > LocalFrameCount)
+           && (0 < fdcan_msg_port_read(&pNewFrame, 2)))
     {
         CanLogManager_DrainPortStartHook();
         CanLogManager_FrameCount++;
@@ -1726,6 +1739,11 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogManager_DrainPortEndHook();
     }
 
+    if (BlockIsReady)
+    {
+        RetVal = CLM_E_BLOCK_READY;
+    }
+
     if (true == CanLogCtrlData.emitSyncEntry)
     {
         uint32_t timestamp32 = LastFrameTimestampValid
@@ -1769,6 +1787,8 @@ void appCanLogHandlerPoll(CanLogControlDataType *data)
 
         *(CanLogCtrlData.commitLog) = false;
     }
+
+    return RetVal;
 }
 
 void appCanLogHandlerDeInit(CanLogControlDataType *data)

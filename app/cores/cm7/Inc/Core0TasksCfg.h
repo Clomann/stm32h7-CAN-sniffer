@@ -21,9 +21,9 @@
 #define CORE0_TASK5_STACK_SIZE (1U * configMINIMAL_STACK_SIZE)
 
 #define CORE0_TASK0_PRIO (configMAX_PRIORITIES - 1U) // CanBridgeTask
-#define CORE0_TASK1_PRIO (configMAX_PRIORITIES - 3U) // CanSendTask
-#define CORE0_TASK2_PRIO (configMAX_PRIORITIES - 5U) // Core0Task0Main
-#define CORE0_TASK3_PRIO (configMAX_PRIORITIES - 4U) // Core0Task1Main
+#define CORE0_TASK1_PRIO (configMAX_PRIORITIES - 5U) // CanSendTask
+#define CORE0_TASK2_PRIO (configMAX_PRIORITIES - 6U) // Core0Task0Main
+#define CORE0_TASK3_PRIO (configMAX_PRIORITIES - 3U) // Core0Task1Main
 #define CORE0_TASK4_PRIO (configMAX_PRIORITIES - 2U) // SpiTask
 #define CORE0_TASK5_PRIO (configMAX_PRIORITIES - 4U) // SdBridgeTask
 

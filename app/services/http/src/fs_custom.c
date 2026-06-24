@@ -535,14 +535,19 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             reason = "logger_running";
         }
-        else if (0u == WebInterface_PrepareFirmwareUploadHook())
-        {
-            reason = "prepare_failed";
-        }
         else
         {
-            ok_text = "true";
-            reason  = "slot_erased";
+            HttpdPost_ResetIapUploadSession();
+
+            if (0u == WebInterface_PrepareFirmwareUploadHook())
+            {
+                reason = "prepare_failed";
+            }
+            else
+            {
+                ok_text = "true";
+                reason  = "slot_erased";
+            }
         }
 
         n = snprintf(

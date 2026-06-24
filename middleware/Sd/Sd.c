@@ -62,6 +62,7 @@
 #define IS_VOLTAGE_2_7_2_8(ocr) (((ocr) >> OCR_VOLTAGE_2_7_2_8_POS) & 0x1)
 
 #define SD_SPI_PRE_CMD_CLOCKS 8U
+#define SD_ERASE_CHUNK_BLOCKS 4096U
 
 static ErrorContextType ErrorContext = {.file = __FILE_NAME__};
 
@@ -99,10 +100,34 @@ ALIGN_32BYTES(const uint8_t __attribute__((used, section(".dma_buffer.ro"))
     0xFF
 };
 
+static uint8_t SD_Crc7(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0;
+
+    while (len--)
+    {
+        uint8_t d = *data++;
+
+        for (uint8_t i = 0; i < 8; i++)
+        {
+            crc <<= 1;
+
+            if ((d ^ crc) & 0x80)
+            {
+                crc ^= 0x09;
+            }
+
+            d <<= 1;
+        }
+    }
+
+    return (crc << 1) | 1; // append end bit
+}
+
 static uint8_t
 SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
 {
-    uint8_t RetVal;
+    uint8_t RetVal = SD_E_OK;
 
     // first dummy byte to give SD card some idle time
     buffer[0] = 0xFF;
@@ -131,7 +156,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD12:
         buffer[1] = 0x4C;
@@ -139,7 +164,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD13:
         buffer[1] = 0x4D;
@@ -147,7 +172,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD16:
         buffer[1] = 0x50;
@@ -155,7 +180,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD17:
         buffer[1] = 0x51;
@@ -163,7 +188,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD18:
         buffer[1] = 0x52;
@@ -171,7 +196,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD24:
         buffer[1] = 0x58;
@@ -179,7 +204,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD25:
         buffer[1] = 0x59;
@@ -187,7 +212,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD32:
         buffer[1] = 0x40 + 32U;
@@ -195,23 +220,23 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD33:
-        buffer[1] = 0x40 + 32U;
+        buffer[1] = 0x40 + 33U;
         buffer[2] = (payload >> 24) & 0xFF;
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD38:
         buffer[1] = 0x40 + 38U;
-        buffer[2] = 0x00;
-        buffer[3] = 0x00;
-        buffer[4] = 0x00;
-        buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[3] = (payload >> 16) & 0xFF;
+        buffer[4] = (payload >> 8) & 0xFF;
+        buffer[5] = payload & 0xFF;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD55:
         buffer[1] = 0x77;
@@ -219,7 +244,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_CMD58:
         buffer[1] = 0x7A;
@@ -227,7 +252,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = 0x00;
         buffer[4] = 0x00;
         buffer[5] = 0x00;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     case SD_SPI_ACMD41:
         buffer[1] = 0x69;
@@ -235,7 +260,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
-        buffer[6] = 0x01;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
     default:
         buffer[1] = 0xFF;
@@ -244,7 +269,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[4] = 0xFF;
         buffer[5] = 0xFF;
         buffer[6] = 0xFF;
-        RetVal    = 1;
+        RetVal    = SD_E_NOT_OK;
     }
 
     return RetVal;
@@ -342,13 +367,44 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
         EXTRACT_CSD_BITS(buf, SD_CSD_ALWAYS1_MSK, SD_CSD_ALWAYS1_START);
 }
 
+static uint8_t SD_Spi_WaitBusy(uint32_t maxAttempts)
+{
+    uint32_t attempts = 0;
+    uint8_t resp;
+
+    do
+    {
+        SpiAbs_readByte(SPIABS_DEVICE_1, &resp);
+        if (resp == 0xFF)
+        {
+            break;
+        }
+        if (attempts >= 500U)
+        {
+            Sd_Spi_OsTaskDelayHook(2);
+        }
+    } while (++attempts < maxAttempts);
+
+    return (resp == 0xFF) ? 0U : 1U;
+}
+
 uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
 {
-    SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
+    uint8_t res = SD_E_OK;
 
-    SpiAbs_Send_Spi1_Task0((uint8_t *)aTxSpiCmd, COUNTOF(aTxSpiCmd));
+    res = SD_Spi_CreateCommand(cmd, payload, aTxSpiCmd);
 
-    return 0;
+    if (SD_E_OK == res)
+    {
+        res = SpiAbs_Send_Spi1_Task0((uint8_t *)aTxSpiCmd, COUNTOF(aTxSpiCmd));
+
+        if (SPIABS_E_OK != res)
+        {
+            res = SD_E_SEND;
+        }
+    }
+
+    return res;
 }
 
 uint8_t
@@ -406,24 +462,49 @@ uint8_t SD_Spi_WaitTillIdle()
 uint8_t SD_Spi_GoIdleState(Spi_R1Response *pResponse)
 {
     uint8_t i;
+    uint8_t res = SD_E_OK;
+
+    if (pResponse == NULL)
+    {
+        return SD_E_INV_PARAM;
+    }
+
+    pResponse->byte = 0xFF;
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
     for (i = 0U; i < SD_SPI_PRE_CMD_CLOCKS; i++)
     {
-        SpiAbs_readByte(SPIABS_DEVICE_1, &pResponse->byte); // Ensure idle state
+        res = SpiAbs_readByte(
+            SPIABS_DEVICE_1,
+            &pResponse->byte
+        ); // Ensure idle state
+
+        if (SPIABS_E_OK != res)
+        {
+            return SD_E_NOT_OK;
+        }
     }
 
     // assert chip select
     SpiAbs_CsEnable(SPIABS_DEVICE_1);
 
-    SD_Spi_SendCommand(SD_SPI_CMD0, 0x00000000);
-    SpiAbs_PollForResponse(SPIABS_DEVICE_1, &pResponse->byte);
+    res = SD_Spi_SendCommand(SD_SPI_CMD0, 0x00000000);
+
+    if (SD_E_OK == res)
+    {
+        res = SpiAbs_PollForResponse(SPIABS_DEVICE_1, &pResponse->byte);
+
+        if (SPIABS_E_OK != res)
+        {
+            res = SD_E_RESPONSE;
+        }
+    }
 
     // deassert chip select
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
-    return 0;
+    return res;
 }
 
 // uint8_t SD_Spi_SendWakeUp(Spi_R1Response * pResponse)
@@ -546,7 +627,12 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
     HAL_Delay(100);
     SD_Spi_PowerUp();
     HAL_Delay(300);
-    SD_Spi_GoIdleState(&response);
+    RetVal = SD_Spi_GoIdleState(&response);
+
+    if (SD_E_OK != RetVal)
+    {
+        return RetVal;
+    }
 
     if (0x01 == response.byte)
     {
@@ -831,7 +917,6 @@ uint8_t
 SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 {
     uint8_t res;
-    uint32_t readResponseAttempts;
     uint32_t tokenPollCount;
     uint16_t Crc = 0U;
     Spi_R1Response resp;
@@ -902,14 +987,12 @@ SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 
     if (stopTransmission)
     {
-        readResponseAttempts = 0;
-        do
-        { //Waiting for the end of the state BUSY
-            SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-        } while ((resp.byte != 0xFF)
-                 && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
-
-        if ((readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+        if ((SpiAbs_PollForIdle(
+                 SPIABS_DEVICE_1,
+                 &resp.byte,
+                 SD_MAX_READ_RESPONSE_ATTEMPTS
+             )
+             != 0)
             && (0 == res))
         {
             res = SD_E_CMD_NO_GOING_IDLE;
@@ -938,7 +1021,7 @@ SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 DRESULT SD_Spi_hotReset(void)
 {
     uint8_t res;
-    uint32_t readResponseAttempts;
+    uint8_t WaitRes = 0;
     Spi_R1Response resp;
     uint8_t dummy[8];
 
@@ -961,16 +1044,11 @@ DRESULT SD_Spi_hotReset(void)
         return RES_NOTRDY;
     }
 
-    readResponseAttempts = 0;
-    do
-    { // wait for card to go idle
-        SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-    } while ((resp.byte != 0xFF)
-             && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
+    WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS);
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
 
-    if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+    if (0 != WaitRes)
     {
         res = RES_NOTRDY;
     }
@@ -1059,7 +1137,6 @@ uint8_t
 SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 {
     uint8_t res;
-    uint32_t readResponseAttempts;
     uint16_t Crc = 0U;
     Spi_R1Response resp;
     bool TransmissionStarted     = false;
@@ -1123,15 +1200,11 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
             if (0 == res)
             {
-                readResponseAttempts = 0;
-                do
-                { //Waiting for the end of the state BUSY
-                    SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-                } while ((resp.byte != 0xFF)
-                         && (++readResponseAttempts
-                             < SD_MAX_READ_RESPONSE_ATTEMPTS));
+                uint8_t WaitRes = 0;
 
-                if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+                WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS);
+
+                if (0 != WaitRes)
                 {
                     res = SD_E_CMD_NO_GOING_IDLE;
                 }
@@ -1148,8 +1221,7 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
     {
         SpiAbs_writByte(SPIABS_DEVICE_1, &StopDataToken);
 
-        memset(&address, 0, sizeof(address)); // clear for dummy usage
-        SD_Spi_SendCommand(SD_SPI_CMD12, address); // Send CMD12
+        SD_Spi_SendCommand(SD_SPI_CMD12, 0U);
 
         SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
         if (resp.byte == 0xFF)
@@ -1159,15 +1231,11 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
         if (0 == res)
         {
-            readResponseAttempts = 0;
-            do
-            { //Waiting for the end of the state BUSY
-                SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-            } while ((resp.byte != 0xFF)
-                     && (++readResponseAttempts
-                         < SD_MAX_READ_RESPONSE_ATTEMPTS * 20U));
+            uint8_t WaitRes = 0;
 
-            if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS * 20U)
+            WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS * 20U);
+
+            if (0 != WaitRes)
             {
                 res = SD_E_CMD_NO_GOING_IDLE;
             }
@@ -1196,7 +1264,6 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
 {
     uint8_t RetVal;
-    uint32_t readResponseAttempts;
     uint16_t Crc = 0U;
     Spi_R1Response resp;
     const uint8_t StartDataToken = SD_DEF_START_DATA_MARKER;
@@ -1242,14 +1309,11 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
 
     if (0 == RetVal)
     {
-        readResponseAttempts = 0;
-        do
-        { //Waiting for the end of the state BUSY
-            SpiAbs_readByte(SPIABS_DEVICE_1, &resp.byte);
-        } while ((resp.byte != 0xFF)
-                 && (++readResponseAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS));
+        uint8_t WaitRes = 0;
 
-        if (readResponseAttempts >= SD_MAX_READ_RESPONSE_ATTEMPTS)
+        WaitRes = SD_Spi_WaitBusy(SD_MAX_READ_RESPONSE_ATTEMPTS);
+
+        if (0 != WaitRes)
         {
             RetVal = SD_E_CMD_NO_GOING_IDLE;
         }
@@ -1260,8 +1324,239 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
     return RetVal;
 }
 
+/**
+ * @brief Compute total 512-byte logical block count for CSD v2 cards.
+ * @param csd Parsed CSD register.
+ * @param totalBlocksOut Out: total logical block count.
+ * @return SD_E_OK on success, otherwise SD_E_* error code.
+ */
+static uint8_t
+SD_Spi_TotalBlocks512(const SdCsdRegisterType *csd, uint32_t *totalBlocksOut)
+{
+    uint64_t totalBlocks64;
+
+    if ((NULL == csd) || (NULL == totalBlocksOut))
+    {
+        return SD_E_NOT_OK;
+    }
+
+    if (1U != csd->csdStructure)
+    {
+        /* Dummy/error path for non-SDHC cards until SDSC CSD-v1 support is added. */
+        *totalBlocksOut = 0U;
+        return SD_E_UNSUPPORTED_CARD_TYPE;
+    }
+
+    totalBlocks64 = ((uint64_t)csd->cSize + 1ULL) * 1024ULL;
+    if (totalBlocks64 > (uint64_t)UINT32_MAX)
+    {
+        *totalBlocksOut = 0U;
+        return SD_E_CAPACITY_OVERFLOW;
+    }
+
+    *totalBlocksOut = (uint32_t)totalBlocks64;
+    return SD_E_OK;
+}
+
+uint8_t SD_Spi_TrimAll(uint32_t *blocks_trimmed)
+{
+    return SD_Spi_EraseAll(blocks_trimmed);
+}
+
+uint8_t SD_Spi_EraseAll(uint32_t *blocks_erased)
+{
+    uint8_t res;
+    uint32_t totalBlocks;
+    uint32_t eraseBlockSize;
+    uint32_t currentBlock;
+    uint32_t chunkLimitBlocks;
+    uint32_t readResponseAttempts;
+    uint8_t dummy[SD_SPI_PRE_CMD_CLOCKS];
+    SdCsdRegisterType csd;
+    Spi_R1Response resp;
+
+    res = SD_E_OK;
+
+    if (NULL != blocks_erased)
+    {
+        *blocks_erased = 0U;
+    }
+
+    memset(dummy, SD_SPI_CMD_DUMMY_DATA, sizeof(dummy));
+    memset(&csd, 0, sizeof(csd));
+
+    res = SD_Spi_ReadCSD(&csd);
+    if (SD_E_OK != res)
+    {
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_EraseAll"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+        return res;
+    }
+
+    res = SD_Spi_TotalBlocks512(&csd, &totalBlocks);
+    if (SD_E_OK != res)
+    {
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_EraseAll"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+        return res;
+    }
+
+    /* SDHC/SDXC path only: use 512-byte block granularity for erase ranges. */
+    eraseBlockSize = 1U;
+    currentBlock   = 0U;
+
+    chunkLimitBlocks = SD_ERASE_CHUNK_BLOCKS;
+    chunkLimitBlocks -= (chunkLimitBlocks % eraseBlockSize);
+    if (0U == chunkLimitBlocks)
+    {
+        chunkLimitBlocks = eraseBlockSize;
+    }
+
+    while (currentBlock < totalBlocks)
+    {
+        uint32_t remainingBlocks = totalBlocks - currentBlock;
+        uint32_t chunkBlocks     = (remainingBlocks > chunkLimitBlocks)
+                                       ? chunkLimitBlocks
+                                       : remainingBlocks;
+        uint32_t startBlock;
+        uint32_t endBlock;
+
+        if ((chunkBlocks % eraseBlockSize) != 0U)
+        {
+            chunkBlocks -= (chunkBlocks % eraseBlockSize);
+        }
+
+        if (0U == chunkBlocks)
+        {
+            res = SD_E_ERASE_END_FAILED;
+            break;
+        }
+
+        startBlock = currentBlock;
+        endBlock   = startBlock + chunkBlocks - 1U;
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+        SpiAbs_CsEnable(SPIABS_DEVICE_1);
+        SD_Spi_SendCommand(SD_SPI_CMD32, startBlock);
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+        if (0x00U != resp.byte)
+        {
+            if ((chunkLimitBlocks > eraseBlockSize) && (0xFFU != resp.byte))
+            {
+                chunkLimitBlocks = eraseBlockSize;
+                continue;
+            }
+
+            res = SD_E_ERASE_START_FAILED;
+            break;
+        }
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+        SpiAbs_CsEnable(SPIABS_DEVICE_1);
+        SD_Spi_SendCommand(SD_SPI_CMD33, endBlock);
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+        if (0x00U != resp.byte)
+        {
+            if ((chunkLimitBlocks > eraseBlockSize) && (0xFFU != resp.byte))
+            {
+                chunkLimitBlocks = eraseBlockSize;
+                continue;
+            }
+
+            res = SD_E_ERASE_END_FAILED;
+            break;
+        }
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SpiAbs_Receive_Spi1_Task0(dummy, sizeof(dummy));
+        SpiAbs_CsEnable(SPIABS_DEVICE_1);
+        SD_Spi_SendCommand(SD_SPI_CMD38, 0x00000000U);
+        SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+
+        if (0x00U != resp.byte)
+        {
+            SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+            if ((chunkLimitBlocks > eraseBlockSize) && (0xFFU != resp.byte))
+            {
+                chunkLimitBlocks = eraseBlockSize;
+                continue;
+            }
+
+            res = SD_E_ERASE_CMD_FAILED;
+            break;
+        }
+
+        readResponseAttempts = 0U;
+        do
+        {
+            SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+        } while ((0xFFU != resp.byte)
+                 && (++readResponseAttempts < SD_ERASE_BUSY_TIMEOUT_ATTEMPTS));
+
+        if (readResponseAttempts >= SD_ERASE_BUSY_TIMEOUT_ATTEMPTS)
+        {
+            SpiAbs_CsDisable(SPIABS_DEVICE_1);
+            res = SD_E_CMD_NO_GOING_IDLE;
+            break;
+        }
+
+        SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+        currentBlock += chunkBlocks;
+
+        if (NULL != blocks_erased)
+        {
+            *blocks_erased = currentBlock;
+            res            = SD_E_OK;
+        }
+    }
+
+    if (SD_E_OK != res)
+    {
+        ErrorContext.code = res;
+        ErrorContext.line = __LINE__;
+        snprintf(
+            ErrorContext.function,
+            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
+            "%s",
+            "SD_Spi_EraseAll"
+        );
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+    }
+
+    return res;
+}
+
 uint8_t SD_Spi_GetReadBytes(uint8_t *buff)
 {
     memcpy(buff, SPI_CMD_READ_BUFFER, SD_SDHC_SECTOR_SIZE);
     return 0U;
+}
+
+__attribute__((weak)) uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay)
+{
+    (void)delay;
+
+    return 0;
 }
