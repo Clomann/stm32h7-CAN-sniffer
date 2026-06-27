@@ -61,6 +61,11 @@ jobs:
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/lan8742
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/CMSIS/Device/ST/STM32H7xx
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/Common
+    
+    - name: Check formatting (clang-format)
+      run: |
+        find adapters app dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
+        clang-format-18 -style=file --dry-run --Werror --files=./tools/clang/clang_files.txt
 
     - name: Setup Python venv
       run: |
@@ -99,11 +104,6 @@ jobs:
 
     - name: Configure with CMake
       run: cmake -S tests -B build -DMCUBOOT_PYTHON="${MCUBOOT_PYTHON}" -DCMAKE_OBJCOPY="$(command -v arm-none-eabi-objcopy)"
-
-    - name: Check formatting (clang-format)
-      run: |
-        find adapters app dev middleware platform tests -path 'dev/scripts/env' -prune -o -path '*/_deps' -prune -o -path '*/build' -prune -o -path '*/CMakeFiles' -prune -o -type f \( -name '*.c' -o -name '*.h' \) -print | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
-        clang-format-18 -style=file --dry-run --Werror --files=./tools/clang/clang_files.txt
 
     - name: Build tests
       run: cmake --build build
