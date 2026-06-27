@@ -2,7 +2,7 @@ name: test
 
 on: 
   push: { branches: [ integration, main, ci_cd_pipeline ] }
-  pull_request:  { branches: [ main ] }
+  pull_request:  { branches: [ integration, main ] }
   workflow_dispatch:
 
 jobs:
