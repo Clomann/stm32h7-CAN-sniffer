@@ -38,14 +38,14 @@ class Field:
 
 
 def _strip_suffixes(value: str) -> str:
-    """Remove common C integer suffixes to make expressions Python-evaluable."""
-    return re.sub(r"[uUlL]", "", value)
+    """Remove C integer suffixes (u/U/l/L after a numeric literal) to make expressions Python-evaluable."""
+    return re.sub(r"((?:0[xX][0-9a-fA-F]+|\d+))[uUlL]+", r"\1", value)
 
 
 def _eval_int_expr(expr: str, names: Dict[str, int] | None = None) -> int:
     cleaned = _strip_suffixes(expr)
     tree = ast.parse(cleaned, mode="eval")
-    allowed = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Num, ast.Constant, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.LShift, ast.RShift, ast.BitOr, ast.BitAnd, ast.BitXor, ast.USub, ast.UAdd, ast.Call, ast.Name)
+    allowed = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.LShift, ast.RShift, ast.BitOr, ast.BitAnd, ast.BitXor, ast.USub, ast.UAdd, ast.Call, ast.Name, ast.Load)
     for node in ast.walk(tree):
         if not isinstance(node, allowed):
             raise ValueError(f"Disallowed expression in macro: {expr}")
@@ -61,8 +61,8 @@ def parse_macros(text: str) -> Dict[str, int]:
     for line in text.splitlines():
         if not line.lstrip().startswith("#define"):
             continue
-        if re.match(r"^\s*#define\s+\w+\s*\(", line):
-            continue  # Skip function-like macros.
+        if re.match(r"^\s*#define\s+\w+\(", line):
+            continue  # Skip function-like macros (no space between name and '(' in C).
         match = re.match(r"^\s*#define\s+(\w+)\s+(.+)$", line)
         if not match:
             continue
