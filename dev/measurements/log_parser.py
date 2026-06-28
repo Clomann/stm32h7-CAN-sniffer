@@ -177,32 +177,21 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
 
     end_of_valid_data = min(block_fill, len(block))
     offset = header_size
-    frames_in_block = 0
     entries_in_block = 0
 
-    while True:
-        entry_struct = LEGACY_ENTRY_HEADER_STRUCT if legacy else ENTRY_HEADER_STRUCT
-        if offset + entry_struct.size > end_of_valid_data:
-            break
+    if legacy:
+        entry_struct = LEGACY_ENTRY_HEADER_STRUCT
+        entry_struct_size = LEGACY_ENTRY_HEADER_SIZE
+        while True:
+            if offset + entry_struct_size > end_of_valid_data:
+                break
+            entry_type, header_len, total_len = entry_struct.unpack_from(block, offset)
+            min_len = entry_struct_size + LEGACY_ENTRY_FIXED_SIZE
+            if total_len < min_len or offset + total_len > end_of_valid_data or total_len == 0:
+                break
 
-        entry_type, header_len, total_len = entry_struct.unpack_from(block, offset)
-        if legacy:
-            min_len = entry_struct.size + LEGACY_ENTRY_FIXED_SIZE
-        else:
-            if entry_type == CLB_ENTRY_TYPE_SYNC:
-                min_len = entry_struct.size + SYNC_FIXED_SIZE
-            else:
-                min_len = entry_struct.size + ENTRY_FIXED_SIZE
-
-        if total_len < min_len or offset + total_len > end_of_valid_data or total_len == 0:
-            break
-
-        fixed_offset = offset + entry_struct.size
-
-        if legacy:
-            timestamp, can_id, channel, dlc, flags, _bus_id = LEGACY_ENTRY_FIXED_STRUCT.unpack_from(
-                block, fixed_offset
-            )
+            fixed_offset = offset + entry_struct_size
+            timestamp, can_id, channel, dlc, flags, _bus_id = LEGACY_ENTRY_FIXED_STRUCT.unpack_from(block, fixed_offset)
             payload_offset = fixed_offset + LEGACY_ENTRY_FIXED_SIZE
             payload_len = total_len - (LEGACY_ENTRY_HEADER_SIZE + LEGACY_ENTRY_FIXED_SIZE)
 
@@ -216,10 +205,37 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
                 offset += total_len
                 continue
 
-            timestamp_us = timestamp
-            dlc_val = dlc
-        else:
-            if entry_type == CLB_ENTRY_TYPE_SYNC and total_len >= ENTRY_HEADER_SIZE + SYNC_FIXED_SIZE:
+            yield CanLogFrame(
+                frame_type=frame_type,
+                epoch=epoch,
+                timestamp_us=timestamp,
+                can_id=can_id,
+                channel=channel,
+                dlc=dlc,
+                flags=flags,
+                data=block[payload_offset : payload_offset + data_len].tobytes(),
+                block_index=block_index,
+                block_offset=offset,
+            )
+            entries_in_block += 1
+            offset += total_len
+    else:
+        entry_struct = ENTRY_HEADER_STRUCT
+        entry_struct_size = ENTRY_HEADER_SIZE
+        min_len_sync = entry_struct_size + SYNC_FIXED_SIZE
+        min_len_frame = entry_struct_size + ENTRY_FIXED_SIZE
+        while True:
+            if offset + entry_struct_size > end_of_valid_data:
+                break
+            entry_type, header_len, total_len = entry_struct.unpack_from(block, offset)
+            if total_len == 0:
+                break
+
+            fixed_offset = offset + entry_struct_size
+
+            if entry_type == CLB_ENTRY_TYPE_SYNC:
+                if total_len < min_len_sync or offset + total_len > end_of_valid_data:
+                    break
                 timestamp, abs_high = SYNC_FIXED_STRUCT.unpack_from(block, fixed_offset)
                 abs_time_state["high"] = abs_high
                 entries_in_block += 1
@@ -227,41 +243,40 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
                 continue
 
             if entry_type != CLB_ENTRY_TYPE_FRAME:
+                if offset + total_len > end_of_valid_data:
+                    break
                 offset += total_len
                 continue
 
-            timestamp, can_id, channel, dlc_flags, data_len = ENTRY_FIXED_STRUCT.unpack_from(
-                block, fixed_offset
-            )
+            if total_len < min_len_frame or offset + total_len > end_of_valid_data:
+                break
+
+            timestamp, can_id, channel, dlc_flags, data_len = ENTRY_FIXED_STRUCT.unpack_from(block, fixed_offset)
             payload_offset = fixed_offset + ENTRY_FIXED_SIZE
             payload_len = total_len - (ENTRY_HEADER_SIZE + ENTRY_FIXED_SIZE)
             data_len = min(data_len, payload_len, FDCAN_MAX_LEN)
 
             dlc_val = dlc_flags & CAN_DLC_MASK
             flags = dlc_flags & ~CAN_DLC_MASK
-            is_fd = bool(flags & CAN_FLAG_RTR_FDF) or dlc_val > CLASSIC_MAX_LEN
-            frame_type = "FD" if is_fd else "Classic"
+            frame_type = "FD" if (flags & CAN_FLAG_RTR_FDF) or dlc_val > CLASSIC_MAX_LEN else "Classic"
 
             abs_high = abs_time_state.get("high", 0)
             timestamp_us = (abs_high << 32) | timestamp
 
-        data = block[payload_offset : payload_offset + data_len].tobytes()
-
-        yield CanLogFrame(
-            frame_type=frame_type,
-            epoch=epoch,
-            timestamp_us=timestamp_us,
-            can_id=can_id,
-            channel=channel,
-            dlc=dlc_val,
-            flags=flags,
-            data=data,
-            block_index=block_index,
-            block_offset=offset,
-        )
-        frames_in_block += 1
-        entries_in_block += 1
-        offset += total_len
+            yield CanLogFrame(
+                frame_type=frame_type,
+                epoch=epoch,
+                timestamp_us=timestamp_us,
+                can_id=can_id,
+                channel=channel,
+                dlc=dlc_val,
+                flags=flags,
+                data=block[payload_offset : payload_offset + data_len].tobytes(),
+                block_index=block_index,
+                block_offset=offset,
+            )
+            entries_in_block += 1
+            offset += total_len
 
     if entries_in_block != header_frame_count:
         print(
@@ -406,16 +421,19 @@ def _format_vector_ascii_frame(base_timestamp_us: int | None, frame: CanLogFrame
     else:
         rel_time_s = (frame.timestamp_us - base_timestamp_us) / 1_000_000
     data_len = min(frame.dlc, len(frame.data))
-    data_hex = " ".join(f"{byte:02X}" for byte in frame.data[:data_len])
+    data_hex = frame.data[:data_len].hex(' ').upper()
 
     # Currently we treat every frame as extended-ID. Flags are kept for future decoding (IDE/RTR/BRS/ESI).
-    is_extended = True
-    can_id_str = f"{frame.can_id:X}{'x' if is_extended else ''}"
+    can_id_str = f"{frame.can_id:X}x"
 
-    direction = "Rx"
     frame_type = "fd" if frame.frame_type == "FD" else "d"
 
-    return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} {direction} {frame_type} {data_len} {data_hex}".rstrip()
+    if data_hex:
+        return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} Rx {frame_type} {data_len} {data_hex}"
+    return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} Rx {frame_type} {data_len}"
+
+
+_WRITE_BATCH = 8192  # lines buffered before flushing to OS
 
 
 class VectorAsciiWriter:
@@ -423,7 +441,7 @@ class VectorAsciiWriter:
 
     def __init__(self, path: Path, use_relative_ts: bool):
         self.path = path
-        self.file = path.open("w", encoding="ascii", newline="\n")
+        self.file = path.open("w", encoding="ascii", newline="\n", buffering=1 << 20)
         now = datetime.now()
         now_str = now.strftime("%a %b %d %H:%M:%S %Y")
         self.file.write(f"date {now_str}\n")
@@ -434,19 +452,31 @@ class VectorAsciiWriter:
         self.file.write("   0.000000 Start of measurement\n")
         self.base_timestamp_us: int | None = None if use_relative_ts else 0
         self.ts_width: int = 14  # minimum width; grows if integer part grows
+        self._ts_magnitude: int = 0  # integer seconds corresponding to current ts_width
+        self._buf: list[str] = []
 
     def write_frame(self, frame: CanLogFrame) -> None:
         if self.base_timestamp_us is None:
             self.base_timestamp_us = frame.timestamp_us
-        needed_width = len(str(int(frame.timestamp_us / 1_000_000))) + 1 + 6  # digits + dot + 6 decimals
-        if needed_width > self.ts_width:
-            self.ts_width = needed_width
 
-        line = _format_vector_ascii_frame(self.base_timestamp_us, frame, self.ts_width)
-        self.file.write(line + "\n")
+        ts_s = (frame.timestamp_us - self.base_timestamp_us) // 1_000_000
+        if ts_s > self._ts_magnitude:
+            needed_width = len(str(ts_s)) + 7  # digits + dot + 6 decimals
+            if needed_width > self.ts_width:
+                self.ts_width = needed_width
+            self._ts_magnitude = 10 ** (len(str(ts_s))) - 1
+
+        self._buf.append(_format_vector_ascii_frame(self.base_timestamp_us, frame, self.ts_width))
+        self._buf.append("\n")
+        if len(self._buf) >= _WRITE_BATCH * 2:
+            self.file.writelines(self._buf)
+            self._buf.clear()
 
     def close(self) -> None:
         if self.file:
+            if self._buf:
+                self.file.writelines(self._buf)
+                self._buf.clear()
             self.file.write("End Triggerblock\n")
             self.file.close()
             self.file = None
@@ -538,6 +568,26 @@ def main(argv: Sequence[str] | None = None) -> None:
     logs_dir = args.logs_dir or DEFAULT_LOG_DIR
     trace_out = args.trace_out or DEFAULT_TRACE_OUT
 
+    # If --write-asc names an existing directory, derive output file names inside it.
+    asc_out_dir: Path | None = None
+    asc_stem: str = "trace"
+    asc_suffix: str = ".asc"
+    if args.write_asc:
+        p = args.write_asc
+        if p.is_dir():
+            asc_out_dir = p
+        else:
+            asc_out_dir = p.parent
+            asc_stem = p.stem or "trace"
+            asc_suffix = p.suffix or ".asc"
+    def _asc_path(epoch: int | None = None, seq: int | None = None) -> Path:
+        assert asc_out_dir is not None
+        if epoch is None and seq is None:
+            return asc_out_dir / f"{asc_stem}{asc_suffix}"
+        if seq is None:
+            return asc_out_dir / f"{asc_stem}_epoch{epoch:03d}{asc_suffix}"
+        return asc_out_dir / f"{asc_stem}_epoch{epoch:03d}_seq{seq:03d}{asc_suffix}"
+
     if args.build_trace:
         count = concat_logs_to_trace(logs_dir, trace_out)
         print(f"Concatenated {count} log file(s) into {trace_out}")
@@ -547,7 +597,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     tail = 0 if args.count_only else max(0, args.tail)
     preview: List[CanLogFrame] = []
     tail_buf: Deque[CanLogFrame] = deque(maxlen=tail) if tail else deque()
-    asc_writer = VectorAsciiWriter(args.write_asc, args.relative_ts) if args.write_asc and not args.split_epochs else None
+    asc_writer = VectorAsciiWriter(_asc_path(), args.relative_ts) if args.write_asc and not args.split_epochs else None
     current_epoch: int | None = None
     epoch_seq = 0
 
@@ -563,15 +613,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         count = len(frames)
         if args.write_asc:
             if args.split_epochs:
-                base = args.write_asc
-                suffix = base.suffix or ".asc"
-                stem = base.stem
                 if args.merge_scattered_epochs:
                     for frame in frames:
                         writer = epoch_writers.get(frame.epoch)
                         if not writer:
-                            out_path = base.with_name(f"{stem}_epoch{frame.epoch:03d}{suffix}")
-                            writer = VectorAsciiWriter(out_path, args.relative_ts)
+                            writer = VectorAsciiWriter(_asc_path(frame.epoch), args.relative_ts)
                             epoch_writers[frame.epoch] = writer
                         writer.write_frame(frame)
                 else:
@@ -583,14 +629,13 @@ def main(argv: Sequence[str] | None = None) -> None:
                             if writer:
                                 writer.close()
                             epoch_seq += 1
-                            out_path = base.with_name(f"{stem}_epoch{frame.epoch:03d}_seq{epoch_seq:03d}{suffix}")
-                            writer = VectorAsciiWriter(out_path, args.relative_ts)
+                            writer = VectorAsciiWriter(_asc_path(frame.epoch, epoch_seq), args.relative_ts)
                             current_epoch = frame.epoch
                         writer.write_frame(frame)
                     if writer:
                         writer.close()
             else:
-                asc_writer = VectorAsciiWriter(args.write_asc, args.relative_ts)
+                asc_writer = VectorAsciiWriter(_asc_path(), args.relative_ts)
                 for frame in frames:
                     asc_writer.write_frame(frame)
                 asc_writer.close()
@@ -604,14 +649,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                 tail_buf.append(frame)
             if args.write_asc:
                 if args.split_epochs:
-                    base = args.write_asc
-                    suffix = base.suffix or ".asc"
-                    stem = base.stem
                     if args.merge_scattered_epochs:
                         writer = epoch_writers.get(frame.epoch)
                         if not writer:
-                            out_path = base.with_name(f"{stem}_epoch{frame.epoch:03d}{suffix}")
-                            writer = VectorAsciiWriter(out_path, args.relative_ts)
+                            writer = VectorAsciiWriter(_asc_path(frame.epoch), args.relative_ts)
                             epoch_writers[frame.epoch] = writer
                         writer.write_frame(frame)
                     else:
@@ -619,8 +660,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                             if asc_writer:
                                 asc_writer.close()
                             epoch_seq += 1
-                            out_path = base.with_name(f"{stem}_epoch{frame.epoch:03d}_seq{epoch_seq:03d}{suffix}")
-                            asc_writer = VectorAsciiWriter(out_path, args.relative_ts)
+                            asc_writer = VectorAsciiWriter(_asc_path(frame.epoch, epoch_seq), args.relative_ts)
                             current_epoch = frame.epoch
                         if asc_writer:
                             asc_writer.write_frame(frame)
@@ -652,11 +692,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.write_asc:
         if args.split_epochs:
             if args.merge_scattered_epochs:
-                print(f"Wrote Vector ASCII logs merged by epoch using base {args.write_asc}")
+                print(f"Wrote Vector ASCII logs merged by epoch into {asc_out_dir}/")
             else:
-                print(f"Wrote Vector ASCII logs split by epoch using base {args.write_asc}")
+                print(f"Wrote Vector ASCII logs split by epoch into {asc_out_dir}/")
         else:
-            print(f"Wrote Vector ASCII log to {args.write_asc}")
+            print(f"Wrote Vector ASCII log to {_asc_path()}")
 
     if args.collect_all:
         print(f"Collected {count} frame(s) into memory.")
