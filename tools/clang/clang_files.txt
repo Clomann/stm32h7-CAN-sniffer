@@ -150,11 +150,14 @@ platform/board/stm32h745/cm7/Src/boot_platform.c
 platform/board/stm32h745/cm7/Src/main.c
 platform/board/stm32h745/cm7/Src/stm32h7xx_it.c
 platform/Common/Inc/FwUpdateHandoff.h
+platform/Common/Inc/SequenceChecker_Cfg.h
+platform/Common/Inc/SequenceChecker.h
 platform/Common/Inc/instrumentation.h
 platform/Common/Inc/stm32h7xx_nucleo_conf.h
 platform/Common/Src/instrumentation.c
 platform/Common/Src/system_stm32h7xx.c
 platform/Common/Src/FwUpdateHandoff.c
+platform/Common/Src/SequenceChecker.c
 platform/ports/fdcan_msg_port.h
 platform/ports/spi/spi_port_freertos.h
 platform/ports/spi/spi_port_freertos.c
@@ -179,6 +182,8 @@ tests/app/test_definitions.h
 tests/app/InAppProgramming/stubs/RamFlashSim.h
 tests/app/InAppProgramming/stubs/RamFlashSim.c
 tests/app/InAppProgramming/test_iap.c
+tests/app/Common/test_SequenceChecker.c
+tests/app/Common/test_SequenceChecker.h
 tests/app/test_app.c
 tests/test_template.c
 tests/bootloader/boot_platform_stub.h

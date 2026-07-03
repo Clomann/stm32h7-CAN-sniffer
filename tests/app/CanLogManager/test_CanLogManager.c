@@ -43,6 +43,8 @@ bool get_can_started(void);
 bool get_can_stopped(void);
 bool get_read_called(void);
 
+static void RunAllTests(void);
+
 void test_CanLogManager_setUp(void)
 {
     reset_fs_stubs();

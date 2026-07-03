@@ -166,15 +166,18 @@ add_library(app STATIC
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/ff.c
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/FileHandler.c
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/instrumentation.c
+    ${REPO_ROOT}/tests/app/Common/test_SequenceChecker.c
     ${REPO_ROOT}/app/services/logging/CanLogBuffer.c
     ${REPO_ROOT}/app/services/logging/CanLogManager.c
     ${REPO_ROOT}/app/services/logging/RuntimeChecks.c
+    ${REPO_ROOT}/platform/Common/Src/SequenceChecker.c
     ${REPO_ROOT}/libs/coreJSON/source/core_json.c
 )
 
 target_include_directories(app PUBLIC
     ${REPO_ROOT}/tests/app/CanLogManager/stubs/
     ${REPO_ROOT}/tests/app/CanLogManager
+    ${REPO_ROOT}/tests/app/Common
     ${REPO_ROOT}/tests/app
     ${REPO_ROOT}/app/services/config
     ${REPO_ROOT}/app/services/logging
