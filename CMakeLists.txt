@@ -207,6 +207,7 @@ if(CORE STREQUAL "CM7")
     #
     set(sources_SRCS                    # Modified
         ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/platform/Common/Src/SequenceChecker.c
     )
 
     #
@@ -300,6 +301,9 @@ function(configure_firmware_target target_name)
         -Wextra
         -Wpedantic
         -Werror=implicit-function-declaration
+        # -Wtype-limits 
+        # -Wsign-compare 
+        # -Wconversion
         # Full debug configuration
         $<$<CONFIG:Release>:-O1;-g3;-ggdb>
         $<$<CONFIG:Debug>:-Og;-g3;-ggdb>

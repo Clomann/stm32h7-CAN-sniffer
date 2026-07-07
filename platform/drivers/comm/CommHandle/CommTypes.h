@@ -152,8 +152,9 @@ typedef struct
 {
     uint32_t id;
     uint32_t timestamp;
-    uint8_t channel;
+    uint32_t rx_sequence; // tag for frame sequence checks
     uint16_t dlc_dl_flags; // Packed: dlc + data_length + flags
+    uint8_t channel;
     uint8_t data[8];
 } FDCAN_ClassicFrameType;
 

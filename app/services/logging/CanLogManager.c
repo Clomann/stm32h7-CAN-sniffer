@@ -18,6 +18,7 @@
 #include "SdBridgeTask.h"
 #include "core_json.h"
 #include "RuntimeChecks.h"
+#include "SequenceChecker.h"
 
 #include "instrumentation.h"
 #if INSTR_ENABLED
@@ -128,6 +129,8 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void)
 
 volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
+static ScSequenceType CAN1_Sequence;
+static ScSequenceType CAN2_Sequence;
 static uint32_t Rb1BytesHighWater                     = 0U;
 static uint32_t CanLogFileSize                        = MAX_LOG_FILE_SIZE;
 static uint32_t CanLogFileCount                       = MAX_LOG_FILE_COUNT;
@@ -626,6 +629,9 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
     CanLogPreallocErrorCount = 0U;
     RuntimeChecks_Init();
     CanLogManager_FileLockInit();
+
+    (void)ScInit(&CAN1_Sequence, 0U, UINT32_MAX);
+    (void)ScInit(&CAN2_Sequence, 0U, UINT32_MAX);
 
     return &CanLogCtrlData;
 }
@@ -1569,18 +1575,15 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
     RuntimeChecksContextType ErrorContext;
     CanLogSyncType SyncEntry;
     CanLogEntryStackBufferType EntryBuffer;
-    CanLogEntryType *pFrameEntry = (CanLogEntryType *)(&EntryBuffer);
+    CanLogEntryType *pFrameEntry       = (CanLogEntryType *)(&EntryBuffer);
+    uint32_t CAN1_MissingFrames        = 0U;
+    uint32_t CAN2_MissingFrames        = 0U;
+    static uint32_t CAN1_SequenceIndex = 0U;
+    static uint32_t CAN2_SequenceIndex = 0U;
     volatile uint32_t LocalFrameCount;
     static uint64_t NextPeriodicSyncAbsTime = 0;
     static uint32_t LastFrameTimestamp      = 0;
     static bool LastFrameTimestampValid     = false;
-
-    RuntimeChecks_CheckFrameCounts(&ErrorContext);
-
-    if (RUNTIMECHECKS_E_FRAMES_DROPPED == ErrorContext.err)
-    {
-        CanLogCtrlData.framesLost = true;
-    }
 
     if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
     {
@@ -1594,6 +1597,14 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
             CanLogFileManager_ErrorHandler();
         }
 #endif
+
+        CanLogCtrlData.emitSyncEntry = true;
+        AbsTime                      = FDCAN_GetTimestampHook();
+        NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
+        LastFrameTimestampValid      = false;
+
+        CanLogCtrlData.framesLost = false;
+        RuntimeChecks_Init();
 
         CanAbs_IsStateOff_Can1(&IsOffState);
 
@@ -1625,14 +1636,6 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         }
 
         CanLogCtrlData.runCanTracerOld = *CanLogCtrlData.runCanTracer;
-
-        CanLogCtrlData.emitSyncEntry = true;
-        AbsTime                      = FDCAN_GetTimestampHook();
-        NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
-        LastFrameTimestampValid      = false;
-
-        CanLogCtrlData.framesLost = false;
-        RuntimeChecks_Init();
     }
     else
     {
@@ -1670,7 +1673,8 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         NextPeriodicSyncAbsTime      = AbsTime + CLM_SYNC_EMIT_INTERVAL_US;
     }
 
-    while ((CANLOG_INGEST_BATCH_MAX > LocalFrameCount)
+    while (((CANLOG_INGEST_BATCH_MAX > LocalFrameCount)
+            || (false == *CanLogCtrlData.runCanTracer))
            && (0 < fdcan_msg_port_read(&pNewFrame, 2)))
     {
         CanLogManager_DrainPortStartHook();
@@ -1711,11 +1715,15 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         {
             CanLogCtrlData.Can1.receivedFrames++;
             m_ComputeBusLoad1(&CanLogCtrlData.Can1, pFrameEntry);
+            CAN1_SequenceIndex = pNewFrame->rx_sequence;
+            (void)ScCheckSequence(&CAN1_Sequence, CAN1_SequenceIndex);
         }
         else if (pFrameEntry->channel == 2)
         {
             CanLogCtrlData.Can2.receivedFrames++;
             m_ComputeBusLoad2(&CanLogCtrlData.Can2, pFrameEntry);
+            CAN2_SequenceIndex = pNewFrame->rx_sequence;
+            (void)ScCheckSequence(&CAN2_Sequence, CAN2_SequenceIndex);
         }
 
         appCanLogStoreToFrameBuffer((void *)pFrameEntry);
@@ -1737,6 +1745,18 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         {
         }
         CanLogManager_DrainPortEndHook();
+    }
+
+    if (SC_E_OK == ScGetMissingCount(&CAN1_Sequence, &CAN1_MissingFrames))
+    {
+        CanLogManager_CAN1_MissingCount += CAN1_MissingFrames;
+        ScReset(&CAN1_Sequence, CAN1_SequenceIndex);
+    }
+
+    if (SC_E_OK == ScGetMissingCount(&CAN2_Sequence, &CAN2_MissingFrames))
+    {
+        CanLogManager_CAN2_MissingCount += CAN2_MissingFrames;
+        ScReset(&CAN2_Sequence, CAN2_SequenceIndex);
     }
 
     if (BlockIsReady)
@@ -1788,6 +1808,13 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         *(CanLogCtrlData.commitLog) = false;
     }
 
+    (void)RuntimeChecks_CheckFrameCounts(&ErrorContext);
+
+    if (RUNTIMECHECKS_E_FRAMES_DROPPED == ErrorContext.err)
+    {
+        CanLogCtrlData.framesLost = true;
+    }
+
     return RetVal;
 }
 
@@ -1799,4 +1826,8 @@ void appCanLogHandlerDeInit(CanLogControlDataType *data)
     {
         FatFS_SD_CloseFile(&(CanLogCtrlData.CanLog.writeFileDevice));
     }
+
+    (void)ScDeInit(&CAN1_Sequence);
+
+    (void)ScDeInit(&CAN2_Sequence);
 }

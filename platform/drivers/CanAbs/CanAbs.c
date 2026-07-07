@@ -96,6 +96,9 @@ static RingBuffer Fdcan2TxRingBuffer = {
 static uint32_t CanAbs_Can1_RxHighWater = 0U;
 static uint32_t CanAbs_Can2_RxHighWater = 0U;
 
+static uint32_t Can1_SequenceIndex = 0U;
+static uint32_t Can2_SequenceIndex = 0U;
+
 /* Private functions */
 
 /**
@@ -478,6 +481,24 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
                 );
                 break;
             default:
+                NewFrame.timestamp   = 0U;
+                NewFrame.rx_sequence = 0U;
+                break;
+            }
+
+            switch (channel)
+            {
+            case 1U:
+                Can1_SequenceIndex += 1U;
+                NewFrame.rx_sequence = Can1_SequenceIndex;
+                break;
+            case 2U:
+                Can2_SequenceIndex += 1U;
+                NewFrame.rx_sequence = Can2_SequenceIndex;
+                break;
+            default:
+                NewFrame.timestamp   = 0U;
+                NewFrame.rx_sequence = 0U;
                 break;
             }
 

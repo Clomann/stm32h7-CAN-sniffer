@@ -1,21 +1,23 @@
 #include "RuntimeChecks.h"
 #include "cmsis_gcc.h"
 
-volatile uint64_t CanAbs_FrameCount             = 0;
-volatile uint64_t CanAbs_FrameDropCount         = 0;
-volatile uint64_t CanAbs_CAN1_Rx_FrameDropCount = 0;
-volatile uint64_t CanAbs_CAN2_Rx_FrameDropCount = 0;
-volatile uint64_t CanBridgeTask_FrameCount      = 0;
-volatile uint64_t CanLogManager_FrameCount      = 0;
-volatile uint64_t CanLogManager_FrameDropCount1 = 0;
-volatile uint64_t CanLogManager_FrameDropCount2 = 0;
-volatile uint64_t CanLogBuffer_FrameCount1      = 0;
-volatile uint64_t CanLogBuffer_FrameCount2      = 0;
-volatile uint64_t CanLogBuffer_FrameDropCount   = 0;
-volatile uint64_t CanLogBuffer_BlockCount       = 0;
-volatile uint64_t FcdanMsgPort_FrameDropCount   = 0;
-volatile uint64_t FrameDelta1                   = 0;
-volatile uint64_t ErrorHandlerCalls             = 0;
+volatile uint64_t CanAbs_FrameCount               = 0;
+volatile uint64_t CanAbs_FrameDropCount           = 0;
+volatile uint64_t CanAbs_CAN1_Rx_FrameDropCount   = 0;
+volatile uint64_t CanAbs_CAN2_Rx_FrameDropCount   = 0;
+volatile uint64_t CanBridgeTask_FrameCount        = 0;
+volatile uint64_t CanLogManager_FrameCount        = 0;
+volatile uint64_t CanLogManager_FrameDropCount1   = 0;
+volatile uint64_t CanLogManager_FrameDropCount2   = 0;
+volatile uint64_t CanLogManager_CAN1_MissingCount = 0;
+volatile uint64_t CanLogManager_CAN2_MissingCount = 0;
+volatile uint64_t CanLogBuffer_FrameCount1        = 0;
+volatile uint64_t CanLogBuffer_FrameCount2        = 0;
+volatile uint64_t CanLogBuffer_FrameDropCount     = 0;
+volatile uint64_t CanLogBuffer_BlockCount         = 0;
+volatile uint64_t FcdanMsgPort_FrameDropCount     = 0;
+volatile uint64_t FrameDelta1                     = 0;
+volatile uint64_t ErrorHandlerCalls               = 0;
 
 static void RuntimeChecks_ErrorHandler(void)
 {
@@ -24,20 +26,22 @@ static void RuntimeChecks_ErrorHandler(void)
 
 void RuntimeChecks_Init(void)
 {
-    CanAbs_FrameCount             = 0;
-    CanAbs_FrameDropCount         = 0;
-    CanAbs_CAN1_Rx_FrameDropCount = 0;
-    CanAbs_CAN2_Rx_FrameDropCount = 0;
-    CanBridgeTask_FrameCount      = 0;
-    CanLogManager_FrameCount      = 0;
-    CanLogManager_FrameDropCount1 = 0;
-    CanLogManager_FrameDropCount2 = 0;
-    CanLogBuffer_FrameCount1      = 0;
-    CanLogBuffer_FrameCount2      = 0;
-    CanLogBuffer_FrameDropCount   = 0;
-    CanLogBuffer_BlockCount       = 0;
-    FcdanMsgPort_FrameDropCount   = 0;
-    ErrorHandlerCalls             = 0;
+    CanAbs_FrameCount               = 0;
+    CanAbs_FrameDropCount           = 0;
+    CanAbs_CAN1_Rx_FrameDropCount   = 0;
+    CanAbs_CAN2_Rx_FrameDropCount   = 0;
+    CanBridgeTask_FrameCount        = 0;
+    CanLogManager_FrameCount        = 0;
+    CanLogManager_FrameDropCount1   = 0;
+    CanLogManager_FrameDropCount2   = 0;
+    CanLogManager_CAN1_MissingCount = 0;
+    CanLogManager_CAN2_MissingCount = 0;
+    CanLogBuffer_FrameCount1        = 0;
+    CanLogBuffer_FrameCount2        = 0;
+    CanLogBuffer_FrameDropCount     = 0;
+    CanLogBuffer_BlockCount         = 0;
+    FcdanMsgPort_FrameDropCount     = 0;
+    ErrorHandlerCalls               = 0;
 }
 
 static RuntimeChecksErrorType CheckDropCounts(void)
@@ -75,6 +79,11 @@ static RuntimeChecksErrorType CheckDropCounts(void)
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
     else if (0 != CanLogManager_FrameDropCount2)
+    {
+        err = RUNTIMECHECKS_E_FRAMES_DROPPED;
+    }
+    else if (0 != CanLogManager_CAN1_MissingCount
+             || 0 != CanLogManager_CAN2_MissingCount)
     {
         err = RUNTIMECHECKS_E_FRAMES_DROPPED;
     }
