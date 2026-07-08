@@ -14,7 +14,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from collections import deque
 from pathlib import Path
-from typing import Deque, Iterator, List, Sequence
+from typing import Callable, Deque, Iterator, List, Sequence
 
 from gen_canlog_layout import generate_layout, needs_regeneration
 
@@ -245,6 +245,12 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
             if entry_type != CLB_ENTRY_TYPE_FRAME:
                 if offset + total_len > end_of_valid_data:
                     break
+                # Firmware frame_count counts every stored entry, including
+                # marker metadata, even though only CAN frames are yielded.
+                # Unknown entry types remain excluded so corruption still
+                # produces a frame_count warning.
+                if entry_type == CLB_ENTRY_TYPE_MARKER:
+                    entries_in_block += 1
                 offset += total_len
                 continue
 
@@ -285,15 +291,24 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
         )
 
 
-def iter_can_frames(path: Path = DEFAULT_TRACE, abort_on_gap: bool = False, continue_on_gap: bool = False) -> Iterator[CanLogFrame]:
+def iter_can_blocks(
+    path: Path = DEFAULT_TRACE,
+    abort_on_gap: bool = False,
+    continue_on_gap: bool = False,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> Iterator[tuple[memoryview, int, dict]]:
     """
-    Stream frames from a CAN trace without holding the entire file in memory.
+    Stream validated blocks from a CAN trace using one reusable buffer.
+
+    on_progress(bytes_read, total_bytes), when supplied, is called after each
+    fully consumed block. The yielded memoryview is valid only until the next
+    block is requested.
     """
     block_index = 0
     buf = bytearray(max(BLOCK_HEADER_SIZE, LEGACY_BLOCK_HEADER_SIZE, 64 * 1024))
     prev_epoch = None
     prev_cnt = None
-    abs_time_state = {"high": 0}
+    total_bytes = path.stat().st_size
     with path.open("rb") as fh:
         print("Parsing data ...")
 
@@ -307,8 +322,6 @@ def iter_can_frames(path: Path = DEFAULT_TRACE, abort_on_gap: bool = False, cont
             block_cnt = header_meta["cnt"]
             block_size = header_meta["block_size"]
             block_fill = header_meta["block_fill"]
-            frame_count = header_meta["frame_count"]
-            ingress_frames = header_meta["ingress_frames"]
             legacy = header_meta["legacy"]
 
             min_header_size = LEGACY_BLOCK_HEADER_SIZE if legacy else BLOCK_HEADER_SIZE
@@ -350,12 +363,31 @@ def iter_can_frames(path: Path = DEFAULT_TRACE, abort_on_gap: bool = False, cont
                 if read_n is None or read_n < remaining:
                     break  # Truncated block at EOF
 
-            for frame in _iter_block_frames(buf_view, block_index, abs_time_state, header_meta):
-                yield frame
+            yield buf_view, block_index, header_meta
+
+            if on_progress:
+                on_progress(fh.tell(), total_bytes)
 
             prev_epoch = epoch
             prev_cnt = block_cnt
             block_index += 1
+
+
+def iter_can_frames(
+    path: Path = DEFAULT_TRACE,
+    abort_on_gap: bool = False,
+    continue_on_gap: bool = False,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> Iterator[CanLogFrame]:
+    """Stream decoded frames from a CAN trace."""
+    abs_time_state = {"high": 0}
+    for block, block_index, header_meta in iter_can_blocks(
+        path,
+        abort_on_gap=abort_on_gap,
+        continue_on_gap=continue_on_gap,
+        on_progress=on_progress,
+    ):
+        yield from _iter_block_frames(block, block_index, abs_time_state, header_meta)
 
 
 def parse_can_trace(path: Path = DEFAULT_TRACE, abort_on_gap: bool = False) -> List[CanLogFrame]:
