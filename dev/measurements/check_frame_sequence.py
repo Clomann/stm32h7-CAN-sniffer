@@ -1,5 +1,5 @@
 """
-Check frame continuity in Vector ASCII (.asc) CAN logs.
+Check frame continuity in binary (.bin) or Vector ASCII (.asc) CAN logs.
 
 Two independent checks are available and can be combined:
 
@@ -11,31 +11,58 @@ ID-sequence check (--check-id-sequence):
   Verifies that the CAN ID itself increments by 1 (modulo --id-modulo, default
   256) for each channel.  Useful when the firmware encodes a frame counter
   directly in the arbitration ID.
+
+Fast ID-only check (--id-sequence-only):
+  For binary logs, checks only the CAN ID sequence without copying payloads or
+  allocating objects for each frame.
 """
 
 from __future__ import annotations
 
 import argparse
+import subprocess
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 
 @dataclass(slots=True)
 class Frame:
-    """Minimal frame info extracted from the ASCII log."""
+    """Minimal frame info extracted from a CAN log."""
 
     timestamp: float
     channel: int
     can_id: int
     counter: Optional[int]  # None when DLC=0 (no payload to read counter from)
     line_no: int
+    position_unit: str = "line"
 
 
 _PROGRESS_INTERVAL = 30.0
 _PROGRESS_CHECK_LINES = 10_000
+
+
+def describe_git_version() -> str:
+    """Return a human-readable repository revision for report provenance."""
+    try:
+        return subprocess.check_output(
+            ["git", "describe", "--long", "--tags", "--dirty"],
+            cwd=Path(__file__).resolve().parent,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unavailable"
+
+
+def format_duration(seconds: float) -> str:
+    """Format a duration as HH:MM:SS."""
+    total_seconds = max(0, round(seconds))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def parse_vector_ascii(path: Path) -> Iterable[Frame]:
@@ -65,8 +92,89 @@ def parse_vector_ascii(path: Path) -> Iterable[Frame]:
             except ValueError:
                 counter = None
 
-            frame_count += 1
             yield Frame(timestamp=timestamp, channel=channel, can_id=can_id, counter=counter, line_no=line_no)
+
+
+def make_byte_progress_reporter(path: Path) -> Callable[[int, int], None]:
+    """Create a percentage/ETA reporter for a binary input file."""
+    total_bytes = path.stat().st_size
+    next_percent = 1
+    started_at = time.monotonic()
+    print(f"Parsed bytes: 0% (0/{total_bytes}), ETA: calculating", flush=True)
+
+    def report_progress(bytes_read: int, file_size: int) -> None:
+        nonlocal next_percent
+        if file_size <= 0:
+            return
+        completed_percent = min(100, bytes_read * 100 // file_size)
+        elapsed = time.monotonic() - started_at
+        remaining = elapsed * max(0, file_size - bytes_read) / bytes_read if bytes_read else 0
+        while next_percent <= completed_percent:
+            print(
+                f"Parsed bytes: {next_percent}% ({bytes_read}/{file_size}), "
+                f"ETA: {format_duration(remaining)}",
+                flush=True,
+            )
+            next_percent += 1
+
+    return report_progress
+
+
+def parse_binary(
+    path: Path,
+    abort_on_gap: bool = False,
+    continue_on_gap: bool = False,
+) -> Iterator[Frame]:
+    """Yield frames directly from a binary CAN logger trace."""
+    # Keep this import lazy: checking an ASC file does not need the generated
+    # firmware layout used by the binary parser.
+    from log_parser import iter_can_frames
+
+    for frame_no, decoded in enumerate(
+        iter_can_frames(
+            path,
+            abort_on_gap=abort_on_gap,
+            continue_on_gap=continue_on_gap,
+            on_progress=make_byte_progress_reporter(path),
+        ),
+        start=1,
+    ):
+        yield Frame(
+            timestamp=decoded.timestamp_us / 1_000_000,
+            channel=decoded.channel,
+            can_id=decoded.can_id,
+            counter=decoded.data[0] if decoded.data else None,
+            line_no=frame_no,
+            position_unit="frame",
+        )
+
+
+def resolve_input_format(path: Path, input_format: str = "auto") -> str:
+    """Resolve an explicit or filename-derived input format."""
+    if input_format == "auto":
+        suffix = path.suffix.lower()
+        if suffix == ".asc":
+            return "asc"
+        elif suffix == ".bin":
+            return "bin"
+        raise ValueError(
+            f"Cannot detect input format from {path.name!r}; "
+            "use --input-format asc or --input-format bin."
+        )
+    return input_format
+
+
+def parse_input(
+    path: Path,
+    input_format: str = "auto",
+    abort_on_gap: bool = False,
+    continue_on_gap: bool = False,
+) -> Iterable[Frame]:
+    """Select the ASC or binary streaming parser."""
+    input_format = resolve_input_format(path, input_format)
+    if input_format == "asc":
+        return parse_vector_ascii(path)
+    return parse_binary(path, abort_on_gap=abort_on_gap, continue_on_gap=continue_on_gap)
 
 
 @dataclass(slots=True)
@@ -176,6 +284,194 @@ def find_all_gaps(
     return frame_count, frames_with_counter, n_counter_gaps, missing_by_key, n_id_gaps, missing_by_channel
 
 
+def find_binary_id_gaps_fast(
+    path: Path,
+    id_modulo: int = 256,
+    on_flush: Callable[[List[Gap], List[Gap]], None] | None = None,
+    abort_on_gap: bool = False,
+    continue_on_gap: bool = False,
+) -> Tuple[int, int, Dict[int, int]]:
+    """
+    Check binary ID continuity directly in each block.
+
+    This path deliberately avoids payload copies, per-frame objects, and
+    per-frame generator hand-offs. Frame/Gap objects are created only when a
+    discontinuity must be reported.
+    """
+    import log_parser as binary
+
+    last_id_by_channel = [0] * 256
+    last_timestamp_by_channel = [0] * 256
+    last_frame_by_channel = [0] * 256
+    missing_by_channel: Dict[int, int] = defaultdict(int)
+    pending_id: List[Gap] = []
+    n_id_gaps = 0
+    frame_count = 0
+    next_flush_check = _PROGRESS_CHECK_LINES
+    last_flush = time.monotonic()
+    abs_time_high = 0
+
+    entry_header_unpack = binary.ENTRY_HEADER_STRUCT.unpack_from
+    entry_fixed_unpack = binary.ENTRY_FIXED_STRUCT.unpack_from
+    sync_fixed_unpack = binary.SYNC_FIXED_STRUCT.unpack_from
+    legacy_header_unpack = binary.LEGACY_ENTRY_HEADER_STRUCT.unpack_from
+    legacy_fixed_unpack = binary.LEGACY_ENTRY_FIXED_STRUCT.unpack_from
+
+    def record_gap(
+        channel: int,
+        can_id: int,
+        timestamp_us: int,
+        previous_id: int,
+        previous_timestamp_us: int,
+        previous_frame_no: int,
+        missing_count: int,
+    ) -> None:
+        nonlocal n_id_gaps
+        pending_id.append(
+            Gap(
+                key=(channel, -1),
+                missing_start=(previous_id + 1) % id_modulo,
+                missing_count=missing_count,
+                modulo=id_modulo,
+                previous=Frame(
+                    timestamp=previous_timestamp_us / 1_000_000,
+                    channel=channel,
+                    can_id=previous_id,
+                    counter=None,
+                    line_no=previous_frame_no,
+                    position_unit="frame",
+                ),
+                current=Frame(
+                    timestamp=timestamp_us / 1_000_000,
+                    channel=channel,
+                    can_id=can_id,
+                    counter=None,
+                    line_no=frame_count,
+                    position_unit="frame",
+                ),
+            )
+        )
+        missing_by_channel[channel] += missing_count
+        n_id_gaps += 1
+
+    for block, block_index, header in binary.iter_can_blocks(
+        path,
+        abort_on_gap=abort_on_gap,
+        continue_on_gap=continue_on_gap,
+        on_progress=make_byte_progress_reporter(path),
+    ):
+        offset = header["header_size"]
+        end_of_valid_data = min(header["block_fill"], len(block))
+        entries_in_block = 0
+
+        if header["legacy"]:
+            while offset + binary.LEGACY_ENTRY_HEADER_SIZE <= end_of_valid_data:
+                entry_type, _header_len, total_len = legacy_header_unpack(block, offset)
+                if (
+                    total_len < binary.LEGACY_ENTRY_HEADER_SIZE + binary.LEGACY_ENTRY_FIXED_SIZE
+                    or offset + total_len > end_of_valid_data
+                    or total_len == 0
+                ):
+                    break
+
+                if entry_type not in (1, 2):
+                    offset += total_len
+                    continue
+
+                entries_in_block += 1
+                timestamp_us, can_id, channel, _dlc, _flags, _bus_id = legacy_fixed_unpack(
+                    block, offset + binary.LEGACY_ENTRY_HEADER_SIZE
+                )
+                frame_count += 1
+                previous_frame_no = last_frame_by_channel[channel]
+                if previous_frame_no:
+                    previous_id = last_id_by_channel[channel]
+                    delta = (can_id - previous_id) % id_modulo
+                    if delta not in (0, 1):
+                        record_gap(
+                            channel,
+                            can_id,
+                            timestamp_us,
+                            previous_id,
+                            last_timestamp_by_channel[channel],
+                            previous_frame_no,
+                            delta - 1,
+                        )
+                last_id_by_channel[channel] = can_id
+                last_timestamp_by_channel[channel] = timestamp_us
+                last_frame_by_channel[channel] = frame_count
+                offset += total_len
+        else:
+            while offset + binary.ENTRY_HEADER_SIZE <= end_of_valid_data:
+                entry_type, _header_len, total_len = entry_header_unpack(block, offset)
+                if total_len == 0 or offset + total_len > end_of_valid_data:
+                    break
+
+                fixed_offset = offset + binary.ENTRY_HEADER_SIZE
+
+                if entry_type == binary.CLB_ENTRY_TYPE_SYNC:
+                    if total_len < binary.ENTRY_HEADER_SIZE + binary.SYNC_FIXED_SIZE:
+                        break
+                    entries_in_block += 1
+                    _timestamp, abs_time_high = sync_fixed_unpack(block, fixed_offset)
+                    offset += total_len
+                    continue
+
+                if entry_type != binary.CLB_ENTRY_TYPE_FRAME:
+                    if entry_type == binary.CLB_ENTRY_TYPE_MARKER:
+                        entries_in_block += 1
+                    offset += total_len
+                    continue
+
+                if total_len < binary.ENTRY_HEADER_SIZE + binary.ENTRY_FIXED_SIZE:
+                    break
+
+                entries_in_block += 1
+                timestamp, can_id, channel, _dlc_flags, _data_len = entry_fixed_unpack(block, fixed_offset)
+                timestamp_us = (abs_time_high << 32) | timestamp
+                frame_count += 1
+                previous_frame_no = last_frame_by_channel[channel]
+                if previous_frame_no:
+                    previous_id = last_id_by_channel[channel]
+                    delta = (can_id - previous_id) % id_modulo
+                    if delta not in (0, 1):
+                        record_gap(
+                            channel,
+                            can_id,
+                            timestamp_us,
+                            previous_id,
+                            last_timestamp_by_channel[channel],
+                            previous_frame_no,
+                            delta - 1,
+                        )
+                last_id_by_channel[channel] = can_id
+                last_timestamp_by_channel[channel] = timestamp_us
+                last_frame_by_channel[channel] = frame_count
+                offset += total_len
+
+        if entries_in_block != header["frame_count"]:
+            print(
+                f"Warning: block {block_index} header frame_count={header['frame_count']} "
+                f"parsed={entries_in_block} (cnt={header['cnt']}, "
+                f"ingress_frames={header['ingress_frames']})",
+                flush=True,
+            )
+
+        if on_flush and frame_count >= next_flush_check:
+            while next_flush_check <= frame_count:
+                next_flush_check += _PROGRESS_CHECK_LINES
+            now = time.monotonic()
+            if now - last_flush >= _PROGRESS_INTERVAL:
+                on_flush([], pending_id)
+                pending_id.clear()
+                last_flush = now
+
+    if on_flush and pending_id:
+        on_flush([], pending_id)
+
+    return frame_count, n_id_gaps, missing_by_channel
+
+
 def format_id_gap(gap: Gap, preview_values: int = 16) -> str:
     """Pretty-print an ID-sequence gap."""
     channel, _ = gap.key
@@ -185,8 +481,8 @@ def format_id_gap(gap: Gap, preview_values: int = 16) -> str:
         missing += f" ... (+{extra} more)"
     return (
         f"Ch{channel} ID 0x{gap.previous.can_id:X}->0x{gap.current.can_id:X} "
-        f"at {gap.previous.timestamp:.6f}s (line {gap.previous.line_no}) -> "
-        f"{gap.current.timestamp:.6f}s (line {gap.current.line_no}): "
+        f"at {gap.previous.timestamp:.6f}s ({gap.previous.position_unit} {gap.previous.line_no}) -> "
+        f"{gap.current.timestamp:.6f}s ({gap.current.position_unit} {gap.current.line_no}): "
         f"missing {gap.missing_count} ID(s): {missing}"
     )
 
@@ -201,17 +497,33 @@ def format_gap(gap: Gap, preview_values: int = 16) -> str:
     return (
         f"Ch{channel} ID=0x{can_id:08X} "
         f"{gap.previous.counter:02X}->{gap.current.counter:02X} "
-        f"at {gap.previous.timestamp:.6f}s (line {gap.previous.line_no}) -> "
-        f"{gap.current.timestamp:.6f}s (line {gap.current.line_no}): "
+        f"at {gap.previous.timestamp:.6f}s ({gap.previous.position_unit} {gap.previous.line_no}) -> "
+        f"{gap.current.timestamp:.6f}s ({gap.current.position_unit} {gap.current.line_no}): "
         f"missing {gap.missing_count} frame(s): {missing}"
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Detect missing frames in Vector ASCII CAN logs using the first data byte as an 8-bit counter."
+        description="Detect missing frames in binary or Vector ASCII CAN logs."
     )
-    parser.add_argument("path", type=Path, help="Path to the .asc log file")
+    parser.add_argument("path", type=Path, help="Path to a .bin or .asc CAN log")
+    parser.add_argument(
+        "--input-format",
+        choices=("auto", "asc", "bin"),
+        default="auto",
+        help="Input format (default: auto-detect from .asc/.bin extension).",
+    )
+    parser.add_argument(
+        "--abort-on-gap",
+        action="store_true",
+        help="For binary input, abort when a block gap, epoch change, or empty block is detected.",
+    )
+    parser.add_argument(
+        "--continue-on-gap",
+        action="store_true",
+        help="For binary input, continue after block gaps/epoch changes (default: stop parsing).",
+    )
     parser.add_argument(
         "--preview",
         type=int,
@@ -235,6 +547,11 @@ def main() -> None:
         help="Also verify that the CAN ID increments by 1 (mod --id-modulo) per channel.",
     )
     parser.add_argument(
+        "--id-sequence-only",
+        action="store_true",
+        help="For BIN input, use the allocation-free fast path and check only the CAN ID sequence.",
+    )
+    parser.add_argument(
         "--id-modulo",
         type=lambda s: int(s, 0),
         default=256,
@@ -243,6 +560,17 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    try:
+        input_format = resolve_input_format(args.path, args.input_format)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.id_sequence_only and input_format != "bin":
+        parser.error("--id-sequence-only requires BIN input")
+
+    print(f"Checked file: {args.path}")
+    print(f"Git version: {describe_git_version()}")
+
+    check_id_sequence = args.check_id_sequence or args.id_sequence_only
     max_counter = None if args.show_all else (args.max_gaps if args.max_gaps > 0 else 0)
     max_id      = None if args.show_all else (args.max_gaps if args.max_gaps > 0 else 0)
     counter_shown = 0
@@ -253,28 +581,47 @@ def main() -> None:
 
         for gap in counter_batch:
             if max_counter is None or counter_shown < max_counter:
-                print(format_gap(gap, preview_values=args.preview))
+                print(format_gap(gap, preview_values=args.preview), flush=True)
                 counter_shown += 1
 
-        if args.check_id_sequence:
+        if check_id_sequence:
             for gap in id_batch:
                 if max_id is None or id_shown < max_id:
-                    print(format_id_gap(gap, preview_values=args.preview))
+                    print(format_id_gap(gap, preview_values=args.preview), flush=True)
                     id_shown += 1
 
-    frame_count, frames_with_counter, n_counter_gaps, missing_by_key, n_id_gaps, missing_by_channel = find_all_gaps(
-        parse_vector_ascii(args.path),
-        check_id_seq=args.check_id_sequence,
-        id_modulo=args.id_modulo,
-        on_flush=on_flush,
-    )
+    if args.id_sequence_only:
+        frame_count, n_id_gaps, missing_by_channel = find_binary_id_gaps_fast(
+            args.path,
+            id_modulo=args.id_modulo,
+            on_flush=on_flush,
+            abort_on_gap=args.abort_on_gap,
+            continue_on_gap=args.continue_on_gap,
+        )
+        frames_with_counter = 0
+        n_counter_gaps = 0
+        missing_by_key: Dict[Tuple[int, int], int] = {}
+    else:
+        frame_count, frames_with_counter, n_counter_gaps, missing_by_key, n_id_gaps, missing_by_channel = find_all_gaps(
+            parse_input(
+                args.path,
+                input_format=input_format,
+                abort_on_gap=args.abort_on_gap,
+                continue_on_gap=args.continue_on_gap,
+            ),
+            check_id_seq=check_id_sequence,
+            id_modulo=args.id_modulo,
+            on_flush=on_flush,
+        )
 
     if frame_count == 0:
         print(f"No frames found in {args.path}")
         return
 
     # --- counter check summary ---
-    if frames_with_counter == 0:
+    if args.id_sequence_only:
+        print("Counter check: skipped (--id-sequence-only).")
+    elif frames_with_counter == 0:
         print(f"Counter check: NOT APPLICABLE — all {frame_count} frames have DLC=0 (no counter payload).")
     elif n_counter_gaps == 0:
         print(f"Counter check: no missing frames in {args.path} (checked {frames_with_counter} frames with payload).")
@@ -288,7 +635,7 @@ def main() -> None:
             print(f"  Ch{channel} ID=0x{can_id:08X}: {count} missing frame(s)")
 
     # --- ID-sequence check summary ---
-    if args.check_id_sequence:
+    if check_id_sequence:
         print()
         if n_id_gaps == 0:
             print(f"ID-sequence check (mod {args.id_modulo}): no gaps in {frame_count} frames.")
