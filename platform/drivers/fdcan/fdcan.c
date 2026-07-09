@@ -259,7 +259,7 @@ comm_status_t FDCAN_Init(CommDriver *dev)
         FDCAN_ErrorHandler();
     }
 
-#if ((FDCAN_IRQ_NOTIFICATION == FDCAN_IT_RX_FIFO0_WATERMARK))
+#if ((FDCAN_IRQ_NOTIFICATION & FDCAN_IT_RX_FIFO0_WATERMARK) != 0U)
 #if FDCAN_IRQ_RX_WATERMARK < 2
 #error "Implausible value for FDCAN_IRQ_RX_WATERMARK!"
 #endif
