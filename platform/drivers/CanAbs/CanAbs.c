@@ -443,9 +443,10 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
     uint64_t HardwareTimestamp;
     RingBufferErrorType res;
 
-    if (hfdcan->Instance->RXF0S & FDCAN_RXF0S_RF0L)
+    if (((RxFifo0ITs & FDCAN_IT_RX_FIFO0_MESSAGE_LOST) != 0U)
+        || ((hfdcan->Instance->RXF0S & FDCAN_RXF0S_RF0L) != 0U))
     {
-        hfdcan->Instance->IR = FDCAN_IR_RF0L;
+        __HAL_FDCAN_CLEAR_FLAG(hfdcan, FDCAN_FLAG_RX_FIFO0_MESSAGE_LOST);
         if (rxOverflowDropCount != NULL)
         {
             (*rxOverflowDropCount)++;
