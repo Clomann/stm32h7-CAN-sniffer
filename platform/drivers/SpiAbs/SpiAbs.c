@@ -185,6 +185,49 @@ typedef struct
     uint8_t done;
 } TaskContextType;
 
+static uint8_t
+SpiAbs_WaitForCompletion(volatile TaskContextType *context, uint32_t timeout_ms)
+{
+    uint32_t start;
+
+    if (NULL == context)
+    {
+        return HAL_ERROR;
+    }
+
+    start = HAL_GetTick();
+
+    while (1U != context->done)
+    {
+        if ((HAL_GetTick() - start) >= timeout_ms)
+        {
+            return HAL_TIMEOUT;
+        }
+
+        __NOP();
+    }
+
+    __DMB();
+
+    return HAL_OK;
+}
+
+static uint32_t
+SpiAbs_ScaledTimeout(uint32_t timeout_ms, uint32_t retry_count)
+{
+    if (0U == retry_count)
+    {
+        retry_count = 1U;
+    }
+
+    if (timeout_ms > (UINT32_MAX / retry_count))
+    {
+        return UINT32_MAX;
+    }
+
+    return timeout_ms * retry_count;
+}
+
 void SpiAbs_Send_Spi1_CompleteCallback_Task0(
     void *context,
     uint32_t status,
@@ -235,12 +278,15 @@ uint8_t SpiAbs_readByte(enum SPIABS_DEVICE dev, uint8_t *resp)
 
     res = SpiAbs_ReceiveWithCallback(dev, &transaction, aRxSpiDummy, 1U);
 
-    while (1 != context.done)
+    if (COMM_SUCCESS != res)
     {
-        __NOP();
+        return res;
     }
 
-    __DMB();
+    res = SpiAbs_WaitForCompletion(
+        &context,
+        SpiAbs_ScaledTimeout(transaction.timeout, transaction.max_retries + 1U)
+    );
 
     return res;
 }
@@ -267,12 +313,15 @@ uint8_t SpiAbs_writByte(enum SPIABS_DEVICE dev, const uint8_t *data)
 
     res = SpiAbs_SendWithCallback(dev, &transaction, data, 1U);
 
-    while (1 != context.done)
+    if (COMM_SUCCESS != res)
     {
-        __NOP();
+        return res;
     }
 
-    __DMB();
+    res = SpiAbs_WaitForCompletion(
+        &context,
+        SpiAbs_ScaledTimeout(transaction.timeout, transaction.max_retries + 1U)
+    );
 
     return res;
 }
@@ -499,11 +548,15 @@ uint8_t SpiAbs_Send_Spi1_Task0(const uint8_t *data, uint16_t bytes)
 
     res = SpiAbs_SendWithCallback(SPIABS_DEVICE_1, &transaction, data, bytes);
 
-    while (1 != context.done)
+    if (COMM_SUCCESS != res)
     {
-        __NOP();
+        return res;
     }
-    __DMB();
+
+    res = SpiAbs_WaitForCompletion(
+        &context,
+        SpiAbs_ScaledTimeout(transaction.timeout, transaction.max_retries + 1U)
+    );
 
     return res;
 }
@@ -561,12 +614,15 @@ uint8_t SpiAbs_Receive_Spi1_Task0(uint8_t *data, uint16_t bytes)
         bytes
     );
 
-    while (1 != context.done)
+    if (COMM_SUCCESS != res)
     {
-        __NOP();
+        return res;
     }
 
-    __DMB();
+    res = SpiAbs_WaitForCompletion(
+        &context,
+        SpiAbs_ScaledTimeout(transaction.timeout, transaction.max_retries + 1U)
+    );
 
     return res;
 }
@@ -633,12 +689,14 @@ uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
     SPI_Poll(pDrv);
 #endif
 
-    while (1 != context.done)
+    res = SpiAbs_WaitForCompletion(
+        &context,
+        SpiAbs_ScaledTimeout(transaction.timeout, transaction.max_retries + 1U)
+    );
+    if (HAL_OK != res)
     {
-        __NOP();
+        return res;
     }
-
-    __DMB();
 
     return (0xFFU == *pResponse) ? 1U : 0U;
 }
@@ -693,12 +751,14 @@ static uint8_t m_PollForIdle(
     SPI_Poll(pDrv);
 #endif
 
-    while (1 != context.done)
+    res = SpiAbs_WaitForCompletion(
+        &context,
+        SpiAbs_ScaledTimeout(transaction.timeout, transaction.max_retries + 1U)
+    );
+    if (HAL_OK != res)
     {
-        __NOP();
+        return res;
     }
-
-    __DMB();
 
     /* err=1 in callback status means timed out (card never went idle) */
     return (uint8_t)context.status;
