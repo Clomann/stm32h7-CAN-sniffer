@@ -93,6 +93,8 @@ static RingBuffer Fdcan2TxRingBuffer = {
     .isFull      = false
 };
 
+static uint32_t CanAbs_Can1_HwHighWatermark = 0U;
+static uint32_t CanAbs_Can2_HwHighWatermark = 0U;
 static uint32_t CanAbs_Can1_RxHighWater = 0U;
 static uint32_t CanAbs_Can2_RxHighWater = 0U;
 
@@ -457,6 +459,24 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
         0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0))
     )
     {
+        switch (channel)
+        {
+        case 1U:
+            if (fill_level > CanAbs_Can1_HwHighWatermark)
+            {
+                CanAbs_Can1_HwHighWatermark = fill_level;
+            }
+            break;
+        case 2U:
+            if (fill_level > CanAbs_Can2_HwHighWatermark)
+            {
+                CanAbs_Can2_HwHighWatermark = fill_level;
+            }
+            break;
+        default:
+            break;
+        }
+
         if (driver->interface->read(driver, (void *)&NewFrame, 8u, RxFifo0ITs)
             == COMM_SUCCESS)
         {
@@ -593,6 +613,7 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
     comm_status_t res;
 
     CanAbs_Can1_RxHighWater = 0U;
+    CanAbs_Can1_HwHighWatermark = 0U;
 
     res = CanAbs_Init(
         &Fdcan1Driver,
@@ -656,6 +677,7 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
     comm_status_t res;
 
     CanAbs_Can2_RxHighWater = 0U;
+    CanAbs_Can2_HwHighWatermark = 0U;
 
     res = CanAbs_Init(
         &Fdcan2Driver,
