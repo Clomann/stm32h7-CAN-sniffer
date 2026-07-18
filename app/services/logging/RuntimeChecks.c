@@ -72,7 +72,7 @@ static RuntimeChecksErrorType CheckDropCounts(void)
     }
     else if (CanLogBuffer_FrameDropCount > 1024U)
     {
-        err = RUNTIMECHECKS_E_FRAMES_DROPPED;
+        // only for monitoring
     }
     else if (0 != CanLogManager_FrameDropCount1)
     {

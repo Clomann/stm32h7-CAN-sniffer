@@ -3,15 +3,20 @@
 
 #include <stdint.h>
 
-#define CANLOG_E_OK         0U
-#define CANLOG_E_NOT_OK     1U
-#define CANLOG_E_EMPTY      2U
-#define CANLOG_E_BOCK_FULL  3U
-#define CANLOG_E_FILE_OPEN  4U
-#define CANLOG_E_FILE_READ  5U
-#define CANLOG_E_FILE_WRITE 6U
+#define CLB_E_OK            ((ClbReturnType)0U)
+#define CLB_E_NOT_OK        ((ClbReturnType)1U)
+#define CLB_E_EMPTY         ((ClbReturnType)2U)
+#define CLB_E_BUFFER_FULL   ((ClbReturnType)3U)
+#define CLB_E_WRITE_PADDING ((ClbReturnType)4U)
+#define CLB_E_WRITE_HEADER  ((ClbReturnType)5U)
+#define CLB_E_WRITE_ENTRY   ((ClbReturnType)6U)
+#define CLB_E_FILE_OPEN     ((ClbReturnType)7U)
+#define CLB_E_FILE_READ     ((ClbReturnType)8U)
+#define CLB_E_FILE_WRITE    ((ClbReturnType)9U)
 
-#define CANLOG_ENTRY_MAX_DATA_LENGTH 64U
+typedef uint8_t ClbReturnType;
+
+#define CLB_ENTRY_MAX_DATA_LENGTH 64U
 
 #define CANLOG_VERSION  2U
 #define BLOCK_SIZE      (64U * 1024U)
@@ -64,7 +69,7 @@ typedef struct __attribute__((packed))
 typedef struct
 {
     _Alignas(CanLogEntryType
-    ) uint8_t raw[sizeof(CanLogEntryType) + CANLOG_ENTRY_MAX_DATA_LENGTH];
+    ) uint8_t raw[sizeof(CanLogEntryType) + CLB_ENTRY_MAX_DATA_LENGTH];
 } CanLogEntryStackBufferType;
 
 typedef struct __attribute__((packed))
@@ -85,7 +90,7 @@ typedef struct
     uint32_t
         block_fill; // indicates the block fill level to determine padding byte count
     uint32_t ingress_frames; /*!< ingress frame count of staging buffer */
-    uint32_t frame_count; /*!< number of frames in this block */
+    uint32_t entries_count; /*!< number of entries in this block */
 } __attribute__((packed)) CanLogBlockHeaderType;
 
 uint8_t CanLogBuffer_Init(void);

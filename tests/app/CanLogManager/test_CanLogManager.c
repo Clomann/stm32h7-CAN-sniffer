@@ -12,6 +12,7 @@
 #include "fs_custom.h"
 #include "CanAbs.h"
 #include "fdcan_msg_port.h"
+#include "SdBridgeTask.h"
 #include "test_filehandler_state.h"
 #include "test_ff_state.h"
 
@@ -29,6 +30,8 @@ void test_ff_reset(void);
 
 void set_file_size(uint32_t size);
 void set_file_open_result(FRESULT result);
+void set_next_write_result(FRESULT result);
+void set_next_flush_result(FRESULT result);
 void set_frames_available(int count);
 void set_can_start_result(comm_status_t result);
 void set_tracer_running(bool running);
@@ -152,7 +155,7 @@ void test_CanLogBuffer_ReadBlock(void)
     uint8_t readResult =
         CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount);
 
-    TEST_ASSERT_EQUAL(CANLOG_E_OK, readResult);
+    TEST_ASSERT_EQUAL(CLB_E_OK, readResult);
     TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
 
     CanLogBlockHeaderType *header = (CanLogBlockHeaderType *)blockData;
@@ -188,7 +191,7 @@ void test_CanLogBuffer_BlockBoundaryPadding(void)
         memset(entry->data, 0xA0 + (uint8_t)i, payload_len);
 
         TEST_ASSERT_EQUAL_UINT8(
-            CANLOG_E_OK,
+            CLB_E_OK,
             CanLogBuffer_AddEntry(entry, entry->header.total_len)
         );
 
@@ -200,7 +203,7 @@ void test_CanLogBuffer_BlockBoundaryPadding(void)
     uint32_t blockLength;
     uint32_t frameCount;
     TEST_ASSERT_EQUAL_UINT8(
-        CANLOG_E_OK,
+        CLB_E_OK,
         CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount)
     );
 
@@ -228,7 +231,7 @@ void test_CanLogBuffer_BlockBoundaryPadding(void)
         memset(entry->data, 0xB0 + (uint8_t)i, payload_len);
 
         TEST_ASSERT_EQUAL_UINT8(
-            CANLOG_E_OK,
+            CLB_E_OK,
             CanLogBuffer_AddEntry(entry, entry->header.total_len)
         );
 
@@ -237,7 +240,7 @@ void test_CanLogBuffer_BlockBoundaryPadding(void)
     }
 
     TEST_ASSERT_EQUAL_UINT8(
-        CANLOG_E_OK,
+        CLB_E_OK,
         CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount)
     );
     TEST_ASSERT_EQUAL(BLOCK_SIZE, blockLength);
@@ -270,7 +273,7 @@ void test_CanLogBuffer_ConsumeUpdatesCounters(void)
         memset(entry->data, 0xB0 + (uint8_t)i, payload_len);
 
         TEST_ASSERT_EQUAL_UINT8(
-            CANLOG_E_OK,
+            CLB_E_OK,
             CanLogBuffer_AddEntry(entry, entry->header.total_len)
         );
     }
@@ -282,7 +285,7 @@ void test_CanLogBuffer_ConsumeUpdatesCounters(void)
     uint32_t blockLength;
     uint32_t frameCount;
     TEST_ASSERT_EQUAL_UINT8(
-        CANLOG_E_OK,
+        CLB_E_OK,
         CanLogBuffer_ReadNextBlock(&blockData, &blockLength, &frameCount)
     );
 
@@ -425,7 +428,7 @@ void test_CommitFlushOnStop_PadsAndFlushes(void)
         entry->channel   = 1;
         entry->can_id    = 0x100U + i;
         TEST_ASSERT_EQUAL_UINT8(
-            CANLOG_E_OK,
+            CLB_E_OK,
             CanLogBuffer_AddEntry(entry, entry->header.total_len)
         );
     }
@@ -437,6 +440,62 @@ void test_CommitFlushOnStop_PadsAndFlushes(void)
     TEST_ASSERT_EQUAL_UINT64(BLOCK_SIZE, get_total_bytes_written());
     TEST_ASSERT_EQUAL_UINT32(54U, get_last_block_frame_count());
     TEST_ASSERT_EQUAL_UINT64(54U, get_total_frames_written());
+}
+
+/**
+ * @brief Tests storage retry path
+ * @details A failed SD write must leave the block queued for a later retry.
+ */
+void test_StoreBlockFailure_RetriesWithoutDroppingFrames(void)
+{
+    appCanLogHandlerInit(testCtrlData);
+
+    reset_filehandler_stubs();
+
+    mockRunCanTracer = true;
+    set_frames_available(0);
+    appCanLogHandlerPoll(testCtrlData);
+
+    CanLogBuffer_Init();
+    uint64_t frameCountStart = CanLogBuffer_FrameCount1;
+
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = 0;
+    entry->header.total_len  = sizeof(CanLogEntryType);
+    entry->dlc_flags         = MAKE_DLC_FLAGS(0, 0);
+
+    for (uint32_t i = 0; i < 54U; i++)
+    {
+        entry->timestamp = 1000U + i;
+        entry->channel   = 1;
+        entry->can_id    = 0x100U + i;
+        TEST_ASSERT_EQUAL_UINT8(
+            CLB_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+    }
+
+    TEST_ASSERT_EQUAL_UINT8(CLB_E_OK, CanLogBuffer_FillBlockWithPadding());
+    TEST_ASSERT_EQUAL_UINT64(frameCountStart + 54U, CanLogBuffer_FrameCount1);
+
+    set_next_write_result(FR_DISK_ERR);
+    SdBridgeTask_ActionHook();
+
+    TEST_ASSERT_EQUAL_UINT32(1U, get_write_call_count());
+    TEST_ASSERT_EQUAL_UINT64(0U, get_total_bytes_written());
+    TEST_ASSERT_EQUAL_UINT64(0U, CanLogBuffer_FrameCount2);
+    TEST_ASSERT_EQUAL_UINT64(0U, CanLogManager_FrameDropCount2);
+
+    SdBridgeTask_ActionHook();
+
+    TEST_ASSERT_EQUAL_UINT32(2U, get_write_call_count());
+    TEST_ASSERT_EQUAL_UINT64(BLOCK_SIZE, get_total_bytes_written());
+    TEST_ASSERT_EQUAL_UINT64(54U, CanLogBuffer_FrameCount2);
+    TEST_ASSERT_EQUAL_UINT32(54U, get_last_block_frame_count());
 }
 
 /**
@@ -578,6 +637,7 @@ void RunAllTests(void)
     RUN_TEST(test_FileRotation_ClosesFileOnSizeExceeded);
     RUN_TEST(test_StorePipeline_WritesFramesToFile);
     RUN_TEST(test_CommitFlushOnStop_PadsAndFlushes);
+    RUN_TEST(test_StoreBlockFailure_RetriesWithoutDroppingFrames);
     RUN_TEST(test_MetaDataPersistence_RoundTrip);
     RUN_TEST(test_Preallocation_CreatesSizedFiles);
     RUN_TEST(test_FileRotation_WrapsHeadTailAtLimit);

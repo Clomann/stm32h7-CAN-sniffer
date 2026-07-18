@@ -114,7 +114,7 @@ def _read_block_header(fh) -> dict | None:
             block_size,
             block_fill,
             ingress_frames,
-            frame_count,
+            entries_count,
         ) = BLOCK_HEADER_STRUCT.unpack(header_bytes)
         return {
             "legacy": False,
@@ -125,7 +125,7 @@ def _read_block_header(fh) -> dict | None:
             "block_size": block_size,
             "block_fill": block_fill,
             "ingress_frames": ingress_frames,
-            "frame_count": frame_count,
+            "entries_count": entries_count,
             "header_bytes": header_bytes,
         }
     if header_size == LEGACY_BLOCK_HEADER_SIZE:
@@ -137,7 +137,7 @@ def _read_block_header(fh) -> dict | None:
             epoch,
             cnt,
             ingress_frames,
-            frame_count,
+            entries_count,
         ) = LEGACY_BLOCK_HEADER_STRUCT.unpack(header_bytes)
         return {
             "legacy": True,
@@ -148,7 +148,7 @@ def _read_block_header(fh) -> dict | None:
             "block_size": block_size,
             "block_fill": block_fill,
             "ingress_frames": ingress_frames,
-            "frame_count": frame_count,
+            "entries_count": entries_count,
             "header_bytes": header_bytes,
         }
 
@@ -164,7 +164,7 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
     header_size = header_meta["header_size"]
     block_size = header_meta["block_size"]
     block_fill = header_meta["block_fill"]
-    header_frame_count = header_meta["frame_count"]
+    header_entries_count = header_meta["entries_count"]
     header_cnt = header_meta["cnt"]
     ingress_frames = header_meta["ingress_frames"]
     legacy = header_meta["legacy"]
@@ -245,10 +245,10 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
             if entry_type != CLB_ENTRY_TYPE_FRAME:
                 if offset + total_len > end_of_valid_data:
                     break
-                # Firmware frame_count counts every stored entry, including
+                # Firmware entries_count counts every stored entry, including
                 # marker metadata, even though only CAN frames are yielded.
                 # Unknown entry types remain excluded so corruption still
-                # produces a frame_count warning.
+                # produces an entries_count warning.
                 if entry_type == CLB_ENTRY_TYPE_MARKER:
                     entries_in_block += 1
                 offset += total_len
@@ -284,9 +284,9 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
             entries_in_block += 1
             offset += total_len
 
-    if entries_in_block != header_frame_count:
+    if entries_in_block != header_entries_count:
         print(
-            f"Warning: block {block_index} header frame_count={header_frame_count} "
+            f"Warning: block {block_index} header entries_count={header_entries_count} "
             f"parsed={entries_in_block} (cnt={header_cnt}, ingress_frames={ingress_frames})"
         )
 

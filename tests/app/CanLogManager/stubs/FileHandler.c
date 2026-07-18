@@ -15,6 +15,8 @@ static uint64_t mock_total_bytes_written    = 0;
 static uint64_t mock_total_frames_written   = 0;
 static uint32_t mock_last_block_frame_count = 0;
 static uint32_t mock_write_call_count       = 0;
+static FRESULT mock_next_write_result       = FR_OK;
+static FRESULT mock_next_flush_result       = FR_OK;
 
 static const char mock_meta_filename[] = "/logs_meta.json";
 static char mock_meta_file_content[128];
@@ -33,6 +35,8 @@ void reset_filehandler_stubs(void)
     mock_total_frames_written   = 0;
     mock_last_block_frame_count = 0;
     mock_write_call_count       = 0;
+    mock_next_write_result      = FR_OK;
+    mock_next_flush_result      = FR_OK;
     mock_meta_file_len          = 0;
     mock_meta_file_present      = false;
     mock_current_is_meta        = false;
@@ -48,6 +52,16 @@ void set_file_open_result(FRESULT result)
 void set_file_size(uint32_t size)
 {
     mock_file_size = size;
+}
+
+void set_next_write_result(FRESULT result)
+{
+    mock_next_write_result = result;
+}
+
+void set_next_flush_result(FRESULT result)
+{
+    mock_next_flush_result = result;
 }
 
 bool get_file_closed(void)
@@ -266,6 +280,14 @@ FatFS_SD_WriteFile(FatFsDeviceType *dev, const char *data, uint32_t length)
         return FR_OK;
     }
 
+    if (mock_next_write_result != FR_OK)
+    {
+        FRESULT result         = mock_next_write_result;
+        mock_next_write_result = FR_OK;
+        mock_write_call_count++;
+        return result;
+    }
+
     if ((data != NULL) && (length > 0U))
     {
         mock_total_bytes_written += length;
@@ -322,6 +344,13 @@ FRESULT FatFS_SD_Formatting_Request(
 FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
 {
     (void)dev;
+
+    if (mock_next_flush_result != FR_OK)
+    {
+        FRESULT result         = mock_next_flush_result;
+        mock_next_flush_result = FR_OK;
+        return result;
+    }
 
     return FR_OK;
 }

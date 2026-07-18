@@ -29,6 +29,7 @@ void CanLogBuffer_SetEpochCount(uint8_t epoch)
 uint8_t CanLogBuffer_AddEntry(const void *entry, uint32_t entryTotalSize)
 {
     lwrb_sz_t free_space;
+    const CanLogEntryHeaderType *header = (const CanLogEntryHeaderType *)entry;
 
     while (1)
     {
@@ -42,7 +43,7 @@ uint8_t CanLogBuffer_AddEntry(const void *entry, uint32_t entryTotalSize)
         {
             if (free_space < sizeof(HeaderPlaceholder))
             {
-                return 1;
+                return CLB_E_BUFFER_FULL;
             }
 
             if (sizeof(HeaderPlaceholder)
@@ -52,7 +53,7 @@ uint8_t CanLogBuffer_AddEntry(const void *entry, uint32_t entryTotalSize)
                     sizeof(HeaderPlaceholder)
                 ))
             {
-                return 1;
+                return CLB_E_WRITE_HEADER;
             }
 
             continue; /* offset changed, re-evaluate with new pointer */
@@ -65,7 +66,7 @@ uint8_t CanLogBuffer_AddEntry(const void *entry, uint32_t entryTotalSize)
 
             if (padding_to_next > free_space)
             {
-                return 1;
+                return CLB_E_BUFFER_FULL;
             }
 
             while (padding_to_next > 0U)
@@ -76,7 +77,7 @@ uint8_t CanLogBuffer_AddEntry(const void *entry, uint32_t entryTotalSize)
 
                 if (chunk != lwrb_write(&Rb1, PaddingChunk, chunk))
                 {
-                    return 1;
+                    return CLB_E_WRITE_PADDING;
                 }
 
                 padding_to_next -= chunk;
@@ -87,16 +88,19 @@ uint8_t CanLogBuffer_AddEntry(const void *entry, uint32_t entryTotalSize)
 
         if (entryTotalSize > free_space)
         {
-            return 1;
+            return CLB_E_BUFFER_FULL;
         }
 
         if (entryTotalSize == lwrb_write(&Rb1, entry, entryTotalSize))
         {
-            CanLogBuffer_FrameCount1++;
-            return 0;
+            if (CLB_ENTRY_TYPE_FRAME == header->type)
+            {
+                CanLogBuffer_FrameCount1++;
+            }
+            return CLB_E_OK;
         }
 
-        return 1;
+        return CLB_E_WRITE_ENTRY;
     }
 }
 
@@ -111,7 +115,7 @@ uint8_t CanLogBuffer_FillBlockWithPadding(void)
     offset = (uint32_t)(Rb1.w_ptr % BLOCK_SIZE);
     if (offset == 0U)
     {
-        return CANLOG_E_OK;
+        return CLB_E_OK;
     }
 
     pad_len      = BLOCK_SIZE - offset;
@@ -120,7 +124,7 @@ uint8_t CanLogBuffer_FillBlockWithPadding(void)
 
     if ((free_space < pad_len) || (linear_space < pad_len))
     {
-        return CANLOG_E_NOT_OK;
+        return CLB_E_NOT_OK;
     }
 
     remaining = pad_len;
@@ -132,13 +136,13 @@ uint8_t CanLogBuffer_FillBlockWithPadding(void)
 
         if (chunk != lwrb_write(&Rb1, PaddingChunk, chunk))
         {
-            return CANLOG_E_NOT_OK;
+            return CLB_E_NOT_OK;
         }
 
         remaining -= chunk;
     }
 
-    return CANLOG_E_OK;
+    return CLB_E_OK;
 }
 
 uint8_t CanLogBuffer_IsBlockReady(uint8_t *rdy)
@@ -255,8 +259,7 @@ uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
         {
         case CLB_ENTRY_TYPE_FRAME:
             EntryMinSize = sizeof(CanLogEntryType);
-            EntryMaxSize =
-                sizeof(CanLogEntryType) + CANLOG_ENTRY_MAX_DATA_LENGTH;
+            EntryMaxSize = sizeof(CanLogEntryType) + CLB_ENTRY_MAX_DATA_LENGTH;
             break;
         case CLB_ENTRY_TYPE_SYNC:
             EntryMinSize = sizeof(CanLogSyncType);
@@ -299,11 +302,11 @@ uint8_t CanLogBuffer_UsedBytes(uint32_t *bytes)
 {
     if (bytes == NULL)
     {
-        return CANLOG_E_NOT_OK;
+        return CLB_E_NOT_OK;
     }
 
     *bytes = (uint32_t)lwrb_get_full(&Rb1);
-    return CANLOG_E_OK;
+    return CLB_E_OK;
 }
 
 uint8_t
@@ -323,8 +326,9 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
     lwrb_sz_t free_space = 0U;
     uint32_t remaining   = 0U;
     lwrb_sz_t linear_len;
+    uint32_t entries_count = 0U;
 
-    res          = CANLOG_E_OK;
+    res          = CLB_E_OK;
     total_len    = 0;
     offset       = sizeof(CanLogBlockHeaderType);
     *len         = 0U;
@@ -337,7 +341,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
 
         if (lwrb_get_full(&Rb1) < skip_to_align)
         {
-            return CANLOG_E_NOT_OK;
+            return CLB_E_NOT_OK;
         }
 
         lwrb_skip(&Rb1, skip_to_align);
@@ -355,13 +359,13 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
     if (block_available
         < (sizeof(CanLogBlockHeaderType) + sizeof(CanLogEntryHeaderType)))
     {
-        return CANLOG_E_NOT_OK;
+        return CLB_E_NOT_OK;
     }
 
     /* Require a contiguous block for direct write-out */
     if (linear_len < BLOCK_SIZE)
     {
-        return CANLOG_E_NOT_OK;
+        return CLB_E_NOT_OK;
     }
 
     /* If this is a partial block and there is contiguous free space to extend it,
@@ -373,7 +377,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
 
         if (free_space < pad_len)
         {
-            return CANLOG_E_NOT_OK;
+            return CLB_E_NOT_OK;
         }
 
         remaining = pad_len;
@@ -386,7 +390,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
 
             if (chunk != lwrb_write(&Rb1, PaddingChunk, chunk))
             {
-                return CANLOG_E_NOT_OK;
+                return CLB_E_NOT_OK;
             }
 
             remaining -= chunk;
@@ -397,7 +401,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
 
     block_ptr = lwrb_get_linear_block_read_address(&Rb1);
 
-    while (CANLOG_E_OK == res)
+    while (CLB_E_OK == res)
     {
         if ((block_available - offset) < sizeof(EntryHeader))
         {
@@ -424,13 +428,25 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
             break;
         }
 
+        if ((CLB_ENTRY_TYPE_FRAME != entry_type)
+            && (CLB_ENTRY_TYPE_SYNC != entry_type)
+            && (CLB_ENTRY_TYPE_MARKER != entry_type))
+        {
+            break;
+        }
+
         if ((offset + total_len) > block_available)
         {
             break; // Output block full
         }
 
         offset += total_len;
-        (*frame_count)++;
+        if (CLB_ENTRY_TYPE_FRAME == entry_type)
+        {
+            (*frame_count)++;
+        }
+
+        entries_count++;
     }
 
     if (offset != sizeof(BlockHeader))
@@ -443,7 +459,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
         BlockHeader.epoch       = EpochCount;
 
         BlockHeader.ingress_frames = CanLogBuffer_FrameCount1;
-        BlockHeader.frame_count    = *frame_count;
+        BlockHeader.entries_count  = entries_count;
 
         memcpy(block_ptr, &BlockHeader, sizeof(BlockHeader));
 
@@ -452,7 +468,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
     }
     else
     {
-        res = CANLOG_E_NOT_OK;
+        res = CLB_E_NOT_OK;
     }
 
     (void)res;
