@@ -150,7 +150,6 @@ platform/board/stm32h745/cm7/Src/boot_platform.c
 platform/board/stm32h745/cm7/Src/main.c
 platform/board/stm32h745/cm7/Src/stm32h7xx_it.c
 platform/Common/Inc/FwUpdateHandoff.h
-platform/Common/Inc/SequenceChecker_Cfg.h
 platform/Common/Inc/SequenceChecker.h
 platform/Common/Inc/instrumentation.h
 platform/Common/Inc/stm32h7xx_nucleo_conf.h

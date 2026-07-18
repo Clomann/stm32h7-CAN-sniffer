@@ -648,8 +648,16 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
     (void)ScInit(&CAN1_Sequence, 0U, UINT32_MAX);
     (void)ScInit(&CAN2_Sequence, 0U, UINT32_MAX);
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
-    (void)ScInit(&CAN1_IdSequence, DEBUG_CAN_ID_SEQUENCE_MAX_ID, DEBUG_CAN_ID_SEQUENCE_MAX_ID);
-    (void)ScInit(&CAN2_IdSequence, DEBUG_CAN_ID_SEQUENCE_MAX_ID, DEBUG_CAN_ID_SEQUENCE_MAX_ID);
+    (void)ScInit(
+        &CAN1_IdSequence,
+        DEBUG_CAN_ID_SEQUENCE_MAX_ID,
+        DEBUG_CAN_ID_SEQUENCE_MAX_ID
+    );
+    (void)ScInit(
+        &CAN2_IdSequence,
+        DEBUG_CAN_ID_SEQUENCE_MAX_ID,
+        DEBUG_CAN_ID_SEQUENCE_MAX_ID
+    );
 #endif
     return &CanLogCtrlData;
 }
@@ -1311,7 +1319,7 @@ static comm_status_t appCanLogStoreToFrameBuffer(void *entry)
         {
             CanLogManager_FrameDropCount2++;
         }
-        
+
         res = COMM_ERROR;
     }
 
