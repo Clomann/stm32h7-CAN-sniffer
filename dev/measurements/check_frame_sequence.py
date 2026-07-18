@@ -290,7 +290,7 @@ def find_binary_id_gaps_fast(
     on_flush: Callable[[List[Gap], List[Gap]], None] | None = None,
     abort_on_gap: bool = False,
     continue_on_gap: bool = False,
-) -> Tuple[int, int, Dict[int, int]]:
+) -> Tuple[int, int, Dict[int, int], Dict[Tuple[int, int], int]]:
     """
     Check binary ID continuity directly in each block.
 
@@ -300,13 +300,14 @@ def find_binary_id_gaps_fast(
     """
     import log_parser as binary
 
-    last_id_by_channel = [0] * 256
-    last_timestamp_by_channel = [0] * 256
-    last_frame_by_channel = [0] * 256
+    last_id_by_epoch_channel: Dict[Tuple[int, int], int] = {}
+    last_timestamp_by_epoch_channel: Dict[Tuple[int, int], int] = {}
+    last_frame_by_epoch_channel: Dict[Tuple[int, int], int] = {}
     missing_by_channel: Dict[int, int] = defaultdict(int)
+    missing_by_epoch_channel: Dict[Tuple[int, int], int] = defaultdict(int)
     pending_id: List[Gap] = []
     n_id_gaps = 0
-    entries_count = 0
+    frame_count = 0
     next_flush_check = _PROGRESS_CHECK_LINES
     last_flush = time.monotonic()
     abs_time_high = 0
@@ -319,6 +320,7 @@ def find_binary_id_gaps_fast(
 
     def record_gap(
         channel: int,
+        epoch: int,
         can_id: int,
         timestamp_us: int,
         previous_id: int,
@@ -346,12 +348,13 @@ def find_binary_id_gaps_fast(
                     channel=channel,
                     can_id=can_id,
                     counter=None,
-                    line_no=entries_count,
+                    line_no=frame_count,
                     position_unit="frame",
                 ),
             )
         )
         missing_by_channel[channel] += missing_count
+        missing_by_epoch_channel[(epoch, channel)] += missing_count
         n_id_gaps += 1
 
     for block, block_index, header in binary.iter_can_blocks(
@@ -361,6 +364,7 @@ def find_binary_id_gaps_fast(
         on_progress=make_byte_progress_reporter(path),
     ):
         offset = header["header_size"]
+        epoch = header["epoch"]
         end_of_valid_data = min(header["block_fill"], len(block))
         entries_in_block = 0
 
@@ -382,24 +386,26 @@ def find_binary_id_gaps_fast(
                 timestamp_us, can_id, channel, _dlc, _flags, _bus_id = legacy_fixed_unpack(
                     block, offset + binary.LEGACY_ENTRY_HEADER_SIZE
                 )
-                entries_count += 1
-                previous_frame_no = last_frame_by_channel[channel]
-                if previous_frame_no:
-                    previous_id = last_id_by_channel[channel]
+                frame_count += 1
+                key = (epoch, channel)
+                previous_frame_no = last_frame_by_epoch_channel.get(key)
+                if previous_frame_no is not None:
+                    previous_id = last_id_by_epoch_channel[key]
                     delta = (can_id - previous_id) % id_modulo
                     if delta not in (0, 1):
                         record_gap(
                             channel,
+                            epoch,
                             can_id,
                             timestamp_us,
                             previous_id,
-                            last_timestamp_by_channel[channel],
+                            last_timestamp_by_epoch_channel[key],
                             previous_frame_no,
                             delta - 1,
                         )
-                last_id_by_channel[channel] = can_id
-                last_timestamp_by_channel[channel] = timestamp_us
-                last_frame_by_channel[channel] = entries_count
+                last_id_by_epoch_channel[key] = can_id
+                last_timestamp_by_epoch_channel[key] = timestamp_us
+                last_frame_by_epoch_channel[key] = frame_count
                 offset += total_len
         else:
             while offset + binary.ENTRY_HEADER_SIZE <= end_of_valid_data:
@@ -429,24 +435,26 @@ def find_binary_id_gaps_fast(
                 entries_in_block += 1
                 timestamp, can_id, channel, _dlc_flags, _data_len = entry_fixed_unpack(block, fixed_offset)
                 timestamp_us = (abs_time_high << 32) | timestamp
-                entries_count += 1
-                previous_frame_no = last_frame_by_channel[channel]
-                if previous_frame_no:
-                    previous_id = last_id_by_channel[channel]
+                frame_count += 1
+                key = (header["epoch"], channel)
+                previous_frame_no = last_frame_by_epoch_channel.get(key)
+                if previous_frame_no is not None:
+                    previous_id = last_id_by_epoch_channel[key]
                     delta = (can_id - previous_id) % id_modulo
                     if delta not in (0, 1):
                         record_gap(
                             channel,
+                            header["epoch"],
                             can_id,
                             timestamp_us,
                             previous_id,
-                            last_timestamp_by_channel[channel],
+                            last_timestamp_by_epoch_channel[key],
                             previous_frame_no,
                             delta - 1,
                         )
-                last_id_by_channel[channel] = can_id
-                last_timestamp_by_channel[channel] = timestamp_us
-                last_frame_by_channel[channel] = entries_count
+                last_id_by_epoch_channel[key] = can_id
+                last_timestamp_by_epoch_channel[key] = timestamp_us
+                last_frame_by_epoch_channel[key] = frame_count
                 offset += total_len
 
         if entries_in_block != header["entries_count"]:
@@ -457,8 +465,8 @@ def find_binary_id_gaps_fast(
                 flush=True,
             )
 
-        if on_flush and entries_count >= next_flush_check:
-            while next_flush_check <= entries_count:
+        if on_flush and frame_count >= next_flush_check:
+            while next_flush_check <= frame_count:
                 next_flush_check += _PROGRESS_CHECK_LINES
             now = time.monotonic()
             if now - last_flush >= _PROGRESS_INTERVAL:
@@ -469,7 +477,7 @@ def find_binary_id_gaps_fast(
     if on_flush and pending_id:
         on_flush([], pending_id)
 
-    return entries_count, n_id_gaps, missing_by_channel
+    return frame_count, n_id_gaps, missing_by_channel, missing_by_epoch_channel
 
 
 def format_id_gap(gap: Gap, preview_values: int = 16) -> str:
@@ -591,7 +599,7 @@ def main() -> None:
                     id_shown += 1
 
     if args.id_sequence_only:
-        frame_count, n_id_gaps, missing_by_channel = find_binary_id_gaps_fast(
+        frame_count, n_id_gaps, missing_by_channel, missing_by_epoch_channel = find_binary_id_gaps_fast(
             args.path,
             id_modulo=args.id_modulo,
             on_flush=on_flush,
@@ -602,6 +610,7 @@ def main() -> None:
         n_counter_gaps = 0
         missing_by_key: Dict[Tuple[int, int], int] = {}
     else:
+        missing_by_epoch_channel: Dict[Tuple[int, int], int] = {}
         frame_count, frames_with_counter, n_counter_gaps, missing_by_key, n_id_gaps, missing_by_channel = find_all_gaps(
             parse_input(
                 args.path,
@@ -647,6 +656,10 @@ def main() -> None:
             print("\nMissing ID counts by channel:")
             for ch, count in sorted(missing_by_channel.items()):
                 print(f"  Ch{ch}: {count} missing ID(s)")
+            if missing_by_epoch_channel:
+                print("\nMissing ID counts by epoch and channel:")
+                for (epoch, ch), count in sorted(missing_by_epoch_channel.items()):
+                    print(f"  Epoch {epoch} Ch{ch}: {count} missing ID(s)")
 
 
 if __name__ == "__main__":

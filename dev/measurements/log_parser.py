@@ -313,8 +313,16 @@ def iter_can_blocks(
         print("Parsing data ...")
 
         while True:
+            header_offset = fh.tell()
             header_meta = _read_block_header(fh)
             if not header_meta:
+                if header_offset < total_bytes:
+                    fh.seek(header_offset)
+                    sample = fh.read(16).hex(" ")
+                    print(
+                        f"Stopped parsing at byte {header_offset}/{total_bytes}: "
+                        f"unrecognized or truncated block header (next bytes: {sample})"
+                    )
                 break
 
             header_size = header_meta["header_size"]
@@ -326,8 +334,16 @@ def iter_can_blocks(
 
             min_header_size = LEGACY_BLOCK_HEADER_SIZE if legacy else BLOCK_HEADER_SIZE
             if block_size == 0:
+                print(
+                    f"Stopped parsing at block {block_index} byte {header_offset}: "
+                    "block_size is 0"
+                )
                 break
             if block_size < header_size or block_size < min_header_size:
+                print(
+                    f"Stopped parsing at block {block_index} byte {header_offset}: "
+                    f"invalid block_size={block_size}, header_size={header_size}"
+                )
                 break
 
             gap_reason = None
@@ -361,6 +377,11 @@ def iter_can_blocks(
             if remaining:
                 read_n = fh.readinto(buf_view[header_size:])
                 if read_n is None or read_n < remaining:
+                    got = 0 if read_n is None else read_n
+                    print(
+                        f"Stopped parsing at block {block_index} byte {header_offset}: "
+                        f"truncated block payload ({got}/{remaining} bytes read)"
+                    )
                     break  # Truncated block at EOF
 
             yield buf_view, block_index, header_meta
