@@ -41,6 +41,16 @@ extern volatile uint64_t CanLogManager_CAN1_MissingCount;
 /** Number of frames dropped based on internal E2E sequenceing for CAN 2 */
 extern volatile uint64_t CanLogManager_CAN2_MissingCount;
 
+/** Number of CAN ID test-sequence errors on CAN 1.
+ *  Repeated IDs are treated as sequence errors.
+ */
+extern volatile uint64_t CanLogManager_CAN1_MissingIdsCount;
+
+/** Number of CAN ID test-sequence errors on CAN 2.
+ *  Repeated IDs are treated as sequence errors.
+ */
+extern volatile uint64_t CanLogManager_CAN2_MissingIdsCount;
+
 /** Number of frames written to SD card staging buffer */
 extern volatile uint64_t CanLogBuffer_FrameCount1;
 

@@ -31,6 +31,17 @@
 #include "semphr.h"
 #endif
 
+#ifndef DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+/* Integration-test aid for generated CAN traffic.
+ * Contract: each channel emits a strictly increasing CAN ID stream modulo the
+ * configured maximum ID. Repeated IDs are treated as sequence errors. */
+#define DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE 0U
+#endif
+
+#ifndef DEBUG_CAN_ID_SEQUENCE_MAX_ID
+#define DEBUG_CAN_ID_SEQUENCE_MAX_ID 0xFFU
+#endif
+
 #define CANLOG_INGEST_BATCH_MAX 256
 
 #define CLM_ABS_TIME_TO_TIMSTAMP(x) (uint32_t)(x)
@@ -131,6 +142,10 @@ volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
 volatile static CanLogControlDataType CanLogCtrlData;
 static ScSequenceType CAN1_Sequence;
 static ScSequenceType CAN2_Sequence;
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+static ScSequenceType CAN1_IdSequence;
+static ScSequenceType CAN2_IdSequence;
+#endif
 static uint32_t Rb1BytesHighWater                     = 0U;
 static uint32_t CanLogFileSize                        = MAX_LOG_FILE_SIZE;
 static uint32_t CanLogFileCount                       = MAX_LOG_FILE_COUNT;
@@ -632,7 +647,10 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 
     (void)ScInit(&CAN1_Sequence, 0U, UINT32_MAX);
     (void)ScInit(&CAN2_Sequence, 0U, UINT32_MAX);
-
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+    (void)ScInit(&CAN1_IdSequence, DEBUG_CAN_ID_SEQUENCE_MAX_ID, DEBUG_CAN_ID_SEQUENCE_MAX_ID);
+    (void)ScInit(&CAN2_IdSequence, DEBUG_CAN_ID_SEQUENCE_MAX_ID, DEBUG_CAN_ID_SEQUENCE_MAX_ID);
+#endif
     return &CanLogCtrlData;
 }
 
@@ -1277,7 +1295,7 @@ static InstrErrorType appPersistInstrumentationData(void)
 
 static comm_status_t appCanLogStoreToFrameBuffer(void *entry)
 {
-    comm_status_t res = COMM_SUCCESS;
+    comm_status_t res        = COMM_SUCCESS;
     ClbReturnType buffer_res = CLB_E_OK;
     CanLogEntryHeaderType *pHeader;
 
@@ -1585,6 +1603,10 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
     uint32_t CAN2_MissingFrames        = 0U;
     static uint32_t CAN1_SequenceIndex = 0U;
     static uint32_t CAN2_SequenceIndex = 0U;
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+    static uint32_t CAN1_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
+    static uint32_t CAN2_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
+#endif
     volatile uint32_t LocalFrameCount;
     static uint64_t NextPeriodicSyncAbsTime = 0;
     static uint32_t LastFrameTimestamp      = 0;
@@ -1610,6 +1632,12 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 
         CanLogCtrlData.framesLost = false;
         RuntimeChecks_Init();
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+        CAN1_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
+        CAN2_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
+        ScReset(&CAN1_IdSequence, CAN1_CanId);
+        ScReset(&CAN2_IdSequence, CAN2_CanId);
+#endif
 
         CanAbs_IsStateOff_Can1(&IsOffState);
 
@@ -1722,6 +1750,13 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
             m_ComputeBusLoad1(&CanLogCtrlData.Can1, pFrameEntry);
             CAN1_SequenceIndex = pNewFrame->rx_sequence;
             (void)ScCheckSequence(&CAN1_Sequence, CAN1_SequenceIndex);
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+            CAN1_CanId = pNewFrame->id;
+            if (SC_E_SEQUENCE == ScCheckSequence(&CAN1_IdSequence, CAN1_CanId))
+            {
+                CanLogManager_CAN1_MissingIdsCount++;
+            }
+#endif
         }
         else if (pFrameEntry->channel == 2)
         {
@@ -1729,6 +1764,13 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
             m_ComputeBusLoad2(&CanLogCtrlData.Can2, pFrameEntry);
             CAN2_SequenceIndex = pNewFrame->rx_sequence;
             (void)ScCheckSequence(&CAN2_Sequence, CAN2_SequenceIndex);
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+            CAN2_CanId = pNewFrame->id;
+            if (SC_E_SEQUENCE == ScCheckSequence(&CAN2_IdSequence, CAN2_CanId))
+            {
+                CanLogManager_CAN2_MissingIdsCount++;
+            }
+#endif
         }
 
         appCanLogStoreToFrameBuffer((void *)pFrameEntry);
@@ -1763,6 +1805,23 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogManager_CAN2_MissingCount += CAN2_MissingFrames;
         ScReset(&CAN2_Sequence, CAN2_SequenceIndex);
     }
+
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+    uint32_t CAN1_MissingIds = 0U;
+    uint32_t CAN2_MissingIds = 0U;
+
+    if (SC_E_OK == ScGetMissingCount(&CAN1_IdSequence, &CAN1_MissingIds))
+    {
+        CanLogManager_CAN1_MissingIdsCount += CAN1_MissingIds;
+        ScReset(&CAN1_IdSequence, CAN1_CanId);
+    }
+
+    if (SC_E_OK == ScGetMissingCount(&CAN2_IdSequence, &CAN2_MissingIds))
+    {
+        CanLogManager_CAN2_MissingIdsCount += CAN2_MissingIds;
+        ScReset(&CAN2_IdSequence, CAN2_CanId);
+    }
+#endif
 
     if (BlockIsReady)
     {
