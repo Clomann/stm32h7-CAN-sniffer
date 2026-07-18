@@ -130,7 +130,7 @@ ScStatusType ScReset(ScSequenceType *seq, uint32_t index)
     {
         return SC_E_SEQUENCE;
     }
-    
+
     if ((0U == seq->wrap_index) || (index > seq->wrap_index))
     {
         return SC_E_INV_PARAM;

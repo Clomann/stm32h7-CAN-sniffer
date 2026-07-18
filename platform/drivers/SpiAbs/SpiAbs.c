@@ -212,8 +212,7 @@ SpiAbs_WaitForCompletion(volatile TaskContextType *context, uint32_t timeout_ms)
     return HAL_OK;
 }
 
-static uint32_t
-SpiAbs_ScaledTimeout(uint32_t timeout_ms, uint32_t retry_count)
+static uint32_t SpiAbs_ScaledTimeout(uint32_t timeout_ms, uint32_t retry_count)
 {
     if (0U == retry_count)
     {

@@ -95,8 +95,8 @@ static RingBuffer Fdcan2TxRingBuffer = {
 
 static uint32_t CanAbs_Can1_HwHighWatermark = 0U;
 static uint32_t CanAbs_Can2_HwHighWatermark = 0U;
-static uint32_t CanAbs_Can1_RxHighWater = 0U;
-static uint32_t CanAbs_Can2_RxHighWater = 0U;
+static uint32_t CanAbs_Can1_RxHighWater     = 0U;
+static uint32_t CanAbs_Can2_RxHighWater     = 0U;
 
 static uint32_t Can1_SequenceIndex = 0U;
 static uint32_t Can2_SequenceIndex = 0U;
@@ -612,7 +612,7 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
 {
     comm_status_t res;
 
-    CanAbs_Can1_RxHighWater = 0U;
+    CanAbs_Can1_RxHighWater     = 0U;
     CanAbs_Can1_HwHighWatermark = 0U;
 
     res = CanAbs_Init(
@@ -676,7 +676,7 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
 {
     comm_status_t res;
 
-    CanAbs_Can2_RxHighWater = 0U;
+    CanAbs_Can2_RxHighWater     = 0U;
     CanAbs_Can2_HwHighWatermark = 0U;
 
     res = CanAbs_Init(
