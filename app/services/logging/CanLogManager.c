@@ -228,7 +228,7 @@ static void CanLogManager_UpdateRb1BytesHighWater(void)
 {
     uint32_t used = 0U;
 
-    if (CANLOG_E_OK == CanLogBuffer_UsedBytes(&used))
+    if (CLB_E_OK == CanLogBuffer_UsedBytes(&used))
     {
         if (used > Rb1BytesHighWater)
         {
@@ -980,11 +980,11 @@ static int CanLogManager_ParseMetaData(
 
     if (JSONSuccess == result)
     {
-        return CANLOG_E_OK;
+        return CLB_E_OK;
     }
     else
     {
-        return CANLOG_E_NOT_OK;
+        return CLB_E_NOT_OK;
     }
 }
 
@@ -1019,18 +1019,18 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
         res = FatFS_SD_GetFileSize(&Dev, &FileSize);
         if (res != FR_OK)
         {
-            res = CANLOG_E_FILE_READ;
+            res = CLB_E_FILE_READ;
         }
 
-        if (CANLOG_E_OK == res)
+        if (CLB_E_OK == res)
         {
             // Read data
             ReadSize = (FileSize < BufferSize) ? FileSize : BufferSize;
             res      = FatFS_SD_ReadFile(&Dev, Content, ReadSize);
 
-            if (CANLOG_E_OK != res)
+            if (CLB_E_OK != res)
             {
-                res = CANLOG_E_FILE_READ;
+                res = CLB_E_FILE_READ;
             }
         }
 
@@ -1057,7 +1057,7 @@ static FRESULT m_MetaDataLoad(CanLogMetaDataType *data)
     }
     else
     {
-        res = CANLOG_E_FILE_OPEN;
+        res = CLB_E_FILE_OPEN;
     }
 
     return res;
@@ -1107,15 +1107,15 @@ static FRESULT m_MetaDataStore(CanLogMetaDataType *data)
 
         (void)m_MetaDataToJSonString(data, Content, BufferSize, &StringSize);
 
-        if (CANLOG_E_OK == res)
+        if (CLB_E_OK == res)
         {
             // Read data
             WriteSize = (StringSize < BufferSize) ? StringSize : BufferSize;
             res       = FatFS_SD_WriteFile(&Dev, Content, WriteSize);
 
-            if (CANLOG_E_OK != res)
+            if (CLB_E_OK != res)
             {
-                res = CANLOG_E_FILE_WRITE;
+                res = CLB_E_FILE_WRITE;
                 CanLogFileManager_ErrorHandler();
             }
         }
@@ -1128,7 +1128,7 @@ static FRESULT m_MetaDataStore(CanLogMetaDataType *data)
     }
     else
     {
-        res = CANLOG_E_FILE_OPEN;
+        res = CLB_E_FILE_OPEN;
     }
 
     return res;
@@ -1278,13 +1278,23 @@ static InstrErrorType appPersistInstrumentationData(void)
 static comm_status_t appCanLogStoreToFrameBuffer(void *entry)
 {
     comm_status_t res = COMM_SUCCESS;
+    ClbReturnType buffer_res = CLB_E_OK;
     CanLogEntryHeaderType *pHeader;
 
     pHeader = (CanLogEntryHeaderType *)entry;
 
-    if (0 != CanLogBuffer_AddEntry(entry, pHeader->total_len))
+    buffer_res = CanLogBuffer_AddEntry(entry, pHeader->total_len);
+
+    if (CLB_E_OK != buffer_res)
     {
         CanLogManager_FrameDropCount1++;
+
+        if (CLB_E_BUFFER_FULL == buffer_res)
+        {
+            CanLogManager_FrameDropCount2++;
+        }
+        
+        res = COMM_ERROR;
     }
 
     CanLogManager_UpdateRb1BytesHighWater();
@@ -1326,7 +1336,7 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
     uint8_t *DataPtr;
     comm_status_t res = COMM_SUCCESS;
 
-    if (CANLOG_E_OK
+    if (CLB_E_OK
         == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
     {
         CanLogManager_UpdateRb1BytesHighWater();
@@ -1340,15 +1350,10 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         CanLogManager_FileUnlock();
         CanLogManager_InstrumentationFlushEndHook();
 
-        CanLogBuffer_Consume(DataLength, FrameCount);
-
         if (COMM_SUCCESS == res)
         {
+            CanLogBuffer_Consume(DataLength, FrameCount);
             CanLogBuffer_BlockCount++;
-        }
-        else
-        {
-            CanLogManager_FrameDropCount2 += FrameCount;
         }
     }
     else
@@ -1784,7 +1789,7 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 
         if (SlotsToWrite > 0)
         {
-            if (CANLOG_E_OK != CanLogBuffer_FillBlockWithPadding())
+            if (CLB_E_OK != CanLogBuffer_FillBlockWithPadding())
             {
                 CanLogFileManager_ErrorHandler();
             }

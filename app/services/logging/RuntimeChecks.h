@@ -32,7 +32,7 @@ extern volatile uint64_t CanLogManager_FrameCount;
 /** Number of frames dropped trying to add to the buffer in CanLogManager */
 extern volatile uint64_t CanLogManager_FrameDropCount1;
 
-/** Number of frames dropped trying to write to SD card in CanLogManager */
+/** Number of frames dropped because downstream log storage did not drain the staging buffer in time */
 extern volatile uint64_t CanLogManager_FrameDropCount2;
 
 /** Number of frames dropped based on internal E2E sequenceing for CAN 1 */
