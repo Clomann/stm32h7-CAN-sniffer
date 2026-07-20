@@ -51,7 +51,7 @@ def ParseCsvValue(value):
 
 def ConfigureAxis(ax):
     ax.set_xlabel('t in s')
-    ax.set_ylabel('dT in us')
+    ax.set_ylabel('dT in ms')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
@@ -94,10 +94,13 @@ except Exception as e:
 
 t_us = df['t'].to_numpy(dtype=np.float64)
 dT_us = df['dT'].to_numpy(dtype=np.float64)
+dT_ms = dT_us / 1000.0
 
-mask = np.isfinite(t_us) & np.isfinite(dT_us)
+dT = dT_us
+
+mask = np.isfinite(t_us) & np.isfinite(dT)
 t_us = t_us[mask]
-dT_us = dT_us[mask]
+dT = dT[mask]
 
 # ---- Fix circular buffer dump order (head/tail meet) ----
 dt = np.diff(t_us)
@@ -105,21 +108,22 @@ wrap_candidates = np.where(dt < 0)[0]
 if wrap_candidates.size > 0:
     k = wrap_candidates[np.argmin(dt[wrap_candidates])]
     t_us = np.concatenate([t_us[k + 1:], t_us[:k + 1]])
-    dT_us = np.concatenate([dT_us[k + 1:], dT_us[:k + 1]])
+    dT = np.concatenate([dT[k + 1:], dT[:k + 1]])
 else:
     order = np.argsort(t_us)
     t_us = t_us[order]
-    dT_us = dT_us[order]
+    dT = dT[order]
 
 # ---- Drop the last sample w.r.t. time (persist-log entry) ----
 if len(t_us) > 1:
-    dT_us = dT_us[:-2]
+    dT = dT[:-2]
     t_us = t_us[:-2]
 
 print(len(t_us))
 
-tt = t_us / 1e6  # seconds
-yy = dT_us       # microseconds
+tt = t_us / 1e6        # seconds
+yy_us = dT             # microseconds, used for calculations
+yy_ms = yy_us / 1000.0 # milliseconds, used for plots
 
 # ---- Derived metrics: cadence + end-to-end throughput ----
 P_us_full = np.diff(t_us)
@@ -129,17 +133,17 @@ P_us = P_us_full[valid]
 cadence_hz = 1e6 / P_us
 e2e_MBps = (BYTES / (P_us * 1e-6)) / (1024 * 1024)
 
-dT_aligned = dT_us[:-1]
+dT_aligned = dT[:-1]
 util = dT_aligned[valid] / P_us_full[valid]
 
-raw_MBps = (BYTES / (yy * 1e-6)) / (1024 * 1024)
+raw_MBps = (BYTES / (yy_us * 1e-6)) / (1024 * 1024)
 
 # ---- Print key stats to console ----
-print("=== f_write duration dT (us) ===")
-print("p50  :", round(pct(yy, 50), 2))
-print("p99  :", round(pct(yy, 99), 2))
-print("p999 :", round(pct(yy, 99.9), 2))
-print("max  :", round(np.nanmax(yy), 2))
+print("=== f_write duration dT (ms) ===")
+print("p50  :", round(pct(yy_ms, 50), 4))
+print("p99  :", round(pct(yy_ms, 99), 4))
+print("p999 :", round(pct(yy_ms, 99.9), 4))
+print("max  :", round(np.nanmax(yy_ms), 4))
 
 print("\n=== Raw in-flush rate (MiB/s), computed from dT ===")
 print("p50  :", round(pct(raw_MBps, 50), 3))
@@ -181,21 +185,25 @@ axs['Left'].set_title(f'Multi-block write duration ({BYTES/1024:.1f} kB data; {l
 
 x_min = float(np.nanmin(tt))
 x_max = float(np.nanmax(tt))
-y_min = float(np.nanmin(yy)) - 500
-y_max = float(np.nanmax(yy)) + 500
 
-axs['Left'].plot(tt, yy)
+# Plot dT in milliseconds. Keep yy_us for throughput/utilization calculations.
+yy_plot = yy_ms
+y_min = float(np.nanmin(yy_plot)) - 0.5  # 0.5 ms margin
+y_max = float(np.nanmax(yy_plot)) + 0.5  # 0.5 ms margin
+
+axs['Left'].plot(tt, yy_plot)
 axs['Left'].axis([x_min, x_max, y_min, y_max])
 
 # ---- Histograms ----
-BIN_DURATION_1 = 50
-BIN_DURATION_2 = 100
+# Original bin widths were 50 us / 100 us; convert them to ms for plotting.
+BIN_DURATION_1_MS = 50 / 1000.0
+BIN_DURATION_2_MS = 100 / 1000.0
 
-yy_series = pd.Series(yy)
+yy_series = pd.Series(yy_plot)
 
 # Same x-range on both histograms to align x axes
-hist_bins_1 = max(1, round((y_max - y_min) / BIN_DURATION_1))
-hist_bins_2 = max(1, round((y_max - y_min) / BIN_DURATION_2))
+hist_bins_1 = max(1, round((y_max - y_min) / BIN_DURATION_1_MS))
+hist_bins_2 = max(1, round((y_max - y_min) / BIN_DURATION_2_MS))
 
 yy_series.hist(bins=hist_bins_1, range=(y_min, y_max), ax=axs['TopRight'])
 yy_series.hist(bins=hist_bins_2, range=(y_min, y_max), ax=axs['BottomRight'])
@@ -205,36 +213,41 @@ axs['TopRight'].set_xlim(y_min, y_max)
 axs['BottomRight'].set_xlim(y_min, y_max)
 axs['BottomRight'].set_xticks(axs['TopRight'].get_xticks())
 
+# Set final axis limits before adding arrow annotations.
+axs['BottomRight'].axis([y_min, y_max, 0, 10])
+
 # Axis cosmetics (arrows)
 for el in axs:
     ConfigureAxis(axs[el])
 
 # Labels for histogram axes
-axs['TopRight'].set_xlabel(f'dT in us')
+axs['Left'].set_xlabel('t in s')
+axs['Left'].set_ylabel('dT in ms')
+axs['TopRight'].set_xlabel('dT in ms')
 axs['TopRight'].set_ylabel('samples')
-fig.text(0.90, 0.85, f'bin width:\n{BIN_DURATION_1} us', ha='right', va='top', fontsize=8)
-axs['BottomRight'].set_xlabel(f'dT in us')
+fig.text(0.90, 0.85, f'bin width:\n{BIN_DURATION_1_MS:g} ms', ha='right', va='top', fontsize=8)
+axs['BottomRight'].set_xlabel('dT in ms')
 axs['BottomRight'].set_ylabel('samples')
-axs['BottomRight'].axis([y_min, y_max, 0, 10])
-fig.text(0.90, 0.5, f'bin width:\n{BIN_DURATION_2} us', ha='right', va='top', fontsize=8)
+fig.text(0.90, 0.5, f'bin width:\n{BIN_DURATION_2_MS:g} ms', ha='right', va='top', fontsize=8)
 fig.tight_layout()
 
 # ---- Put stats BELOW the plot (line breaks, fully printed) ----
-median_dT = pct(yy, 50)
-p99_dT = pct(yy, 99)
-p999_dT = pct(yy, 99.9)
-max_dT = float(np.nanmax(yy))
+median_dT_us = pct(yy_us, 50)
+median_dT_ms = pct(yy_ms, 50)
+p99_dT_ms = pct(yy_ms, 99)
+p999_dT_ms = pct(yy_ms, 99.9)
+max_dT_ms = float(np.nanmax(yy_ms))
 
-median_raw = (BYTES / (median_dT * 1e-6)) / (1024 * 1024)  # MiB/s
+median_raw = (BYTES / (median_dT_us * 1e-6)) / (1024 * 1024)  # MiB/s
 median_cad = pct(cadence_hz, 50) if cadence_hz.size else np.nan
 median_e2e = pct(e2e_MBps, 50) if e2e_MBps.size else np.nan
 
 stats_line_1 = (
-f"dT(us):\n\
-  p50={median_dT:.0f}\n\
-  p99={p99_dT:.0f}\n\
-  p999={p999_dT:.0f}\n\
-  max={max_dT:.0f}"
+f"dT(ms):\n\
+  p50={median_dT_ms:.3f}\n\
+  p99={p99_dT_ms:.3f}\n\
+  p999={p999_dT_ms:.3f}\n\
+  max={max_dT_ms:.3f}"
 )
 stats_line_2 = (
 f"Raw(in-flush): p50={median_raw:.2f} MiB/s\n\
