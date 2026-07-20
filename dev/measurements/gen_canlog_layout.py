@@ -38,14 +38,36 @@ class Field:
 
 
 def _strip_suffixes(value: str) -> str:
-    """Remove C integer suffixes (u/U/l/L after a numeric literal) to make expressions Python-evaluable."""
-    return re.sub(r"((?:0[xX][0-9a-fA-F]+|\d+))[uUlL]+", r"\1", value)
+    """Remove common C integer suffixes to make expressions Python-evaluable."""
+    return re.sub(r"\b(0[xX][0-9A-Fa-f]+|\d+)([uUlL]+)\b", r"\1", value)
 
 
 def _eval_int_expr(expr: str, names: Dict[str, int] | None = None) -> int:
     cleaned = _strip_suffixes(expr)
     tree = ast.parse(cleaned, mode="eval")
-    allowed = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.LShift, ast.RShift, ast.BitOr, ast.BitAnd, ast.BitXor, ast.USub, ast.UAdd, ast.Call, ast.Name, ast.Load)
+    allowed = (
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Constant,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.FloorDiv,
+        ast.Mod,
+        ast.Pow,
+        ast.LShift,
+        ast.RShift,
+        ast.BitOr,
+        ast.BitAnd,
+        ast.BitXor,
+        ast.USub,
+        ast.UAdd,
+        ast.Call,
+        ast.Name,
+        ast.Load,
+    )
     for node in ast.walk(tree):
         if not isinstance(node, allowed):
             raise ValueError(f"Disallowed expression in macro: {expr}")
@@ -58,11 +80,12 @@ def _eval_int_expr(expr: str, names: Dict[str, int] | None = None) -> int:
 def parse_macros(text: str) -> Dict[str, int]:
     macros: Dict[str, int] = {}
     raw_exprs: Dict[str, str] = {}
+    text = re.sub(r"\\\s*\n\s*", " ", text)
     for line in text.splitlines():
         if not line.lstrip().startswith("#define"):
             continue
         if re.match(r"^\s*#define\s+\w+\(", line):
-            continue  # Skip function-like macros (no space between name and '(' in C).
+            continue  # Skip function-like macros.
         match = re.match(r"^\s*#define\s+(\w+)\s+(.+)$", line)
         if not match:
             continue
@@ -205,7 +228,7 @@ def generate_layout(header_path: Path = HEADER_PATH, output_path: Path = OUTPUT_
     def emit_constants():
         keys = [
             "CANLOG_VERSION",
-            "CANLOG_ENTRY_MAX_DATA_LENGTH",
+            "CLB_ENTRY_MAX_DATA_LENGTH",
             "BLOCK_SIZE",
             "LOG_BUFFER_SIZE",
             "CAN_DLC_MASK",
@@ -226,6 +249,8 @@ def generate_layout(header_path: Path = HEADER_PATH, output_path: Path = OUTPUT_
         for key in keys:
             if key in macros:
                 output.append(f"{key} = {macros[key]}")
+        if "CANLOG_ENTRY_MAX_DATA_LENGTH" not in macros and "CLB_ENTRY_MAX_DATA_LENGTH" in macros:
+            output.append("CANLOG_ENTRY_MAX_DATA_LENGTH = CLB_ENTRY_MAX_DATA_LENGTH")
         output.append("")
 
     def emit_struct(name: str, label: str) -> None:
