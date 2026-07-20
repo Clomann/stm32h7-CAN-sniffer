@@ -46,17 +46,17 @@ To apply the same formatting to the code base, run this Docker command:
 ```sh
 docker run --rm -v "$PWD:/repo" -w /repo catthehacker/ubuntu:act-latest \
   bash -lc '
+    set -o pipefail &&
     sudo apt-get update >/dev/null &&
     sudo apt-get install -y clang-format-18 >/dev/null &&
-    find adapters app bootloader dev middleware platform tests \
-      -path "dev/scripts/env" -prune -o \
-      -path "*/_deps" -prune -o \
-      -path "*/build" -prune -o \
-      -path "*/CMakeFiles" -prune -o \
-      -type f \( -name "*.c" -o -name "*.h" \) -print \
-      | awk '"'"'NR==1{printf "%s",$0; next} {printf "\n%s",$0}'"'"' \
+    find . -type f \( -name "*.c" -o -name "*.h" \) -print \
+      | sed "s#^\./##" \
+      | grep -vFf tools/clang/format_exclude.txt \
+      | LC_ALL=C sort \
+      | awk '\''NR==1 { printf "%s", $0; next } { printf "\n%s", $0 }'\'' \
       > tools/clang/clang_files.txt &&
-    clang-format-18 -style=file -i --files=./tools/clang/clang_files.txt'
+    clang-format-18 -style=file -i --files=./tools/clang/clang_files.txt
+  '
 ```
 
 To pre-check the GitHub action locally, run:
