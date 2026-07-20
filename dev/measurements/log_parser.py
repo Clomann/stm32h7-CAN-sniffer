@@ -53,9 +53,12 @@ LEGACY_ENTRY_FIXED_SIZE = LEGACY_ENTRY_FIXED_STRUCT.size
 LEGACY_CLASSIC_MAX_LEN = 8
 LEGACY_FD_MAX_LEN = 64
 
-DEFAULT_TRACE = Path(__file__).with_name("CAN-TRACE-1_MBitPs_85_percent_1_byte_dlc.BIN")
 DEFAULT_LOG_DIR = Path(__file__).with_name("logs")
-DEFAULT_TRACE_OUT = DEFAULT_TRACE
+
+
+def default_trace_out_for_logs(logs_dir: Path) -> Path:
+    folder_name = logs_dir.name or logs_dir.resolve().name
+    return logs_dir.with_name(f"{folder_name}.BIN")
 
 
 @dataclass
@@ -292,7 +295,7 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
 
 
 def iter_can_blocks(
-    path: Path = DEFAULT_TRACE,
+    path: Path,
     abort_on_gap: bool = False,
     continue_on_gap: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
@@ -395,7 +398,7 @@ def iter_can_blocks(
 
 
 def iter_can_frames(
-    path: Path = DEFAULT_TRACE,
+    path: Path,
     abort_on_gap: bool = False,
     continue_on_gap: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
@@ -411,7 +414,7 @@ def iter_can_frames(
         yield from _iter_block_frames(block, block_index, abs_time_state, header_meta)
 
 
-def parse_can_trace(path: Path = DEFAULT_TRACE, abort_on_gap: bool = False) -> List[CanLogFrame]:
+def parse_can_trace(path: Path, abort_on_gap: bool = False) -> List[CanLogFrame]:
     """
     Return a list of all frames in the trace file.
 
@@ -494,7 +497,11 @@ class VectorAsciiWriter:
 
     def __init__(self, path: Path, use_relative_ts: bool):
         self.path = path
-        self.file = path.open("w", encoding="ascii", newline="\n", buffering=1 << 20)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.file = path.open("w", encoding="ascii", newline="\n", buffering=1 << 20)
+        except OSError as exc:
+            raise OSError(f"Cannot open ASC output file {path}: {exc}") from exc
         now = datetime.now()
         now_str = now.strftime("%a %b %d %H:%M:%S %Y")
         self.file.write(f"date {now_str}\n")
@@ -536,27 +543,52 @@ class VectorAsciiWriter:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Parse CAN-TRACE.BIN produced by the logger.")
+    parser = argparse.ArgumentParser(
+        description="Parse CAN logger trace files produced by the firmware.",
+        epilog=f"""argument notes:
+  TRACE_OR_LOG       Existing concatenated trace or one CAN.LOG* file to parse.
+  --build-trace      Create a trace from CAN.LOG* files, then exit.
+  --logs-dir DIR     Directory read by --build-trace.
+  --trace-out TRACE  File written by --build-trace.
+  --write-asc ASC    Vector ASCII output file.
+  --head/--tail N    Number of frames printed from the start/end.
+
+examples:
+  Parse a specific trace or CAN.LOG part:
+    python3 {Path(__file__).name} path/to/CAN-TRACE.BIN
+    python3 {Path(__file__).name} path/to/CAN.LOG0 --count-only
+
+  Build a concatenated trace from CAN.LOG* parts:
+    python3 {Path(__file__).name} --build-trace --logs-dir path/to/logs
+
+  Write Vector ASCII output:
+    python3 {Path(__file__).name} path/to/CAN-TRACE.BIN --write-asc out.asc --split-epochs
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "path",
         nargs="?",
         type=Path,
-        help=f"Path to CAN trace (default: {DEFAULT_TRACE.name})",
+        metavar="TRACE_OR_LOG",
+        help="Input file to parse: a concatenated CAN-TRACE.BIN or a single CAN.LOG* part.",
     )
     parser.add_argument(
         "--build-trace",
         action="store_true",
-        help=f"Concatenate CAN.LOG* files into {DEFAULT_TRACE_OUT.name} and exit.",
+        help="Concatenate CAN.LOG* files from --logs-dir into --trace-out, then exit.",
     )
     parser.add_argument(
         "--logs-dir",
         type=Path,
-        help=f"Directory containing CAN.LOG* parts (default: {DEFAULT_LOG_DIR})",
+        metavar="DIR",
+        help="Input directory containing CAN.LOG* parts for --build-trace (default: logs next to this script).",
     )
     parser.add_argument(
         "--trace-out",
         type=Path,
-        help=f"Output path when using --build-trace (default: {DEFAULT_TRACE_OUT})",
+        metavar="TRACE",
+        help="Output trace path when using --build-trace (default: <logs-dir-name>.BIN next to the logs directory).",
     )
     parser.add_argument(
         "--head",
@@ -583,7 +615,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--write-asc",
         type=Path,
-        help="Write frames to a Vector ASCII (.asc) file at the given path.",
+        metavar="ASC",
+        help="Output path for Vector ASCII (.asc) conversion.",
     )
     parser.add_argument(
         "--split-epochs",
@@ -617,9 +650,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         print("Enabling --continue-on-gap because --merge-scattered-epochs was requested.")
         args.continue_on_gap = True
 
-    trace_path = args.path or DEFAULT_TRACE
     logs_dir = args.logs_dir or DEFAULT_LOG_DIR
-    trace_out = args.trace_out or DEFAULT_TRACE_OUT
+    trace_out = args.trace_out or default_trace_out_for_logs(logs_dir)
 
     # If --write-asc names an existing directory, derive output file names inside it.
     asc_out_dir: Path | None = None
@@ -645,6 +677,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         count = concat_logs_to_trace(logs_dir, trace_out)
         print(f"Concatenated {count} log file(s) into {trace_out}")
         return
+
+    if args.path is None:
+        parser.error("TRACE_OR_LOG is required unless --build-trace is used.")
+
+    trace_path = args.path
 
     head = 0 if args.count_only else args.head
     tail = 0 if args.count_only else max(0, args.tail)
