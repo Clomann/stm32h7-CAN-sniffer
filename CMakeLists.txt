@@ -14,6 +14,8 @@ set(APP_VERSION "auto" CACHE STRING "Application version string exposed via HTTP
 set(FW_USE_PRINTF_FLOAT ON CACHE BOOL "Enable printf float formatting (requires FW_USE_MALLOC)")
 set(FW_USE_MALLOC ${FW_USE_PRINTF_FLOAT} CACHE BOOL "Enable newlib heap (malloc/free) via sysmem.c")
 set(FW_LINKER_TRACE OFF CACHE BOOL "Enable linker --trace output and symbol tracing")
+set(DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE "0U" CACHE STRING "Enable CAN frame ID sequence debug checking")
+set(DEBUG_CAN_ID_SEQUENCE_MAX_ID "0xFFU" CACHE STRING "Maximum CAN ID used by sequence debug checking")
 
 set(IS_APP_BUILD FALSE)
 set(IS_BOOTLOADER_BUILD FALSE)
@@ -155,6 +157,10 @@ message(STATUS "App version: ${APP_VERSION_RESOLVED}")
 
 string(REPLACE "\"" "\\\"" APP_VERSION_ESCAPED "${APP_VERSION_RESOLVED}")
 list(APPEND symbols_SYMB "APP_VERSION=\"${APP_VERSION_ESCAPED}\"")
+list(APPEND symbols_SYMB
+    "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE=${DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE}"
+    "DEBUG_CAN_ID_SEQUENCE_MAX_ID=${DEBUG_CAN_ID_SEQUENCE_MAX_ID}"
+)
 
 # push flags to all targets
 add_compile_options(${CPU_PARAMETERS})

@@ -70,6 +70,17 @@
             }
         },
         {
+            "name": "Release_CM7_Test",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CORE": "CM7",
+                "DUAL_CORE": "true",
+                "MCUBOOT_ENABLE_ENCRYPTION": "ON",
+                "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE": "1U"
+            }
+        },
+        {
             "name": "Release_CM7_Boot",
             "inherits": "default",
             "cacheVariables": {
