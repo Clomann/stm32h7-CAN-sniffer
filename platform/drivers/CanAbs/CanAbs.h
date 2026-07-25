@@ -2,6 +2,7 @@
 
 #include "stm32h7xx_hal.h"
 #include "CommManager.h"
+#include "fdcan.h"
 
 #define CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ 1
 
@@ -14,6 +15,7 @@ comm_status_t CanAbs_SetBaudrate_Can1(uint32_t baudrate);
 comm_status_t CanAbs_SetMode_Can1(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can1(bool *isOff);
 uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames);
+uint8_t CanAbs_GetStaticTxReplayStats_Can1(FdcanStaticTxReplayStatsType *stats);
 
 comm_status_t CanAbs_Init_Can2(uint32_t baudrate);
 comm_status_t CanAbs_Send_Can2(FDCAN_Message *msg);
@@ -24,6 +26,7 @@ comm_status_t CanAbs_SetBaudrate_Can2(uint32_t baudrate);
 comm_status_t CanAbs_SetMode_Can2(uint32_t mode);
 comm_status_t CanAbs_IsStateOff_Can2(bool *isOff);
 uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames);
+uint8_t CanAbs_GetStaticTxReplayStats_Can2(FdcanStaticTxReplayStatsType *stats);
 
 uint32_t CanAbs_GetRxBufferCapacity(void);
 

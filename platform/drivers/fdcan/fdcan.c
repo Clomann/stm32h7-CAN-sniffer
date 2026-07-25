@@ -11,6 +11,7 @@
 #include "nvic_irg_config.h"
 #include "stm32h7xx_hal_fdcan.h"
 #include "stm32h7xx_hal_rcc_ex.h"
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -23,6 +24,15 @@ typedef struct
     FDCAN_HandleTypeDef hfdcan;
     FDCAN_RxHeaderTypeDef rxheader;
     uint64_t mostRecentInterrupTimestamp;
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    uint32_t staticReplayBufferMask;
+    uint32_t staticReplayPendingBatchMask;
+    uint32_t staticReplayRequests;
+    uint32_t staticReplayCompleted;
+    uint32_t staticReplayIrqs;
+    uint8_t staticReplayPrepared;
+    uint8_t staticReplayActive;
+#endif
 } FdcanInstanceType;
 
 static FdcanInstanceType fdcan_hfdcan[FDCAN_MAX_INSTANCES] = {
@@ -92,6 +102,162 @@ comm_status_t get_fdcan_config(FdcanInstanceType *, FDCAN_FilterTypeDef *);
 
 comm_status_t
 fdcan_init_tx_header(const void *, FDCAN_TxHeaderTypeDef *, uint32_t);
+
+#if CAN_STATIC_TX_REPLAY_ENABLE
+static uint32_t fdcan_static_replay_buffer_mask(uint32_t buffer_count)
+{
+    if (buffer_count >= 32U)
+    {
+        return 0xFFFFFFFFU;
+    }
+
+    return (1UL << buffer_count) - 1UL;
+}
+
+static uint32_t fdcan_static_replay_batch_complete_mask(uint32_t buffer_count)
+{
+    if (0U == buffer_count)
+    {
+        return 0U;
+    }
+
+    return 1UL << (buffer_count - 1U);
+}
+
+static uint32_t fdcan_static_replay_base_id(FDCAN_GlobalTypeDef *fdcan)
+{
+    if (FDCAN_2 == fdcan)
+    {
+        return CAN_STATIC_TX_REPLAY_CAN2_BASE_ID;
+    }
+
+    return CAN_STATIC_TX_REPLAY_CAN1_BASE_ID;
+}
+
+static uint32_t fdcan_static_replay_channel_bit(FDCAN_GlobalTypeDef *fdcan)
+{
+    if (FDCAN_2 == fdcan)
+    {
+        return 0x2U;
+    }
+
+    return 0x1U;
+}
+
+static bool fdcan_static_replay_channel_enabled(FDCAN_GlobalTypeDef *fdcan)
+{
+    return (
+        (CAN_STATIC_TX_REPLAY_CHANNEL_MASK
+         & fdcan_static_replay_channel_bit(fdcan))
+        != 0U
+    );
+}
+
+static comm_status_t fdcan_static_replay_prepare_instance(
+    FdcanInstanceType *instance,
+    uint32_t base_id,
+    uint32_t id_count
+)
+{
+    FDCAN_TxHeaderTypeDef tx_header;
+    uint8_t tx_data[8] = {0U};
+    uint32_t buffer_count;
+    uint32_t id_range;
+
+    if (NULL == instance)
+    {
+        return COMM_NULL_POINTER;
+    }
+
+    buffer_count = CAN_STATIC_TX_REPLAY_TX_BUFFERS;
+    if (buffer_count == 0U)
+    {
+        return COMM_INVALID_PARAMETER;
+    }
+
+    id_range = (id_count == 0U) ? 1U : id_count;
+    if (id_range > 0x800U)
+    {
+        return COMM_INVALID_PARAMETER;
+    }
+
+    instance->staticReplayPrepared         = 0U;
+    instance->staticReplayActive           = 0U;
+    instance->staticReplayPendingBatchMask = 0U;
+    instance->staticReplayBufferMask =
+        fdcan_static_replay_buffer_mask(buffer_count);
+
+    memset(&tx_header, 0, sizeof(tx_header));
+    tx_header.IdType              = FDCAN_STANDARD_ID;
+    tx_header.TxFrameType         = FDCAN_DATA_FRAME;
+    tx_header.DataLength          = FDCAN_DLC_BYTES_0;
+    tx_header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+    tx_header.BitRateSwitch       = FDCAN_BRS_OFF;
+    tx_header.FDFormat            = FDCAN_CLASSIC_CAN;
+    tx_header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;
+
+    for (uint32_t i = 0U; i < buffer_count; i++)
+    {
+        tx_header.Identifier    = (base_id + (i % id_range)) & 0x7FFU;
+        tx_header.MessageMarker = i & 0xFFU;
+
+        if (HAL_OK
+            != HAL_FDCAN_AddMessageToTxBuffer(
+                &instance->hfdcan,
+                &tx_header,
+                tx_data,
+                (1UL << i)
+            ))
+        {
+            return COMM_ERROR;
+        }
+    }
+
+    instance->staticReplayPrepared = 1U;
+
+    return COMM_SUCCESS;
+}
+
+static comm_status_t
+fdcan_static_replay_prepare_default(FdcanInstanceType *instance)
+{
+    if (!fdcan_static_replay_channel_enabled(instance->fdcan))
+    {
+        instance->staticReplayBufferMask       = 0U;
+        instance->staticReplayPendingBatchMask = 0U;
+        instance->staticReplayPrepared         = 1U;
+        instance->staticReplayActive           = 0U;
+        return COMM_SUCCESS;
+    }
+
+    return fdcan_static_replay_prepare_instance(
+        instance,
+        fdcan_static_replay_base_id(instance->fdcan),
+        CAN_STATIC_TX_REPLAY_ID_COUNT
+    );
+}
+
+static void
+fdcan_static_replay_rearm(FdcanInstanceType *instance, uint32_t mask)
+{
+    uint32_t request_mask;
+
+    if ((NULL == instance) || (0U == instance->staticReplayActive)
+        || (0U == instance->staticReplayPrepared))
+    {
+        return;
+    }
+
+    request_mask = mask & instance->staticReplayBufferMask;
+    if (0U == request_mask)
+    {
+        return;
+    }
+
+    instance->hfdcan.Instance->TXBAR = request_mask;
+    instance->staticReplayRequests += __builtin_popcount(request_mask);
+}
+#endif
 
 comm_status_t FDCAN_GetMostRecentTimestamp(CommDriver *dev, uint64_t *timestamp)
 {
@@ -211,6 +377,14 @@ comm_status_t FDCAN_Init(CommDriver *dev)
         /* Initialization Error */
         RetVal = COMM_ERROR;
     }
+
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    if (COMM_SUCCESS == RetVal
+        && COMM_SUCCESS != fdcan_static_replay_prepare_default(instance))
+    {
+        RetVal = COMM_ERROR;
+    }
+#endif
 
     if (0 != instance->hfdcan.ErrorCode)
     {
@@ -342,6 +516,11 @@ comm_status_t FDCAN_DeInit(CommDriver *dev)
 
 comm_status_t FDCAN_Send(CommDriver *dev, const void *pMsg)
 {
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    (void)dev;
+    (void)pMsg;
+    return COMM_INVALID_STATE;
+#else
     comm_status_t RetVal;
     uint8_t *pData;
     FDCAN_Message *pMsgCpy;
@@ -375,6 +554,7 @@ comm_status_t FDCAN_Send(CommDriver *dev, const void *pMsg)
     }
 
     return RetVal;
+#endif
 }
 
 comm_status_t
@@ -542,6 +722,150 @@ uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev)
     return ((FdcanInstanceType *)dev->instance)->mostRecentInterrupTimestamp;
 }
 
+#if CAN_STATIC_TX_REPLAY_ENABLE
+comm_status_t FDCAN_StaticTxReplayPrepare(
+    CommDriver *dev,
+    uint32_t base_id,
+    uint32_t id_count
+)
+{
+    FdcanInstanceType *instance;
+
+    if ((NULL == dev) || (NULL == dev->instance))
+    {
+        return COMM_NULL_POINTER;
+    }
+
+    instance = (FdcanInstanceType *)dev->instance;
+    if (!fdcan_static_replay_channel_enabled(instance->hfdcan.Instance))
+    {
+        instance->staticReplayBufferMask       = 0U;
+        instance->staticReplayPendingBatchMask = 0U;
+        instance->staticReplayPrepared         = 1U;
+        instance->staticReplayActive           = 0U;
+        return COMM_SUCCESS;
+    }
+
+    return fdcan_static_replay_prepare_instance(instance, base_id, id_count);
+}
+
+comm_status_t FDCAN_StaticTxReplayStart(CommDriver *dev)
+{
+    FdcanInstanceType *instance;
+
+    if ((NULL == dev) || (NULL == dev->instance))
+    {
+        return COMM_NULL_POINTER;
+    }
+
+    instance = (FdcanInstanceType *)dev->instance;
+    if (!fdcan_static_replay_channel_enabled(instance->hfdcan.Instance))
+    {
+        instance->staticReplayActive = 0U;
+        return COMM_SUCCESS;
+    }
+
+    if (0U == instance->staticReplayPrepared)
+    {
+        return COMM_INVALID_STATE;
+    }
+
+    instance->staticReplayActive = 1U;
+    instance->staticReplayPendingBatchMask =
+        fdcan_static_replay_batch_complete_mask(CAN_STATIC_TX_REPLAY_TX_BUFFERS
+        );
+    fdcan_static_replay_rearm(instance, instance->staticReplayBufferMask);
+
+    return COMM_SUCCESS;
+}
+
+comm_status_t FDCAN_StaticTxReplayStop(CommDriver *dev)
+{
+    FdcanInstanceType *instance;
+
+    if ((NULL == dev) || (NULL == dev->instance))
+    {
+        return COMM_NULL_POINTER;
+    }
+
+    instance                               = (FdcanInstanceType *)dev->instance;
+    instance->staticReplayActive           = 0U;
+    instance->staticReplayPendingBatchMask = 0U;
+
+    if (!fdcan_static_replay_channel_enabled(instance->hfdcan.Instance))
+    {
+        return COMM_SUCCESS;
+    }
+
+    if (HAL_OK
+        != HAL_FDCAN_DeactivateNotification(
+            &instance->hfdcan,
+            FDCAN_IT_TX_COMPLETE
+        ))
+    {
+        return COMM_ERROR;
+    }
+
+    __HAL_FDCAN_CLEAR_IT(&instance->hfdcan, FDCAN_IT_TX_COMPLETE);
+
+    return COMM_SUCCESS;
+}
+
+comm_status_t FDCAN_StaticTxReplayGetStats(
+    CommDriver *dev,
+    FdcanStaticTxReplayStatsType *stats
+)
+{
+    FdcanInstanceType *instance;
+
+    if ((NULL == dev) || (NULL == dev->instance) || (NULL == stats))
+    {
+        return COMM_NULL_POINTER;
+    }
+
+    instance         = (FdcanInstanceType *)dev->instance;
+    stats->requests  = instance->staticReplayRequests;
+    stats->completed = instance->staticReplayCompleted;
+    stats->irqs      = instance->staticReplayIrqs;
+
+    return COMM_SUCCESS;
+}
+
+void FDCAN_StaticTxReplayIrqHandler(FDCAN_GlobalTypeDef *fdcan)
+{
+    FdcanInstanceType *instance;
+    uint32_t completed;
+
+    if (COMM_SUCCESS != fdcan_get_handle(fdcan, &instance))
+    {
+        FDCAN_ErrorHandler();
+        return;
+    }
+
+    if (!fdcan_static_replay_channel_enabled(instance->hfdcan.Instance))
+    {
+        return;
+    }
+
+    completed = instance->hfdcan.Instance->TXBTO;
+    completed &= instance->staticReplayPendingBatchMask;
+
+    __HAL_FDCAN_CLEAR_FLAG(&instance->hfdcan, FDCAN_FLAG_TX_COMPLETE);
+
+    if (0U != completed)
+    {
+        instance->staticReplayIrqs++;
+        instance->staticReplayCompleted +=
+            __builtin_popcount(instance->staticReplayBufferMask);
+        instance->staticReplayPendingBatchMask =
+            fdcan_static_replay_batch_complete_mask(
+                CAN_STATIC_TX_REPLAY_TX_BUFFERS
+            );
+        fdcan_static_replay_rearm(instance, instance->staticReplayBufferMask);
+    }
+}
+#endif
+
 void FDCAN_1_IRQHandler(void)
 {
     FdcanInstanceType *instance;
@@ -568,6 +892,18 @@ void FDCAN_2_IRQHandler(void)
     instance->mostRecentInterrupTimestamp = SampleTime();
     HAL_FDCAN_IRQHandler(&instance->hfdcan);
 }
+
+#if CAN_STATIC_TX_REPLAY_ENABLE
+void FDCAN_1_TX_IRQHandler(void)
+{
+    FDCAN_StaticTxReplayIrqHandler(FDCAN_1);
+}
+
+void FDCAN_2_TX_IRQHandler(void)
+{
+    FDCAN_StaticTxReplayIrqHandler(FDCAN_2);
+}
+#endif
 
 /* IOCTL/ driver specific functions */
 
@@ -637,6 +973,14 @@ static comm_status_t FDCAN_SetBaudrate(CommDriver *dev, uint32_t baudrate)
             /* Initialization Error */
             res = COMM_ERROR;
         }
+
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        if (COMM_SUCCESS == res
+            && COMM_SUCCESS != fdcan_static_replay_prepare_default(instance))
+        {
+            res = COMM_ERROR;
+        }
+#endif
     }
 
     return res;
@@ -652,11 +996,19 @@ static comm_status_t FDCAN_SetMode(CommDriver *dev, uint32_t mode)
     switch (mode)
     {
     case FDCAN_MODE_1:
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        instance->hfdcan.Init.Mode = CAN_STATIC_TX_REPLAY_FDCAN_MODE;
+#else
         instance->hfdcan.Init.Mode = FDCAN_MODE_NORMAL;
-        res                        = COMM_SUCCESS;
+#endif
+        res = COMM_SUCCESS;
         break;
     case FDCAN_MODE_2:
         instance->hfdcan.Init.Mode = FDCAN_MODE_BUS_MONITORING;
+        res                        = COMM_SUCCESS;
+        break;
+    case FDCAN_MODE_4:
+        instance->hfdcan.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
         res                        = COMM_SUCCESS;
         break;
     default:
@@ -671,6 +1023,14 @@ static comm_status_t FDCAN_SetMode(CommDriver *dev, uint32_t mode)
             /* Initialization Error */
             res = COMM_ERROR;
         }
+
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        if (COMM_SUCCESS == res
+            && COMM_SUCCESS != fdcan_static_replay_prepare_default(instance))
+        {
+            res = COMM_ERROR;
+        }
+#endif
     }
 
     return res;
@@ -702,6 +1062,61 @@ comm_status_t FDCAN_Ioctl(CommDriver *dev, int cmd, void *argument)
             res = COMM_ERROR;
             FDCAN_ErrorHandler();
         }
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        else if (!fdcan_static_replay_channel_enabled(instance->hfdcan.Instance
+                 ))
+        {
+            if (HAL_OK
+                != HAL_FDCAN_ActivateNotification(
+                    &instance->hfdcan,
+                    FDCAN_IRQ_NOTIFICATION,
+                    0
+                ))
+            {
+                res = COMM_ERROR;
+                FDCAN_ErrorHandler();
+            }
+        }
+        else if (0U == instance->staticReplayPrepared)
+        {
+            res = COMM_INVALID_STATE;
+            FDCAN_ErrorHandler();
+        }
+        else if (HAL_OK
+                 != HAL_FDCAN_ConfigInterruptLines(
+                     &instance->hfdcan,
+                     FDCAN_IT_TX_COMPLETE,
+                     FDCAN_INTERRUPT_LINE1
+                 ))
+        {
+            res = COMM_ERROR;
+            FDCAN_ErrorHandler();
+        }
+        else if (HAL_OK
+                 != HAL_FDCAN_ActivateNotification(
+                     &instance->hfdcan,
+                     FDCAN_IRQ_NOTIFICATION | FDCAN_IT_TX_COMPLETE,
+                     fdcan_static_replay_batch_complete_mask(
+                         CAN_STATIC_TX_REPLAY_TX_BUFFERS
+                     )
+                 ))
+        {
+            res = COMM_ERROR;
+            FDCAN_ErrorHandler();
+        }
+        else
+        {
+            instance->staticReplayActive = 1U;
+            instance->staticReplayPendingBatchMask =
+                fdcan_static_replay_batch_complete_mask(
+                    CAN_STATIC_TX_REPLAY_TX_BUFFERS
+                );
+            fdcan_static_replay_rearm(
+                instance,
+                instance->staticReplayBufferMask
+            );
+        }
+#else
         else if (HAL_OK
                  == HAL_FDCAN_AbortTxRequest(
                      &instance->hfdcan,
@@ -714,6 +1129,7 @@ comm_status_t FDCAN_Ioctl(CommDriver *dev, int cmd, void *argument)
                 0
             );
         }
+#endif
 
         if (COMM_SUCCESS == res)
         {
@@ -729,6 +1145,13 @@ comm_status_t FDCAN_Ioctl(CommDriver *dev, int cmd, void *argument)
         {
             /* nothing to do */
         }
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        else if (COMM_SUCCESS != FDCAN_StaticTxReplayStop(dev))
+        {
+            res = COMM_ERROR;
+            FDCAN_ErrorHandler();
+        }
+#endif
         else if ((HAL_FDCAN_DeactivateNotification(
                       &instance->hfdcan,
                       FDCAN_IRQ_NOTIFICATION
@@ -747,7 +1170,11 @@ comm_status_t FDCAN_Ioctl(CommDriver *dev, int cmd, void *argument)
         }
         else if ((HalRes = HAL_FDCAN_AbortTxRequest(
                       &instance->hfdcan,
+#if CAN_STATIC_TX_REPLAY_ENABLE
+                      instance->staticReplayBufferMask
+#else
                       FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2
+#endif
                   ))
                  != HAL_OK)
         {
@@ -905,11 +1332,27 @@ HAL_StatusTypeDef FDCAN_Nvic(FDCAN_GlobalTypeDef *fdcan)
     {
         HAL_NVIC_SetPriority(FDCAN_1_IRQn, FDCAN_IRQ_PREEMPT_PRIO, 1);
         HAL_NVIC_EnableIRQ(FDCAN_1_IRQn);
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        HAL_NVIC_SetPriority(
+            FDCAN_1_TX_IRQn,
+            FDCAN_TX_REPLAY_IRQ_PREEMPT_PRIO,
+            1
+        );
+        HAL_NVIC_EnableIRQ(FDCAN_1_TX_IRQn);
+#endif
     }
     else if (FDCAN_2 == fdcan)
     {
         HAL_NVIC_SetPriority(FDCAN_2_IRQn, FDCAN_IRQ_PREEMPT_PRIO, 1);
         HAL_NVIC_EnableIRQ(FDCAN_2_IRQn);
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        HAL_NVIC_SetPriority(
+            FDCAN_2_TX_IRQn,
+            FDCAN_TX_REPLAY_IRQ_PREEMPT_PRIO,
+            1
+        );
+        HAL_NVIC_EnableIRQ(FDCAN_2_TX_IRQn);
+#endif
     }
     else
     {
@@ -973,12 +1416,18 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef *hfdcan)
 
         /*##-3- Disable the NVIC for FDCANx ########################################*/
         HAL_NVIC_DisableIRQ(FDCAN_1_IRQn);
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        HAL_NVIC_DisableIRQ(FDCAN_1_TX_IRQn);
+#endif
     }
     else if (FDCAN_2 == hfdcan->Instance)
     {
         HAL_GPIO_DeInit(FDCAN_2_TX_GPIO_PORT, FDCAN_2_TX_PIN);
         HAL_GPIO_DeInit(FDCAN_2_RX_GPIO_PORT, FDCAN_2_RX_PIN);
         HAL_NVIC_DisableIRQ(FDCAN_2_IRQn);
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        HAL_NVIC_DisableIRQ(FDCAN_2_TX_IRQn);
+#endif
     }
     else
     {
@@ -1098,9 +1547,13 @@ comm_status_t get_fdcan_config(
 
         sample point at 75 %
     */
-    instance->hfdcan.Instance                = instance->fdcan;
-    instance->hfdcan.Init.FrameFormat        = FDCAN_FRAME_CLASSIC;
-    instance->hfdcan.Init.Mode               = FDCAN_MODE_DEFAULT;
+    instance->hfdcan.Instance         = instance->fdcan;
+    instance->hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    instance->hfdcan.Init.Mode = CAN_STATIC_TX_REPLAY_FDCAN_MODE;
+#else
+    instance->hfdcan.Init.Mode = FDCAN_MODE_DEFAULT;
+#endif
     instance->hfdcan.Init.AutoRetransmission = ENABLE;
     instance->hfdcan.Init.TransmitPause      = DISABLE;
     instance->hfdcan.Init.ProtocolException  = ENABLE;
@@ -1111,17 +1564,30 @@ comm_status_t get_fdcan_config(
         34U; /* NominalTimeSeg1 = Propagation_segment + Phase_segment_1 */
     instance->hfdcan.Init.NominalTimeSeg2 = 5U;
     ram_usage(instance->fdcan, &instance->hfdcan.Init.MessageRAMOffset);
-    instance->hfdcan.Init.StdFiltersNbr       = 1;
-    instance->hfdcan.Init.ExtFiltersNbr       = 0;
-    instance->hfdcan.Init.RxFifo0ElmtsNbr     = FDCAN_RAM_RX_ELEMENTS;
-    instance->hfdcan.Init.RxFifo0ElmtSize     = FDCAN_DATA_BYTES_8;
-    instance->hfdcan.Init.RxFifo1ElmtsNbr     = 0;
-    instance->hfdcan.Init.RxBuffersNbr        = 0;
-    instance->hfdcan.Init.TxEventsNbr         = 0;
+    instance->hfdcan.Init.StdFiltersNbr   = 1;
+    instance->hfdcan.Init.ExtFiltersNbr   = 0;
+    instance->hfdcan.Init.RxFifo0ElmtsNbr = FDCAN_RAM_RX_ELEMENTS;
+    instance->hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
+    instance->hfdcan.Init.RxFifo1ElmtsNbr = 0;
+    instance->hfdcan.Init.RxBuffersNbr    = 0;
+    instance->hfdcan.Init.TxEventsNbr     = 0;
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    if (fdcan_static_replay_channel_enabled(instance->fdcan))
+    {
+        instance->hfdcan.Init.TxBuffersNbr = CAN_STATIC_TX_REPLAY_TX_BUFFERS;
+        instance->hfdcan.Init.TxFifoQueueElmtsNbr = 0;
+    }
+    else
+    {
+        instance->hfdcan.Init.TxBuffersNbr        = 0;
+        instance->hfdcan.Init.TxFifoQueueElmtsNbr = FDCAN_RAM_TX_ELEMENTS;
+    }
+#else
     instance->hfdcan.Init.TxBuffersNbr        = 0;
     instance->hfdcan.Init.TxFifoQueueElmtsNbr = FDCAN_RAM_TX_ELEMENTS;
-    instance->hfdcan.Init.TxFifoQueueMode     = FDCAN_TX_FIFO_OPERATION;
-    instance->hfdcan.Init.TxElmtSize          = FDCAN_DATA_BYTES_8;
+#endif
+    instance->hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+    instance->hfdcan.Init.TxElmtSize      = FDCAN_DATA_BYTES_8;
 
     pFilterConfig->IdType       = FDCAN_STANDARD_ID;
     pFilterConfig->FilterIndex  = 0;

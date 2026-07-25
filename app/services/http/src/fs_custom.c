@@ -42,7 +42,7 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
-#define CANLOG_MAX_STATUS_SIZE    320U
+#define CANLOG_MAX_STATUS_SIZE    768U
 #define CANLOG_MAX_CONFIG_SIZE    96U
 #define IAP_STATUS_MAX_SIZE       640U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
@@ -72,7 +72,10 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
     "2f,\"rb1_bytes_highwater_pct\":%.2f,\"can1_rx_highwater_pct\":%.2f,"      \
     "\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f,"    \
     "\"sd_write_max_us\":%lu,\"sd_sync_max_us\":%lu,\"sd_store_block_max_"     \
-    "us\":%lu}"
+    "us\":"                                                                    \
+    "%lu,\"can1_tx_replay_requests\":%lu,\"can1_tx_replay_completed\":%lu,"    \
+    "\"can1_tx_replay_irqs\":%lu,\"can2_tx_replay_requests\":%lu,"             \
+    "\"can2_tx_replay_completed\":%lu,\"can2_tx_replay_irqs\":%lu}"
 
 #define CANLOG_CONFIG_STRING                                                   \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
@@ -256,6 +259,12 @@ int fs_open_custom(struct fs_file *file, const char *name)
         uint32_t SdWriteMaxUs          = 0U;
         uint32_t SdSyncMaxUs           = 0U;
         uint32_t SdStoreBlockMaxUs     = 0U;
+        uint32_t Can1TxReplayRequests  = 0U;
+        uint32_t Can1TxReplayCompleted = 0U;
+        uint32_t Can1TxReplayIrqs      = 0U;
+        uint32_t Can2TxReplayRequests  = 0U;
+        uint32_t Can2TxReplayCompleted = 0U;
+        uint32_t Can2TxReplayIrqs      = 0U;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
@@ -305,6 +314,28 @@ int fs_open_custom(struct fs_file *file, const char *name)
             SdSyncMaxUs       = 0U;
             SdStoreBlockMaxUs = 0U;
         }
+        if (0U
+            != FsCustom_GetStaticTxReplayStatsCan1(
+                &Can1TxReplayRequests,
+                &Can1TxReplayCompleted,
+                &Can1TxReplayIrqs
+            ))
+        {
+            Can1TxReplayRequests  = 0U;
+            Can1TxReplayCompleted = 0U;
+            Can1TxReplayIrqs      = 0U;
+        }
+        if (0U
+            != FsCustom_GetStaticTxReplayStatsCan2(
+                &Can2TxReplayRequests,
+                &Can2TxReplayCompleted,
+                &Can2TxReplayIrqs
+            ))
+        {
+            Can2TxReplayRequests  = 0U;
+            Can2TxReplayCompleted = 0U;
+            Can2TxReplayIrqs      = 0U;
+        }
         FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
         FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
 
@@ -343,7 +374,13 @@ int fs_open_custom(struct fs_file *file, const char *name)
             FdcanMsgPortHighWaterPct,
             (unsigned long)SdWriteMaxUs,
             (unsigned long)SdSyncMaxUs,
-            (unsigned long)SdStoreBlockMaxUs
+            (unsigned long)SdStoreBlockMaxUs,
+            (unsigned long)Can1TxReplayRequests,
+            (unsigned long)Can1TxReplayCompleted,
+            (unsigned long)Can1TxReplayIrqs,
+            (unsigned long)Can2TxReplayRequests,
+            (unsigned long)Can2TxReplayCompleted,
+            (unsigned long)Can2TxReplayIrqs
         );
 
         if (n < 0 || (size_t)n >= sizeof(StatusData))

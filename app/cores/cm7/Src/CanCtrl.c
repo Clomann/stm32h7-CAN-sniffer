@@ -78,6 +78,9 @@ void appFdcanInit(CanCtrlDataType *data)
 
 void appFdcanPoll(_Bool sendingActive)
 {
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    (void)sendingActive;
+#else
     volatile uint8_t res;
 
     if (sendingActive)
@@ -106,6 +109,7 @@ void appFdcanPoll(_Bool sendingActive)
             CANCONTROL_ErrorHandlerHook();
         }
     }
+#endif
 }
 
 void appCanCtrlSetBaudrate(CanCtrlDataType *data)
@@ -123,12 +127,33 @@ void appCanCtrlSetBaudrate(CanCtrlDataType *data)
 
 void appCanCtrlSetMode(CanCtrlDataType *data)
 {
-    if (COMM_SUCCESS != CanAbs_SetMode_Can1(data->can1.mode))
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    FdcanModeType can1_mode;
+    FdcanModeType can2_mode;
+
+    if (FDCAN_MODE_EXTERNAL_LOOPBACK == CAN_STATIC_TX_REPLAY_FDCAN_MODE)
+    {
+        can1_mode = FDCAN_MODE_4;
+        can2_mode = FDCAN_MODE_4;
+    }
+    else
+    {
+        can1_mode = FDCAN_MODE_1;
+        can2_mode = FDCAN_MODE_1;
+    }
+
+    (void)data;
+#else
+    FdcanModeType can1_mode = data->can1.mode;
+    FdcanModeType can2_mode = data->can2.mode;
+#endif
+
+    if (COMM_SUCCESS != CanAbs_SetMode_Can1(can1_mode))
     {
         CANCONTROL_ErrorHandlerHook();
     }
 
-    if (COMM_SUCCESS != CanAbs_SetMode_Can2(data->can2.mode))
+    if (COMM_SUCCESS != CanAbs_SetMode_Can2(can2_mode))
     {
         CANCONTROL_ErrorHandlerHook();
     }

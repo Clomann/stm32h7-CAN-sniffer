@@ -11,6 +11,16 @@ uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes);
 uint8_t FsCustom_GetCanAbsRxHighWaterCan1(uint32_t *frames);
 uint8_t FsCustom_GetCanAbsRxHighWaterCan2(uint32_t *frames);
 uint8_t FsCustom_GetCanAbsRxCapacity(uint32_t *frames);
+uint8_t FsCustom_GetStaticTxReplayStatsCan1(
+    uint32_t *requests,
+    uint32_t *completed,
+    uint32_t *irqs
+);
+uint8_t FsCustom_GetStaticTxReplayStatsCan2(
+    uint32_t *requests,
+    uint32_t *completed,
+    uint32_t *irqs
+);
 uint8_t FsCustom_GetFdcanMsgPortHighWater(uint32_t *bytes);
 uint8_t FsCustom_GetFdcanMsgPortCapacity(uint32_t *bytes);
 uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count);

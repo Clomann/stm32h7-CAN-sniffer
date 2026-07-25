@@ -42,6 +42,7 @@ typedef uint32_t FdcanBaudrateType;
 #define FDCAN_MODE_1 1U /*<! normal */
 #define FDCAN_MODE_2 2U /*<! listen only */
 #define FDCAN_MODE_3 3U /*<! off */
+#define FDCAN_MODE_4 4U /*<! external loopback */
 typedef uint32_t FdcanModeType;
 
 #define FDCAN_STATUS_OK 0U
@@ -87,6 +88,13 @@ typedef struct
     FdcanDataType data;
 } FdcanDeviceType;
 
+typedef struct
+{
+    uint32_t requests;
+    uint32_t completed;
+    uint32_t irqs;
+} FdcanStaticTxReplayStatsType;
+
 extern const CommInterface FDCAN_Interface;
 
 /**
@@ -117,6 +125,21 @@ comm_status_t FDCAN_Read(CommDriver *dev, void *, uint8_t, uint32_t);
 comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan);
 
 uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev);
+
+#if CAN_STATIC_TX_REPLAY_ENABLE
+comm_status_t FDCAN_StaticTxReplayPrepare(
+    CommDriver *dev,
+    uint32_t base_id,
+    uint32_t id_count
+);
+comm_status_t FDCAN_StaticTxReplayStart(CommDriver *dev);
+comm_status_t FDCAN_StaticTxReplayStop(CommDriver *dev);
+comm_status_t FDCAN_StaticTxReplayGetStats(
+    CommDriver *dev,
+    FdcanStaticTxReplayStatsType *stats
+);
+void FDCAN_StaticTxReplayIrqHandler(FDCAN_GlobalTypeDef *fdcan);
+#endif
 
 /* shims needed to be implemented by the caller */
 void FDCAN_ErrorHandler(void);

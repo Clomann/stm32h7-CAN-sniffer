@@ -750,6 +750,23 @@ uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames)
     return 0U;
 }
 
+uint8_t CanAbs_GetStaticTxReplayStats_Can1(FdcanStaticTxReplayStatsType *stats)
+{
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    return (uint8_t)FDCAN_StaticTxReplayGetStats(&Fdcan1Driver, stats);
+#else
+    if (stats == NULL)
+    {
+        return 1U;
+    }
+
+    stats->requests  = 0U;
+    stats->completed = 0U;
+    stats->irqs      = 0U;
+    return 0U;
+#endif
+}
+
 uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
 {
     if (frames == NULL)
@@ -759,6 +776,23 @@ uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
 
     *frames = CanAbs_Can2_RxHighWater;
     return 0U;
+}
+
+uint8_t CanAbs_GetStaticTxReplayStats_Can2(FdcanStaticTxReplayStatsType *stats)
+{
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    return (uint8_t)FDCAN_StaticTxReplayGetStats(&Fdcan2Driver, stats);
+#else
+    if (stats == NULL)
+    {
+        return 1U;
+    }
+
+    stats->requests  = 0U;
+    stats->completed = 0U;
+    stats->irqs      = 0U;
+    return 0U;
+#endif
 }
 
 uint32_t CanAbs_GetRxBufferCapacity(void)

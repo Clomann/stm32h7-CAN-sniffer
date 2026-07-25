@@ -33,13 +33,75 @@
 
 #ifndef DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
 /* Integration-test aid for generated CAN traffic.
- * Contract: each channel emits a strictly increasing CAN ID stream modulo the
- * configured maximum ID. Repeated IDs are treated as sequence errors. */
+ * Static replay builds check one complete ID set per replay batch. */
 #define DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE 0U
 #endif
 
 #ifndef DEBUG_CAN_ID_SEQUENCE_MAX_ID
 #define DEBUG_CAN_ID_SEQUENCE_MAX_ID 0xFFU
+#endif
+
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE && CAN_STATIC_TX_REPLAY_ENABLE           \
+    && (CAN_STATIC_TX_REPLAY_ID_COUNT < CAN_STATIC_TX_REPLAY_TX_BUFFERS)
+#error                                                                         \
+    "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE requires one unique static replay ID per Tx buffer"
+#endif
+
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE && CAN_STATIC_TX_REPLAY_ENABLE
+typedef struct
+{
+    uint32_t base_id;
+    uint32_t expected_mask;
+    uint32_t seen_mask;
+} CanLogStaticReplayIdCheckType;
+
+static uint32_t CanLogManager_StaticReplayExpectedMask(void)
+{
+#if CAN_STATIC_TX_REPLAY_TX_BUFFERS >= 32U
+    return 0xFFFFFFFFU;
+#else
+    return (1UL << CAN_STATIC_TX_REPLAY_TX_BUFFERS) - 1UL;
+#endif
+}
+
+static void CanLogManager_StaticReplayIdCheckInit(
+    CanLogStaticReplayIdCheckType *check,
+    uint32_t base_id
+)
+{
+    check->base_id       = base_id & 0x7FFU;
+    check->expected_mask = CanLogManager_StaticReplayExpectedMask();
+    check->seen_mask     = 0U;
+}
+
+static bool CanLogManager_StaticReplayIdCheck(
+    CanLogStaticReplayIdCheckType *check,
+    uint32_t can_id
+)
+{
+    uint32_t offset;
+    uint32_t bit;
+
+    offset = ((can_id & 0x7FFU) + 0x800U - check->base_id) & 0x7FFU;
+    if (offset >= CAN_STATIC_TX_REPLAY_TX_BUFFERS)
+    {
+        return false;
+    }
+
+    bit = 1UL << offset;
+    if ((check->seen_mask & bit) != 0U)
+    {
+        return false;
+    }
+
+    check->seen_mask |= bit;
+    if (check->seen_mask == check->expected_mask)
+    {
+        check->seen_mask = 0U;
+    }
+
+    return true;
+}
 #endif
 
 #define CANLOG_INGEST_BATCH_MAX 256
@@ -143,8 +205,13 @@ volatile static CanLogControlDataType CanLogCtrlData;
 static ScSequenceType CAN1_Sequence;
 static ScSequenceType CAN2_Sequence;
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if CAN_STATIC_TX_REPLAY_ENABLE
+static CanLogStaticReplayIdCheckType CAN1_IdReplayCheck;
+static CanLogStaticReplayIdCheckType CAN2_IdReplayCheck;
+#else
 static ScSequenceType CAN1_IdSequence;
 static ScSequenceType CAN2_IdSequence;
+#endif
 #endif
 static uint32_t Rb1BytesHighWater                     = 0U;
 static uint32_t CanLogFileSize                        = MAX_LOG_FILE_SIZE;
@@ -380,6 +447,54 @@ uint8_t FsCustom_GetCanAbsRxCapacity(uint32_t *frames)
     }
 
     *frames = CanAbs_GetRxBufferCapacity();
+    return 0U;
+}
+
+uint8_t FsCustom_GetStaticTxReplayStatsCan1(
+    uint32_t *requests,
+    uint32_t *completed,
+    uint32_t *irqs
+)
+{
+    FdcanStaticTxReplayStatsType stats;
+
+    if ((requests == NULL) || (completed == NULL) || (irqs == NULL))
+    {
+        return 1U;
+    }
+
+    if (0U != CanAbs_GetStaticTxReplayStats_Can1(&stats))
+    {
+        return 1U;
+    }
+
+    *requests  = stats.requests;
+    *completed = stats.completed;
+    *irqs      = stats.irqs;
+    return 0U;
+}
+
+uint8_t FsCustom_GetStaticTxReplayStatsCan2(
+    uint32_t *requests,
+    uint32_t *completed,
+    uint32_t *irqs
+)
+{
+    FdcanStaticTxReplayStatsType stats;
+
+    if ((requests == NULL) || (completed == NULL) || (irqs == NULL))
+    {
+        return 1U;
+    }
+
+    if (0U != CanAbs_GetStaticTxReplayStats_Can2(&stats))
+    {
+        return 1U;
+    }
+
+    *requests  = stats.requests;
+    *completed = stats.completed;
+    *irqs      = stats.irqs;
     return 0U;
 }
 
@@ -672,6 +787,16 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
     (void)ScInit(&CAN1_Sequence, 0U, UINT32_MAX);
     (void)ScInit(&CAN2_Sequence, 0U, UINT32_MAX);
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if CAN_STATIC_TX_REPLAY_ENABLE
+    CanLogManager_StaticReplayIdCheckInit(
+        &CAN1_IdReplayCheck,
+        CAN_STATIC_TX_REPLAY_CAN1_BASE_ID
+    );
+    CanLogManager_StaticReplayIdCheckInit(
+        &CAN2_IdReplayCheck,
+        CAN_STATIC_TX_REPLAY_CAN2_BASE_ID
+    );
+#else
     (void)ScInit(
         &CAN1_IdSequence,
         DEBUG_CAN_ID_SEQUENCE_MAX_ID,
@@ -682,6 +807,7 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
         DEBUG_CAN_ID_SEQUENCE_MAX_ID,
         DEBUG_CAN_ID_SEQUENCE_MAX_ID
     );
+#endif
 #endif
     return &CanLogCtrlData;
 }
@@ -1689,8 +1815,10 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
     static uint32_t CAN1_SequenceIndex = 0U;
     static uint32_t CAN2_SequenceIndex = 0U;
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if !CAN_STATIC_TX_REPLAY_ENABLE
     static uint32_t CAN1_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
     static uint32_t CAN2_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
+#endif
 #endif
     volatile uint32_t LocalFrameCount;
     static uint64_t NextPeriodicSyncAbsTime = 0;
@@ -1718,10 +1846,21 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         CanLogCtrlData.framesLost = false;
         RuntimeChecks_Init();
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if CAN_STATIC_TX_REPLAY_ENABLE
+        CanLogManager_StaticReplayIdCheckInit(
+            &CAN1_IdReplayCheck,
+            CAN_STATIC_TX_REPLAY_CAN1_BASE_ID
+        );
+        CanLogManager_StaticReplayIdCheckInit(
+            &CAN2_IdReplayCheck,
+            CAN_STATIC_TX_REPLAY_CAN2_BASE_ID
+        );
+#else
         CAN1_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
         CAN2_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
         ScReset(&CAN1_IdSequence, CAN1_CanId);
         ScReset(&CAN2_IdSequence, CAN2_CanId);
+#endif
 #endif
 
         CanAbs_IsStateOff_Can1(&IsOffState);
@@ -1836,11 +1975,21 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
             CAN1_SequenceIndex = pNewFrame->rx_sequence;
             (void)ScCheckSequence(&CAN1_Sequence, CAN1_SequenceIndex);
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if CAN_STATIC_TX_REPLAY_ENABLE
+            if (!CanLogManager_StaticReplayIdCheck(
+                    &CAN1_IdReplayCheck,
+                    pNewFrame->id
+                ))
+            {
+                CanLogManager_CAN1_MissingIdsCount++;
+            }
+#else
             CAN1_CanId = pNewFrame->id;
             if (SC_E_SEQUENCE == ScCheckSequence(&CAN1_IdSequence, CAN1_CanId))
             {
                 CanLogManager_CAN1_MissingIdsCount++;
             }
+#endif
 #endif
         }
         else if (pFrameEntry->channel == 2)
@@ -1850,11 +1999,21 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
             CAN2_SequenceIndex = pNewFrame->rx_sequence;
             (void)ScCheckSequence(&CAN2_Sequence, CAN2_SequenceIndex);
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if CAN_STATIC_TX_REPLAY_ENABLE
+            if (!CanLogManager_StaticReplayIdCheck(
+                    &CAN2_IdReplayCheck,
+                    pNewFrame->id
+                ))
+            {
+                CanLogManager_CAN2_MissingIdsCount++;
+            }
+#else
             CAN2_CanId = pNewFrame->id;
             if (SC_E_SEQUENCE == ScCheckSequence(&CAN2_IdSequence, CAN2_CanId))
             {
                 CanLogManager_CAN2_MissingIdsCount++;
             }
+#endif
 #endif
         }
 
@@ -1891,7 +2050,7 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         ScReset(&CAN2_Sequence, CAN2_SequenceIndex);
     }
 
-#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
+#if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE && !CAN_STATIC_TX_REPLAY_ENABLE
     uint32_t CAN1_MissingIds = 0U;
     uint32_t CAN2_MissingIds = 0U;
 
