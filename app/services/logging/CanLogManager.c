@@ -161,6 +161,9 @@ static volatile uint32_t FdcanMsgPortPeakMetaFileIndex           = 0U;
 static volatile uint32_t FdcanMsgPortPeakMetaByteOffset          = 0U;
 static volatile uint64_t FdcanMsgPortPeakCanLogManagerFrameCount = 0U;
 static volatile uint64_t FdcanMsgPortPeakCanLogBufferBlockCount  = 0U;
+static volatile uint32_t CanLogSdWriteMaxUs                      = 0U;
+static volatile uint32_t CanLogSdSyncMaxUs                       = 0U;
+static volatile uint32_t CanLogSdStoreBlockMaxUs                 = 0U;
 
 #if !defined(UNIT_TEST)
 static StaticSemaphore_t CanLogFileMutexBuffer;
@@ -408,6 +411,24 @@ uint8_t FsCustom_GetPreallocErrorFlag(uint8_t *flag)
     return 0U;
 }
 
+uint8_t FsCustom_GetCanLogSdTimingMaxUs(
+    uint32_t *write_us,
+    uint32_t *sync_us,
+    uint32_t *store_block_us
+)
+{
+    if ((NULL == write_us) || (NULL == sync_us) || (NULL == store_block_us))
+    {
+        return 1U;
+    }
+
+    *write_us       = CanLogSdWriteMaxUs;
+    *sync_us        = CanLogSdSyncMaxUs;
+    *store_block_us = CanLogSdStoreBlockMaxUs;
+
+    return 0U;
+}
+
 static bool appCanLogIsValidBaudrate(uint32_t value)
 {
     return (value == 250000U) || (value == 500000U) || (value == 1000000U);
@@ -642,6 +663,9 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
     CanLogCtrlData.Can2.accumulatedTime = 0;
 
     CanLogPreallocErrorCount = 0U;
+    CanLogSdWriteMaxUs       = 0U;
+    CanLogSdSyncMaxUs        = 0U;
+    CanLogSdStoreBlockMaxUs  = 0U;
     RuntimeChecks_Init();
     CanLogManager_FileLockInit();
 
@@ -1332,16 +1356,48 @@ static comm_status_t
 appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
 {
     comm_status_t res = COMM_SUCCESS;
+    uint64_t start_us;
+    uint64_t after_write_us;
+    uint64_t after_sync_us;
+    uint32_t write_us;
+    uint32_t sync_us;
+    uint32_t total_us;
 
+    start_us = FDCAN_GetTimestampHook();
     if (FR_OK == FatFS_SD_WriteFile(dev, (const char *)data, length))
     {
+        after_write_us = FDCAN_GetTimestampHook();
         if (FR_OK != FatFS_SD_Flush(dev))
         {
             res = COMM_ERROR;
         }
+        after_sync_us = FDCAN_GetTimestampHook();
+
+        write_us = (uint32_t)(after_write_us - start_us);
+        sync_us  = (uint32_t)(after_sync_us - after_write_us);
+        total_us = (uint32_t)(after_sync_us - start_us);
+
+        if (write_us > CanLogSdWriteMaxUs)
+        {
+            CanLogSdWriteMaxUs = write_us;
+        }
+        if (sync_us > CanLogSdSyncMaxUs)
+        {
+            CanLogSdSyncMaxUs = sync_us;
+        }
+        if (total_us > CanLogSdStoreBlockMaxUs)
+        {
+            CanLogSdStoreBlockMaxUs = total_us;
+        }
     }
     else
     {
+        after_write_us = FDCAN_GetTimestampHook();
+        write_us       = (uint32_t)(after_write_us - start_us);
+        if (write_us > CanLogSdWriteMaxUs)
+        {
+            CanLogSdWriteMaxUs = write_us;
+        }
         res = COMM_ERROR;
     }
 
@@ -1410,7 +1466,28 @@ static comm_status_t CanLogManager_EmitSyncEntry(
 
 void SdBridgeTask_ActionHook(void)
 {
-    appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice));
+    uint8_t block_ready = 0U;
+
+    do
+    {
+        block_ready = 0U;
+        if (CLB_E_OK != CanLogBuffer_IsBlockReady(&block_ready))
+        {
+            CanLogFileManager_ErrorHandler();
+            break;
+        }
+
+        if (0U != block_ready)
+        {
+            if (COMM_SUCCESS
+                != appCanLogStoreBlock(&(CanLogCtrlData.CanLog.writeFileDevice)
+                ))
+            {
+                CanLogFileManager_ErrorHandler();
+                break;
+            }
+        }
+    } while (0U != block_ready);
 }
 
 CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)

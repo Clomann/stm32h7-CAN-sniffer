@@ -70,7 +70,9 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
     "\"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_"  \
     "hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%."   \
     "2f,\"rb1_bytes_highwater_pct\":%.2f,\"can1_rx_highwater_pct\":%.2f,"      \
-    "\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f}"
+    "\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f,"    \
+    "\"sd_write_max_us\":%lu,\"sd_sync_max_us\":%lu,\"sd_store_block_max_"     \
+    "us\":%lu}"
 
 #define CANLOG_CONFIG_STRING                                                   \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
@@ -251,6 +253,9 @@ int fs_open_custom(struct fs_file *file, const char *name)
         uint64_t FrameCount            = 0U;
         unsigned long FrameCountHi     = 0UL;
         unsigned long FrameCountLo     = 0UL;
+        uint32_t SdWriteMaxUs          = 0U;
+        uint32_t SdSyncMaxUs           = 0U;
+        uint32_t SdStoreBlockMaxUs     = 0U;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
@@ -289,6 +294,17 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             FrameCount = 0U;
         }
+        if (0U
+            != FsCustom_GetCanLogSdTimingMaxUs(
+                &SdWriteMaxUs,
+                &SdSyncMaxUs,
+                &SdStoreBlockMaxUs
+            ))
+        {
+            SdWriteMaxUs      = 0U;
+            SdSyncMaxUs       = 0U;
+            SdStoreBlockMaxUs = 0U;
+        }
         FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
         FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
 
@@ -324,7 +340,10 @@ int fs_open_custom(struct fs_file *file, const char *name)
             Rb1BytesHighWaterPct,
             CanAbsRxHighWaterPctCan1,
             CanAbsRxHighWaterPctCan2,
-            FdcanMsgPortHighWaterPct
+            FdcanMsgPortHighWaterPct,
+            (unsigned long)SdWriteMaxUs,
+            (unsigned long)SdSyncMaxUs,
+            (unsigned long)SdStoreBlockMaxUs
         );
 
         if (n < 0 || (size_t)n >= sizeof(StatusData))

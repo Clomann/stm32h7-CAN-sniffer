@@ -15,6 +15,11 @@ uint8_t FsCustom_GetFdcanMsgPortHighWater(uint32_t *bytes);
 uint8_t FsCustom_GetFdcanMsgPortCapacity(uint32_t *bytes);
 uint8_t FsCustom_GetCanLogFrameCount(uint64_t *count);
 uint8_t FsCustom_GetPreallocErrorFlag(uint8_t *flag);
+uint8_t FsCustom_GetCanLogSdTimingMaxUs(
+    uint32_t *write_us,
+    uint32_t *sync_us,
+    uint32_t *store_block_us
+);
 
 uint8_t FsCustom_IsTracerRunning(uint8_t *running);
 _Bool FsCustom_IsAnyFrameLostFlag(void);
