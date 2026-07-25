@@ -9,6 +9,10 @@
 #include "stm32h7xx_hal_fdcan.h"
 #include "stm32h7xx_hal_cortex.h"
 
+#ifndef CANABS_RX_ISR_MAX_FRAMES_PER_CHANNEL
+#define CANABS_RX_ISR_MAX_FRAMES_PER_CHANNEL FDCAN_IRQ_RX_WATERMARK
+#endif
+
 /**
  * @brief Hook called at CAN ISR entry for measurement instrumentation.
  * @note Implemented by the application layer (e.g., GPIO toggle, timestamping, trace).
@@ -455,9 +459,10 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
         }
     }
 
-    while (
-        0 < (fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0))
-    )
+    while ((frames_processed < CANABS_RX_ISR_MAX_FRAMES_PER_CHANNEL)
+           && (0
+               < (fill_level =
+                      HAL_FDCAN_GetRxFifoFillLevel(hfdcan, FDCAN_RX_FIFO0))))
     {
         switch (channel)
         {
@@ -622,7 +627,7 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
         (uint8_t *)&Fdcan1RxRingBuffer
     );
 
-    if (0 == COMM_SUCCESS)
+    if (COMM_SUCCESS == res)
     {
         Fdcan1Driver.interface->ioctl(
             &Fdcan1Driver,
@@ -686,7 +691,7 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
         (uint8_t *)&Fdcan2RxRingBuffer
     );
 
-    if (0 == COMM_SUCCESS)
+    if (COMM_SUCCESS == res)
     {
         Fdcan2Driver.interface->ioctl(
             &Fdcan2Driver,
