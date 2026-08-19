@@ -21,7 +21,12 @@
 
 #define CLUSTER_SIZE                   (32768U)
 #define PERSIST_CAN_LOG_FILE_HEAD_TAIL 0U
+#ifdef MAX_LOG_FILE_COUNT
+#define MAX_LOG_FILE_COUNT_FROM_COMPILER 1U
+#else
+#define MAX_LOG_FILE_COUNT_FROM_COMPILER 0U
 #define MAX_LOG_FILE_COUNT             640U
+#endif
 #define MAX_LOG_FILE_SIZE              (10U * 1024U * 1024U)
 #define MAX_LOG_INDEX                  (MAX_LOG_FILE_COUNT - 1U)
 

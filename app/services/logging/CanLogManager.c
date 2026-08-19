@@ -106,6 +106,10 @@ static bool CanLogManager_StaticReplayIdCheck(
 
 #define CANLOG_INGEST_BATCH_MAX 256
 
+#define CAN_LOG_PREALLOC_MARKER_FILENAME "/logs/prealloc.json"
+#define CAN_LOG_PREALLOC_MARKER_VERSION  1U
+#define CAN_LOG_PREALLOC_MARKER_MAX_SIZE 128U
+
 #define CLM_ABS_TIME_TO_TIMSTAMP(x) (uint32_t)(x)
 #define CLM_ABS_TIME_TO_ABS_HIGH(x) ((uint32_t)((x) >> 32U))
 #define CLM_SYNC_EMIT_INTERVAL_US   (30ULL * 60ULL * 1000000ULL)
@@ -901,6 +905,148 @@ static bool m_verify_preallocation(const char *path)
     return can_seek;
 }
 
+static bool CanLogManager_ParseMarkerValue(
+    char *buffer,
+    uint32_t buffer_len,
+    const char *key,
+    uint32_t *out_value
+)
+{
+    JSONStatus_t json_res;
+    char tmp[16];
+    char *value;
+    size_t value_length;
+
+    json_res = FileHandler_GetValue(
+        buffer,
+        buffer_len,
+        key,
+        (uint32_t)strlen(key),
+        &value,
+        &value_length
+    );
+    if (JSONSuccess != json_res || value_length >= sizeof(tmp))
+    {
+        return false;
+    }
+
+    memcpy(tmp, value, value_length);
+    tmp[value_length] = '\0';
+
+    return 0U == FileHandler_ConvertToInteger(tmp, out_value, 10U);
+}
+
+static bool CanLogManager_PreallocMarkerMatches(
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
+{
+    FRESULT res;
+    FatFsDeviceType marker;
+    uint32_t file_size             = 0U;
+    uint32_t read_size             = 0U;
+    uint32_t marker_version        = 0U;
+    uint32_t marker_log_file_size  = 0U;
+    uint32_t marker_log_file_count = 0U;
+    char buffer[CAN_LOG_PREALLOC_MARKER_MAX_SIZE];
+    bool matches = false;
+
+    res = FatFS_SD_OpenFileForRead(&marker, CAN_LOG_PREALLOC_MARKER_FILENAME);
+    if (FR_OK != res)
+    {
+        return false;
+    }
+
+    do
+    {
+        res = FatFS_SD_GetFileSize(&marker, &file_size);
+        if (FR_OK != res || file_size == 0U || file_size >= sizeof(buffer))
+        {
+            break;
+        }
+
+        read_size = file_size;
+        res       = FatFS_SD_ReadFile(&marker, buffer, read_size);
+        if (FR_OK != res)
+        {
+            break;
+        }
+
+        buffer[read_size] = '\0';
+        matches           = CanLogManager_ParseMarkerValue(
+                      buffer,
+                      read_size,
+                      "version",
+                      &marker_version
+                  )
+                  && CanLogManager_ParseMarkerValue(
+                      buffer,
+                      read_size,
+                      "log_file_size",
+                      &marker_log_file_size
+                  )
+                  && CanLogManager_ParseMarkerValue(
+                      buffer,
+                      read_size,
+                      "log_file_count",
+                      &marker_log_file_count
+                  )
+                  && marker_version == CAN_LOG_PREALLOC_MARKER_VERSION
+                  && marker_log_file_size == log_file_size
+                  && marker_log_file_count == log_file_count;
+    } while (0);
+
+    (void)FatFS_SD_CloseFile(&marker);
+    return matches;
+}
+
+static FRESULT CanLogManager_StorePreallocMarker(
+    uint32_t log_file_size,
+    uint32_t log_file_count
+)
+{
+    FRESULT res;
+    FatFsDeviceType marker;
+    char content[CAN_LOG_PREALLOC_MARKER_MAX_SIZE];
+    int length;
+
+    res = FatFS_SD_OpenFileForOverWrite(
+        &marker,
+        CAN_LOG_PREALLOC_MARKER_FILENAME
+    );
+    if (FR_OK != res)
+    {
+        return res;
+    }
+
+    length = snprintf(
+        content,
+        sizeof(content),
+        "{\"version\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}",
+        (unsigned long)CAN_LOG_PREALLOC_MARKER_VERSION,
+        (unsigned long)log_file_size,
+        (unsigned long)log_file_count
+    );
+    if (length < 0 || (size_t)length >= sizeof(content))
+    {
+        (void)FatFS_SD_CloseFile(&marker);
+        return FR_INVALID_PARAMETER;
+    }
+
+    res = FatFS_SD_WriteFile(&marker, content, (uint32_t)length);
+    if (FR_OK == res)
+    {
+        res = FatFS_SD_Flush(&marker);
+    }
+
+    if (FR_OK != FatFS_SD_CloseFile(&marker) && FR_OK == res)
+    {
+        res = FR_DISK_ERR;
+    }
+
+    return res;
+}
+
 volatile static uint32_t UnseekableFiles = 0;
 
 static FRESULT m_preallocate_log_files(void)
@@ -913,6 +1059,8 @@ static FRESULT m_preallocate_log_files(void)
     uint32_t log_file_size;
     uint32_t log_file_count;
     uint32_t max_index;
+    bool preallocation_complete = false;
+    bool prealloc_marker_valid  = false;
 
     UnseekableFiles          = 0;
     CanLogPreallocErrorCount = 0U;
@@ -933,7 +1081,22 @@ static FRESULT m_preallocate_log_files(void)
         (int)max_index
     );
 
-    if (1U != m_verify_preallocation(full_path))
+    if (CanLogManager_PreallocMarkerMatches(log_file_size, log_file_count)
+        && m_verify_preallocation(full_path))
+    {
+        preallocation_complete = true;
+        prealloc_marker_valid  = true;
+    }
+
+    if (!preallocation_complete)
+    {
+        if (1U == m_verify_preallocation(full_path))
+        {
+            preallocation_complete = true;
+        }
+    }
+
+    if (!preallocation_complete)
     {
         for (uint32_t i = 0; i < log_file_count; i++)
         {
@@ -1032,6 +1195,15 @@ static FRESULT m_preallocate_log_files(void)
         }
     }
 
+    if (CanLogPreallocErrorCount == 0U && !prealloc_marker_valid)
+    {
+        res = CanLogManager_StorePreallocMarker(log_file_size, log_file_count);
+        if (FR_OK != res)
+        {
+            return res;
+        }
+    }
+
     CanLogCtrlData.CanLog.fileHeadIndex = 0;
 
     // Build candidate filename
@@ -1042,12 +1214,17 @@ static FRESULT m_preallocate_log_files(void)
         0
     );
 
+    if (CanLogPreallocErrorCount != 0U)
+    {
+        return FR_DISK_ERR;
+    }
+
     CanLogCtrlData.CanLog.openRes = FatFS_SD_OpenFileForWrite(
         &(CanLogCtrlData.CanLog.writeFileDevice),
         CanLogCtrlData.CanLog.filename
     );
 
-    return FR_OK;
+    return CanLogCtrlData.CanLog.openRes;
 }
 
 #if CANLOGAMANGER_PERSIST_METADATA
@@ -1377,7 +1554,11 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 #if PREALLOCATE_LOG_FILES
     if (RES_OK == *CanLogCtrlData.mountRes)
     {
-        m_preallocate_log_files();
+        res = m_preallocate_log_files();
+        if (res != FR_OK)
+        {
+            CanLogFileManager_ErrorHandler();
+        }
     }
     else
     {

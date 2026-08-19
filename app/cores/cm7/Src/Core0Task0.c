@@ -386,6 +386,10 @@ static void appHandleFormattingRequest(void)
         ReformattingRequested = false;
     }
 
+#if MAX_LOG_FILE_COUNT_FROM_COMPILER
+    log_file_count = MAX_LOG_FILE_COUNT;
+#endif
+
     appCanLogSetFileConfig(log_file_size, log_file_count);
     appCanLogSetClusterSize(cluster_size);
 

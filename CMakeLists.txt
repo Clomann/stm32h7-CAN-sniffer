@@ -16,6 +16,8 @@ set(FW_USE_MALLOC ${FW_USE_PRINTF_FLOAT} CACHE BOOL "Enable newlib heap (malloc/
 set(FW_LINKER_TRACE OFF CACHE BOOL "Enable linker --trace output and symbol tracing")
 set(DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE "0U" CACHE STRING "Enable CAN frame ID sequence debug checking")
 set(DEBUG_CAN_ID_SEQUENCE_MAX_ID "0xFFU" CACHE STRING "Maximum CAN ID used by sequence debug checking")
+set(MAX_LOG_FILE_COUNT_DEFAULT "640U")
+set(MAX_LOG_FILE_COUNT "${MAX_LOG_FILE_COUNT_DEFAULT}" CACHE STRING "Override number of preallocated CAN log files")
 set(CAN_STATIC_TX_REPLAY_ENABLE OFF CACHE BOOL "Enable FDCAN static Tx replay from dedicated Tx buffers")
 set(CAN_STATIC_TX_REPLAY_TX_BUFFERS "32U" CACHE STRING "Number of dedicated FDCAN Tx buffers used for static replay")
 set(CAN_STATIC_TX_REPLAY_ID_COUNT "0xFFU" CACHE STRING "Configured standard ID wrap count for static replay")
@@ -169,6 +171,10 @@ list(APPEND symbols_SYMB
     "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE=${DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE}"
     "DEBUG_CAN_ID_SEQUENCE_MAX_ID=${DEBUG_CAN_ID_SEQUENCE_MAX_ID}"
 )
+
+if(NOT "${MAX_LOG_FILE_COUNT}" STREQUAL "${MAX_LOG_FILE_COUNT_DEFAULT}")
+    list(APPEND symbols_SYMB "MAX_LOG_FILE_COUNT=${MAX_LOG_FILE_COUNT}")
+endif()
 
 if(CAN_STATIC_TX_REPLAY_ENABLE)
     list(APPEND symbols_SYMB "CAN_STATIC_TX_REPLAY_ENABLE=1U")
