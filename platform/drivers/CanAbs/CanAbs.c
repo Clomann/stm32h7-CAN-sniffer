@@ -763,6 +763,16 @@ uint8_t CanAbs_GetStaticTxReplayStats_Can1(FdcanStaticTxReplayStatsType *stats)
     stats->requests  = 0U;
     stats->completed = 0U;
     stats->irqs      = 0U;
+    stats->last_completed_mask = 0U;
+    stats->buffer_mask         = 0U;
+    stats->next_id_offset      = 0U;
+    stats->tx_pending          = 0U;
+    stats->tx_occurred         = 0U;
+    stats->tx_cancelled        = 0U;
+    stats->protocol_status     = 0U;
+    stats->error_counter       = 0U;
+    stats->reload_errors       = 0U;
+    stats->active              = 0U;
     return 0U;
 #endif
 }
@@ -791,6 +801,16 @@ uint8_t CanAbs_GetStaticTxReplayStats_Can2(FdcanStaticTxReplayStatsType *stats)
     stats->requests  = 0U;
     stats->completed = 0U;
     stats->irqs      = 0U;
+    stats->last_completed_mask = 0U;
+    stats->buffer_mask         = 0U;
+    stats->next_id_offset      = 0U;
+    stats->tx_pending          = 0U;
+    stats->tx_occurred         = 0U;
+    stats->tx_cancelled        = 0U;
+    stats->protocol_status     = 0U;
+    stats->error_counter       = 0U;
+    stats->reload_errors       = 0U;
+    stats->active              = 0U;
     return 0U;
 #endif
 }
