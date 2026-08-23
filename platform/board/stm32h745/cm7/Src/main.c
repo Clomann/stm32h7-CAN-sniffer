@@ -26,7 +26,6 @@
 
 //#include "SD.h"
 //#include "Spi_Cmds.h"
-#include "utils_mpu.h"
 #include "Core0Task0.h"
 #include "Core0Task1.h"
 #include "TasksHooks.h"
@@ -324,6 +323,9 @@ void Error_Handler(void)
 extern uint8_t __dma_buffers_start;
 extern uint8_t __dma_buffers_end;
 
+/* Must match the .dma_buffer ALIGN()/ASSERT budget in STM32H745ZITX_FLASH.ld. */
+#define DMA_BUFFER_MPU_REGION_BYTES (16UL * 1024UL)
+
 /**
   * @brief  Configure the MPU attributes
   * @param  None
@@ -383,17 +385,24 @@ static void MPU_Config(void)
 
     HAL_MPU_ConfigRegion(&MPU_InitStruct);
 
-    uint64_t base              = (uint64_t)(uint32_t)&__dma_buffers_start;
+    /* .dma_buffer is reserved at a fixed, 16KB-aligned budget in the linker
+       script (see STM32H745ZITX_FLASH.ld) so the base address is guaranteed
+       MPU-aligned and the size is a compile-time constant; a linker ASSERT
+       there catches the section outgrowing this region. The assert below
+       catches MPU_InitStruct.Size drifting away from that same 16KB budget
+       (e.g. picking the wrong MPU_REGION_SIZE_xx by mistake). */
+    _Static_assert((1UL << (MPU_REGION_SIZE_16KB + 1U)) == DMA_BUFFER_MPU_REGION_BYTES,
+                   "MPU_REGION_SIZE_16KB no longer matches DMA_BUFFER_MPU_REGION_BYTES - "
+                   "update both, and the linker ALIGN()/ASSERT, together");
+
     MPU_InitStruct.Enable      = MPU_REGION_ENABLE;
-    MPU_InitStruct.BaseAddress = base;
-    MPU_InitStruct.Size        = mpu_utils_get_size(
-        round_up_pow2((uint64_t)(uint32_t)&__dma_buffers_end - base)
-    );
+    MPU_InitStruct.BaseAddress = (uint32_t)&__dma_buffers_start;
+    MPU_InitStruct.Size        = MPU_REGION_SIZE_16KB;
     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
     MPU_InitStruct.IsBufferable     = MPU_ACCESS_NOT_BUFFERABLE;
     MPU_InitStruct.IsCacheable      = MPU_ACCESS_NOT_CACHEABLE;
     MPU_InitStruct.IsShareable      = MPU_ACCESS_SHAREABLE;
-    MPU_InitStruct.Number           = MPU_REGION_NUMBER2;
+    MPU_InitStruct.Number           = MPU_REGION_NUMBER3;
     MPU_InitStruct.TypeExtField     = MPU_TEX_LEVEL1;
     MPU_InitStruct.SubRegionDisable = 0x00;
     MPU_InitStruct.DisableExec      = MPU_INSTRUCTION_ACCESS_ENABLE;

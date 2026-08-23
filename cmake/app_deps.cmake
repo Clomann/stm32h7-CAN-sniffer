@@ -7,7 +7,6 @@ list(APPEND sources_SRCS
     ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/stm32h7xx_hal_msp.c
     ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/stm32h7xx_it.c
     ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/main.c
-    ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/utils_mpu.c
     ${PROJ_PATH}/platform/Common/Src/instrumentation.c
     ${PROJ_PATH}/platform/Common/Src/FwUpdateHandoff.c
     ${PROJ_PATH}/middleware/freertos/freertos_interface.c

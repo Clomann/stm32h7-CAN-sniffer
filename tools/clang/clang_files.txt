@@ -64,6 +64,8 @@ app/services/iap/ingest/UpdateIngestRegistry.c
 app/services/iap/ingest/UpdateIngestRegistry.h
 app/services/logging/CanLogBuffer.c
 app/services/logging/CanLogBuffer.h
+app/services/logging/CanLogDebugProvider.c
+app/services/logging/CanLogDebugProvider.h
 app/services/logging/CanLogManager.c
 app/services/logging/CanLogManager.h
 app/services/logging/CanLogManagerTypes.h
@@ -113,19 +115,16 @@ platform/board/stm32h745/cm7/Inc/memory_sections.h
 platform/board/stm32h745/cm7/Inc/nvic_irg_config.h
 platform/board/stm32h745/cm7/Inc/stm32h7xx_hal_conf.h
 platform/board/stm32h745/cm7/Inc/stm32h7xx_it.h
-platform/board/stm32h745/cm7/Inc/utils_mpu.h
 platform/board/stm32h745/cm7/Src/boot_platform.c
 platform/board/stm32h745/cm7/Src/main.c
 platform/board/stm32h745/cm7/Src/stm32h7xx_hal_msp.c
 platform/board/stm32h745/cm7/Src/stm32h7xx_it.c
-platform/board/stm32h745/cm7/Src/utils_mpu.c
 platform/drivers/CanAbs/CanAbs.c
 platform/drivers/CanAbs/CanAbs.h
 platform/drivers/SpiAbs/SpiAbs.c
 platform/drivers/SpiAbs/SpiAbs.h
 platform/drivers/SpiAbs/SpiAbsHooks.c
 platform/drivers/buffers.h
-platform/Common/Inc/SequenceChecker.h
 platform/drivers/comm/CommHandle/CommHandle.h
 platform/drivers/comm/CommHandle/CommMessages.h
 platform/drivers/comm/CommHandle/CommTypes.h
@@ -153,7 +152,6 @@ platform/drivers/spi/spi_utils.h
 platform/drivers/timer/timer.c
 platform/drivers/timer/timer.h
 platform/ports/fdcan_msg_port.c
-platform/Common/Src/SequenceChecker.c
 platform/ports/fdcan_msg_port.h
 platform/ports/spi/spi_port_freertos.c
 platform/ports/spi/spi_port_freertos.h
@@ -178,8 +176,6 @@ tests/app/Common/test_SequenceChecker.h
 tests/app/InAppProgramming/stubs/RamFlashSim.c
 tests/app/InAppProgramming/stubs/RamFlashSim.h
 tests/app/InAppProgramming/test_iap.c
-tests/app/Common/test_SequenceChecker.c
-tests/app/Common/test_SequenceChecker.h
 tests/app/test_app.c
 tests/app/test_definitions.h
 tests/bootloader/boot_platform_stub.c

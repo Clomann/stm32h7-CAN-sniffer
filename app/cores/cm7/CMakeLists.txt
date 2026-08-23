@@ -10,7 +10,6 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/CanSendTask.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/CanCtrl.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/SpiTask.c
-    ${PROJ_PATH}/platform/board/stm32h745/cm7/Src/utils_mpu.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/profiling.c
 )
 

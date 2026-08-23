@@ -289,11 +289,19 @@ SECTIONS
     . = ALIGN(4);
   } >RAM_D2
 
-  .dma_buffer (NOLOAD) : ALIGN(32) {
+  /* Reserved at a fixed 16K, MPU-region-aligned budget: RAM_D2 starts at a
+     16K-aligned address, so ALIGN(16K) here guarantees __dma_buffers_start
+     is a valid MPU region base with no runtime alignment needed. Bump this
+     ALIGN() and the matching ASSERT below (and MPU_InitStruct.Size in
+     MPU_Config(), main.c) together if .dma_buffer outgrows 16K. */
+  .dma_buffer (NOLOAD) : ALIGN(16K) {
     __dma_buffers_start__ = .;
     *(.dma_buffer)
     __dma_buffers_end__   = .;
   } >RAM_D2
+
+  ASSERT(__dma_buffers_end__ - __dma_buffers_start__ <= 16K,
+         "dma_buffer section exceeds its 16K MPU-region budget - bump ALIGN() here and MPU_InitStruct.Size in MPU_Config()")
 
   PROVIDE(__dma_buffers_start = __dma_buffers_start__);
   PROVIDE(__dma_buffers_end   = __dma_buffers_end__);
