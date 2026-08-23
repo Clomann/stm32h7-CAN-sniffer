@@ -915,19 +915,23 @@
                 const prepareResp = await fetch(IAP_PREPARE_URL, { cache: "no-store" });
                 const prepareJson = await prepareResp.json();
                 if (!prepareResp.ok || !prepareJson.ok) {
-                uploadInProgress = false;
-                stopDeviceProgressWatch();
-                startStatusPolling();
-                uploadState.textContent = "Prepare failed";
+                    uploadInProgress = false;
+                    stopDeviceProgressWatch();
+                    startStatusPolling();
                     uploadMetrics.textContent = "Remaining time: -";
                     uploadBtn.disabled = !precheckOk;
                     uploadBtn.title = precheckOk ? "" : "Fix pre-check errors first.";
-                    setChip(imageState, "Image: error", "status-err");
                     if (prepareJson && prepareJson.reason === "logger_running") {
+                        uploadState.textContent = "Prepare blocked";
+                        setChip(imageState, "Image: waiting", "status-warn");
                         applyMessage.textContent = "Stop CAN logger before preparing upload.";
                     } else if (prepareJson && prepareJson.reason) {
+                        uploadState.textContent = "Prepare failed";
+                        setChip(imageState, "Image: error", "status-err");
                         applyMessage.textContent = `Prepare failed (${prepareJson.reason}).`;
                     } else {
+                        uploadState.textContent = "Prepare failed";
+                        setChip(imageState, "Image: error", "status-err");
                         applyMessage.textContent = "Prepare failed.";
                     }
                     refreshApplyButton();
@@ -1082,6 +1086,7 @@
             applyBtn.disabled = true;
             applyBtn.title = "Apply request in progress.";
             applyMessage.textContent = "Requesting reboot…";
+            stopStatusPolling();
 
             try {
                 const resp = await fetch(IAP_APPLY_URL, { cache: "no-store" });
@@ -1090,6 +1095,7 @@
                 if (json.ok) {
                     applyMessage.textContent = "Reboot requested. Connection may drop now.";
                     setChip(imageState, "Image: apply requested", "status-warn");
+                    return;
                 } else if (json.reason === "logger_running") {
                     applyMessage.textContent = "Rejected: stop CAN logger first.";
                 } else if (json.reason === "image_not_verified" || json.reason === "upload_not_ready") {
@@ -1098,9 +1104,12 @@
                     applyMessage.textContent = "Apply rejected.";
                 }
             } catch (e) {
-                applyMessage.textContent = "Apply request failed.";
+                applyMessage.textContent = "Apply request sent. Waiting for reboot.";
+                setChip(imageState, "Image: apply requested", "status-warn");
+                return;
             }
 
+            startStatusPolling();
             await pollIapStatus();
         });
 
