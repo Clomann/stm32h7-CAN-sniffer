@@ -51,27 +51,17 @@
 typedef struct
 {
     uint32_t base_id;
-    uint32_t expected_mask;
-    uint32_t seen_mask;
+    uint32_t id_count;
 } CanLogStaticReplayIdCheckType;
-
-static uint32_t CanLogManager_StaticReplayExpectedMask(void)
-{
-#if CAN_STATIC_TX_REPLAY_TX_BUFFERS >= 32U
-    return 0xFFFFFFFFU;
-#else
-    return (1UL << CAN_STATIC_TX_REPLAY_TX_BUFFERS) - 1UL;
-#endif
-}
 
 static void CanLogManager_StaticReplayIdCheckInit(
     CanLogStaticReplayIdCheckType *check,
-    uint32_t base_id
+    uint32_t base_id,
+    uint32_t id_count
 )
 {
-    check->base_id       = base_id & 0x7FFU;
-    check->expected_mask = CanLogManager_StaticReplayExpectedMask();
-    check->seen_mask     = 0U;
+    check->base_id  = base_id & 0x7FFU;
+    check->id_count = (0U == id_count) ? 1U : id_count;
 }
 
 static bool CanLogManager_StaticReplayIdCheck(
@@ -794,11 +784,13 @@ CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 #if CAN_STATIC_TX_REPLAY_ENABLE
     CanLogManager_StaticReplayIdCheckInit(
         &CAN1_IdReplayCheck,
-        CAN_STATIC_TX_REPLAY_CAN1_BASE_ID
+        CAN_STATIC_TX_REPLAY_CAN1_BASE_ID,
+        CAN_STATIC_TX_REPLAY_ID_COUNT
     );
     CanLogManager_StaticReplayIdCheckInit(
         &CAN2_IdReplayCheck,
-        CAN_STATIC_TX_REPLAY_CAN2_BASE_ID
+        CAN_STATIC_TX_REPLAY_CAN2_BASE_ID,
+        CAN_STATIC_TX_REPLAY_ID_COUNT
     );
 #else
     (void)ScInit(
@@ -2030,11 +2022,13 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 #if CAN_STATIC_TX_REPLAY_ENABLE
         CanLogManager_StaticReplayIdCheckInit(
             &CAN1_IdReplayCheck,
-            CAN_STATIC_TX_REPLAY_CAN1_BASE_ID
+            CAN_STATIC_TX_REPLAY_CAN1_BASE_ID,
+            CAN_STATIC_TX_REPLAY_ID_COUNT
         );
         CanLogManager_StaticReplayIdCheckInit(
             &CAN2_IdReplayCheck,
-            CAN_STATIC_TX_REPLAY_CAN2_BASE_ID
+            CAN_STATIC_TX_REPLAY_CAN2_BASE_ID,
+            CAN_STATIC_TX_REPLAY_ID_COUNT
         );
 #else
         CAN1_CanId = DEBUG_CAN_ID_SEQUENCE_MAX_ID;
