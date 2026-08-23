@@ -39,6 +39,9 @@ uint32_t EthernetLinkTimer;
 #define MAX_DHCP_TRIES 4
 uint32_t DHCPfineTimer = 0;
 uint8_t DHCP_state     = DHCP_OFF;
+extern uint8_t IP_ADDRESS[4];
+extern uint8_t NETMASK_ADDRESS[4];
+extern uint8_t GATEWAY_ADDRESS[4];
 #endif
 
 static uint32_t EthLinkStatePrev = 0U;
@@ -163,9 +166,27 @@ void DHCP_Process(struct netif *netif)
                 DHCP_state = DHCP_TIMEOUT;
 
                 /* Static address used */
-                // IP_ADDR4(&ipaddr, IP_ADDR0 ,IP_ADDR1 , IP_ADDR2 , IP_ADDR3 );
-                // IP_ADDR4(&netmask, NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
-                // IP_ADDR4(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
+                IP_ADDR4(
+                    &ipaddr,
+                    IP_ADDRESS[0],
+                    IP_ADDRESS[1],
+                    IP_ADDRESS[2],
+                    IP_ADDRESS[3]
+                );
+                IP_ADDR4(
+                    &netmask,
+                    NETMASK_ADDRESS[0],
+                    NETMASK_ADDRESS[1],
+                    NETMASK_ADDRESS[2],
+                    NETMASK_ADDRESS[3]
+                );
+                IP_ADDR4(
+                    &gw,
+                    GATEWAY_ADDRESS[0],
+                    GATEWAY_ADDRESS[1],
+                    GATEWAY_ADDRESS[2],
+                    GATEWAY_ADDRESS[3]
+                );
                 netif_set_addr(netif, &ipaddr, &netmask, &gw);
 
 #ifdef USE_LCD

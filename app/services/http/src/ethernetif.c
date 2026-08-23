@@ -60,6 +60,9 @@
 /* ETH_RX_BUFFER_SIZE parameter is defined in lwipopts.h */
 
 /* USER CODE BEGIN 1 */
+#if NO_SYS == 1
+#define ETHERNETIF_INPUT_POLL_BUDGET 4U
+#endif
 
 /* USER CODE END 1 */
 
@@ -501,7 +504,10 @@ static struct pbuf *low_level_input(struct netif *netif)
     {
         status = HAL_ETH_ReadData(&heth, (void **)&p);
 
+        if (p != NULL)
+        {
         AddressAligned_InvalidateDCache(p->payload, p->tot_len);
+        }
     }
 
     return p;
@@ -520,6 +526,9 @@ void ethernetif_input(void *argument)
 {
     struct pbuf *p      = NULL;
     struct netif *netif = (struct netif *)argument;
+#if NO_SYS == 1
+    uint32_t processed = 0U;
+#endif
 #if NO_SYS != 1
     for (;;)
     {
@@ -535,8 +544,15 @@ void ethernetif_input(void *argument)
                     {
                         pbuf_free(p);
                     }
+#if NO_SYS == 1
+                    processed++;
+#endif
                 }
-            } while (p != NULL);
+            } while (p != NULL
+#if NO_SYS == 1
+                     && processed < ETHERNETIF_INPUT_POLL_BUDGET
+#endif
+            );
 #if NO_SYS != 1
         }
     }
