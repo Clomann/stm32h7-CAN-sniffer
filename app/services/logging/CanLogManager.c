@@ -2198,7 +2198,12 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 #endif
         }
 
-        appCanLogStoreToFrameBuffer((void *)pFrameEntry);
+        if (COMM_SUCCESS != appCanLogStoreToFrameBuffer((void *)pFrameEntry))
+        {
+            *CanLogCtrlData.runCanTracer = false;
+            CanLogFileManager_ErrorHandler();
+            break;
+        }
         LastFrameTimestamp      = pNewFrame->timestamp;
         LastFrameTimestampValid = true;
 
@@ -2206,8 +2211,9 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 
         if (0 != CanLogCtrlData.CanLog.openRes)
         {
-            /* quit */
+            *CanLogCtrlData.runCanTracer = false;
             CanLogFileManager_ErrorHandler();
+            break;
         }
         else if (BlockIsReady)
         {

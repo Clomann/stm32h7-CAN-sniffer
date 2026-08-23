@@ -51,6 +51,9 @@ typedef struct
     ConfigManagerType Config;
     uint8_t mountRes;
     bool runCanTracer;
+    bool canTracerActionPending;
+    bool requestedRunCanTracer;
+    uint8_t canTracerActionDelayPolls;
     bool applyConfig;
     bool applyFirmwareUpdate;
     bool commitLog;
@@ -563,10 +566,25 @@ static void Core0Task0Main(void *parameters)
 
     while (run)
     {
+        uint8_t canConfigChanged = 0U;
+
         http_poll();
+        if (AppCtrlData.canTracerActionPending)
+        {
+            if (AppCtrlData.canTracerActionDelayPolls > 0U)
+            {
+                AppCtrlData.canTracerActionDelayPolls--;
+            }
+            else
+            {
+                AppCtrlData.runCanTracer = AppCtrlData.requestedRunCanTracer;
+                AppCtrlData.canTracerActionPending = false;
+            }
+        }
         Iap_VerifyPoll();
 
-        if (SettingsHandler_Poll(&AppConfig))
+        canConfigChanged = SettingsHandler_Poll(&AppConfig);
+        if (0U != canConfigChanged)
         {
             if (ConfigManager_UpdateConfig(
                     &AppCtrlData.Config,
@@ -596,13 +614,16 @@ static void Core0Task0Main(void *parameters)
 
         if (0 != AppCtrlData.applyConfig && 0 == AppCtrlData.runCanTracer)
         {
-            appCanCtrlDataSetter(
-                &CanCtrlData,
-                (const AppControlDataType *)&AppCtrlData,
-                (const AppConfigType *)&AppConfig
-            );
-            appCanCtrlSetBaudrate(&CanCtrlData);
-            appCanCtrlSetMode(&CanCtrlData);
+            if (0U != canConfigChanged)
+            {
+                appCanCtrlDataSetter(
+                    &CanCtrlData,
+                    (const AppControlDataType *)&AppCtrlData,
+                    (const AppConfigType *)&AppConfig
+                );
+                appCanCtrlSetBaudrate(&CanCtrlData);
+                appCanCtrlSetMode(&CanCtrlData);
+            }
             AppCtrlData.applyConfig = 0;
         }
         else
@@ -727,7 +748,9 @@ int ConfigManager_DeserializeHook(
 
 void WebInterface_GetActionHook(uint8_t action)
 {
-    AppCtrlData.runCanTracer = action;
+    AppCtrlData.requestedRunCanTracer     = (action != 0U);
+    AppCtrlData.canTracerActionDelayPolls = 2U;
+    AppCtrlData.canTracerActionPending    = true;
 }
 
 void WebInterface_RequestFormattingHook(

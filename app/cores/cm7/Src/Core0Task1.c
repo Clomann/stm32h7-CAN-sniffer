@@ -11,8 +11,6 @@ static CanLogControlDataType *CanLogHandle = NULL;
 
 static void Core0Task1Main(void *parameters)
 {
-    ClmErrorType res = CLM_E_OK;
-
     (void)parameters;
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -21,12 +19,11 @@ static void Core0Task1Main(void *parameters)
     {
         if (CanLogHandle != NULL)
         {
-            res = appCanLogHandlerPoll(CanLogHandle);
-
-            if (CLM_E_BLOCK_READY == res)
-            {
-                vTaskDelay(1);
-            }
+            (void)appCanLogHandlerPoll(CanLogHandle);
+        }
+        else
+        {
+            vTaskDelay(1);
         }
     }
 }
