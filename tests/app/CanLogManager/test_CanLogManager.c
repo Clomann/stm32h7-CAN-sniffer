@@ -443,6 +443,91 @@ void test_CommitFlushOnStop_PadsAndFlushes(void)
 }
 
 /**
+ * @brief Tests RB1/SD telemetry window fields
+ * @details Verifies one stored block is reported once and the window resets
+ */
+void test_BufferTelemetry_ReportsStoreWindowAndResets(void)
+{
+    FsCustomCanLogBufferTelemetryType telemetry = {0U};
+
+    appCanLogHandlerInit(testCtrlData);
+
+    reset_filehandler_stubs();
+
+    mockRunCanTracer = true;
+    set_frames_available(0);
+    appCanLogHandlerPoll(testCtrlData);
+
+    CanLogBuffer_Init();
+    TEST_ASSERT_EQUAL_UINT8(0U, FsCustom_GetCanLogBufferTelemetry(&telemetry));
+
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = 0U;
+    entry->header.total_len  = sizeof(CanLogEntryType);
+    entry->dlc_flags         = MAKE_DLC_FLAGS(0U, 0U);
+
+    for (uint32_t i = 0; i < 54U; i++)
+    {
+        entry->timestamp = 1000U + i;
+        entry->channel   = 1U;
+        entry->can_id    = 0x100U + i;
+        TEST_ASSERT_EQUAL_UINT8(
+            CLB_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+    }
+
+    mockRunCanTracer = false;
+    appCanLogHandlerPoll(testCtrlData);
+
+    TEST_ASSERT_EQUAL_UINT8(0U, FsCustom_GetCanLogBufferTelemetry(&telemetry));
+    TEST_ASSERT_EQUAL_UINT32(LOG_BUFFER_SIZE, telemetry.rb1_bytes_capacity);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.rb1_bytes_now);
+    TEST_ASSERT_EQUAL_UINT32(BLOCK_SIZE, telemetry.rb1_bytes_highwater);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.rb1_bytes_min_since_status);
+    TEST_ASSERT_EQUAL_UINT32(BLOCK_SIZE, telemetry.rb1_bytes_max_since_status);
+    TEST_ASSERT_EQUAL_UINT32(
+        BLOCK_SIZE,
+        telemetry.rb1_bytes_at_last_sd_block_start
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+        BLOCK_SIZE,
+        telemetry.rb1_bytes_at_last_sd_block_end_before_consume
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+        0U,
+        telemetry.rb1_bytes_at_last_sd_block_end_after_consume
+    );
+    TEST_ASSERT_EQUAL_UINT32(1U, telemetry.sd_block_attempts_since_status);
+    TEST_ASSERT_EQUAL_UINT32(1U, telemetry.sd_blocks_written_since_status);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_block_errors_since_status);
+    TEST_ASSERT_EQUAL_UINT32(54U, telemetry.sd_last_block_frames);
+    TEST_ASSERT_EQUAL_UINT32(100U, telemetry.sd_write_last_us);
+    TEST_ASSERT_EQUAL_UINT32(100U, telemetry.sd_sync_last_us);
+    TEST_ASSERT_EQUAL_UINT32(200U, telemetry.sd_store_block_last_us);
+    TEST_ASSERT_EQUAL_UINT32(100U, telemetry.sd_write_max_since_status_us);
+    TEST_ASSERT_EQUAL_UINT32(100U, telemetry.sd_sync_max_since_status_us);
+    TEST_ASSERT_EQUAL_UINT32(
+        200U,
+        telemetry.sd_store_block_max_since_status_us
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+        200U,
+        telemetry.sd_store_block_avg_since_status_us
+    );
+
+    TEST_ASSERT_EQUAL_UINT8(0U, FsCustom_GetCanLogBufferTelemetry(&telemetry));
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_block_attempts_since_status);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_blocks_written_since_status);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.rb1_bytes_min_since_status);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.rb1_bytes_max_since_status);
+}
+
+/**
  * @brief Tests storage retry path
  * @details A failed SD write must leave the block queued for a later retry.
  */
@@ -637,6 +722,7 @@ void RunAllTests(void)
     RUN_TEST(test_FileRotation_ClosesFileOnSizeExceeded);
     RUN_TEST(test_StorePipeline_WritesFramesToFile);
     RUN_TEST(test_CommitFlushOnStop_PadsAndFlushes);
+    RUN_TEST(test_BufferTelemetry_ReportsStoreWindowAndResets);
     RUN_TEST(test_StoreBlockFailure_RetriesWithoutDroppingFrames);
     RUN_TEST(test_MetaDataPersistence_RoundTrip);
     RUN_TEST(test_Preallocation_CreatesSizedFiles);
