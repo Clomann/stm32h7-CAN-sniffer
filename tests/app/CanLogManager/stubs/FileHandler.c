@@ -189,8 +189,6 @@ static uint32_t test_count_valid_entries(const uint8_t *data, uint32_t length)
 
 FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
 {
-    (void)dev;
-    (void)name;
     mock_current_is_meta = false;
     if (dev)
     {
@@ -201,6 +199,11 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
     {
         mock_file_open_failed = true;
     }
+    else if (dev != NULL)
+    {
+        return f_open(&dev->file, name, FA_OPEN_APPEND | FA_WRITE);
+    }
+
     return mock_file_open_result;
 }
 
@@ -245,15 +248,19 @@ FRESULT FatFS_SD_GetFileSize(FatFsDeviceType *dev, uint32_t *size)
 
 FRESULT FatFS_SD_CloseFile(FatFsDeviceType *dev)
 {
-    (void)dev;
+    FRESULT result = FR_OK;
 
     mock_file_closed = true;
+    if (dev != NULL)
+    {
+        result = f_close(&dev->file);
+    }
     if (dev == mock_meta_dev)
     {
         mock_meta_dev = NULL;
     }
     mock_current_is_meta = false;
-    return FR_OK;
+    return result;
 }
 
 FRESULT
@@ -397,6 +404,10 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
     else
     {
         mock_meta_dev = NULL;
+        if (dev != NULL)
+        {
+            return f_open(&dev->file, name, FA_WRITE | FA_CREATE_ALWAYS);
+        }
     }
     return FR_OK;
 }

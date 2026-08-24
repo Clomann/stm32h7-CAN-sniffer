@@ -19,7 +19,7 @@ typedef struct
     bool in_use;
 } TestOpenHandle;
 
-static TestFileEntry test_files[256];
+static TestFileEntry test_files[768];
 static TestOpenHandle open_handles[16];
 static uint32_t test_file_count   = 0;
 static uint32_t test_open_count   = 0;

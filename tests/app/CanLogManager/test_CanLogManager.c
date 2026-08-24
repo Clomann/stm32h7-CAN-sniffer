@@ -696,7 +696,7 @@ void test_FileRotation_WrapsHeadTailAtLimit(void)
 
 /**
  * @brief Tests error handling for file operation failures
- * @details Verifies graceful handling of file open failures during initialization
+ * @details Verifies file open failures are reported during initialization
  */
 void test_ErrorHandling_FileOpenFailure(void)
 {
@@ -704,7 +704,7 @@ void test_ErrorHandling_FileOpenFailure(void)
 
     FRESULT result = appCanLogHandlerInit(testCtrlData);
 
-    TEST_ASSERT_EQUAL(FR_OK, result);
+    TEST_ASSERT_EQUAL(FR_DENIED, result);
 
     TEST_ASSERT_TRUE(get_file_open_failed());
 }
