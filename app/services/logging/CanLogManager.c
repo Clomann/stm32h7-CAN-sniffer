@@ -621,6 +621,62 @@ uint8_t FsCustom_GetCanAbsRxCapacity(uint32_t *frames)
     return 0U;
 }
 
+static void CanLogManager_CopyFdcanHealthStats(
+    FsCustomFdcanHealthStatsType *dst,
+    const CanAbsFdcanHealthStatsType *src
+)
+{
+    dst->protocol_status         = src->protocol_status;
+    dst->error_counter           = src->error_counter;
+    dst->rx_fifo0_status         = src->rx_fifo0_status;
+    dst->interrupt_flags         = src->interrupt_flags;
+    dst->protocol_status_latched = src->protocol_status_latched;
+    dst->error_counter_latched   = src->error_counter_latched;
+    dst->rx_fifo0_status_latched = src->rx_fifo0_status_latched;
+    dst->interrupt_flags_latched = src->interrupt_flags_latched;
+    dst->rx_fifo0_lost_events    = src->rx_fifo0_lost_events;
+    dst->protocol_error_events   = src->protocol_error_events;
+    dst->error_warning_events    = src->error_warning_events;
+    dst->error_passive_events    = src->error_passive_events;
+    dst->bus_off_events          = src->bus_off_events;
+}
+
+uint8_t FsCustom_GetCanAbsFdcanHealthCan1(FsCustomFdcanHealthStatsType *stats)
+{
+    CanAbsFdcanHealthStatsType canabs_stats;
+
+    if (stats == NULL)
+    {
+        return 1U;
+    }
+
+    if (0U != CanAbs_GetFdcanHealth_Can1(&canabs_stats))
+    {
+        return 1U;
+    }
+
+    CanLogManager_CopyFdcanHealthStats(stats, &canabs_stats);
+    return 0U;
+}
+
+uint8_t FsCustom_GetCanAbsFdcanHealthCan2(FsCustomFdcanHealthStatsType *stats)
+{
+    CanAbsFdcanHealthStatsType canabs_stats;
+
+    if (stats == NULL)
+    {
+        return 1U;
+    }
+
+    if (0U != CanAbs_GetFdcanHealth_Can2(&canabs_stats))
+    {
+        return 1U;
+    }
+
+    CanLogManager_CopyFdcanHealthStats(stats, &canabs_stats);
+    return 0U;
+}
+
 uint8_t FsCustom_GetStaticTxReplayStatsCan1(
     uint32_t *requests,
     uint32_t *completed,
@@ -2252,6 +2308,7 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 
         CanLogCtrlData.framesLost = false;
         RuntimeChecks_Init();
+        CanAbs_ResetFdcanHealth();
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
 #if CAN_STATIC_TX_REPLAY_ENABLE
         CanLogManager_StaticReplayIdCheckInit(

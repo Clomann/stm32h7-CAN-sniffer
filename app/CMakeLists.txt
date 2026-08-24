@@ -21,6 +21,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/storage/FileHandler.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/HttpAbs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/logging/CanLogBuffer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/logging/CanLogDebugProvider.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/config/SettingsHandler.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/logging/CanLogManager.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/config/ConfigManager.c

@@ -34,6 +34,7 @@
 
 #include "SettingsHandler.h"
 #include "ConfigManager.h"
+#include "CanLogDebugProvider.h"
 #include "CanLogManager.h"
 #include "CanCtrl.h"
 #include "WebInterface.h"
@@ -513,6 +514,7 @@ static void Core0Task0Main(void *parameters)
         &AppCtrlData.commitLog
     );
     appCanLogHandlerInit(AppCtrlData.Log);
+    CanLogDebugProvider_Register();
     Core0Task1_SetCanLogHandle(AppCtrlData.Log);
 
     GPIO_Mco1_Init();

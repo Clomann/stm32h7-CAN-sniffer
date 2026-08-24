@@ -43,12 +43,14 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
 #define CANLOG_MAX_STATUS_SIZE    5120U
+#define CANLOG_MAX_DEBUG_SIZE     4096U
 #define CANLOG_MAX_CONFIG_SIZE    96U
 #define IAP_STATUS_MAX_SIZE       640U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
 #define CANLOG_CONFIG_PATH        "/logs/config"
 #define CANLOG_STATUS_PATH        "/logger/status"
+#define CANLOG_DEBUG_PATH         "/logger/debug"
 #define CANLOG_POST_REDIRECT_PATH "/postredir"
 #define IAP_STATUS_PATH           "/iap/status"
 #define IAP_PREPARE_PATH          "/iap/prepare"
@@ -91,6 +93,53 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define CANLOG_CONFIG_STRING                                                   \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
 
+#define U64_HI(value) ((unsigned long)(((value) >> 32) & 0xFFFFFFFFULL))
+#define U64_LO(value) ((unsigned long)((value) & 0xFFFFFFFFULL))
+
+#define CANLOG_DEBUG_COUNTER_PAIR(name)                                        \
+    "\"" name "_hi\":%lu,\"" name "_lo\":%lu"
+
+#define CANLOG_DEBUG_STRING                                                    \
+    "{ " CANLOG_DEBUG_COUNTER_PAIR("can_rx_frames"                             \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can_rx_dropped_frames"                    \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_rx_dropped_frames"                   \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_rx_dropped_frames"                   \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("bridge_ingress_frames"                    \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("logger_ingress_frames"                    \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("bridge_logger_backlog_frames"             \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("logger_buffer_rejected_frames"            \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("logger_buffer_full_frames"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_sequence_gap_frames"                 \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_sequence_gap_frames"                 \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_id_sequence_errors"                  \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_id_sequence_errors"                  \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("sd_buffer_ingress_frames"                 \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("sd_buffer_egress_frames"                  \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("sd_buffer_dropped_frames"                 \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("sd_blocks_written"                        \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("message_port_dropped_frames"              \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("runtime_check_error_calls"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_rx_fifo0_lost_events"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_rx_fifo0_lost_events"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_protocol_error_events"               \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_protocol_error_events"               \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_error_warning_events"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_error_warning_events"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_error_passive_events"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_error_passive_events"                \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can1_bus_off_events"                      \
+    ) "," CANLOG_DEBUG_COUNTER_PAIR("can2_bus_off_events") "}"
+
+#define CANLOG_DEBUG_ERROR_STRING                                              \
+    "{\"error_reason\":\"%s\",\"payload_size\":%lu,\"max_size\":%lu}"
+
+#define JSON_RESPONSE_HEADER                                                   \
+    "HTTP/1.1 200 OK\r\n"                                                      \
+    "Content-Type: application/json\r\n"                                       \
+    "Connection: close\r\n"                                                    \
+    "\r\n"
+#define JSON_RESPONSE_HEADER_SIZE (sizeof(JSON_RESPONSE_HEADER) - 1U)
+
 #define IAP_STATUS_STRING                                                      \
     "{\"app_version\":\"%s\",\"logger_active\":%s,\"upload_ready\":%s,"        \
     "\"upload_state\":\"%s\","                                                 \
@@ -119,15 +168,31 @@ static FatFsDeviceType CanLogReadFileDevice;
  * Assumes single-threaded or serialized HTTP request processing. */
 static char MetaData[CANLOG_MAX_META_DATA_SIZE];
 static char StatusData[CANLOG_MAX_STATUS_SIZE];
+static char DebugData[JSON_RESPONSE_HEADER_SIZE + CANLOG_MAX_DEBUG_SIZE];
 static char ConfigData[CANLOG_MAX_CONFIG_SIZE];
 static char IapStatusData[IAP_STATUS_MAX_SIZE];
 static char IapPrepareResultData[96U];
 static char IapApplyResultData[96U];
 static char AppVersionData[96U];
+static FsCustomDebugProviderType DebugProvider = {0};
+
+uint8_t FsCustom_SetDebugProvider(const FsCustomDebugProviderType *provider)
+{
+    if ((NULL == provider) || (NULL == provider->read))
+    {
+        return 1U;
+    }
+
+    DebugProvider = *provider;
+    return 0U;
+}
+
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
     uint32_t FileSize = 0U;
+
+    memset(file, 0, sizeof(*file));
 
     /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
     if (0 == strncmp(name, CANLOG_FILE_PATH, sizeof(CANLOG_FILE_PATH) - 1))
@@ -425,6 +490,118 @@ int fs_open_custom(struct fs_file *file, const char *name)
         file->data           = StatusData;
         file->len            = n;
         file->index          = 0;
+        file->is_custom_file = 0; /* httpd sends static buffer     */
+        return 1;
+    }
+    else if (0
+             == strncmp(name, CANLOG_DEBUG_PATH, sizeof(CANLOG_DEBUG_PATH) - 1))
+    {
+        FsCustomDebugSnapshotType Snapshot;
+        char *DebugPayload = &DebugData[JSON_RESPONSE_HEADER_SIZE];
+        int n              = 0;
+
+        if ((NULL == DebugProvider.read)
+            || (0U != DebugProvider.read(DebugProvider.context, &Snapshot)))
+        {
+            return 0;
+        }
+
+        memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
+
+        n = snprintf(
+            DebugPayload,
+            CANLOG_MAX_DEBUG_SIZE,
+            CANLOG_DEBUG_STRING,
+            U64_HI(Snapshot.can_rx_frames),
+            U64_LO(Snapshot.can_rx_frames),
+            U64_HI(Snapshot.can_rx_dropped_frames),
+            U64_LO(Snapshot.can_rx_dropped_frames),
+            U64_HI(Snapshot.can1_rx_dropped_frames),
+            U64_LO(Snapshot.can1_rx_dropped_frames),
+            U64_HI(Snapshot.can2_rx_dropped_frames),
+            U64_LO(Snapshot.can2_rx_dropped_frames),
+            U64_HI(Snapshot.bridge_ingress_frames),
+            U64_LO(Snapshot.bridge_ingress_frames),
+            U64_HI(Snapshot.logger_ingress_frames),
+            U64_LO(Snapshot.logger_ingress_frames),
+            U64_HI(Snapshot.bridge_logger_backlog_frames),
+            U64_LO(Snapshot.bridge_logger_backlog_frames),
+            U64_HI(Snapshot.logger_buffer_rejected_frames),
+            U64_LO(Snapshot.logger_buffer_rejected_frames),
+            U64_HI(Snapshot.logger_buffer_full_frames),
+            U64_LO(Snapshot.logger_buffer_full_frames),
+            U64_HI(Snapshot.can1_sequence_gap_frames),
+            U64_LO(Snapshot.can1_sequence_gap_frames),
+            U64_HI(Snapshot.can2_sequence_gap_frames),
+            U64_LO(Snapshot.can2_sequence_gap_frames),
+            U64_HI(Snapshot.can1_id_sequence_errors),
+            U64_LO(Snapshot.can1_id_sequence_errors),
+            U64_HI(Snapshot.can2_id_sequence_errors),
+            U64_LO(Snapshot.can2_id_sequence_errors),
+            U64_HI(Snapshot.sd_buffer_ingress_frames),
+            U64_LO(Snapshot.sd_buffer_ingress_frames),
+            U64_HI(Snapshot.sd_buffer_egress_frames),
+            U64_LO(Snapshot.sd_buffer_egress_frames),
+            U64_HI(Snapshot.sd_buffer_dropped_frames),
+            U64_LO(Snapshot.sd_buffer_dropped_frames),
+            U64_HI(Snapshot.sd_blocks_written),
+            U64_LO(Snapshot.sd_blocks_written),
+            U64_HI(Snapshot.message_port_dropped_frames),
+            U64_LO(Snapshot.message_port_dropped_frames),
+            U64_HI(Snapshot.runtime_check_error_calls),
+            U64_LO(Snapshot.runtime_check_error_calls),
+            U64_HI(Snapshot.can1_rx_fifo0_lost_events),
+            U64_LO(Snapshot.can1_rx_fifo0_lost_events),
+            U64_HI(Snapshot.can2_rx_fifo0_lost_events),
+            U64_LO(Snapshot.can2_rx_fifo0_lost_events),
+            U64_HI(Snapshot.can1_protocol_error_events),
+            U64_LO(Snapshot.can1_protocol_error_events),
+            U64_HI(Snapshot.can2_protocol_error_events),
+            U64_LO(Snapshot.can2_protocol_error_events),
+            U64_HI(Snapshot.can1_error_warning_events),
+            U64_LO(Snapshot.can1_error_warning_events),
+            U64_HI(Snapshot.can2_error_warning_events),
+            U64_LO(Snapshot.can2_error_warning_events),
+            U64_HI(Snapshot.can1_error_passive_events),
+            U64_LO(Snapshot.can1_error_passive_events),
+            U64_HI(Snapshot.can2_error_passive_events),
+            U64_LO(Snapshot.can2_error_passive_events),
+            U64_HI(Snapshot.can1_bus_off_events),
+            U64_LO(Snapshot.can1_bus_off_events),
+            U64_HI(Snapshot.can2_bus_off_events),
+            U64_LO(Snapshot.can2_bus_off_events)
+        );
+
+        if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
+        {
+            unsigned long PayloadSize = 0UL;
+            const char *Reason        = "debug_payload_format_failed";
+
+            if (n >= 0)
+            {
+                PayloadSize = (unsigned long)n;
+                Reason      = "debug_payload_too_large";
+            }
+
+            n = snprintf(
+                DebugPayload,
+                CANLOG_MAX_DEBUG_SIZE,
+                CANLOG_DEBUG_ERROR_STRING,
+                Reason,
+                PayloadSize,
+                (unsigned long)CANLOG_MAX_DEBUG_SIZE
+            );
+            if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
+            {
+                return 0;
+            }
+        }
+
+        file->data  = DebugData;
+        file->len   = (int)JSON_RESPONSE_HEADER_SIZE + n;
+        file->index = 0;
+        file->flags =
+            FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
         file->is_custom_file = 0; /* httpd sends static buffer     */
         return 1;
     }
