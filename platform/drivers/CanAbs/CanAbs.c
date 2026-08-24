@@ -102,10 +102,40 @@ static uint32_t CanAbs_Can2_HwHighWatermark = 0U;
 static uint32_t CanAbs_Can1_RxHighWater     = 0U;
 static uint32_t CanAbs_Can2_RxHighWater     = 0U;
 
+typedef struct
+{
+    volatile uint32_t protocol_status_latched;
+    volatile uint32_t error_counter_latched;
+    volatile uint32_t rx_fifo0_status_latched;
+    volatile uint32_t interrupt_flags_latched;
+    volatile uint32_t active_error_event_ir_flags;
+    volatile uint8_t rx_fifo0_lost_active;
+    volatile uint64_t rx_fifo0_lost_events;
+    volatile uint64_t protocol_error_events;
+    volatile uint64_t error_warning_events;
+    volatile uint64_t error_passive_events;
+    volatile uint64_t bus_off_events;
+} CanAbsFdcanHealthStateType;
+
+static CanAbsFdcanHealthStateType CanAbs_Can1_FdcanHealth = {0U};
+static CanAbsFdcanHealthStateType CanAbs_Can2_FdcanHealth = {0U};
+
 static uint32_t Can1_SequenceIndex = 0U;
 static uint32_t Can2_SequenceIndex = 0U;
 
 /* Private functions */
+
+#define CANABS_FDCAN_PROTOCOL_ERROR_IR_MASK                                    \
+    (FDCAN_IR_ELO | FDCAN_IR_PEA | FDCAN_IR_PED | FDCAN_IR_ARA)
+
+#define CANABS_FDCAN_ERROR_STATE_IR_MASK                                       \
+    (FDCAN_IR_EP | FDCAN_IR_EW | FDCAN_IR_BO)
+
+#define CANABS_FDCAN_ERROR_EVENT_IR_MASK                                       \
+    (CANABS_FDCAN_PROTOCOL_ERROR_IR_MASK | CANABS_FDCAN_ERROR_STATE_IR_MASK)
+
+#define CANABS_FDCAN_LAST_ERROR_CODE_NO_ERROR  0U
+#define CANABS_FDCAN_LAST_ERROR_CODE_NO_CHANGE 7U
 
 /**
  * Little helper function to make ioctl function call a bit prettier.
@@ -133,6 +163,253 @@ static void CanAbs_UpdateRxHighWater(uint8_t channel, const RingBuffer *rb)
             CanAbs_Can2_RxHighWater = used;
         }
     }
+}
+
+static CanAbsFdcanHealthStateType *CanAbs_GetFdcanHealthState(uint8_t channel)
+{
+    if (channel == 1U)
+    {
+        return &CanAbs_Can1_FdcanHealth;
+    }
+    else if (channel == 2U)
+    {
+        return &CanAbs_Can2_FdcanHealth;
+    }
+
+    return NULL;
+}
+
+static uint8_t CanAbs_IsLastErrorCodeActive(uint32_t code)
+{
+    return ((code != CANABS_FDCAN_LAST_ERROR_CODE_NO_ERROR)
+            && (code != CANABS_FDCAN_LAST_ERROR_CODE_NO_CHANGE))
+               ? 1U
+               : 0U;
+}
+
+static uint8_t CanAbs_PsrHasInterestingError(uint32_t psr)
+{
+    uint32_t lec  = (psr & FDCAN_PSR_LEC) >> FDCAN_PSR_LEC_Pos;
+    uint32_t dlec = (psr & FDCAN_PSR_DLEC) >> FDCAN_PSR_DLEC_Pos;
+
+    if (0U
+        != (psr & (FDCAN_PSR_EP | FDCAN_PSR_EW | FDCAN_PSR_BO | FDCAN_PSR_PXE)))
+    {
+        return 1U;
+    }
+
+    if ((0U != CanAbs_IsLastErrorCodeActive(lec))
+        || (0U != CanAbs_IsLastErrorCodeActive(dlec)))
+    {
+        return 1U;
+    }
+
+    return 0U;
+}
+
+static uint8_t CanAbs_EcrHasInterestingError(uint32_t ecr)
+{
+    return (0U
+            != (ecr
+                & (FDCAN_ECR_TEC | FDCAN_ECR_REC | FDCAN_ECR_RP | FDCAN_ECR_CEL)
+            ))
+               ? 1U
+               : 0U;
+}
+
+static uint8_t
+CanAbs_HasFdcanHealthLatch(const CanAbsFdcanHealthStateType *state)
+{
+    if (state == NULL)
+    {
+        return 0U;
+    }
+
+    return (0U
+            != (state->protocol_status_latched | state->error_counter_latched
+                | state->rx_fifo0_status_latched
+                | state->interrupt_flags_latched))
+               ? 1U
+               : 0U;
+}
+
+static void CanAbs_ResetFdcanHealthState(CanAbsFdcanHealthStateType *state)
+{
+    if (state == NULL)
+    {
+        return;
+    }
+
+    state->protocol_status_latched     = 0U;
+    state->error_counter_latched       = 0U;
+    state->rx_fifo0_status_latched     = 0U;
+    state->interrupt_flags_latched     = 0U;
+    state->active_error_event_ir_flags = 0U;
+    state->rx_fifo0_lost_active        = 0U;
+    state->rx_fifo0_lost_events        = 0U;
+    state->protocol_error_events       = 0U;
+    state->error_warning_events        = 0U;
+    state->error_passive_events        = 0U;
+    state->bus_off_events              = 0U;
+}
+
+static void CanAbs_PrimeFdcanHealthState(
+    CommDriver *driver,
+    CanAbsFdcanHealthStateType *state
+)
+{
+    FDCAN_HandleTypeDef *hfdcan;
+    uint32_t rxf0s;
+    uint32_t ir;
+
+    if ((driver == NULL) || (state == NULL))
+    {
+        return;
+    }
+
+    if (COMM_SUCCESS != fdcan_get_can(driver, &hfdcan))
+    {
+        return;
+    }
+
+    if ((hfdcan == NULL) || (hfdcan->Instance == NULL))
+    {
+        return;
+    }
+
+    rxf0s = hfdcan->Instance->RXF0S;
+    ir    = hfdcan->Instance->IR;
+
+    state->rx_fifo0_lost_active =
+        ((0U != (rxf0s & FDCAN_RXF0S_RF0L)) || (0U != (ir & FDCAN_IR_RF0L)))
+            ? 1U
+            : 0U;
+    state->active_error_event_ir_flags = ir & CANABS_FDCAN_ERROR_EVENT_IR_MASK;
+}
+
+static void
+CanAbs_CaptureFdcanHealth(uint8_t channel, FDCAN_HandleTypeDef *hfdcan)
+{
+    CanAbsFdcanHealthStateType *state;
+    uint32_t psr;
+    uint32_t ecr;
+    uint32_t rxf0s;
+    uint32_t ir;
+    uint32_t active_error_event_ir_flags;
+    uint32_t new_error_event_ir_flags;
+    uint8_t rx_fifo0_lost_active;
+    uint8_t latch_snapshot = 0U;
+
+    if ((hfdcan == NULL) || (hfdcan->Instance == NULL))
+    {
+        return;
+    }
+
+    state = CanAbs_GetFdcanHealthState(channel);
+    if (state == NULL)
+    {
+        return;
+    }
+
+    psr   = hfdcan->Instance->PSR;
+    ecr   = hfdcan->Instance->ECR;
+    rxf0s = hfdcan->Instance->RXF0S;
+    ir    = hfdcan->Instance->IR;
+
+    rx_fifo0_lost_active =
+        ((0U != (rxf0s & FDCAN_RXF0S_RF0L)) || (0U != (ir & FDCAN_IR_RF0L)))
+            ? 1U
+            : 0U;
+    if ((rx_fifo0_lost_active != 0U) && (state->rx_fifo0_lost_active == 0U))
+    {
+        state->rx_fifo0_lost_events++;
+        latch_snapshot = 1U;
+    }
+    state->rx_fifo0_lost_active = rx_fifo0_lost_active;
+
+    active_error_event_ir_flags = ir & CANABS_FDCAN_ERROR_EVENT_IR_MASK;
+    new_error_event_ir_flags =
+        active_error_event_ir_flags & ~state->active_error_event_ir_flags;
+    state->active_error_event_ir_flags = active_error_event_ir_flags;
+
+    if (0U != (new_error_event_ir_flags & CANABS_FDCAN_PROTOCOL_ERROR_IR_MASK))
+    {
+        state->protocol_error_events++;
+        latch_snapshot = 1U;
+    }
+
+    if (0U != (new_error_event_ir_flags & FDCAN_IR_EW))
+    {
+        state->error_warning_events++;
+        latch_snapshot = 1U;
+    }
+
+    if (0U != (new_error_event_ir_flags & FDCAN_IR_EP))
+    {
+        state->error_passive_events++;
+        latch_snapshot = 1U;
+    }
+
+    if (0U != (new_error_event_ir_flags & FDCAN_IR_BO))
+    {
+        state->bus_off_events++;
+        latch_snapshot = 1U;
+    }
+
+    if ((latch_snapshot == 0U) && (0U == CanAbs_HasFdcanHealthLatch(state))
+        && ((0U != CanAbs_PsrHasInterestingError(psr))
+            || (0U != CanAbs_EcrHasInterestingError(ecr))))
+    {
+        latch_snapshot = 1U;
+    }
+
+    if (latch_snapshot != 0U)
+    {
+        state->protocol_status_latched = psr;
+        state->error_counter_latched   = ecr;
+        state->rx_fifo0_status_latched = rxf0s;
+        state->interrupt_flags_latched = ir;
+    }
+}
+
+static uint8_t CanAbs_GetFdcanHealth(
+    CommDriver *driver,
+    CanAbsFdcanHealthStateType *state,
+    CanAbsFdcanHealthStatsType *stats
+)
+{
+    FDCAN_HandleTypeDef *hfdcan;
+
+    if ((driver == NULL) || (state == NULL) || (stats == NULL))
+    {
+        return 1U;
+    }
+
+    if (COMM_SUCCESS != fdcan_get_can(driver, &hfdcan))
+    {
+        return 1U;
+    }
+
+    if ((hfdcan == NULL) || (hfdcan->Instance == NULL))
+    {
+        return 1U;
+    }
+
+    stats->protocol_status         = hfdcan->Instance->PSR;
+    stats->error_counter           = hfdcan->Instance->ECR;
+    stats->rx_fifo0_status         = hfdcan->Instance->RXF0S;
+    stats->interrupt_flags         = hfdcan->Instance->IR;
+    stats->protocol_status_latched = state->protocol_status_latched;
+    stats->error_counter_latched   = state->error_counter_latched;
+    stats->rx_fifo0_status_latched = state->rx_fifo0_status_latched;
+    stats->interrupt_flags_latched = state->interrupt_flags_latched;
+    stats->rx_fifo0_lost_events    = state->rx_fifo0_lost_events;
+    stats->protocol_error_events   = state->protocol_error_events;
+    stats->error_warning_events    = state->error_warning_events;
+    stats->error_passive_events    = state->error_passive_events;
+    stats->bus_off_events          = state->bus_off_events;
+
+    return 0U;
 }
 
 #if CANABS_CONSUME_ALL_FRAMES_ON_ANY_IRQ
@@ -449,6 +726,8 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
     uint64_t HardwareTimestamp;
     RingBufferErrorType res;
 
+    CanAbs_CaptureFdcanHealth(channel, hfdcan);
+
     if (((RxFifo0ITs & FDCAN_IT_RX_FIFO0_MESSAGE_LOST) != 0U)
         || ((hfdcan->Instance->RXF0S & FDCAN_RXF0S_RF0L) != 0U))
     {
@@ -619,6 +898,7 @@ comm_status_t CanAbs_Init_Can1(uint32_t baudrate)
 
     CanAbs_Can1_RxHighWater     = 0U;
     CanAbs_Can1_HwHighWatermark = 0U;
+    CanAbs_ResetFdcanHealthState(&CanAbs_Can1_FdcanHealth);
 
     res = CanAbs_Init(
         &Fdcan1Driver,
@@ -683,6 +963,7 @@ comm_status_t CanAbs_Init_Can2(uint32_t baudrate)
 
     CanAbs_Can2_RxHighWater     = 0U;
     CanAbs_Can2_HwHighWatermark = 0U;
+    CanAbs_ResetFdcanHealthState(&CanAbs_Can2_FdcanHealth);
 
     res = CanAbs_Init(
         &Fdcan2Driver,
@@ -750,6 +1031,17 @@ uint8_t CanAbs_GetRxHighWater_Can1(uint32_t *frames)
     return 0U;
 }
 
+uint8_t CanAbs_GetHwRxFifoHighWater_Can1(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_Can1_HwHighWatermark;
+    return 0U;
+}
+
 uint8_t CanAbs_GetStaticTxReplayStats_Can1(FdcanStaticTxReplayStatsType *stats)
 {
 #if CAN_STATIC_TX_REPLAY_ENABLE
@@ -760,9 +1052,9 @@ uint8_t CanAbs_GetStaticTxReplayStats_Can1(FdcanStaticTxReplayStatsType *stats)
         return 1U;
     }
 
-    stats->requests  = 0U;
-    stats->completed = 0U;
-    stats->irqs      = 0U;
+    stats->requests            = 0U;
+    stats->completed           = 0U;
+    stats->irqs                = 0U;
     stats->last_completed_mask = 0U;
     stats->buffer_mask         = 0U;
     stats->next_id_offset      = 0U;
@@ -775,6 +1067,15 @@ uint8_t CanAbs_GetStaticTxReplayStats_Can1(FdcanStaticTxReplayStatsType *stats)
     stats->active              = 0U;
     return 0U;
 #endif
+}
+
+uint8_t CanAbs_GetFdcanHealth_Can1(CanAbsFdcanHealthStatsType *stats)
+{
+    return CanAbs_GetFdcanHealth(
+        &Fdcan1Driver,
+        &CanAbs_Can1_FdcanHealth,
+        stats
+    );
 }
 
 uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
@@ -788,6 +1089,17 @@ uint8_t CanAbs_GetRxHighWater_Can2(uint32_t *frames)
     return 0U;
 }
 
+uint8_t CanAbs_GetHwRxFifoHighWater_Can2(uint32_t *frames)
+{
+    if (frames == NULL)
+    {
+        return 1U;
+    }
+
+    *frames = CanAbs_Can2_HwHighWatermark;
+    return 0U;
+}
+
 uint8_t CanAbs_GetStaticTxReplayStats_Can2(FdcanStaticTxReplayStatsType *stats)
 {
 #if CAN_STATIC_TX_REPLAY_ENABLE
@@ -798,9 +1110,9 @@ uint8_t CanAbs_GetStaticTxReplayStats_Can2(FdcanStaticTxReplayStatsType *stats)
         return 1U;
     }
 
-    stats->requests  = 0U;
-    stats->completed = 0U;
-    stats->irqs      = 0U;
+    stats->requests            = 0U;
+    stats->completed           = 0U;
+    stats->irqs                = 0U;
     stats->last_completed_mask = 0U;
     stats->buffer_mask         = 0U;
     stats->next_id_offset      = 0U;
@@ -815,9 +1127,31 @@ uint8_t CanAbs_GetStaticTxReplayStats_Can2(FdcanStaticTxReplayStatsType *stats)
 #endif
 }
 
+uint8_t CanAbs_GetFdcanHealth_Can2(CanAbsFdcanHealthStatsType *stats)
+{
+    return CanAbs_GetFdcanHealth(
+        &Fdcan2Driver,
+        &CanAbs_Can2_FdcanHealth,
+        stats
+    );
+}
+
 uint32_t CanAbs_GetRxBufferCapacity(void)
 {
     return SW_RX_FRAME_BUFFER_SIZE;
+}
+
+uint32_t CanAbs_GetHwRxFifoCapacity(void)
+{
+    return FDCAN_RAM_RX_ELEMENTS;
+}
+
+void CanAbs_ResetFdcanHealth(void)
+{
+    CanAbs_ResetFdcanHealthState(&CanAbs_Can1_FdcanHealth);
+    CanAbs_ResetFdcanHealthState(&CanAbs_Can2_FdcanHealth);
+    CanAbs_PrimeFdcanHealthState(&Fdcan1Driver, &CanAbs_Can1_FdcanHealth);
+    CanAbs_PrimeFdcanHealthState(&Fdcan2Driver, &CanAbs_Can2_FdcanHealth);
 }
 
 void CanAbs_Drain(void)
