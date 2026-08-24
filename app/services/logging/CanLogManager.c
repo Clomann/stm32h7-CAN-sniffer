@@ -70,27 +70,9 @@ static bool CanLogManager_StaticReplayIdCheck(
 )
 {
     uint32_t offset;
-    uint32_t bit;
 
     offset = ((can_id & 0x7FFU) + 0x800U - check->base_id) & 0x7FFU;
-    if (offset >= CAN_STATIC_TX_REPLAY_TX_BUFFERS)
-    {
-        return false;
-    }
-
-    bit = 1UL << offset;
-    if ((check->seen_mask & bit) != 0U)
-    {
-        return false;
-    }
-
-    check->seen_mask |= bit;
-    if (check->seen_mask == check->expected_mask)
-    {
-        check->seen_mask = 0U;
-    }
-
-    return true;
+    return offset < check->id_count;
 }
 #endif
 
