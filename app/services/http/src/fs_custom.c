@@ -42,7 +42,7 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 
 #define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 96U
-#define CANLOG_MAX_STATUS_SIZE    768U
+#define CANLOG_MAX_STATUS_SIZE    5120U
 #define CANLOG_MAX_CONFIG_SIZE    96U
 #define IAP_STATUS_MAX_SIZE       640U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
@@ -69,8 +69,19 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
     "{ "                                                                       \
     "\"active\":%s,\"frames_lost\":%s,\"prealloc_errors\":%s,\"frames_total_"  \
     "hi\":%lu,\"frames_total_lo\":%lu,\"bus_load_1\":%.2f,\"bus_load_2\":%."   \
-    "2f,\"rb1_bytes_highwater_pct\":%.2f,\"can1_rx_highwater_pct\":%.2f,"      \
-    "\"can2_rx_highwater_pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f,"    \
+    "2f,\"rb1_bytes_capacity\":%lu,\"rb1_bytes_now\":%lu,\"rb1_bytes_"         \
+    "highwater\":%lu,\"rb1_bytes_highwater_pct\":%.2f,\"rb1_bytes_min_"        \
+    "since_status\":%lu,\"rb1_bytes_max_since_status\":%lu,\"rb1_bytes_at_"    \
+    "last_sd_block_start\":%lu,\"rb1_bytes_at_last_sd_block_end_before_"       \
+    "consume\":%lu,\"rb1_bytes_at_last_sd_block_end_after_consume\":%lu,"      \
+    "\"sd_block_attempts_since_status\":%lu,\"sd_blocks_written_since_"        \
+    "status\":%lu,\"sd_block_errors_since_status\":%lu,\"sd_last_block_"       \
+    "frames\":%lu,\"sd_write_last_us\":%lu,\"sd_sync_last_us\":%lu,"           \
+    "\"sd_store_block_last_us\":%lu,\"sd_write_max_since_status_us\":%lu,"     \
+    "\"sd_sync_max_since_status_us\":%lu,\"sd_store_block_max_since_status_"   \
+    "us\":%lu,\"sd_store_block_avg_since_status_us\":%lu,"                     \
+    "\"can1_rx_highwater_pct\":%.2f,\"can2_rx_highwater_pct\":%.2f,"           \
+    "\"fdcan_msg_port_highwater_pct\":%.2f,"                                    \
     "\"sd_write_max_us\":%lu,\"sd_sync_max_us\":%lu,\"sd_store_block_max_"     \
     "us\":"                                                                    \
     "%lu,\"can1_tx_replay_requests\":%lu,\"can1_tx_replay_completed\":%lu,"    \
@@ -238,33 +249,33 @@ int fs_open_custom(struct fs_file *file, const char *name)
                  sizeof(CANLOG_STATUS_PATH) - 1
              ))
     {
-        uint8_t IsTracerRunning        = 1;
-        float BusLoadCan1              = 0.0;
-        float BusLoadCan2              = 0.0;
-        _Bool AnyFrameLost             = false;
-        uint8_t PreallocErrors         = 0U;
-        uint32_t Rb1BytesHighWater     = 0U;
-        float Rb1BytesHighWaterPct     = 0.0f;
-        uint32_t CanAbsRxHighWaterCan1 = 0U;
-        uint32_t CanAbsRxHighWaterCan2 = 0U;
-        uint32_t CanAbsRxCapacity      = 0U;
-        float CanAbsRxHighWaterPctCan1 = 0.0f;
-        float CanAbsRxHighWaterPctCan2 = 0.0f;
-        uint32_t FdcanMsgPortHighWater = 0U;
-        uint32_t FdcanMsgPortCapacity  = 0U;
-        float FdcanMsgPortHighWaterPct = 0.0f;
-        uint64_t FrameCount            = 0U;
-        unsigned long FrameCountHi     = 0UL;
-        unsigned long FrameCountLo     = 0UL;
-        uint32_t SdWriteMaxUs          = 0U;
-        uint32_t SdSyncMaxUs           = 0U;
-        uint32_t SdStoreBlockMaxUs     = 0U;
-        uint32_t Can1TxReplayRequests  = 0U;
-        uint32_t Can1TxReplayCompleted = 0U;
-        uint32_t Can1TxReplayIrqs      = 0U;
-        uint32_t Can2TxReplayRequests  = 0U;
-        uint32_t Can2TxReplayCompleted = 0U;
-        uint32_t Can2TxReplayIrqs      = 0U;
+        uint8_t IsTracerRunning                           = 1;
+        float BusLoadCan1                                 = 0.0;
+        float BusLoadCan2                                 = 0.0;
+        _Bool AnyFrameLost                                = false;
+        uint8_t PreallocErrors                            = 0U;
+        float Rb1BytesHighWaterPct                        = 0.0f;
+        uint32_t CanAbsRxHighWaterCan1                    = 0U;
+        uint32_t CanAbsRxHighWaterCan2                    = 0U;
+        uint32_t CanAbsRxCapacity                         = 0U;
+        float CanAbsRxHighWaterPctCan1                    = 0.0f;
+        float CanAbsRxHighWaterPctCan2                    = 0.0f;
+        uint32_t FdcanMsgPortHighWater                    = 0U;
+        uint32_t FdcanMsgPortCapacity                     = 0U;
+        float FdcanMsgPortHighWaterPct                    = 0.0f;
+        uint64_t FrameCount                               = 0U;
+        unsigned long FrameCountHi                        = 0UL;
+        unsigned long FrameCountLo                        = 0UL;
+        uint32_t SdWriteMaxUs                             = 0U;
+        uint32_t SdSyncMaxUs                              = 0U;
+        uint32_t SdStoreBlockMaxUs                        = 0U;
+        FsCustomCanLogBufferTelemetryType BufferTelemetry = {0U};
+        uint32_t Can1TxReplayRequests                     = 0U;
+        uint32_t Can1TxReplayCompleted                    = 0U;
+        uint32_t Can1TxReplayIrqs                         = 0U;
+        uint32_t Can2TxReplayRequests                     = 0U;
+        uint32_t Can2TxReplayCompleted                    = 0U;
+        uint32_t Can2TxReplayIrqs                         = 0U;
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
@@ -275,9 +286,10 @@ int fs_open_custom(struct fs_file *file, const char *name)
         (void)FsCustom_GetPreallocErrorFlag(&PreallocErrors);
         FsCustom_GetBusloadCan1(&BusLoadCan1);
         FsCustom_GetBusloadCan2(&BusLoadCan2);
-        if (0U != FsCustom_GetRb1BytesHighWater(&Rb1BytesHighWater))
+        if (0U != FsCustom_GetCanLogBufferTelemetry(&BufferTelemetry))
         {
-            Rb1BytesHighWater = 0U;
+            memset(&BufferTelemetry, 0, sizeof(BufferTelemetry));
+            BufferTelemetry.rb1_bytes_capacity = LOG_BUFFER_SIZE;
         }
         if (0U != FsCustom_GetCanAbsRxHighWaterCan1(&CanAbsRxHighWaterCan1))
         {
@@ -339,10 +351,11 @@ int fs_open_custom(struct fs_file *file, const char *name)
         FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
         FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
 
-        if (LOG_BUFFER_SIZE > 0U)
+        if (BufferTelemetry.rb1_bytes_capacity > 0U)
         {
-            Rb1BytesHighWaterPct =
-                (float)Rb1BytesHighWater * 100.0f / (float)LOG_BUFFER_SIZE;
+            Rb1BytesHighWaterPct = (float)BufferTelemetry.rb1_bytes_highwater
+                                   * 100.0f
+                                   / (float)BufferTelemetry.rb1_bytes_capacity;
         }
         if (CanAbsRxCapacity > 0U)
         {
@@ -368,7 +381,28 @@ int fs_open_custom(struct fs_file *file, const char *name)
             FrameCountLo,
             BusLoadCan1,
             BusLoadCan2,
+            (unsigned long)BufferTelemetry.rb1_bytes_capacity,
+            (unsigned long)BufferTelemetry.rb1_bytes_now,
+            (unsigned long)BufferTelemetry.rb1_bytes_highwater,
             Rb1BytesHighWaterPct,
+            (unsigned long)BufferTelemetry.rb1_bytes_min_since_status,
+            (unsigned long)BufferTelemetry.rb1_bytes_max_since_status,
+            (unsigned long)BufferTelemetry.rb1_bytes_at_last_sd_block_start,
+            (unsigned long
+            )BufferTelemetry.rb1_bytes_at_last_sd_block_end_before_consume,
+            (unsigned long
+            )BufferTelemetry.rb1_bytes_at_last_sd_block_end_after_consume,
+            (unsigned long)BufferTelemetry.sd_block_attempts_since_status,
+            (unsigned long)BufferTelemetry.sd_blocks_written_since_status,
+            (unsigned long)BufferTelemetry.sd_block_errors_since_status,
+            (unsigned long)BufferTelemetry.sd_last_block_frames,
+            (unsigned long)BufferTelemetry.sd_write_last_us,
+            (unsigned long)BufferTelemetry.sd_sync_last_us,
+            (unsigned long)BufferTelemetry.sd_store_block_last_us,
+            (unsigned long)BufferTelemetry.sd_write_max_since_status_us,
+            (unsigned long)BufferTelemetry.sd_sync_max_since_status_us,
+            (unsigned long)BufferTelemetry.sd_store_block_max_since_status_us,
+            (unsigned long)BufferTelemetry.sd_store_block_avg_since_status_us,
             CanAbsRxHighWaterPctCan1,
             CanAbsRxHighWaterPctCan2,
             FdcanMsgPortHighWaterPct,

@@ -225,6 +225,126 @@ static volatile uint64_t FdcanMsgPortPeakCanLogBufferBlockCount  = 0U;
 static volatile uint32_t CanLogSdWriteMaxUs                      = 0U;
 static volatile uint32_t CanLogSdSyncMaxUs                       = 0U;
 static volatile uint32_t CanLogSdStoreBlockMaxUs                 = 0U;
+static volatile uint8_t Rb1TelemetryWindowInitialized            = 0U;
+static volatile uint32_t Rb1BytesMinSinceStatus                  = 0U;
+static volatile uint32_t Rb1BytesMaxSinceStatus                  = 0U;
+static volatile uint32_t Rb1BytesAtLastSdBlockStart              = 0U;
+static volatile uint32_t Rb1BytesAtLastSdBlockEndBeforeConsume   = 0U;
+static volatile uint32_t Rb1BytesAtLastSdBlockEndAfterConsume    = 0U;
+static volatile uint32_t CanLogSdBlockAttemptsSinceStatus        = 0U;
+static volatile uint32_t CanLogSdBlocksWrittenSinceStatus        = 0U;
+static volatile uint32_t CanLogSdBlockErrorsSinceStatus          = 0U;
+static volatile uint32_t CanLogSdLastBlockFrames                 = 0U;
+static volatile uint32_t CanLogSdWriteLastUs                     = 0U;
+static volatile uint32_t CanLogSdSyncLastUs                      = 0U;
+static volatile uint32_t CanLogSdStoreBlockLastUs                = 0U;
+static volatile uint32_t CanLogSdWriteMaxSinceStatusUs           = 0U;
+static volatile uint32_t CanLogSdSyncMaxSinceStatusUs            = 0U;
+static volatile uint32_t CanLogSdStoreBlockMaxSinceStatusUs      = 0U;
+static volatile uint64_t CanLogSdStoreBlockSumSinceStatusUs      = 0U;
+
+static uint32_t CanLogManager_ReadRb1UsedBytes(void)
+{
+    uint32_t used = 0U;
+
+    (void)CanLogBuffer_UsedBytes(&used);
+    return used;
+}
+
+static void CanLogManager_RecordRb1UsedBytes(uint32_t used)
+{
+    if (0U == Rb1TelemetryWindowInitialized)
+    {
+        Rb1BytesMinSinceStatus        = used;
+        Rb1BytesMaxSinceStatus        = used;
+        Rb1TelemetryWindowInitialized = 1U;
+    }
+    else
+    {
+        if (used < Rb1BytesMinSinceStatus)
+        {
+            Rb1BytesMinSinceStatus = used;
+        }
+        if (used > Rb1BytesMaxSinceStatus)
+        {
+            Rb1BytesMaxSinceStatus = used;
+        }
+    }
+}
+
+static void CanLogManager_ResetBufferTelemetryWindow(uint32_t rb1_used)
+{
+    Rb1TelemetryWindowInitialized      = 1U;
+    Rb1BytesMinSinceStatus             = rb1_used;
+    Rb1BytesMaxSinceStatus             = rb1_used;
+    CanLogSdBlockAttemptsSinceStatus   = 0U;
+    CanLogSdBlocksWrittenSinceStatus   = 0U;
+    CanLogSdBlockErrorsSinceStatus     = 0U;
+    CanLogSdWriteMaxSinceStatusUs      = 0U;
+    CanLogSdSyncMaxSinceStatusUs       = 0U;
+    CanLogSdStoreBlockMaxSinceStatusUs = 0U;
+    CanLogSdStoreBlockSumSinceStatusUs = 0U;
+}
+
+static void CanLogManager_ResetBufferTelemetry(uint32_t rb1_used)
+{
+    Rb1BytesHighWater                     = 0U;
+    Rb1BytesAtLastSdBlockStart            = 0U;
+    Rb1BytesAtLastSdBlockEndBeforeConsume = 0U;
+    Rb1BytesAtLastSdBlockEndAfterConsume  = 0U;
+    CanLogSdBlockAttemptsSinceStatus      = 0U;
+    CanLogSdBlocksWrittenSinceStatus      = 0U;
+    CanLogSdBlockErrorsSinceStatus        = 0U;
+    CanLogSdLastBlockFrames               = 0U;
+    CanLogSdWriteLastUs                   = 0U;
+    CanLogSdSyncLastUs                    = 0U;
+    CanLogSdStoreBlockLastUs              = 0U;
+    CanLogSdWriteMaxSinceStatusUs         = 0U;
+    CanLogSdSyncMaxSinceStatusUs          = 0U;
+    CanLogSdStoreBlockMaxSinceStatusUs    = 0U;
+    CanLogSdStoreBlockSumSinceStatusUs    = 0U;
+
+    CanLogManager_ResetBufferTelemetryWindow(rb1_used);
+}
+
+static void CanLogManager_RecordSdBlockTiming(
+    uint32_t write_us,
+    uint32_t sync_us,
+    uint32_t store_block_us,
+    uint32_t frame_count,
+    comm_status_t result
+)
+{
+    CanLogSdBlockAttemptsSinceStatus++;
+    CanLogSdLastBlockFrames  = frame_count;
+    CanLogSdWriteLastUs      = write_us;
+    CanLogSdSyncLastUs       = sync_us;
+    CanLogSdStoreBlockLastUs = store_block_us;
+
+    if (write_us > CanLogSdWriteMaxSinceStatusUs)
+    {
+        CanLogSdWriteMaxSinceStatusUs = write_us;
+    }
+
+    if (COMM_SUCCESS == result)
+    {
+        CanLogSdBlocksWrittenSinceStatus++;
+        CanLogSdStoreBlockSumSinceStatusUs += store_block_us;
+
+        if (sync_us > CanLogSdSyncMaxSinceStatusUs)
+        {
+            CanLogSdSyncMaxSinceStatusUs = sync_us;
+        }
+        if (store_block_us > CanLogSdStoreBlockMaxSinceStatusUs)
+        {
+            CanLogSdStoreBlockMaxSinceStatusUs = store_block_us;
+        }
+    }
+    else
+    {
+        CanLogSdBlockErrorsSinceStatus++;
+    }
+}
 
 #if !defined(UNIT_TEST)
 static StaticSemaphore_t CanLogFileMutexBuffer;
@@ -299,8 +419,14 @@ static void appCanLogFillEntry(
     uint8_t channel
 );
 static comm_status_t appCanLogStoreToFrameBuffer(void *entry);
-static comm_status_t
-appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length);
+static comm_status_t appCanLogStoreToSd(
+    FatFsDeviceType *dev,
+    char *data,
+    uint32_t length,
+    uint32_t *write_us,
+    uint32_t *sync_us,
+    uint32_t *store_block_us
+);
 static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev);
 
 static void CanLogManager_UpdateRb1BytesHighWater(void)
@@ -309,6 +435,8 @@ static void CanLogManager_UpdateRb1BytesHighWater(void)
 
     if (CLB_E_OK == CanLogBuffer_UsedBytes(&used))
     {
+        CanLogManager_RecordRb1UsedBytes(used);
+
         if (used > Rb1BytesHighWater)
         {
             Rb1BytesHighWater = used;
@@ -420,6 +548,55 @@ uint8_t FsCustom_GetBusloadCan2(float *busload)
 uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes)
 {
     *bytes = Rb1BytesHighWater;
+    return 0U;
+}
+
+uint8_t
+FsCustom_GetCanLogBufferTelemetry(FsCustomCanLogBufferTelemetryType *telemetry)
+{
+    uint32_t rb1_used_now;
+    uint32_t sd_block_attempts;
+    uint32_t sd_blocks_written;
+
+    if (NULL == telemetry)
+    {
+        return 1U;
+    }
+
+    rb1_used_now = CanLogManager_ReadRb1UsedBytes();
+    CanLogManager_RecordRb1UsedBytes(rb1_used_now);
+
+    sd_block_attempts = CanLogSdBlockAttemptsSinceStatus;
+    sd_blocks_written = CanLogSdBlocksWrittenSinceStatus;
+
+    telemetry->rb1_bytes_capacity               = LOG_BUFFER_SIZE;
+    telemetry->rb1_bytes_now                    = rb1_used_now;
+    telemetry->rb1_bytes_highwater              = Rb1BytesHighWater;
+    telemetry->rb1_bytes_min_since_status       = Rb1BytesMinSinceStatus;
+    telemetry->rb1_bytes_max_since_status       = Rb1BytesMaxSinceStatus;
+    telemetry->rb1_bytes_at_last_sd_block_start = Rb1BytesAtLastSdBlockStart;
+    telemetry->rb1_bytes_at_last_sd_block_end_before_consume =
+        Rb1BytesAtLastSdBlockEndBeforeConsume;
+    telemetry->rb1_bytes_at_last_sd_block_end_after_consume =
+        Rb1BytesAtLastSdBlockEndAfterConsume;
+    telemetry->sd_block_attempts_since_status = sd_block_attempts;
+    telemetry->sd_blocks_written_since_status = sd_blocks_written;
+    telemetry->sd_block_errors_since_status   = CanLogSdBlockErrorsSinceStatus;
+    telemetry->sd_last_block_frames           = CanLogSdLastBlockFrames;
+    telemetry->sd_write_last_us               = CanLogSdWriteLastUs;
+    telemetry->sd_sync_last_us                = CanLogSdSyncLastUs;
+    telemetry->sd_store_block_last_us         = CanLogSdStoreBlockLastUs;
+    telemetry->sd_write_max_since_status_us   = CanLogSdWriteMaxSinceStatusUs;
+    telemetry->sd_sync_max_since_status_us    = CanLogSdSyncMaxSinceStatusUs;
+    telemetry->sd_store_block_max_since_status_us =
+        CanLogSdStoreBlockMaxSinceStatusUs;
+    telemetry->sd_store_block_avg_since_status_us =
+        (sd_blocks_written > 0U)
+            ? (uint32_t)(CanLogSdStoreBlockSumSinceStatusUs / sd_blocks_written)
+            : 0U;
+
+    CanLogManager_ResetBufferTelemetryWindow(rb1_used_now);
+
     return 0U;
 }
 
@@ -751,7 +928,7 @@ CanLogControlDataType *
 CanLogHandler_Init(uint8_t *mount_res, bool *run, bool *commit)
 {
     memset(&CanLogCtrlData, 0x0, sizeof(CanLogCtrlData));
-    Rb1BytesHighWater = 0U;
+    CanLogManager_ResetBufferTelemetry(0U);
 
     CanLogCtrlData.CanLog.filename    = CanLogFileName;
     CanLogCtrlData.CanLog.fnamemaxlen = sizeof(CanLogFileName);
@@ -1509,6 +1686,7 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
     CanLogCtrlData.CanLog.fileIndexWrapped = 0;
 
     CanLogBuffer_Init();
+    CanLogManager_ResetBufferTelemetry(CanLogManager_ReadRb1UsedBytes());
 
     fdcan_msg_port_init();
 
@@ -1651,16 +1829,28 @@ static comm_status_t appCanLogStoreToFrameBuffer(void *entry)
     return res;
 }
 
-static comm_status_t
-appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
+static comm_status_t appCanLogStoreToSd(
+    FatFsDeviceType *dev,
+    char *data,
+    uint32_t length,
+    uint32_t *write_us,
+    uint32_t *sync_us,
+    uint32_t *store_block_us
+)
 {
     comm_status_t res = COMM_SUCCESS;
     uint64_t start_us;
     uint64_t after_write_us;
     uint64_t after_sync_us;
-    uint32_t write_us;
-    uint32_t sync_us;
-    uint32_t total_us;
+
+    if ((NULL == write_us) || (NULL == sync_us) || (NULL == store_block_us))
+    {
+        return COMM_NULL_POINTER;
+    }
+
+    *write_us       = 0U;
+    *sync_us        = 0U;
+    *store_block_us = 0U;
 
     start_us = FDCAN_GetTimestampHook();
     if (FR_OK == FatFS_SD_WriteFile(dev, (const char *)data, length))
@@ -1672,30 +1862,31 @@ appCanLogStoreToSd(FatFsDeviceType *dev, char *data, uint32_t length)
         }
         after_sync_us = FDCAN_GetTimestampHook();
 
-        write_us = (uint32_t)(after_write_us - start_us);
-        sync_us  = (uint32_t)(after_sync_us - after_write_us);
-        total_us = (uint32_t)(after_sync_us - start_us);
+        *write_us       = (uint32_t)(after_write_us - start_us);
+        *sync_us        = (uint32_t)(after_sync_us - after_write_us);
+        *store_block_us = (uint32_t)(after_sync_us - start_us);
 
-        if (write_us > CanLogSdWriteMaxUs)
+        if (*write_us > CanLogSdWriteMaxUs)
         {
-            CanLogSdWriteMaxUs = write_us;
+            CanLogSdWriteMaxUs = *write_us;
         }
-        if (sync_us > CanLogSdSyncMaxUs)
+        if (*sync_us > CanLogSdSyncMaxUs)
         {
-            CanLogSdSyncMaxUs = sync_us;
+            CanLogSdSyncMaxUs = *sync_us;
         }
-        if (total_us > CanLogSdStoreBlockMaxUs)
+        if (*store_block_us > CanLogSdStoreBlockMaxUs)
         {
-            CanLogSdStoreBlockMaxUs = total_us;
+            CanLogSdStoreBlockMaxUs = *store_block_us;
         }
     }
     else
     {
-        after_write_us = FDCAN_GetTimestampHook();
-        write_us       = (uint32_t)(after_write_us - start_us);
-        if (write_us > CanLogSdWriteMaxUs)
+        after_write_us  = FDCAN_GetTimestampHook();
+        *write_us       = (uint32_t)(after_write_us - start_us);
+        *store_block_us = *write_us;
+        if (*write_us > CanLogSdWriteMaxUs)
         {
-            CanLogSdWriteMaxUs = write_us;
+            CanLogSdWriteMaxUs = *write_us;
         }
         res = COMM_ERROR;
     }
@@ -1714,16 +1905,36 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
 {
     uint32_t DataLength;
     uint32_t FrameCount;
+    uint32_t Rb1BytesBeforeWrite;
+    uint32_t Rb1BytesAfterWriteBeforeConsume;
+    uint32_t Rb1BytesAfterConsume;
+    uint32_t SdWriteUs;
+    uint32_t SdSyncUs;
+    uint32_t SdStoreBlockUs;
     uint8_t *DataPtr;
     comm_status_t res = COMM_SUCCESS;
 
     if (CLB_E_OK
         == CanLogBuffer_ReadNextBlock(&DataPtr, &DataLength, &FrameCount))
     {
-        CanLogManager_UpdateRb1BytesHighWater();
+        Rb1BytesBeforeWrite = CanLogManager_ReadRb1UsedBytes();
+        CanLogManager_RecordRb1UsedBytes(Rb1BytesBeforeWrite);
+        if (Rb1BytesBeforeWrite > Rb1BytesHighWater)
+        {
+            Rb1BytesHighWater = Rb1BytesBeforeWrite;
+        }
+        Rb1BytesAtLastSdBlockStart = Rb1BytesBeforeWrite;
+
         CanLogManager_InstrumentationFlushStartHook();
         CanLogManager_FileLock();
-        res = appCanLogStoreToSd(dev, (char *)DataPtr, DataLength);
+        res = appCanLogStoreToSd(
+            dev,
+            (char *)DataPtr,
+            DataLength,
+            &SdWriteUs,
+            &SdSyncUs,
+            &SdStoreBlockUs
+        );
         if (COMM_SUCCESS == res)
         {
             (void)appCanLogCheckNewFileOpenLocked();
@@ -1731,11 +1942,34 @@ static comm_status_t appCanLogStoreBlock(FatFsDeviceType *dev)
         CanLogManager_FileUnlock();
         CanLogManager_InstrumentationFlushEndHook();
 
+        Rb1BytesAfterWriteBeforeConsume = CanLogManager_ReadRb1UsedBytes();
+        CanLogManager_RecordRb1UsedBytes(Rb1BytesAfterWriteBeforeConsume);
+        if (Rb1BytesAfterWriteBeforeConsume > Rb1BytesHighWater)
+        {
+            Rb1BytesHighWater = Rb1BytesAfterWriteBeforeConsume;
+        }
+        Rb1BytesAtLastSdBlockEndBeforeConsume = Rb1BytesAfterWriteBeforeConsume;
+
         if (COMM_SUCCESS == res)
         {
             CanLogBuffer_Consume(DataLength, FrameCount);
             CanLogBuffer_BlockCount++;
+            Rb1BytesAfterConsume = CanLogManager_ReadRb1UsedBytes();
         }
+        else
+        {
+            Rb1BytesAfterConsume = Rb1BytesAfterWriteBeforeConsume;
+        }
+
+        CanLogManager_RecordRb1UsedBytes(Rb1BytesAfterConsume);
+        Rb1BytesAtLastSdBlockEndAfterConsume = Rb1BytesAfterConsume;
+        CanLogManager_RecordSdBlockTiming(
+            SdWriteUs,
+            SdSyncUs,
+            SdStoreBlockUs,
+            FrameCount,
+            res
+        );
     }
     else
     {
@@ -2003,7 +2237,7 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
     }
     else if (true == *CanLogCtrlData.runCanTracer)
     {
-        Rb1BytesHighWater = 0U;
+        CanLogManager_ResetBufferTelemetry(CanLogManager_ReadRb1UsedBytes());
 #if CANLOGMANAGER_REOPEN_LOG_FILE
         if (CAN_LOG_OK != appCanLogReopenFile(data))
         {
