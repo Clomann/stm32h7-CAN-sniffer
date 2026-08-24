@@ -1,6 +1,8 @@
 #include "RuntimeChecks.h"
 #include "cmsis_gcc.h"
 
+#include <stddef.h>
+
 volatile uint64_t CanAbs_FrameCount                  = 0;
 volatile uint64_t CanAbs_FrameDropCount              = 0;
 volatile uint64_t CanAbs_CAN1_Rx_FrameDropCount      = 0;
@@ -113,4 +115,42 @@ void RuntimeChecks_CheckFrameCounts(RuntimeChecksContextType *context)
     }
 
     context->err = err;
+}
+
+uint8_t RuntimeChecks_GetDiagnostics(RuntimeChecksDiagnosticsType *diagnostics)
+{
+    if (NULL == diagnostics)
+    {
+        return 1U;
+    }
+
+    diagnostics->can_abs_frame_count      = CanAbs_FrameCount;
+    diagnostics->can_abs_frame_drop_count = CanAbs_FrameDropCount;
+    diagnostics->can_abs_can1_rx_frame_drop_count =
+        CanAbs_CAN1_Rx_FrameDropCount;
+    diagnostics->can_abs_can2_rx_frame_drop_count =
+        CanAbs_CAN2_Rx_FrameDropCount;
+    diagnostics->can_bridge_task_frame_count = CanBridgeTask_FrameCount;
+    diagnostics->can_log_manager_frame_count = CanLogManager_FrameCount;
+    diagnostics->frame_delta1                = FrameDelta1;
+    diagnostics->can_log_manager_frame_drop_count1 =
+        CanLogManager_FrameDropCount1;
+    diagnostics->can_log_manager_frame_drop_count2 =
+        CanLogManager_FrameDropCount2;
+    diagnostics->can_log_manager_can1_missing_count =
+        CanLogManager_CAN1_MissingCount;
+    diagnostics->can_log_manager_can2_missing_count =
+        CanLogManager_CAN2_MissingCount;
+    diagnostics->can_log_manager_can1_missing_ids_count =
+        CanLogManager_CAN1_MissingIdsCount;
+    diagnostics->can_log_manager_can2_missing_ids_count =
+        CanLogManager_CAN2_MissingIdsCount;
+    diagnostics->can_log_buffer_frame_count1     = CanLogBuffer_FrameCount1;
+    diagnostics->can_log_buffer_frame_count2     = CanLogBuffer_FrameCount2;
+    diagnostics->can_log_buffer_frame_drop_count = CanLogBuffer_FrameDropCount;
+    diagnostics->can_log_buffer_block_count      = CanLogBuffer_BlockCount;
+    diagnostics->fdcan_msg_port_frame_drop_count = FcdanMsgPort_FrameDropCount;
+    diagnostics->error_handler_calls             = ErrorHandlerCalls;
+
+    return 0U;
 }

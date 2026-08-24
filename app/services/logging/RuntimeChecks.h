@@ -14,6 +14,29 @@ typedef struct
     RuntimeChecksErrorType err;
 } RuntimeChecksContextType;
 
+typedef struct
+{
+    uint64_t can_abs_frame_count;
+    uint64_t can_abs_frame_drop_count;
+    uint64_t can_abs_can1_rx_frame_drop_count;
+    uint64_t can_abs_can2_rx_frame_drop_count;
+    uint64_t can_bridge_task_frame_count;
+    uint64_t can_log_manager_frame_count;
+    uint64_t frame_delta1;
+    uint64_t can_log_manager_frame_drop_count1;
+    uint64_t can_log_manager_frame_drop_count2;
+    uint64_t can_log_manager_can1_missing_count;
+    uint64_t can_log_manager_can2_missing_count;
+    uint64_t can_log_manager_can1_missing_ids_count;
+    uint64_t can_log_manager_can2_missing_ids_count;
+    uint64_t can_log_buffer_frame_count1;
+    uint64_t can_log_buffer_frame_count2;
+    uint64_t can_log_buffer_frame_drop_count;
+    uint64_t can_log_buffer_block_count;
+    uint64_t fdcan_msg_port_frame_drop_count;
+    uint64_t error_handler_calls;
+} RuntimeChecksDiagnosticsType;
+
 /** Number of received CAN frames */
 extern volatile uint64_t CanAbs_FrameCount;
 
@@ -69,3 +92,5 @@ extern volatile uint64_t FcdanMsgPort_FrameDropCount;
 void RuntimeChecks_Init(void);
 
 void RuntimeChecks_CheckFrameCounts(RuntimeChecksContextType *context);
+
+uint8_t RuntimeChecks_GetDiagnostics(RuntimeChecksDiagnosticsType *diagnostics);
