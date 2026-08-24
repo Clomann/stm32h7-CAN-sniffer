@@ -48,6 +48,23 @@ typedef struct
 
 typedef struct
 {
+    uint32_t requests;
+    uint32_t completed;
+    uint32_t irqs;
+    uint32_t last_completed_mask;
+    uint32_t buffer_mask;
+    uint32_t next_id_offset;
+    uint32_t tx_pending;
+    uint32_t tx_occurred;
+    uint32_t tx_cancelled;
+    uint32_t protocol_status;
+    uint32_t error_counter;
+    uint32_t reload_errors;
+    uint8_t active;
+} FsCustomStaticTxReplayStatsType;
+
+typedef struct
+{
     uint32_t protocol_status;
     uint32_t error_counter;
     uint32_t rx_fifo0_status;
@@ -96,16 +113,13 @@ uint8_t FsCustom_GetRb1BytesHighWater(uint32_t *bytes);
 uint8_t FsCustom_GetCanAbsRxHighWaterCan1(uint32_t *frames);
 uint8_t FsCustom_GetCanAbsRxHighWaterCan2(uint32_t *frames);
 uint8_t FsCustom_GetCanAbsRxCapacity(uint32_t *frames);
-uint8_t FsCustom_GetStaticTxReplayStatsCan1(
-    uint32_t *requests,
-    uint32_t *completed,
-    uint32_t *irqs
-);
-uint8_t FsCustom_GetStaticTxReplayStatsCan2(
-    uint32_t *requests,
-    uint32_t *completed,
-    uint32_t *irqs
-);
+uint8_t FsCustom_GetCanAbsHwRxFifoHighWaterCan1(uint32_t *frames);
+uint8_t FsCustom_GetCanAbsHwRxFifoHighWaterCan2(uint32_t *frames);
+uint8_t FsCustom_GetCanAbsHwRxFifoCapacity(uint32_t *frames);
+uint8_t
+FsCustom_GetStaticTxReplayStatsCan1(FsCustomStaticTxReplayStatsType *stats);
+uint8_t
+FsCustom_GetStaticTxReplayStatsCan2(FsCustomStaticTxReplayStatsType *stats);
 uint8_t FsCustom_GetCanAbsFdcanHealthCan1(FsCustomFdcanHealthStatsType *stats);
 uint8_t FsCustom_GetCanAbsFdcanHealthCan2(FsCustomFdcanHealthStatsType *stats);
 uint8_t FsCustom_GetFdcanMsgPortHighWater(uint32_t *bytes);

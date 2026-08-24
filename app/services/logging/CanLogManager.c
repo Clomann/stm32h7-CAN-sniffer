@@ -677,51 +677,86 @@ uint8_t FsCustom_GetCanAbsFdcanHealthCan2(FsCustomFdcanHealthStatsType *stats)
     return 0U;
 }
 
-uint8_t FsCustom_GetStaticTxReplayStatsCan1(
-    uint32_t *requests,
-    uint32_t *completed,
-    uint32_t *irqs
-)
+uint8_t FsCustom_GetCanAbsHwRxFifoHighWaterCan1(uint32_t *frames)
 {
-    FdcanStaticTxReplayStatsType stats;
+    return CanAbs_GetHwRxFifoHighWater_Can1(frames);
+}
 
-    if ((requests == NULL) || (completed == NULL) || (irqs == NULL))
+uint8_t FsCustom_GetCanAbsHwRxFifoHighWaterCan2(uint32_t *frames)
+{
+    return CanAbs_GetHwRxFifoHighWater_Can2(frames);
+}
+
+uint8_t FsCustom_GetCanAbsHwRxFifoCapacity(uint32_t *frames)
+{
+    if (frames == NULL)
     {
         return 1U;
     }
 
-    if (0U != CanAbs_GetStaticTxReplayStats_Can1(&stats))
-    {
-        return 1U;
-    }
-
-    *requests  = stats.requests;
-    *completed = stats.completed;
-    *irqs      = stats.irqs;
+    *frames = CanAbs_GetHwRxFifoCapacity();
     return 0U;
 }
 
-uint8_t FsCustom_GetStaticTxReplayStatsCan2(
-    uint32_t *requests,
-    uint32_t *completed,
-    uint32_t *irqs
-)
+uint8_t
+FsCustom_GetStaticTxReplayStatsCan1(FsCustomStaticTxReplayStatsType *stats)
 {
-    FdcanStaticTxReplayStatsType stats;
+    FdcanStaticTxReplayStatsType fdcan_stats;
 
-    if ((requests == NULL) || (completed == NULL) || (irqs == NULL))
+    if (stats == NULL)
     {
         return 1U;
     }
 
-    if (0U != CanAbs_GetStaticTxReplayStats_Can2(&stats))
+    if (0U != CanAbs_GetStaticTxReplayStats_Can1(&fdcan_stats))
     {
         return 1U;
     }
 
-    *requests  = stats.requests;
-    *completed = stats.completed;
-    *irqs      = stats.irqs;
+    stats->requests            = fdcan_stats.requests;
+    stats->completed           = fdcan_stats.completed;
+    stats->irqs                = fdcan_stats.irqs;
+    stats->last_completed_mask = fdcan_stats.last_completed_mask;
+    stats->buffer_mask         = fdcan_stats.buffer_mask;
+    stats->next_id_offset      = fdcan_stats.next_id_offset;
+    stats->tx_pending          = fdcan_stats.tx_pending;
+    stats->tx_occurred         = fdcan_stats.tx_occurred;
+    stats->tx_cancelled        = fdcan_stats.tx_cancelled;
+    stats->protocol_status     = fdcan_stats.protocol_status;
+    stats->error_counter       = fdcan_stats.error_counter;
+    stats->reload_errors       = fdcan_stats.reload_errors;
+    stats->active              = fdcan_stats.active;
+    return 0U;
+}
+
+uint8_t
+FsCustom_GetStaticTxReplayStatsCan2(FsCustomStaticTxReplayStatsType *stats)
+{
+    FdcanStaticTxReplayStatsType fdcan_stats;
+
+    if (stats == NULL)
+    {
+        return 1U;
+    }
+
+    if (0U != CanAbs_GetStaticTxReplayStats_Can2(&fdcan_stats))
+    {
+        return 1U;
+    }
+
+    stats->requests            = fdcan_stats.requests;
+    stats->completed           = fdcan_stats.completed;
+    stats->irqs                = fdcan_stats.irqs;
+    stats->last_completed_mask = fdcan_stats.last_completed_mask;
+    stats->buffer_mask         = fdcan_stats.buffer_mask;
+    stats->next_id_offset      = fdcan_stats.next_id_offset;
+    stats->tx_pending          = fdcan_stats.tx_pending;
+    stats->tx_occurred         = fdcan_stats.tx_occurred;
+    stats->tx_cancelled        = fdcan_stats.tx_cancelled;
+    stats->protocol_status     = fdcan_stats.protocol_status;
+    stats->error_counter       = fdcan_stats.error_counter;
+    stats->reload_errors       = fdcan_stats.reload_errors;
+    stats->active              = fdcan_stats.active;
     return 0U;
 }
 

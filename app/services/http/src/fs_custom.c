@@ -83,12 +83,30 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
     "\"sd_sync_max_since_status_us\":%lu,\"sd_store_block_max_since_status_"   \
     "us\":%lu,\"sd_store_block_avg_since_status_us\":%lu,"                     \
     "\"can1_rx_highwater_pct\":%.2f,\"can2_rx_highwater_pct\":%.2f,"           \
-    "\"fdcan_msg_port_highwater_pct\":%.2f,"                                    \
+    "\"can1_hw_rx_fifo_highwater_pct\":%.2f,\"can2_hw_rx_fifo_highwater_"      \
+    "pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f,"                        \
+    "\"can1_psr\":%lu,\"can1_ecr\":%lu,\"can1_rxf0s\":%lu,\"can1_ir\":"        \
+    "%lu,\"can1_psr_latched\":%lu,\"can1_ecr_latched\":%lu,"                   \
+    "\"can1_rxf0s_latched\":%lu,\"can1_ir_latched\":%lu,"                      \
+    "\"can2_psr\":%lu,\"can2_ecr\":%lu,\"can2_rxf0s\":%lu,\"can2_ir\":"        \
+    "%lu,\"can2_psr_latched\":%lu,\"can2_ecr_latched\":%lu,"                   \
+    "\"can2_rxf0s_latched\":%lu,\"can2_ir_latched\":%lu,"                      \
     "\"sd_write_max_us\":%lu,\"sd_sync_max_us\":%lu,\"sd_store_block_max_"     \
     "us\":"                                                                    \
     "%lu,\"can1_tx_replay_requests\":%lu,\"can1_tx_replay_completed\":%lu,"    \
-    "\"can1_tx_replay_irqs\":%lu,\"can2_tx_replay_requests\":%lu,"             \
-    "\"can2_tx_replay_completed\":%lu,\"can2_tx_replay_irqs\":%lu}"
+    "\"can1_tx_replay_irqs\":%lu,\"can1_tx_replay_last_completed_mask\":%lu,"  \
+    "\"can1_tx_replay_buffer_mask\":%lu,\"can1_tx_replay_next_id_offset\":"    \
+    "%lu,\"can1_tx_replay_txbrp\":%lu,"                                        \
+    "\"can1_tx_replay_txbto\":%lu,\"can1_tx_replay_txbcf\":%lu,"               \
+    "\"can1_tx_replay_psr\":%lu,\"can1_tx_replay_ecr\":%lu,"                   \
+    "\"can1_tx_replay_reload_errors\":%lu,\"can1_tx_replay_active\":%s,"       \
+    "\"can2_tx_replay_requests\":%lu,\"can2_tx_replay_completed\":%lu,"        \
+    "\"can2_tx_replay_irqs\":%lu,\"can2_tx_replay_last_completed_mask\":%lu,"  \
+    "\"can2_tx_replay_buffer_mask\":%lu,\"can2_tx_replay_next_id_offset\":"    \
+    "%lu,\"can2_tx_replay_txbrp\":%lu,"                                        \
+    "\"can2_tx_replay_txbto\":%lu,\"can2_tx_replay_txbcf\":%lu,"               \
+    "\"can2_tx_replay_psr\":%lu,\"can2_tx_replay_ecr\":%lu,"                   \
+    "\"can2_tx_replay_reload_errors\":%lu,\"can2_tx_replay_active\":%s}"
 
 #define CANLOG_CONFIG_STRING                                                   \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
@@ -325,6 +343,11 @@ int fs_open_custom(struct fs_file *file, const char *name)
         uint32_t CanAbsRxCapacity                         = 0U;
         float CanAbsRxHighWaterPctCan1                    = 0.0f;
         float CanAbsRxHighWaterPctCan2                    = 0.0f;
+        uint32_t CanAbsHwRxFifoHighWaterCan1              = 0U;
+        uint32_t CanAbsHwRxFifoHighWaterCan2              = 0U;
+        uint32_t CanAbsHwRxFifoCapacity                   = 0U;
+        float CanAbsHwRxFifoHighWaterPctCan1              = 0.0f;
+        float CanAbsHwRxFifoHighWaterPctCan2              = 0.0f;
         uint32_t FdcanMsgPortHighWater                    = 0U;
         uint32_t FdcanMsgPortCapacity                     = 0U;
         float FdcanMsgPortHighWaterPct                    = 0.0f;
@@ -335,12 +358,10 @@ int fs_open_custom(struct fs_file *file, const char *name)
         uint32_t SdSyncMaxUs                              = 0U;
         uint32_t SdStoreBlockMaxUs                        = 0U;
         FsCustomCanLogBufferTelemetryType BufferTelemetry = {0U};
-        uint32_t Can1TxReplayRequests                     = 0U;
-        uint32_t Can1TxReplayCompleted                    = 0U;
-        uint32_t Can1TxReplayIrqs                         = 0U;
-        uint32_t Can2TxReplayRequests                     = 0U;
-        uint32_t Can2TxReplayCompleted                    = 0U;
-        uint32_t Can2TxReplayIrqs                         = 0U;
+        FsCustomStaticTxReplayStatsType Can1TxReplayStats = {0U};
+        FsCustomStaticTxReplayStatsType Can2TxReplayStats = {0U};
+        FsCustomFdcanHealthStatsType Can1FdcanHealth      = {0U};
+        FsCustomFdcanHealthStatsType Can2FdcanHealth      = {0U};
 
         if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
         {
@@ -368,6 +389,24 @@ int fs_open_custom(struct fs_file *file, const char *name)
         {
             CanAbsRxCapacity = 0U;
         }
+        if (0U
+            != FsCustom_GetCanAbsHwRxFifoHighWaterCan1(
+                &CanAbsHwRxFifoHighWaterCan1
+            ))
+        {
+            CanAbsHwRxFifoHighWaterCan1 = 0U;
+        }
+        if (0U
+            != FsCustom_GetCanAbsHwRxFifoHighWaterCan2(
+                &CanAbsHwRxFifoHighWaterCan2
+            ))
+        {
+            CanAbsHwRxFifoHighWaterCan2 = 0U;
+        }
+        if (0U != FsCustom_GetCanAbsHwRxFifoCapacity(&CanAbsHwRxFifoCapacity))
+        {
+            CanAbsHwRxFifoCapacity = 0U;
+        }
         if (0U != FsCustom_GetFdcanMsgPortHighWater(&FdcanMsgPortHighWater))
         {
             FdcanMsgPortHighWater = 0U;
@@ -391,28 +430,10 @@ int fs_open_custom(struct fs_file *file, const char *name)
             SdSyncMaxUs       = 0U;
             SdStoreBlockMaxUs = 0U;
         }
-        if (0U
-            != FsCustom_GetStaticTxReplayStatsCan1(
-                &Can1TxReplayRequests,
-                &Can1TxReplayCompleted,
-                &Can1TxReplayIrqs
-            ))
-        {
-            Can1TxReplayRequests  = 0U;
-            Can1TxReplayCompleted = 0U;
-            Can1TxReplayIrqs      = 0U;
-        }
-        if (0U
-            != FsCustom_GetStaticTxReplayStatsCan2(
-                &Can2TxReplayRequests,
-                &Can2TxReplayCompleted,
-                &Can2TxReplayIrqs
-            ))
-        {
-            Can2TxReplayRequests  = 0U;
-            Can2TxReplayCompleted = 0U;
-            Can2TxReplayIrqs      = 0U;
-        }
+        (void)FsCustom_GetStaticTxReplayStatsCan1(&Can1TxReplayStats);
+        (void)FsCustom_GetStaticTxReplayStatsCan2(&Can2TxReplayStats);
+        (void)FsCustom_GetCanAbsFdcanHealthCan1(&Can1FdcanHealth);
+        (void)FsCustom_GetCanAbsFdcanHealthCan2(&Can2FdcanHealth);
         FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
         FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
 
@@ -428,6 +449,15 @@ int fs_open_custom(struct fs_file *file, const char *name)
                 (float)CanAbsRxHighWaterCan1 * 100.0f / (float)CanAbsRxCapacity;
             CanAbsRxHighWaterPctCan2 =
                 (float)CanAbsRxHighWaterCan2 * 100.0f / (float)CanAbsRxCapacity;
+        }
+        if (CanAbsHwRxFifoCapacity > 0U)
+        {
+            CanAbsHwRxFifoHighWaterPctCan1 = (float)CanAbsHwRxFifoHighWaterCan1
+                                             * 100.0f
+                                             / (float)CanAbsHwRxFifoCapacity;
+            CanAbsHwRxFifoHighWaterPctCan2 = (float)CanAbsHwRxFifoHighWaterCan2
+                                             * 100.0f
+                                             / (float)CanAbsHwRxFifoCapacity;
         }
         if (FdcanMsgPortCapacity > 0U)
         {
@@ -470,16 +500,54 @@ int fs_open_custom(struct fs_file *file, const char *name)
             (unsigned long)BufferTelemetry.sd_store_block_avg_since_status_us,
             CanAbsRxHighWaterPctCan1,
             CanAbsRxHighWaterPctCan2,
+            CanAbsHwRxFifoHighWaterPctCan1,
+            CanAbsHwRxFifoHighWaterPctCan2,
             FdcanMsgPortHighWaterPct,
+            (unsigned long)Can1FdcanHealth.protocol_status,
+            (unsigned long)Can1FdcanHealth.error_counter,
+            (unsigned long)Can1FdcanHealth.rx_fifo0_status,
+            (unsigned long)Can1FdcanHealth.interrupt_flags,
+            (unsigned long)Can1FdcanHealth.protocol_status_latched,
+            (unsigned long)Can1FdcanHealth.error_counter_latched,
+            (unsigned long)Can1FdcanHealth.rx_fifo0_status_latched,
+            (unsigned long)Can1FdcanHealth.interrupt_flags_latched,
+            (unsigned long)Can2FdcanHealth.protocol_status,
+            (unsigned long)Can2FdcanHealth.error_counter,
+            (unsigned long)Can2FdcanHealth.rx_fifo0_status,
+            (unsigned long)Can2FdcanHealth.interrupt_flags,
+            (unsigned long)Can2FdcanHealth.protocol_status_latched,
+            (unsigned long)Can2FdcanHealth.error_counter_latched,
+            (unsigned long)Can2FdcanHealth.rx_fifo0_status_latched,
+            (unsigned long)Can2FdcanHealth.interrupt_flags_latched,
             (unsigned long)SdWriteMaxUs,
             (unsigned long)SdSyncMaxUs,
             (unsigned long)SdStoreBlockMaxUs,
-            (unsigned long)Can1TxReplayRequests,
-            (unsigned long)Can1TxReplayCompleted,
-            (unsigned long)Can1TxReplayIrqs,
-            (unsigned long)Can2TxReplayRequests,
-            (unsigned long)Can2TxReplayCompleted,
-            (unsigned long)Can2TxReplayIrqs
+            (unsigned long)Can1TxReplayStats.requests,
+            (unsigned long)Can1TxReplayStats.completed,
+            (unsigned long)Can1TxReplayStats.irqs,
+            (unsigned long)Can1TxReplayStats.last_completed_mask,
+            (unsigned long)Can1TxReplayStats.buffer_mask,
+            (unsigned long)Can1TxReplayStats.next_id_offset,
+            (unsigned long)Can1TxReplayStats.tx_pending,
+            (unsigned long)Can1TxReplayStats.tx_occurred,
+            (unsigned long)Can1TxReplayStats.tx_cancelled,
+            (unsigned long)Can1TxReplayStats.protocol_status,
+            (unsigned long)Can1TxReplayStats.error_counter,
+            (unsigned long)Can1TxReplayStats.reload_errors,
+            Can1TxReplayStats.active ? "true" : "false",
+            (unsigned long)Can2TxReplayStats.requests,
+            (unsigned long)Can2TxReplayStats.completed,
+            (unsigned long)Can2TxReplayStats.irqs,
+            (unsigned long)Can2TxReplayStats.last_completed_mask,
+            (unsigned long)Can2TxReplayStats.buffer_mask,
+            (unsigned long)Can2TxReplayStats.next_id_offset,
+            (unsigned long)Can2TxReplayStats.tx_pending,
+            (unsigned long)Can2TxReplayStats.tx_occurred,
+            (unsigned long)Can2TxReplayStats.tx_cancelled,
+            (unsigned long)Can2TxReplayStats.protocol_status,
+            (unsigned long)Can2TxReplayStats.error_counter,
+            (unsigned long)Can2TxReplayStats.reload_errors,
+            Can2TxReplayStats.active ? "true" : "false"
         );
 
         if (n < 0 || (size_t)n >= sizeof(StatusData))

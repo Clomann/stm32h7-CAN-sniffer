@@ -159,6 +159,29 @@ void CanAbs_ResetFdcanHealth(void)
     /* no-op in stub */
 }
 
+uint8_t CanAbs_GetHwRxFifoHighWater_Can1(uint32_t *frames)
+{
+    if (frames)
+    {
+        *frames = 0U;
+    }
+    return 0U;
+}
+
+uint8_t CanAbs_GetHwRxFifoHighWater_Can2(uint32_t *frames)
+{
+    if (frames)
+    {
+        *frames = 0U;
+    }
+    return 0U;
+}
+
+uint32_t CanAbs_GetHwRxFifoCapacity(void)
+{
+    return 0U;
+}
+
 void CanAbs_Drain(void)
 {
     /* no-op in stub */
