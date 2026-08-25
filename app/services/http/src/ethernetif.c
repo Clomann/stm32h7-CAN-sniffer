@@ -506,7 +506,7 @@ static struct pbuf *low_level_input(struct netif *netif)
 
         if (p != NULL)
         {
-        AddressAligned_InvalidateDCache(p->payload, p->tot_len);
+            AddressAligned_InvalidateDCache(p->payload, p->tot_len);
         }
     }
 

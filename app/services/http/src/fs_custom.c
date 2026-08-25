@@ -205,7 +205,6 @@ uint8_t FsCustom_SetDebugProvider(const FsCustomDebugProviderType *provider)
     return 0U;
 }
 
-
 int fs_open_custom(struct fs_file *file, const char *name)
 {
     uint32_t FileSize = 0U;

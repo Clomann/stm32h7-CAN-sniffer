@@ -25,10 +25,10 @@
 #define MAX_LOG_FILE_COUNT_FROM_COMPILER 1U
 #else
 #define MAX_LOG_FILE_COUNT_FROM_COMPILER 0U
-#define MAX_LOG_FILE_COUNT             640U
+#define MAX_LOG_FILE_COUNT               640U
 #endif
-#define MAX_LOG_FILE_SIZE              (10U * 1024U * 1024U)
-#define MAX_LOG_INDEX                  (MAX_LOG_FILE_COUNT - 1U)
+#define MAX_LOG_FILE_SIZE (10U * 1024U * 1024U)
+#define MAX_LOG_INDEX     (MAX_LOG_FILE_COUNT - 1U)
 
 #define CAN_LOG_MAX_FILE_SIZE_KB     16U
 #define CAN_LOG_MAX_FILE_SIZE        (CAN_LOG_MAX_FILE_SIZE_KB * 1024U)

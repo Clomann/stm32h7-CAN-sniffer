@@ -1,0 +1,7 @@
+build/
+CMakeFiles/
+.env/
+libs
+middleware/
+STM32CubeIDE/
+tests/_deps/

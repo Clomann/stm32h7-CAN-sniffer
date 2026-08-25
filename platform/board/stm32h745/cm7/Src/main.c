@@ -391,13 +391,15 @@ static void MPU_Config(void)
        there catches the section outgrowing this region. The assert below
        catches MPU_InitStruct.Size drifting away from that same 16KB budget
        (e.g. picking the wrong MPU_REGION_SIZE_xx by mistake). */
-    _Static_assert((1UL << (MPU_REGION_SIZE_16KB + 1U)) == DMA_BUFFER_MPU_REGION_BYTES,
-                   "MPU_REGION_SIZE_16KB no longer matches DMA_BUFFER_MPU_REGION_BYTES - "
-                   "update both, and the linker ALIGN()/ASSERT, together");
+    _Static_assert(
+        (1UL << (MPU_REGION_SIZE_16KB + 1U)) == DMA_BUFFER_MPU_REGION_BYTES,
+        "MPU_REGION_SIZE_16KB no longer matches DMA_BUFFER_MPU_REGION_BYTES - "
+        "update both, and the linker ALIGN()/ASSERT, together"
+    );
 
-    MPU_InitStruct.Enable      = MPU_REGION_ENABLE;
-    MPU_InitStruct.BaseAddress = (uint32_t)&__dma_buffers_start;
-    MPU_InitStruct.Size        = MPU_REGION_SIZE_16KB;
+    MPU_InitStruct.Enable           = MPU_REGION_ENABLE;
+    MPU_InitStruct.BaseAddress      = (uint32_t)&__dma_buffers_start;
+    MPU_InitStruct.Size             = MPU_REGION_SIZE_16KB;
     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
     MPU_InitStruct.IsBufferable     = MPU_ACCESS_NOT_BUFFERABLE;
     MPU_InitStruct.IsCacheable      = MPU_ACCESS_NOT_CACHEABLE;

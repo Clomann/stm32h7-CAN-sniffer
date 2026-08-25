@@ -163,10 +163,9 @@ static comm_status_t fdcan_static_replay_load_buffer(
     }
 
     memset(&tx_header, 0, sizeof(tx_header));
-    tx_header.Identifier =
-        (instance->staticReplayBaseId
-         + (id_offset % instance->staticReplayIdCount))
-        & 0x7FFU;
+    tx_header.Identifier = (instance->staticReplayBaseId
+                            + (id_offset % instance->staticReplayIdCount))
+                           & 0x7FFU;
     tx_header.IdType              = FDCAN_STANDARD_ID;
     tx_header.TxFrameType         = FDCAN_DATA_FRAME;
     tx_header.DataLength          = FDCAN_DLC_BYTES_0;
@@ -220,13 +219,13 @@ static comm_status_t fdcan_static_replay_prepare_instance(
         return COMM_INVALID_PARAMETER;
     }
 
-    instance->staticReplayPrepared         = 0U;
-    instance->staticReplayActive           = 0U;
-    instance->staticReplayBaseId           = base_id & 0x7FFU;
-    instance->staticReplayIdCount          = id_range;
-    instance->staticReplayNextIdOffset     = buffer_count % id_range;
+    instance->staticReplayPrepared          = 0U;
+    instance->staticReplayActive            = 0U;
+    instance->staticReplayBaseId            = base_id & 0x7FFU;
+    instance->staticReplayIdCount           = id_range;
+    instance->staticReplayNextIdOffset      = buffer_count % id_range;
     instance->staticReplayLastCompletedMask = 0U;
-    instance->staticReplayReloadErrors     = 0U;
+    instance->staticReplayReloadErrors      = 0U;
     instance->staticReplayBufferMask =
         fdcan_static_replay_buffer_mask(buffer_count);
 
@@ -849,7 +848,7 @@ comm_status_t FDCAN_StaticTxReplayStart(CommDriver *dev)
         return COMM_INVALID_STATE;
     }
 
-    instance->staticReplayActive = 1U;
+    instance->staticReplayActive            = 1U;
     instance->staticReplayLastCompletedMask = 0U;
     fdcan_static_replay_rearm(instance, instance->staticReplayBufferMask);
 
@@ -865,8 +864,8 @@ comm_status_t FDCAN_StaticTxReplayStop(CommDriver *dev)
         return COMM_NULL_POINTER;
     }
 
-    instance                                = (FdcanInstanceType *)dev->instance;
-    instance->staticReplayActive            = 0U;
+    instance                     = (FdcanInstanceType *)dev->instance;
+    instance->staticReplayActive = 0U;
     instance->staticReplayLastCompletedMask = 0U;
 
     if (!fdcan_static_replay_channel_enabled(instance->hfdcan.Instance))
