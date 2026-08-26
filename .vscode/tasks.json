@@ -126,8 +126,8 @@
         "-c", "adapter speed 1000",
         "-c", "reset_config srst_only srst_nogate connect_deassert_srst",
         "-c", "init; \
-            targets stm32h7x.cpu0; cortex_m vector_catch reset; \
-            if {[catch {targets stm32h7x.cpu1; cortex_m vector_catch reset}]} {echo \"CM4 not available\"}; \
+            targets stm32h7x.cpu0; \
+            if {[catch {targets stm32h7x.cpu1}]} {echo \"CM4 not available\"}; \
             targets stm32h7x.cpu0; \
             mmw 0x580244A0 0x8 0x0; \
             reset run"
