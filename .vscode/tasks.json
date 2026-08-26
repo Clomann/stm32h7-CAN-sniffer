@@ -165,7 +165,7 @@
     },
     {
       "label": "Flash CM7 & CM4 and start OpenOCD",
-      "dependsOn": ["Start OpenOCD"],
+      "dependsOn": ["Flash CM7 & CM4", "Start OpenOCD"],
       "dependsOrder": "sequence"
     },
     {
