@@ -23,3 +23,5 @@ CMakeFiles/*
 */CMakeFiles/*
 
 */Testing/Temporary/*
+logs/
+tmp/
