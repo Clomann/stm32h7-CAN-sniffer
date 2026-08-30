@@ -16,6 +16,11 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name);
 FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name);
 FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name);
 FRESULT FatFS_SD_Flush(FatFsDeviceType *dev);
+
+/* True when f_sync has FS metadata to persist (dirty FAT/dir window or
+ * FSINFO change). False for an in-place write into a preallocated file. */
+_Bool FatFS_SD_SyncPending(FatFsDeviceType *dev);
+
 FRESULT FatFS_SD_WriteFile(
     FatFsDeviceType *dev,
     const char *content,

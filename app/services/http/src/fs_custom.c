@@ -82,6 +82,7 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
     "\"sd_store_block_last_us\":%lu,\"sd_write_max_since_status_us\":%lu,"     \
     "\"sd_sync_max_since_status_us\":%lu,\"sd_store_block_max_since_status_"   \
     "us\":%lu,\"sd_store_block_avg_since_status_us\":%lu,"                     \
+    "\"sd_sync_skipped_since_status\":%lu,"                                    \
     "\"can1_rx_highwater_pct\":%.2f,\"can2_rx_highwater_pct\":%.2f,"           \
     "\"can1_hw_rx_fifo_highwater_pct\":%.2f,\"can2_hw_rx_fifo_highwater_"      \
     "pct\":%.2f,\"fdcan_msg_port_highwater_pct\":%.2f,"                        \
@@ -497,6 +498,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
             (unsigned long)BufferTelemetry.sd_sync_max_since_status_us,
             (unsigned long)BufferTelemetry.sd_store_block_max_since_status_us,
             (unsigned long)BufferTelemetry.sd_store_block_avg_since_status_us,
+            (unsigned long)BufferTelemetry.sd_sync_skipped_since_status,
             CanAbsRxHighWaterPctCan1,
             CanAbsRxHighWaterPctCan2,
             CanAbsHwRxFifoHighWaterPctCan1,

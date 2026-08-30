@@ -32,6 +32,7 @@ void set_file_size(uint32_t size);
 void set_file_open_result(FRESULT result);
 void set_next_write_result(FRESULT result);
 void set_next_flush_result(FRESULT result);
+void set_fatfs_sync_pending(bool pending);
 void set_frames_available(int count);
 void set_can_start_result(comm_status_t result);
 void set_tracer_running(bool running);
@@ -453,6 +454,7 @@ void test_BufferTelemetry_ReportsStoreWindowAndResets(void)
     appCanLogHandlerInit(testCtrlData);
 
     reset_filehandler_stubs();
+    set_fatfs_sync_pending(true); /* force the f_sync path for this window */
 
     mockRunCanTracer = true;
     set_frames_available(0);
@@ -519,12 +521,67 @@ void test_BufferTelemetry_ReportsStoreWindowAndResets(void)
         200U,
         telemetry.sd_store_block_avg_since_status_us
     );
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_sync_skipped_since_status);
 
     TEST_ASSERT_EQUAL_UINT8(0U, FsCustom_GetCanLogBufferTelemetry(&telemetry));
     TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_block_attempts_since_status);
     TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_blocks_written_since_status);
     TEST_ASSERT_EQUAL_UINT32(0U, telemetry.rb1_bytes_min_since_status);
     TEST_ASSERT_EQUAL_UINT32(0U, telemetry.rb1_bytes_max_since_status);
+}
+
+/**
+ * @brief Tests that f_sync is skipped for an in-place (preallocated) write
+ * @details With no pending FatFS metadata, the block is written but not
+ *          synced: sync timing is zero and the skip is counted.
+ */
+void test_BufferTelemetry_SkipsSyncWhenNoMetadataPending(void)
+{
+    FsCustomCanLogBufferTelemetryType telemetry = {0U};
+
+    appCanLogHandlerInit(testCtrlData);
+
+    reset_filehandler_stubs();
+    set_fatfs_sync_pending(false); /* in-place write, nothing to flush */
+
+    mockRunCanTracer = true;
+    set_frames_available(0);
+    appCanLogHandlerPoll(testCtrlData);
+
+    CanLogBuffer_Init();
+    TEST_ASSERT_EQUAL_UINT8(0U, FsCustom_GetCanLogBufferTelemetry(&telemetry));
+
+    CanLogEntryStackBufferType entryBuf = {0};
+    CanLogEntryType *entry              = (CanLogEntryType *)entryBuf.raw;
+
+    entry->header.header_len = sizeof(entry->header);
+    entry->header.type       = CLB_ENTRY_TYPE_FRAME;
+    entry->data_len          = 0U;
+    entry->header.total_len  = sizeof(CanLogEntryType);
+    entry->dlc_flags         = MAKE_DLC_FLAGS(0U, 0U);
+
+    for (uint32_t i = 0; i < 54U; i++)
+    {
+        entry->timestamp = 1000U + i;
+        entry->channel   = 1U;
+        entry->can_id    = 0x100U + i;
+        TEST_ASSERT_EQUAL_UINT8(
+            CLB_E_OK,
+            CanLogBuffer_AddEntry(entry, entry->header.total_len)
+        );
+    }
+
+    mockRunCanTracer = false;
+    appCanLogHandlerPoll(testCtrlData);
+
+    TEST_ASSERT_EQUAL_UINT8(0U, FsCustom_GetCanLogBufferTelemetry(&telemetry));
+    TEST_ASSERT_EQUAL_UINT32(1U, telemetry.sd_blocks_written_since_status);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_block_errors_since_status);
+    TEST_ASSERT_EQUAL_UINT32(100U, telemetry.sd_write_last_us);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_sync_last_us);
+    TEST_ASSERT_EQUAL_UINT32(100U, telemetry.sd_store_block_last_us);
+    TEST_ASSERT_EQUAL_UINT32(0U, telemetry.sd_sync_max_since_status_us);
+    TEST_ASSERT_EQUAL_UINT32(1U, telemetry.sd_sync_skipped_since_status);
 }
 
 /**
@@ -723,6 +780,7 @@ void RunAllTests(void)
     RUN_TEST(test_StorePipeline_WritesFramesToFile);
     RUN_TEST(test_CommitFlushOnStop_PadsAndFlushes);
     RUN_TEST(test_BufferTelemetry_ReportsStoreWindowAndResets);
+    RUN_TEST(test_BufferTelemetry_SkipsSyncWhenNoMetadataPending);
     RUN_TEST(test_StoreBlockFailure_RetriesWithoutDroppingFrames);
     RUN_TEST(test_MetaDataPersistence_RoundTrip);
     RUN_TEST(test_Preallocation_CreatesSizedFiles);

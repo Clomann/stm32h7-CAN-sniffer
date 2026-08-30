@@ -101,6 +101,7 @@ typedef struct
     uint32_t sd_sync_max_since_status_us;
     uint32_t sd_store_block_max_since_status_us;
     uint32_t sd_store_block_avg_since_status_us;
+    uint32_t sd_sync_skipped_since_status;
 } FsCustomCanLogBufferTelemetryType;
 
 /* Shim functions that need to be implemented by the caller */

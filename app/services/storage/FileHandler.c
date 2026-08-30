@@ -167,6 +167,23 @@ FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
     return res;
 }
 
+_Bool FatFS_SD_SyncPending(FatFsDeviceType *dev)
+{
+    const FATFS *fs;
+
+    if (NULL == dev)
+    {
+        return 0;
+    }
+
+    fs = dev->file.obj.fs;
+
+    /* wflag / fsi_flag b0 are set only when a cluster is (de)allocated, not
+     * by an in-place write. FA_DIRTY is skipped: writes are sector-aligned. */
+    return (NULL != fs)
+           && ((0U != fs->wflag) || (0U != (fs->fsi_flag & 0x01U)));
+}
+
 FRESULT FatFS_SD_WriteFile(
     FatFsDeviceType *dev,
     const char *content,

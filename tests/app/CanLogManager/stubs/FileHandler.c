@@ -17,6 +17,7 @@ static uint32_t mock_last_block_frame_count = 0;
 static uint32_t mock_write_call_count       = 0;
 static FRESULT mock_next_write_result       = FR_OK;
 static FRESULT mock_next_flush_result       = FR_OK;
+static bool mock_sync_pending               = false;
 
 static const char mock_meta_filename[] = "/logs_meta.json";
 static char mock_meta_file_content[128];
@@ -37,6 +38,7 @@ void reset_filehandler_stubs(void)
     mock_write_call_count       = 0;
     mock_next_write_result      = FR_OK;
     mock_next_flush_result      = FR_OK;
+    mock_sync_pending           = false;
     mock_meta_file_len          = 0;
     mock_meta_file_present      = false;
     mock_current_is_meta        = false;
@@ -62,6 +64,11 @@ void set_next_write_result(FRESULT result)
 void set_next_flush_result(FRESULT result)
 {
     mock_next_flush_result = result;
+}
+
+void set_fatfs_sync_pending(bool pending)
+{
+    mock_sync_pending = pending;
 }
 
 bool get_file_closed(void)
@@ -352,6 +359,8 @@ FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
 {
     (void)dev;
 
+    mock_sync_pending = false;
+
     if (mock_next_flush_result != FR_OK)
     {
         FRESULT result         = mock_next_flush_result;
@@ -360,6 +369,12 @@ FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
     }
 
     return FR_OK;
+}
+
+_Bool FatFS_SD_SyncPending(FatFsDeviceType *dev)
+{
+    (void)dev;
+    return mock_sync_pending;
 }
 
 FRESULT FatFS_SD_FileIterator_Open(

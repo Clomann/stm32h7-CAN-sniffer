@@ -224,6 +224,7 @@ static volatile uint32_t CanLogSdWriteMaxSinceStatusUs           = 0U;
 static volatile uint32_t CanLogSdSyncMaxSinceStatusUs            = 0U;
 static volatile uint32_t CanLogSdStoreBlockMaxSinceStatusUs      = 0U;
 static volatile uint64_t CanLogSdStoreBlockSumSinceStatusUs      = 0U;
+static volatile uint32_t CanLogSdSyncSkippedSinceStatus          = 0U;
 
 static uint32_t CanLogManager_ReadRb1UsedBytes(void)
 {
@@ -266,6 +267,7 @@ static void CanLogManager_ResetBufferTelemetryWindow(uint32_t rb1_used)
     CanLogSdSyncMaxSinceStatusUs       = 0U;
     CanLogSdStoreBlockMaxSinceStatusUs = 0U;
     CanLogSdStoreBlockSumSinceStatusUs = 0U;
+    CanLogSdSyncSkippedSinceStatus     = 0U;
 }
 
 static void CanLogManager_ResetBufferTelemetry(uint32_t rb1_used)
@@ -285,6 +287,7 @@ static void CanLogManager_ResetBufferTelemetry(uint32_t rb1_used)
     CanLogSdSyncMaxSinceStatusUs          = 0U;
     CanLogSdStoreBlockMaxSinceStatusUs    = 0U;
     CanLogSdStoreBlockSumSinceStatusUs    = 0U;
+    CanLogSdSyncSkippedSinceStatus        = 0U;
 
     CanLogManager_ResetBufferTelemetryWindow(rb1_used);
 }
@@ -576,6 +579,7 @@ FsCustom_GetCanLogBufferTelemetry(FsCustomCanLogBufferTelemetryType *telemetry)
         (sd_blocks_written > 0U)
             ? (uint32_t)(CanLogSdStoreBlockSumSinceStatusUs / sd_blocks_written)
             : 0U;
+    telemetry->sd_sync_skipped_since_status = CanLogSdSyncSkippedSinceStatus;
 
     CanLogManager_ResetBufferTelemetryWindow(rb1_used_now);
 
@@ -1929,11 +1933,23 @@ static comm_status_t appCanLogStoreToSd(
     if (FR_OK == FatFS_SD_WriteFile(dev, (const char *)data, length))
     {
         after_write_us = FDCAN_GetTimestampHook();
-        if (FR_OK != FatFS_SD_Flush(dev))
+
+        /* Skip f_sync for an in-place write into a preallocated file: it
+         * would only rewrite an unchanged dir entry (pure card wear).
+         * Rotation and shutdown still flush via f_close. */
+        if (FatFS_SD_SyncPending(dev))
         {
-            res = COMM_ERROR;
+            if (FR_OK != FatFS_SD_Flush(dev))
+            {
+                res = COMM_ERROR;
+            }
+            after_sync_us = FDCAN_GetTimestampHook();
         }
-        after_sync_us = FDCAN_GetTimestampHook();
+        else
+        {
+            after_sync_us = after_write_us;
+            CanLogSdSyncSkippedSinceStatus++;
+        }
 
         *write_us       = (uint32_t)(after_write_us - start_us);
         *sync_us        = (uint32_t)(after_sync_us - after_write_us);
