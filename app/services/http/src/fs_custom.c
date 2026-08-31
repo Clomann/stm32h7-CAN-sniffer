@@ -6,11 +6,14 @@
 #include <string.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #include "fs_custom.h"
 #include "FileHandler.h"
 #include "CanLogManager.h"
 #include "CanLogBuffer.h"
+#include "ErrorRecorder.h"
 #include "httpd_post.h"
 #include "WebInterface.h"
 
@@ -45,12 +48,14 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define CANLOG_MAX_STATUS_SIZE    5120U
 #define CANLOG_MAX_DEBUG_SIZE     4096U
 #define CANLOG_MAX_CONFIG_SIZE    96U
+#define ERRORRECORDER_MAX_SIZE    CANLOG_MAX_DEBUG_SIZE
 #define IAP_STATUS_MAX_SIZE       640U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
 #define CANLOG_CONFIG_PATH        "/logs/config"
 #define CANLOG_STATUS_PATH        "/logger/status"
 #define CANLOG_DEBUG_PATH         "/logger/debug"
+#define ERRORRECORDER_PATH        "/logger/errors"
 #define CANLOG_POST_REDIRECT_PATH "/postredir"
 #define IAP_STATUS_PATH           "/iap/status"
 #define IAP_PREPARE_PATH          "/iap/prepare"
@@ -204,6 +209,181 @@ uint8_t FsCustom_SetDebugProvider(const FsCustomDebugProviderType *provider)
 
     DebugProvider = *provider;
     return 0U;
+}
+
+static bool FsCustom_AppendJson(
+    char *buffer,
+    size_t buffer_size,
+    size_t *offset,
+    const char *format,
+    ...
+)
+{
+    va_list args;
+    int n;
+
+    if ((NULL == buffer) || (NULL == offset) || (NULL == format)
+        || (*offset >= buffer_size))
+    {
+        return false;
+    }
+
+    va_start(args, format);
+    n = vsnprintf(&buffer[*offset], buffer_size - *offset, format, args);
+    va_end(args);
+
+    if ((n < 0) || ((size_t)n >= (buffer_size - *offset)))
+    {
+        return false;
+    }
+
+    *offset += (size_t)n;
+    return true;
+}
+
+static bool FsCustom_AppendErrorEntry(
+    char *buffer,
+    size_t buffer_size,
+    size_t *offset,
+    const ErrorRecorderEntryType *entry
+)
+{
+    const ErrorContextType *context;
+    char file[ERRORCONTEXT_FILE_NAME_LENGTH + 1U];
+    char function[ERRORCONTEXT_FUNCTION_NAME_LENGTH + 1U];
+
+    if (NULL == entry)
+    {
+        return FsCustom_AppendJson(buffer, buffer_size, offset, "null");
+    }
+
+    context = &entry->context;
+    memcpy(file, context->file, ERRORCONTEXT_FILE_NAME_LENGTH);
+    file[ERRORCONTEXT_FILE_NAME_LENGTH] = '\0';
+    memcpy(function, context->function, ERRORCONTEXT_FUNCTION_NAME_LENGTH);
+    function[ERRORCONTEXT_FUNCTION_NAME_LENGTH] = '\0';
+
+    return FsCustom_AppendJson(
+        buffer,
+        buffer_size,
+        offset,
+        "{\"seq\":%lu,\"id\":%lu,\"code\":%lu,\"line\":%u,"
+        "\"arg0\":%lu,\"arg1\":%lu,\"file\":\"%s\",\"function\":\"%s\"}",
+        (unsigned long)entry->sequence,
+        (unsigned long)context->id,
+        (unsigned long)context->code,
+        (unsigned int)context->line,
+        (unsigned long)context->arg0,
+        (unsigned long)context->arg1,
+        file,
+        function
+    );
+}
+
+static bool FsCustom_AppendErrorEntryOrNull(
+    char *buffer,
+    size_t buffer_size,
+    size_t *offset,
+    uint8_t valid,
+    const ErrorRecorderEntryType *entry
+)
+{
+    return (0U != valid)
+               ? FsCustom_AppendErrorEntry(buffer, buffer_size, offset, entry)
+               : FsCustom_AppendJson(buffer, buffer_size, offset, "null");
+}
+
+static bool FsCustom_BuildErrorRecorderJson(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+)
+{
+    ErrorRecorderSnapshotType Snapshot;
+    size_t offset = 0U;
+
+    if ((NULL == buffer) || (NULL == payload_size)
+        || (0U != ErrorRecorder_GetSnapshot(&Snapshot)))
+    {
+        return false;
+    }
+
+    if (!FsCustom_AppendJson(
+            buffer,
+            buffer_size,
+            &offset,
+            "{\"total\":%lu,\"overwritten\":%lu,\"first\":",
+            (unsigned long)Snapshot.total_count,
+            (unsigned long)Snapshot.overwritten_count
+        ))
+    {
+        return false;
+    }
+
+    if (!FsCustom_AppendErrorEntryOrNull(
+            buffer,
+            buffer_size,
+            &offset,
+            Snapshot.first_valid,
+            &Snapshot.first
+        ))
+    {
+        return false;
+    }
+
+    if (!FsCustom_AppendJson(buffer, buffer_size, &offset, ",\"last\":"))
+    {
+        return false;
+    }
+
+    if (!FsCustom_AppendErrorEntryOrNull(
+            buffer,
+            buffer_size,
+            &offset,
+            Snapshot.last_valid,
+            &Snapshot.last
+        ))
+    {
+        return false;
+    }
+
+    if (!FsCustom_AppendJson(
+            buffer,
+            buffer_size,
+            &offset,
+            ",\"recent_count\":%u,\"recent\":[",
+            (unsigned int)Snapshot.recent_count
+        ))
+    {
+        return false;
+    }
+
+    for (uint8_t i = 0U; i < Snapshot.recent_count; i++)
+    {
+        if ((i > 0U)
+            && !FsCustom_AppendJson(buffer, buffer_size, &offset, ","))
+        {
+            return false;
+        }
+
+        if (!FsCustom_AppendErrorEntry(
+                buffer,
+                buffer_size,
+                &offset,
+                &Snapshot.recent[i]
+            ))
+        {
+            return false;
+        }
+    }
+
+    if (!FsCustom_AppendJson(buffer, buffer_size, &offset, "]}"))
+    {
+        return false;
+    }
+
+    *payload_size = offset;
+    return true;
 }
 
 int fs_open_custom(struct fs_file *file, const char *name)
@@ -668,6 +848,53 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
         file->data  = DebugData;
         file->len   = (int)JSON_RESPONSE_HEADER_SIZE + n;
+        file->index = 0;
+        file->flags =
+            FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
+        file->is_custom_file = 0; /* httpd sends static buffer     */
+        return 1;
+    }
+    else if (0
+             == strncmp(
+                 name,
+                 ERRORRECORDER_PATH,
+                 sizeof(ERRORRECORDER_PATH) - 1
+             ))
+    {
+        char *ErrorPayload = &DebugData[JSON_RESPONSE_HEADER_SIZE];
+        size_t ErrorPayloadSize = 0U;
+        int ErrorDataSize;
+
+        memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
+
+        if (FsCustom_BuildErrorRecorderJson(
+                ErrorPayload,
+                ERRORRECORDER_MAX_SIZE,
+                &ErrorPayloadSize
+            ))
+        {
+            ErrorDataSize = (int)ErrorPayloadSize;
+        }
+        else
+        {
+            ErrorDataSize = snprintf(
+                ErrorPayload,
+                ERRORRECORDER_MAX_SIZE,
+                CANLOG_DEBUG_ERROR_STRING,
+                "error_recorder_payload_build_failed",
+                (unsigned long)ErrorPayloadSize,
+                (unsigned long)ERRORRECORDER_MAX_SIZE
+            );
+
+            if ((ErrorDataSize < 0)
+                || ((size_t)ErrorDataSize >= ERRORRECORDER_MAX_SIZE))
+            {
+                return 0;
+            }
+        }
+
+        file->data  = DebugData;
+        file->len   = (int)JSON_RESPONSE_HEADER_SIZE + ErrorDataSize;
         file->index = 0;
         file->flags =
             FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
