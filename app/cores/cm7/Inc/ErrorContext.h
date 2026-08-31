@@ -7,11 +7,15 @@
 #define ERRORCONTEXT_FUNCTION_NAME_LENGTH (64U)
 
 typedef uint32_t ErrorCodeType;
+typedef uint32_t ErrorIdType;
 
 typedef struct
 {
+    ErrorIdType id;
     ErrorCodeType code;
+    uint32_t arg0;
+    uint32_t arg1;
     uint16_t line;
-    const char file[ERRORCONTEXT_FILE_NAME_LENGTH];
+    char file[ERRORCONTEXT_FILE_NAME_LENGTH];
     char function[ERRORCONTEXT_FUNCTION_NAME_LENGTH];
 } ErrorContextType;

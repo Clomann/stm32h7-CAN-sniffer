@@ -69,6 +69,8 @@ app/services/logging/CanLogDebugProvider.h
 app/services/logging/CanLogManager.c
 app/services/logging/CanLogManager.h
 app/services/logging/CanLogManagerTypes.h
+app/services/logging/ErrorRecorder.c
+app/services/logging/ErrorRecorder.h
 app/services/logging/RuntimeChecks.c
 app/services/logging/RuntimeChecks.h
 app/services/storage/FileHandler.c
@@ -171,6 +173,8 @@ tests/app/CanLogManager/stubs/test_ff_state.h
 tests/app/CanLogManager/stubs/test_filehandler_state.h
 tests/app/CanLogManager/test_CanLogManager.c
 tests/app/CanLogManager/test_CanLogManager.h
+tests/app/Common/test_ErrorRecorder.c
+tests/app/Common/test_ErrorRecorder.h
 tests/app/Common/test_SequenceChecker.c
 tests/app/Common/test_SequenceChecker.h
 tests/app/InAppProgramming/stubs/RamFlashSim.c
