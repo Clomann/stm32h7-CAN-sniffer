@@ -39,6 +39,7 @@
 #include "CanCtrl.h"
 #include "WebInterface.h"
 #include "RuntimeChecks.h"
+#include "ErrorRecorder.h"
 #include "Iap.h"
 #include "FwUpdateHandoff.h"
 
@@ -106,6 +107,8 @@ void TIM_ErrorHandler()
 
 void Sd_Spi_ErrorHandlerHook(ErrorContextType *context)
 {
+    ErrorRecorder_Record(context);
+
     Error_Handler();
 }
 
@@ -128,13 +131,20 @@ uint8_t Sd_Spi_OsTaskDelayHook(uint32_t delay)
 
 void FileHandler_ErrorHandler(ErrorContextType *context)
 {
+    ErrorRecorder_Record(context);
+
     Error_Handler();
+}
+
+void MMC_ErrorHandler(ErrorContextType *context)
+{
+    ErrorRecorder_Record(context);
 }
 
 #if INSTR_ENABLED
 void Instrumentation_ErrorHandlerHook(ErrorContextType *context)
 {
-    (void)context;
+    ErrorRecorder_Record(context);
 
     Error_Handler();
 }
