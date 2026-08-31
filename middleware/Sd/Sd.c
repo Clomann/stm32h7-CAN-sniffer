@@ -7,6 +7,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "stm32h7xx_hal.h"
@@ -65,6 +66,44 @@
 #define SD_ERASE_CHUNK_BLOCKS 4096U
 
 static ErrorContextType ErrorContext = {.file = __FILE_NAME__};
+
+static void SD_Spi_SetErrorContext(
+    ErrorIdType id,
+    ErrorCodeType code,
+    uint16_t line,
+    const char *function,
+    uint32_t arg0,
+    uint32_t arg1
+)
+{
+    memset(&ErrorContext, 0, sizeof(ErrorContext));
+    ErrorContext.id   = id;
+    ErrorContext.code = code;
+    ErrorContext.arg0 = arg0;
+    ErrorContext.arg1 = arg1;
+    ErrorContext.line = line;
+    snprintf(ErrorContext.file, sizeof(ErrorContext.file), "%s", __FILE_NAME__);
+    snprintf(
+        ErrorContext.function,
+        sizeof(ErrorContext.function),
+        "%s",
+        function
+    );
+}
+
+#define SD_SPI_REPORT_ERROR(id, code, arg0, arg1)                              \
+    do                                                                         \
+    {                                                                          \
+        SD_Spi_SetErrorContext(                                                \
+            (id),                                                              \
+            (ErrorCodeType)(code),                                             \
+            (uint16_t)__LINE__,                                                \
+            __func__,                                                          \
+            (uint32_t)(arg0),                                                  \
+            (uint32_t)(arg1)                                                   \
+        );                                                                     \
+        Sd_Spi_ErrorHandlerHook(&ErrorContext);                                \
+    } while (0)
 
 /**
  * @brief Debug-only counter of SD hot-reset calls.
@@ -1001,16 +1040,12 @@ SD_Spi_readMultiBlock(uint32_t address, uint8_t *const buff, uint32_t cnt)
 
     if (0 != res)
     {
-        ErrorContext.line = __LINE__;
-        ErrorContext.code = res;
-        snprintf(
-            ErrorContext.function,
-            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
-            "%s",
-            "SD_Spi_readMultiBlock"
+        SD_SPI_REPORT_ERROR(
+            SD_SPI_ERROR_ID_READ_MULTI_BLOCK,
+            res,
+            address,
+            cnt
         );
-
-        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -1041,6 +1076,12 @@ DRESULT SD_Spi_hotReset(void)
     if (0xFF == resp.byte)
     {
         SpiAbs_CsDisable(SPIABS_DEVICE_1);
+        SD_SPI_REPORT_ERROR(
+            SD_SPI_ERROR_ID_HOT_RESET_RESP,
+            RES_NOTRDY,
+            resp.byte,
+            HotResetCallCount
+        );
         return RES_NOTRDY;
     }
 
@@ -1051,6 +1092,12 @@ DRESULT SD_Spi_hotReset(void)
     if (0 != WaitRes)
     {
         res = RES_NOTRDY;
+        SD_SPI_REPORT_ERROR(
+            SD_SPI_ERROR_ID_HOT_RESET_BUSY,
+            res,
+            WaitRes,
+            HotResetCallCount
+        );
     }
     else
     {
@@ -1244,16 +1291,12 @@ SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt)
 
     if (0 != res)
     {
-        ErrorContext.code = res;
-        ErrorContext.line = __LINE__;
-        snprintf(
-            ErrorContext.function,
-            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
-            "%s",
-            "SD_Spi_writeMultiBlock"
+        SD_SPI_REPORT_ERROR(
+            SD_SPI_ERROR_ID_WRITE_MULTI_BLOCK,
+            res,
+            address,
+            cnt
         );
-
-        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
@@ -1388,30 +1431,19 @@ uint8_t SD_Spi_EraseAll(uint32_t *blocks_erased)
     res = SD_Spi_ReadCSD(&csd);
     if (SD_E_OK != res)
     {
-        ErrorContext.code = res;
-        ErrorContext.line = __LINE__;
-        snprintf(
-            ErrorContext.function,
-            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
-            "%s",
-            "SD_Spi_EraseAll"
-        );
-        Sd_Spi_ErrorHandlerHook(&ErrorContext);
+        SD_SPI_REPORT_ERROR(SD_SPI_ERROR_ID_ERASE_READ_CSD, res, 0U, 0U);
         return res;
     }
 
     res = SD_Spi_TotalBlocks512(&csd, &totalBlocks);
     if (SD_E_OK != res)
     {
-        ErrorContext.code = res;
-        ErrorContext.line = __LINE__;
-        snprintf(
-            ErrorContext.function,
-            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
-            "%s",
-            "SD_Spi_EraseAll"
+        SD_SPI_REPORT_ERROR(
+            SD_SPI_ERROR_ID_ERASE_TOTAL_BLOCK,
+            res,
+            0U,
+            0U
         );
-        Sd_Spi_ErrorHandlerHook(&ErrorContext);
         return res;
     }
 
@@ -1534,15 +1566,12 @@ uint8_t SD_Spi_EraseAll(uint32_t *blocks_erased)
 
     if (SD_E_OK != res)
     {
-        ErrorContext.code = res;
-        ErrorContext.line = __LINE__;
-        snprintf(
-            ErrorContext.function,
-            ERRORCONTEXT_FUNCTION_NAME_LENGTH,
-            "%s",
-            "SD_Spi_EraseAll"
+        SD_SPI_REPORT_ERROR(
+            SD_SPI_ERROR_ID_ERASE_RANGE,
+            res,
+            currentBlock,
+            totalBlocks
         );
-        Sd_Spi_ErrorHandlerHook(&ErrorContext);
     }
 
     return res;

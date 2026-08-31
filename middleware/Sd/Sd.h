@@ -87,6 +87,14 @@
 /*!< Computed card capacity exceeds 32-bit addressable block count */
 #define SD_E_CAPACITY_OVERFLOW 16U
 
+#define SD_SPI_ERROR_ID_READ_MULTI_BLOCK  0x53440001U
+#define SD_SPI_ERROR_ID_HOT_RESET_RESP    0x53440002U
+#define SD_SPI_ERROR_ID_HOT_RESET_BUSY    0x53440003U
+#define SD_SPI_ERROR_ID_WRITE_MULTI_BLOCK 0x53440004U
+#define SD_SPI_ERROR_ID_ERASE_READ_CSD    0x53440005U
+#define SD_SPI_ERROR_ID_ERASE_TOTAL_BLOCK 0x53440006U
+#define SD_SPI_ERROR_ID_ERASE_RANGE       0x53440007U
+
 /**
  * Enumeration listing the implemented SPI commands.
  * 

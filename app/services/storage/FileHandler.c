@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "ErrorContext.h"
 #include "FileHandler.h"
@@ -17,6 +18,40 @@
 
 static FATFS FatFs; /* FatFs work area needed for each volume */
 static ErrorContextType ErrorContext;
+
+static void FatFS_SD_SetErrorContext(
+    ErrorIdType id,
+    ErrorCodeType code,
+    uint16_t line,
+    const char *function,
+    uint32_t arg0,
+    uint32_t arg1
+)
+{
+    memset(&ErrorContext, 0, sizeof(ErrorContext));
+    ErrorContext.id   = id;
+    ErrorContext.code = code;
+    ErrorContext.arg0 = arg0;
+    ErrorContext.arg1 = arg1;
+    ErrorContext.line = line;
+    snprintf(ErrorContext.file, sizeof(ErrorContext.file), "%s", __FILE_NAME__);
+    snprintf(
+        ErrorContext.function,
+        sizeof(ErrorContext.function),
+        "%s",
+        function
+    );
+}
+
+#define FATFS_SD_SET_ERROR_CONTEXT(id, code, arg0, arg1)                       \
+    FatFS_SD_SetErrorContext(                                                  \
+        (id),                                                                  \
+        (ErrorCodeType)(code),                                                 \
+        (uint16_t)__LINE__,                                                    \
+        __func__,                                                              \
+        (uint32_t)(arg0),                                                      \
+        (uint32_t)(arg1)                                                       \
+    )
 
 static bool FatFS_SD_MbrSignatureIsValid(const BYTE *sector)
 {
@@ -61,6 +96,8 @@ __attribute__((weak)) void FileHandler_InstrumentationWriteEndHook(void)
 
 __attribute__((weak)) void FileHandler_ErrorHandler(ErrorContextType *context)
 {
+    (void)context;
+
     __asm volatile("nop");
 }
 
@@ -97,6 +134,12 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
 
     if (fr != FR_OK)
     {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_OPEN_WRITE_SEEK,
+            fr,
+            dev->writeIndex,
+            dev->fflags
+        );
         fr = f_truncate(&dev->file);
 
         if (fr == FR_OK)
@@ -104,8 +147,28 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
             // Reset to last valid write pointer and keep allocation
             fr = f_tell(&dev->file);
         }
+        else
+        {
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_OPEN_WRITE_TRUNC,
+                fr,
+                dev->writeIndex,
+                dev->fflags
+            );
+        }
     }
 #endif
+
+    if (FR_OK != fr)
+    {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_OPEN_WRITE,
+            fr,
+            dev->writeIndex,
+            dev->fflags
+        );
+        FileHandler_ErrorHandler(&ErrorContext);
+    }
 
     return fr;
 }
@@ -121,7 +184,18 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
 
     if (FR_OK != fr)
     {
+        FRESULT open_fr = fr;
+
         fr = f_open(&dev->file, name, dev->fflags | FA_CREATE_ALWAYS);
+        if (FR_OK != fr)
+        {
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_OPEN_OVERWRITE,
+                fr,
+                (uint32_t)open_fr,
+                dev->fflags | FA_CREATE_ALWAYS
+            );
+        }
     }
     else
     {
@@ -131,6 +205,15 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
     {
         // Reset to beginning but keep allocation
         fr = f_lseek(&dev->file, 0);
+        if (FR_OK != fr)
+        {
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_OVERWRITE_SEEK,
+                fr,
+                0U,
+                dev->fflags
+            );
+        }
     }
 
 #if FATFS_TRUNCATE_ON_SEEK_FAIL
@@ -142,8 +225,22 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
             // Reset to beginning but keep allocation
             fr = f_lseek(&dev->file, 0);
         }
+        else
+        {
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_OVERWRITE_TRUNC,
+                fr,
+                0U,
+                dev->fflags
+            );
+        }
     }
 #endif
+
+    if (FR_OK != fr)
+    {
+        FileHandler_ErrorHandler(&ErrorContext);
+    }
 
     return fr;
 }
@@ -163,6 +260,17 @@ FRESULT FatFS_SD_Flush(FatFsDeviceType *dev)
     FRESULT res;
 
     res = f_sync(&dev->file);
+
+    if (FR_OK != res)
+    {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_F_SYNC,
+            res,
+            f_tell(&dev->file),
+            dev->fflags
+        );
+        FileHandler_ErrorHandler(&ErrorContext);
+    }
 
     return res;
 }
@@ -210,17 +318,37 @@ FRESULT FatFS_SD_WriteFile(
 
     if (FR_OK != res)
     {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_WRITE_LSEEK,
+            res,
+            FileSize,
+            len
+        );
+
         // File corrupted - truncate to known good size and continue
         res = f_truncate(&dev->file);
 
         if (FR_OK == res)
         {
             res = f_lseek(&dev->file, f_tell(&dev->file));
+            if (FR_OK != res)
+            {
+                FATFS_SD_SET_ERROR_CONTEXT(
+                    FILEHANDLER_ERROR_ID_WRITE_RESEEK,
+                    res,
+                    f_tell(&dev->file),
+                    len
+                );
+            }
         }
         else
         {
-            ErrorContext.code = res;
-            ErrorContext.line = __LINE__;
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_WRITE_TRUNCATE,
+                res,
+                FileSize,
+                len
+            );
         }
     }
 
@@ -230,17 +358,25 @@ FRESULT FatFS_SD_WriteFile(
         res = f_write(&dev->file, content, len, &BytesWritten);
         if (FR_OK != res)
         {
-            ErrorContext.code = res;
-            ErrorContext.line = __LINE__;
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_WRITE_F_WRITE,
+                res,
+                len,
+                BytesWritten
+            );
         }
         FileHandler_InstrumentationWriteEndHook();
     }
 
     if (FR_OK == res && BytesWritten != len)
     {
-        res               = FR_DISK_ERR; // Partial write = error
-        ErrorContext.code = res;
-        ErrorContext.line = __LINE__;
+        res = FR_DISK_ERR; // Partial write = error
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_WRITE_PARTIAL,
+            res,
+            len,
+            BytesWritten
+        );
     }
 
     if (res != FR_OK)
@@ -264,27 +400,84 @@ FRESULT FatFS_SD_WriteBeginningOfFile(
 
     if (FR_OK != res)
     {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_WRITE_BEGIN_SEEK,
+            res,
+            0U,
+            len
+        );
+
         // File corrupted - truncate to known good size and continue
         res = f_truncate(&dev->file);
 
         if (FR_OK == res)
         {
             res = f_lseek(&dev->file, 0);
+            if (FR_OK != res)
+            {
+                FATFS_SD_SET_ERROR_CONTEXT(
+                    FILEHANDLER_ERROR_ID_WRITE_BEGIN_SEEK,
+                    res,
+                    0U,
+                    len
+                );
+            }
+        }
+        else
+        {
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_WRITE_BEGIN_TRUNC,
+                res,
+                0U,
+                len
+            );
         }
     }
 
     if (FR_OK == res)
     {
         res = f_write(&dev->file, content, len, &BytesWritten);
+        if (FR_OK != res)
+        {
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_WRITE_BEGIN_WRITE,
+                res,
+                len,
+                BytesWritten
+            );
+        }
     }
 
-    if (FR_OK == res && BytesWritten != len)
+    if (FR_OK == res)
     {
-        res = FR_DISK_ERR; // Partial write = error
+        if (BytesWritten != len)
+        {
+            res = FR_DISK_ERR; // Partial write = error
+            FATFS_SD_SET_ERROR_CONTEXT(
+                FILEHANDLER_ERROR_ID_WRITE_BEGIN_PART,
+                res,
+                len,
+                BytesWritten
+            );
+        }
+        else
+        {
+            res = f_lseek(&dev->file, 0);
+            if (FR_OK != res)
+            {
+                FATFS_SD_SET_ERROR_CONTEXT(
+                    FILEHANDLER_ERROR_ID_WRITE_BEGIN_RESET,
+                    res,
+                    0U,
+                    len
+                );
+            }
+        }
     }
-    else
+
+    if (FR_OK != res)
     {
-        res = f_lseek(&dev->file, 0);
+        FileHandler_ErrorHandler(&ErrorContext);
     }
 
     return res;
@@ -297,9 +490,26 @@ FRESULT FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t len)
 
     fr = f_read(&dev->file, data, len, &BytesRead);
 
-    if (BytesRead != len)
+    if (FR_OK != fr)
+    {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_READ_F_READ,
+            fr,
+            len,
+            BytesRead
+        );
+        FileHandler_ErrorHandler(&ErrorContext);
+    }
+    else if (BytesRead != len)
     {
         fr = FR_DISK_ERR;
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_READ_PARTIAL,
+            fr,
+            len,
+            BytesRead
+        );
+        FileHandler_ErrorHandler(&ErrorContext);
     }
 
     return fr;
@@ -307,9 +517,23 @@ FRESULT FatFS_SD_ReadFile(FatFsDeviceType *dev, char *data, uint32_t len)
 
 FRESULT FatFS_SD_CloseFile(FatFsDeviceType *dev)
 {
+    FRESULT fr;
+
     dev->writeIndex = f_tell(&dev->file);
 
-    return f_close(&dev->file); /* Close the file */
+    fr = f_close(&dev->file); /* Close the file */
+    if (FR_OK != fr)
+    {
+        FATFS_SD_SET_ERROR_CONTEXT(
+            FILEHANDLER_ERROR_ID_CLOSE,
+            fr,
+            dev->writeIndex,
+            dev->fflags
+        );
+        FileHandler_ErrorHandler(&ErrorContext);
+    }
+
+    return fr;
 }
 
 FRESULT FatFS_SD_GetFileSize(FatFsDeviceType *dev, uint32_t *size)

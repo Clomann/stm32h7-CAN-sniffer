@@ -13,6 +13,15 @@
 #include <stdint.h>
 #include "ff.h"
 #include "diskio.h"
+#include "ErrorContext.h"
+
+#define DISKIOFACADE_ERROR_ID_MMC_STATUS     0x4D4D0001U
+#define DISKIOFACADE_ERROR_ID_MMC_INITIALIZE 0x4D4D0002U
+#define DISKIOFACADE_ERROR_ID_MMC_READ       0x4D4D0003U
+#define DISKIOFACADE_ERROR_ID_MMC_WRITE      0x4D4D0004U
+#define DISKIOFACADE_ERROR_ID_MMC_IOCTL      0x4D4D0005U
+
+void MMC_ErrorHandler(ErrorContextType *context);
 
 uint8_t MMC_disk_status(void);
 
