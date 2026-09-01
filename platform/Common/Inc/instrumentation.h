@@ -6,11 +6,21 @@
 #define INSTR_ENABLED        1
 #define INSTR_PERSIST_ACTIVE 1
 
-#define FILEHANDLER_TRACE  1U
-#define FDCANMSGPORT_TRACE 2U
+#define COMPONENT_TRACE_NONE         0U
+#define COMPONENT_TRACE_FILEHANDLER  1U
+#define COMPONENT_TRACE_FDCANMSGPORT 2U
 
 #ifndef COMPONENT_TRACE
-#define COMPONENT_TRACE FDCANMSGPORT_TRACE
+#define COMPONENT_TRACE COMPONENT_TRACE_NONE
+#endif
+
+/* Human-readable name of the selected component, for diagnostics output. */
+#if COMPONENT_TRACE == COMPONENT_TRACE_FILEHANDLER
+#define COMPONENT_TRACE_NAME "filehandler"
+#elif COMPONENT_TRACE == COMPONENT_TRACE_FDCANMSGPORT
+#define COMPONENT_TRACE_NAME "fdcanmsgport"
+#else
+#define COMPONENT_TRACE_NAME "none"
 #endif
 
 #define INSTR_E_OK     0U

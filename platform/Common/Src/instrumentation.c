@@ -37,7 +37,7 @@ typedef struct
 #define INSTR_FDCAN_TRIGGER_POST_COUNT                                         \
     (INSTR_TRACE_COUNT_MAX - INSTR_FDCAN_TRIGGER_PRE_COUNT - 1U)
 
-#if TRACE_SELECTED(FILEHANDLER_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FILEHANDLER)
 static ErrorContextType ErrorContext = {.file = __FILE_NAME__, .code = 0};
 #endif
 
@@ -46,10 +46,10 @@ static InstrumentationTimeTraceType
     __attribute__((section(".ram_d3"))) TraceData[INSTR_TRACE_COUNT_MAX] = {0};
 
 static bool InstrumentationReady = false;
-#if TRACE_SELECTED(FILEHANDLER_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FILEHANDLER)
 static uint64_t last_sd_write_start = 0;
 #endif
-#if TRACE_SELECTED(FDCANMSGPORT_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FDCANMSGPORT)
 typedef enum
 {
     FDCAN_TRACE_ROLLING,
@@ -106,7 +106,7 @@ Instrumentation_SerializeHook(uint8_t *buf, uint32_t *size)
     (void)buf;
 
     buf = (uint8_t *)TraceData;
-#if TRACE_SELECTED(FDCANMSGPORT_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FDCANMSGPORT)
     *size = FdcanTraceStoredCount * sizeof(TraceData[0]);
 #else
     *size = sizeof(TraceData);
@@ -160,7 +160,7 @@ uint64_t Instrumentation_GetTimestampUs(void)
     return FDCAN_GetTimestampHook(); // or replicate the TIMx logic
 }
 
-#if TRACE_SELECTED(FILEHANDLER_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FILEHANDLER)
 static InstrErrorType
 Instrumentation_WriteEntryToBuffer(lwrb_t *buf, const void *entry, uint32_t btw)
 {
@@ -209,7 +209,7 @@ static void Instrumentation_WriteTraceEntry(
 }
 #endif
 
-#if TRACE_SELECTED(FDCANMSGPORT_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FDCANMSGPORT)
 static bool Instrumentation_FdcanTraceTriggerAllowed(uint32_t value)
 {
 #if INSTR_FDCAN_FREEZE_TRIGGER_VALUE > 0U
@@ -406,7 +406,7 @@ void FileHandler_InstrumentationWriteStartHook(void)
     {
         return;
     }
-#if TRACE_SELECTED(FILEHANDLER_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FILEHANDLER)
     last_sd_write_start = Instrumentation_GetTimestampUs();
 #endif
     GPIO_Dbg_On(INSTR_SD_WRITE_PIN);
@@ -414,7 +414,7 @@ void FileHandler_InstrumentationWriteStartHook(void)
 
 void FileHandler_InstrumentationWriteEndHook(void)
 {
-#if TRACE_SELECTED(FILEHANDLER_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FILEHANDLER)
     uint32_t timestamp;
 #endif
 
@@ -423,7 +423,7 @@ void FileHandler_InstrumentationWriteEndHook(void)
         return;
     }
 
-#if TRACE_SELECTED(FILEHANDLER_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FILEHANDLER)
     timestamp = (uint32_t)Instrumentation_GetTimestampUs();
     Instrumentation_WriteTraceEntry(
         timestamp,
@@ -476,7 +476,7 @@ void CanLogManager_DrainPortEndHook(void)
 
 void FdcanMsgPort_InstrumentationUsedBytesHook(uint32_t used_bytes)
 {
-#if TRACE_SELECTED(FDCANMSGPORT_TRACE)
+#if TRACE_SELECTED(COMPONENT_TRACE_FDCANMSGPORT)
     if (!instr_ready())
     {
         return;
