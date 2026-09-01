@@ -519,6 +519,11 @@ FRESULT FatFS_SD_CloseFile(FatFsDeviceType *dev)
 {
     FRESULT fr;
 
+    if (NULL == dev->file.obj.fs)
+    {
+        return FR_OK;
+    }
+
     dev->writeIndex = f_tell(&dev->file);
 
     fr = f_close(&dev->file); /* Close the file */
