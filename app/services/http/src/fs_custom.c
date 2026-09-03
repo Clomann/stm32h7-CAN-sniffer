@@ -11,6 +11,7 @@
 
 #include "fs_custom.h"
 #include "FileHandler.h"
+#include "MmcAdapter.h"
 #include "CanLogManager.h"
 #include "CanLogBuffer.h"
 #include "ErrorRecorder.h"
@@ -20,6 +21,14 @@
 #ifndef APP_VERSION
 #define APP_VERSION "0.0.0-unknown"
 #endif
+
+/* CID identity fields are raw register bytes; off-brand cards leave some
+ * non-ASCII. Keep the JSON printable. */
+static char FsCardAscii(char c)
+{
+    unsigned char u = (unsigned char)c;
+    return (u >= 0x20U && u < 0x7FU) ? (char)u : '?';
+}
 
 struct fs_custom_data
 {
@@ -61,6 +70,7 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define IAP_PREPARE_PATH          "/iap/prepare"
 #define IAP_APPLY_PATH            "/iap/apply"
 #define APP_VERSION_PATH          "/api/version"
+#define APP_CARD_PATH             "/api/card"
 
 #define IAP_VERIFY_STATE_IDLE      ((uint8_t)0u)
 #define IAP_VERIFY_STATE_PENDING   ((uint8_t)1u)
@@ -175,6 +185,10 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define IAP_APPLY_RESULT_STRING   "{\"ok\":%s,\"reason\":\"%s\"}"
 #define IAP_PREPARE_RESULT_STRING "{\"ok\":%s,\"reason\":\"%s\"}"
 #define APP_VERSION_STRING        "{\"app_version\":\"%s\"}"
+#define APP_CARD_STRING                                                        \
+    "{\"present\":%s,\"manufacturer_id\":%u,\"oem_id\":\"%c%c\","              \
+    "\"product_name\":\"%c%c%c%c%c\",\"revision\":\"%u.%u\","                  \
+    "\"serial\":%lu,\"manufactured\":\"%04u-%02u\",\"capacity_mb\":%lu}"
 
 typedef struct
 {
@@ -360,8 +374,7 @@ static bool FsCustom_BuildErrorRecorderJson(
 
     for (uint8_t i = 0U; i < Snapshot.recent_count; i++)
     {
-        if ((i > 0U)
-            && !FsCustom_AppendJson(buffer, buffer_size, &offset, ","))
+        if ((i > 0U) && !FsCustom_AppendJson(buffer, buffer_size, &offset, ","))
         {
             return false;
         }
@@ -861,7 +874,7 @@ int fs_open_custom(struct fs_file *file, const char *name)
                  sizeof(ERRORRECORDER_PATH) - 1
              ))
     {
-        char *ErrorPayload = &DebugData[JSON_RESPONSE_HEADER_SIZE];
+        char *ErrorPayload      = &DebugData[JSON_RESPONSE_HEADER_SIZE];
         size_t ErrorPayloadSize = 0U;
         int ErrorDataSize;
 
@@ -1077,6 +1090,47 @@ int fs_open_custom(struct fs_file *file, const char *name)
         }
 
         file->data           = AppVersionData;
+        file->len            = n;
+        file->index          = 0;
+        file->is_custom_file = 0;
+        return 1;
+    }
+    else if (0 == strncmp(name, APP_CARD_PATH, sizeof(APP_CARD_PATH) - 1))
+    {
+        SdCidRegisterType cid = {0};
+        uint32_t sector_count = 0U;
+        uint8_t have_cid      = (SD_E_OK == MMCAdapter_GetCardId(&cid));
+        int n;
+
+        (void)MMCAdapter_GetSectorCount(&sector_count);
+
+        n = snprintf(
+            StatusData,
+            sizeof(StatusData),
+            APP_CARD_STRING,
+            have_cid ? "true" : "false",
+            (unsigned)cid.manufacturerId,
+            FsCardAscii(cid.oemId[0]),
+            FsCardAscii(cid.oemId[1]),
+            FsCardAscii(cid.productName[0]),
+            FsCardAscii(cid.productName[1]),
+            FsCardAscii(cid.productName[2]),
+            FsCardAscii(cid.productName[3]),
+            FsCardAscii(cid.productName[4]),
+            (unsigned)cid.revisionMajor,
+            (unsigned)cid.revisionMinor,
+            (unsigned long)cid.serialNumber,
+            (unsigned)cid.manufacturingYear,
+            (unsigned)cid.manufacturingMonth,
+            (unsigned long)((uint64_t)sector_count / 2048U)
+        );
+
+        if (n < 0 || (size_t)n >= sizeof(StatusData))
+        {
+            return 0;
+        }
+
+        file->data           = StatusData;
         file->len            = n;
         file->index          = 0;
         file->is_custom_file = 0;
