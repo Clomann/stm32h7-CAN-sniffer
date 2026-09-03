@@ -197,6 +197,14 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         buffer[5] = payload & 0xFF;
         buffer[6] = SD_Crc7(&buffer[1], 5);
         break;
+    case SD_SPI_CMD10:
+        buffer[1] = 0x4A;
+        buffer[2] = 0x00;
+        buffer[3] = 0x00;
+        buffer[4] = 0x00;
+        buffer[5] = 0x00;
+        buffer[6] = SD_Crc7(&buffer[1], 5);
+        break;
     case SD_SPI_CMD12:
         buffer[1] = 0x4C;
         buffer[2] = 0x00;
@@ -810,6 +818,83 @@ uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd)
     if (0U == RetVal)
     {
         SD_Spi_Csd2Bitfield(SPI_CMD_READ_BUFFER, csd);
+    }
+
+    return RetVal;
+}
+
+static void SD_Spi_Cid2Fields(const uint8_t *raw, SdCidRegisterType *out)
+{
+    uint8_t i;
+
+    /* CID bytes arrive MSB first: raw[0] holds register bits [127:120]. */
+    out->manufacturerId = raw[0];
+    out->oemId[0]       = (char)raw[1];
+    out->oemId[1]       = (char)raw[2];
+
+    for (i = 0U; i < 5U; i++)
+    {
+        out->productName[i] = (char)raw[3U + i];
+    }
+
+    out->revisionMajor = (uint8_t)(raw[8] >> 4);
+    out->revisionMinor = (uint8_t)(raw[8] & 0x0FU);
+
+    out->serialNumber = ((uint32_t)raw[9] << 24) | ((uint32_t)raw[10] << 16)
+                        | ((uint32_t)raw[11] << 8) | (uint32_t)raw[12];
+
+    /* MDT spans bits [19:8]: year in [19:12] (offset from 2000), month [11:8]. */
+    out->manufacturingYear = (uint16_t)(2000U
+                                        + (((uint16_t)(raw[13] & 0x0FU) << 4)
+                                           | (uint16_t)(raw[14] >> 4)));
+    out->manufacturingMonth = (uint8_t)(raw[14] & 0x0FU);
+}
+
+uint8_t SD_Spi_ReadCID(SdCidRegisterType *cid)
+{
+    Spi_R1Response resp;
+    uint32_t readAttempts;
+    uint8_t crc[2];
+    uint8_t RetVal = SD_E_NOT_OK;
+
+    if (NULL == cid)
+    {
+        return SD_E_INV_PARAM;
+    }
+
+    SD_Spi_SendCommandPollResponse(SD_SPI_CMD10, 0x00000000U, &resp.byte);
+
+    SpiAbs_CsEnable(SPIABS_DEVICE_1);
+
+    if (resp.byte != 0xFFU)
+    {
+        readAttempts = 0U;
+        while (++readAttempts < SD_MAX_READ_RESPONSE_ATTEMPTS)
+        {
+            SpiAbs_PollForResponse(SPIABS_DEVICE_1, &resp.byte);
+            if (resp.byte != 0xFFU)
+            {
+                break;
+            }
+        }
+
+        if (SD_SPI_CMD_START_TOKEN == resp.byte)
+        {
+            SpiAbs_Receive_Spi1_Task0(SPI_CMD_READ_BUFFER, SD_SPI_CID_LENGTH);
+            SpiAbs_Receive_Spi1_Task0(crc, sizeof(crc));
+            RetVal = SD_E_OK;
+        }
+    }
+
+    SpiAbs_CsDisable(SPIABS_DEVICE_1);
+
+    if (SD_E_OK == RetVal)
+    {
+        SD_Spi_Cid2Fields(SPI_CMD_READ_BUFFER, cid);
+    }
+    else
+    {
+        SD_SPI_REPORT_ERROR(SD_SPI_ERROR_ID_READ_CID, resp.byte, 0U, 0U);
     }
 
     return RetVal;

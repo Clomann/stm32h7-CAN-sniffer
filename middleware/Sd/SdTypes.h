@@ -86,6 +86,28 @@ typedef struct
     uint8_t always1 : 1; /*!< [0] Always 1 */
 } SdCsdRegisterType;
 
+/**
+ * Decoded Card IDentification (CID) register fields.
+ *
+ * ASCII fields are copied verbatim from the register and are not
+ * NUL-terminated.
+ *
+ * \note Layout: http://problemkaputt.de/gbatek-dsi-sd-mmc-protocol-cid-register.htm
+ */
+typedef struct
+{
+    uint8_t manufacturerId; /*!< [127:120] MID */
+    char oemId[2]; /*!< [119:104] OID, ASCII */
+    char productName[5]; /*!< [103:64] PNM, ASCII */
+    uint8_t revisionMajor; /*!< [63:60] PRV high nibble */
+    uint8_t revisionMinor; /*!< [59:56] PRV low nibble */
+    uint32_t serialNumber; /*!< [55:24] PSN */
+    uint16_t manufacturingYear; /*!< [19:12] MDT, full Gregorian year */
+    uint8_t manufacturingMonth; /*!< [11:8] MDT, 1..12 */
+} SdCidRegisterType;
+
+#define SD_SPI_CID_LENGTH 16U
+
 #define DEFAULT_SPEED_MODE                                                     \
     (0x32) /*!< SDSC/SDHC/SDXC in Default Speed mode (25MHz) */
 #define HIGH_SPEED_MODE                                                        \

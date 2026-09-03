@@ -38,6 +38,12 @@ typedef struct
  */
 uint8_t MMCAdapter_initialize(void);
 
+/**
+ * \brief Copies the cached decoded CID (card identity) captured during
+ * initialization. Returns SD_E_OK when a valid identity is available.
+ */
+uint8_t MMCAdapter_GetCardId(SdCidRegisterType *cid);
+
 uint8_t MMCAdapter_read(
     BYTE *buff, /*!< Data buffer to store read data */
     LBA_t sector, /*!< Start sector in LBA */

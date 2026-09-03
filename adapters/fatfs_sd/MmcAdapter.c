@@ -12,7 +12,9 @@
 #include "diskio.h"
 #include "ff.h"
 
-static volatile SdCsdRegisterType Csd_Sd1 = {0};
+static SdCsdRegisterType Csd_Sd1 = {0};
+static SdCidRegisterType Cid_Sd1 = {0};
+static uint8_t Cid_Sd1_Valid     = 0U;
 
 // static uint8_t SPI_CMD_WRITE_BUFFER[SD_SDHC_SECTOR_SIZE] = {0};
 
@@ -38,7 +40,23 @@ uint8_t MMCAdapter_initialize(void)
         RetVal = SD_Spi_ReadCSD(&Csd_Sd1);
     }
 
+    if (0U == RetVal)
+    {
+        Cid_Sd1_Valid = (SD_E_OK == SD_Spi_ReadCID(&Cid_Sd1)) ? 1U : 0U;
+    }
+
     return RetVal;
+}
+
+uint8_t MMCAdapter_GetCardId(SdCidRegisterType *cid)
+{
+    if (NULL == cid || 0U == Cid_Sd1_Valid)
+    {
+        return SD_E_NOT_OK;
+    }
+
+    *cid = Cid_Sd1;
+    return SD_E_OK;
 }
 
 uint8_t MMCAdapter_read(BYTE *buff, LBA_t sector, UINT count)

@@ -94,6 +94,7 @@
 #define SD_SPI_ERROR_ID_ERASE_READ_CSD    0x53440005U
 #define SD_SPI_ERROR_ID_ERASE_TOTAL_BLOCK 0x53440006U
 #define SD_SPI_ERROR_ID_ERASE_RANGE       0x53440007U
+#define SD_SPI_ERROR_ID_READ_CID          0x53440008U
 
 /**
  * Enumeration listing the implemented SPI commands.
@@ -112,6 +113,8 @@ enum SD_Spi_Commands
     SD_SPI_CMD8,
     /*!< SPI CMD9: Read the Card-Specific Data (CSD) register */
     SD_SPI_CMD9,
+    /*!< SPI CMD10: Read the Card IDentification (CID) register */
+    SD_SPI_CMD10,
     /*!< STOP_TRANSMISSION: The host can send the STOP_TRANSMISSION (CMD12) 
         command on the CMD pin at any time while a data transfer is in progress. */
     SD_SPI_CMD12,
@@ -176,6 +179,7 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff);
 uint8_t
 SD_Spi_writeMultiBlock(uint32_t address, uint8_t const *buff, uint32_t cnt);
 uint8_t SD_Spi_ReadCSD(SdCsdRegisterType *csd);
+uint8_t SD_Spi_ReadCID(SdCidRegisterType *cid);
 
 /*
  * Trims the entire SD card by issuing sequential ERASE/TRIM ranges
