@@ -26,6 +26,9 @@ set(CAN_STATIC_TX_REPLAY_CAN1_BASE_ID "0x000U" CACHE STRING "Base standard ID fo
 set(CAN_STATIC_TX_REPLAY_CAN2_BASE_ID "0x000U" CACHE STRING "Base standard ID for CAN2 static replay")
 set(CAN_STATIC_TX_REPLAY_FDCAN_MODE "FDCAN_MODE_EXTERNAL_LOOPBACK" CACHE STRING "HAL FDCAN mode used by static replay")
 set_property(CACHE CAN_STATIC_TX_REPLAY_FDCAN_MODE PROPERTY STRINGS FDCAN_MODE_EXTERNAL_LOOPBACK FDCAN_MODE_NORMAL)
+set(COMPONENT_TRACE "" CACHE STRING "Instrumentation trace component (empty = instrumentation.h default)")
+set_property(CACHE COMPONENT_TRACE PROPERTY STRINGS
+    "" COMPONENT_TRACE_NONE COMPONENT_TRACE_FILEHANDLER COMPONENT_TRACE_FDCANMSGPORT)
 
 set(IS_APP_BUILD FALSE)
 set(IS_BOOTLOADER_BUILD FALSE)
@@ -165,6 +168,16 @@ endif()
 
 message(STATUS "App version: ${APP_VERSION_RESOLVED}")
 
+# Build manifest: a generated header the HTTP version endpoint serves so every
+# device report carries the version, build type, configure time and the build
+# options that also become compiler definitions below.
+string(TIMESTAMP BUILD_CONFIGURE_UTC "%Y-%m-%dT%H:%M:%SZ" UTC)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_manifest.h.in
+    ${CMAKE_BINARY_DIR}/generated/build_manifest.h
+    @ONLY
+)
+
 string(REPLACE "\"" "\\\"" APP_VERSION_ESCAPED "${APP_VERSION_RESOLVED}")
 list(APPEND symbols_SYMB "APP_VERSION=\"${APP_VERSION_ESCAPED}\"")
 list(APPEND symbols_SYMB
@@ -174,6 +187,20 @@ list(APPEND symbols_SYMB
 
 if(NOT "${MAX_LOG_FILE_COUNT}" STREQUAL "${MAX_LOG_FILE_COUNT_DEFAULT}")
     list(APPEND symbols_SYMB "MAX_LOG_FILE_COUNT=${MAX_LOG_FILE_COUNT}")
+endif()
+
+# Empty keeps the instrumentation.h default; otherwise the value is passed
+# through verbatim and must name a component instrumentation.h knows.
+if(COMPONENT_TRACE)
+    set(_component_trace_values
+        COMPONENT_TRACE_NONE COMPONENT_TRACE_FILEHANDLER COMPONENT_TRACE_FDCANMSGPORT
+        0 1 2 0U 1U 2U)
+    if(NOT COMPONENT_TRACE IN_LIST _component_trace_values)
+        message(FATAL_ERROR
+            "COMPONENT_TRACE='${COMPONENT_TRACE}' is unknown. "
+            "Use COMPONENT_TRACE_NONE, COMPONENT_TRACE_FILEHANDLER or COMPONENT_TRACE_FDCANMSGPORT.")
+    endif()
+    list(APPEND symbols_SYMB "COMPONENT_TRACE=${COMPONENT_TRACE}")
 endif()
 
 if(CAN_STATIC_TX_REPLAY_ENABLE)
@@ -321,6 +348,7 @@ function(configure_firmware_target target_name)
 
     # Include paths
     target_include_directories(${target_name} PRIVATE ${FW_INCLUDES})
+    target_include_directories(${target_name} PRIVATE ${CMAKE_BINARY_DIR}/generated)
 
     # Project symbols
     target_compile_definitions(${target_name} PRIVATE ${symbols_SYMB})

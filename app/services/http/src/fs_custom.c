@@ -17,6 +17,8 @@
 #include "ErrorRecorder.h"
 #include "httpd_post.h"
 #include "WebInterface.h"
+#include "instrumentation.h"
+#include "build_manifest.h"
 
 #ifndef APP_VERSION
 #define APP_VERSION "0.0.0-unknown"
@@ -184,7 +186,6 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 
 #define IAP_APPLY_RESULT_STRING   "{\"ok\":%s,\"reason\":\"%s\"}"
 #define IAP_PREPARE_RESULT_STRING "{\"ok\":%s,\"reason\":\"%s\"}"
-#define APP_VERSION_STRING        "{\"app_version\":\"%s\"}"
 #define APP_CARD_STRING                                                        \
     "{\"present\":%s,\"manufacturer_id\":%u,\"oem_id\":\"%c%c\","              \
     "\"product_name\":\"%c%c%c%c%c\",\"revision\":\"%u.%u\","                  \
@@ -211,8 +212,12 @@ static char ConfigData[CANLOG_MAX_CONFIG_SIZE];
 static char IapStatusData[IAP_STATUS_MAX_SIZE];
 static char IapPrepareResultData[96U];
 static char IapApplyResultData[96U];
-static char AppVersionData[96U];
 static FsCustomDebugProviderType DebugProvider = {0};
+
+/* Version endpoint payload: the generated manifest fragment plus the effective
+ * instrumentation selection, closing the JSON. */
+static const char AppVersionData[] = BUILD_MANIFEST_JSON_HEAD
+    ",\"component_trace\":\"" COMPONENT_TRACE_NAME "\"}}";
 
 uint8_t FsCustom_SetDebugProvider(const FsCustomDebugProviderType *provider)
 {
@@ -1077,20 +1082,8 @@ int fs_open_custom(struct fs_file *file, const char *name)
     }
     else if (0 == strncmp(name, APP_VERSION_PATH, sizeof(APP_VERSION_PATH) - 1))
     {
-        int n = snprintf(
-            AppVersionData,
-            sizeof(AppVersionData),
-            APP_VERSION_STRING,
-            APP_VERSION
-        );
-
-        if (n < 0 || (size_t)n >= sizeof(AppVersionData))
-        {
-            return 0;
-        }
-
         file->data           = AppVersionData;
-        file->len            = n;
+        file->len            = (int)(sizeof(AppVersionData) - 1U);
         file->index          = 0;
         file->is_custom_file = 0;
         return 1;
