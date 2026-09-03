@@ -110,6 +110,17 @@
                 "CORE": "CM4",
                 "DUAL_CORE": "true"
             }
+        },
+        {
+            "name": "Pre_Release_CM7",
+            "inherits": "Release_CM7",
+            "cacheVariables": {
+                "CAN_STATIC_TX_REPLAY_ENABLE": "ON",
+                "CAN_STATIC_TX_REPLAY_CHANNEL_MASK": "3U",
+                "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE": "1U",
+                "CAN_STATIC_TX_REPLAY_FDCAN_MODE": "FDCAN_MODE_EXTERNAL_LOOPBACK",
+                "COMPONENT_TRACE": "COMPONENT_TRACE_NONE"
+            }
         }
     ],
     "buildPresets": [
@@ -146,6 +157,12 @@
         { 
             "name": "release-build-cm7", 
             "configurePreset": "Release_CM7", 
+            "jobs": 4,
+            "cleanFirst": true
+        },
+        { 
+            "name": "pre-release-build-cm7", 
+            "configurePreset": "Pre_Release_CM7", 
             "jobs": 4,
             "cleanFirst": true
         },
@@ -236,6 +253,20 @@
                 { 
                     "type": "build",
                     "name": "debug-build-cm4"
+                }
+            ]
+        },
+        {
+            "description": "Pre-Release test build",
+            "name": "pre-release-test",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "Pre_Release_CM7"
+                },
+                { 
+                    "type": "build",
+                    "name": "pre-release-build-cm7"
                 }
             ]
         },
