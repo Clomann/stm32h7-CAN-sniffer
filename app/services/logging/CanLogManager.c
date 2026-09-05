@@ -105,7 +105,7 @@ typedef struct
     uint32_t crc;
 } CanLogMetaDataType;
 
-static volatile CanLogMetaDataType LogMetaData;
+static CanLogMetaDataType LogMetaData;
 #if CANLOGAMANGER_PERSIST_METADATA
 static uint8_t LogMetaDataOpenRes;
 #endif
@@ -176,8 +176,8 @@ __attribute__((weak)) void CanLogManager_DrainPortEndHook(void)
 {
 }
 
-volatile static char CanLogFileName[255] = "/logs/CAN.LOG";
-volatile static CanLogControlDataType CanLogCtrlData;
+static char CanLogFileName[255] = "/logs/CAN.LOG";
+static CanLogControlDataType CanLogCtrlData;
 static ScSequenceType CAN1_Sequence;
 static ScSequenceType CAN2_Sequence;
 #if DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE
@@ -1121,7 +1121,6 @@ static bool m_verify_preallocation(const char *path)
     uint32_t log_file_size;
     uint32_t seek_offset;
     bool can_seek;
-    bool verified;
 
     res = f_open(&fil, path, FA_READ);
     if (res != FR_OK)
@@ -1144,8 +1143,7 @@ static bool m_verify_preallocation(const char *path)
     can_seek    = (res == FR_OK);
 
     bytes_to_read = sizeof(dummy_bytes);
-    res           = f_read(&fil, dummy_bytes, bytes_to_read, &bytes_read);
-    verified      = (res == FR_OK && bytes_read > 0U);
+    (void)f_read(&fil, dummy_bytes, bytes_to_read, &bytes_read);
 
     f_close(&fil);
     return can_seek;
@@ -1293,7 +1291,7 @@ static FRESULT CanLogManager_StorePreallocMarker(
     return res;
 }
 
-volatile static uint32_t UnseekableFiles = 0;
+static uint32_t UnseekableFiles = 0;
 
 static FRESULT m_preallocate_log_files(void)
 {

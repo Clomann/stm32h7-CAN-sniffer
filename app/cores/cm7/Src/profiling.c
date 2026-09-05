@@ -32,7 +32,7 @@ __attribute__((used)) uint64_t Profiling_GetTimestamp(void)
 void force_profiling_link(void)
 {
     // This forces the linker to keep the function
-    volatile uint64_t (*func_ptr)(void) = &Profiling_GetTimestamp;
+    uint64_t (*volatile func_ptr)(void) = &Profiling_GetTimestamp;
     (void)func_ptr;
 }
 
