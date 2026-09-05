@@ -192,7 +192,19 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
             min_len = entry_struct_size + LEGACY_ENTRY_FIXED_SIZE
             if total_len < min_len or offset + total_len > end_of_valid_data or total_len == 0:
                 break
+    if legacy:
+        entry_struct = LEGACY_ENTRY_HEADER_STRUCT
+        entry_struct_size = LEGACY_ENTRY_HEADER_SIZE
+        while True:
+            if offset + entry_struct_size > end_of_valid_data:
+                break
+            entry_type, header_len, total_len = entry_struct.unpack_from(block, offset)
+            min_len = entry_struct_size + LEGACY_ENTRY_FIXED_SIZE
+            if total_len < min_len or offset + total_len > end_of_valid_data or total_len == 0:
+                break
 
+            fixed_offset = offset + entry_struct_size
+            timestamp, can_id, channel, dlc, flags, _bus_id = LEGACY_ENTRY_FIXED_STRUCT.unpack_from(block, fixed_offset)
             fixed_offset = offset + entry_struct_size
             timestamp, can_id, channel, dlc, flags, _bus_id = LEGACY_ENTRY_FIXED_STRUCT.unpack_from(block, fixed_offset)
             payload_offset = fixed_offset + LEGACY_ENTRY_FIXED_SIZE
@@ -208,6 +220,37 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
                 offset += total_len
                 continue
 
+            yield CanLogFrame(
+                frame_type=frame_type,
+                epoch=epoch,
+                timestamp_us=timestamp,
+                can_id=can_id,
+                channel=channel,
+                dlc=dlc,
+                flags=flags,
+                data=block[payload_offset : payload_offset + data_len].tobytes(),
+                block_index=block_index,
+                block_offset=offset,
+            )
+            entries_in_block += 1
+            offset += total_len
+    else:
+        entry_struct = ENTRY_HEADER_STRUCT
+        entry_struct_size = ENTRY_HEADER_SIZE
+        min_len_sync = entry_struct_size + SYNC_FIXED_SIZE
+        min_len_frame = entry_struct_size + ENTRY_FIXED_SIZE
+        while True:
+            if offset + entry_struct_size > end_of_valid_data:
+                break
+            entry_type, header_len, total_len = entry_struct.unpack_from(block, offset)
+            if total_len == 0:
+                break
+
+            fixed_offset = offset + entry_struct_size
+
+            if entry_type == CLB_ENTRY_TYPE_SYNC:
+                if total_len < min_len_sync or offset + total_len > end_of_valid_data:
+                    break
             yield CanLogFrame(
                 frame_type=frame_type,
                 epoch=epoch,
@@ -261,6 +304,10 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
                 break
 
             timestamp, can_id, channel, dlc_flags, data_len = ENTRY_FIXED_STRUCT.unpack_from(block, fixed_offset)
+            if total_len < min_len_frame or offset + total_len > end_of_valid_data:
+                break
+
+            timestamp, can_id, channel, dlc_flags, data_len = ENTRY_FIXED_STRUCT.unpack_from(block, fixed_offset)
             payload_offset = fixed_offset + ENTRY_FIXED_SIZE
             payload_len = total_len - (ENTRY_HEADER_SIZE + ENTRY_FIXED_SIZE)
             data_len = min(data_len, payload_len, FDCAN_MAX_LEN)
@@ -268,10 +315,25 @@ def _iter_block_frames(block: memoryview, block_index: int, abs_time_state: dict
             dlc_val = dlc_flags & CAN_DLC_MASK
             flags = dlc_flags & ~CAN_DLC_MASK
             frame_type = "FD" if (flags & CAN_FLAG_RTR_FDF) or dlc_val > CLASSIC_MAX_LEN else "Classic"
+            frame_type = "FD" if (flags & CAN_FLAG_RTR_FDF) or dlc_val > CLASSIC_MAX_LEN else "Classic"
 
             abs_high = abs_time_state.get("high", 0)
             timestamp_us = (abs_high << 32) | timestamp
 
+            yield CanLogFrame(
+                frame_type=frame_type,
+                epoch=epoch,
+                timestamp_us=timestamp_us,
+                can_id=can_id,
+                channel=channel,
+                dlc=dlc_val,
+                flags=flags,
+                data=block[payload_offset : payload_offset + data_len].tobytes(),
+                block_index=block_index,
+                block_offset=offset,
+            )
+            entries_in_block += 1
+            offset += total_len
             yield CanLogFrame(
                 frame_type=frame_type,
                 epoch=epoch,
@@ -478,12 +540,20 @@ def _format_vector_ascii_frame(base_timestamp_us: int | None, frame: CanLogFrame
         rel_time_s = (frame.timestamp_us - base_timestamp_us) / 1_000_000
     data_len = min(frame.dlc, len(frame.data))
     data_hex = frame.data[:data_len].hex(' ').upper()
+    data_hex = frame.data[:data_len].hex(' ').upper()
 
     # Currently we treat every frame as extended-ID. Flags are kept for future decoding (IDE/RTR/BRS/ESI).
+    can_id_str = f"{frame.can_id:X}x"
     can_id_str = f"{frame.can_id:X}x"
 
     frame_type = "fd" if frame.frame_type == "FD" else "d"
 
+    if data_hex:
+        return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} Rx {frame_type} {data_len} {data_hex}"
+    return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} Rx {frame_type} {data_len}"
+
+
+_WRITE_BATCH = 8192  # lines buffered before flushing to OS
     if data_hex:
         return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} Rx {frame_type} {data_len} {data_hex}"
     return f"{rel_time_s:>{ts_width}.6f} {frame.channel} {can_id_str} Rx {frame_type} {data_len}"
@@ -514,6 +584,8 @@ class VectorAsciiWriter:
         self.ts_width: int = 14  # minimum width; grows if integer part grows
         self._ts_magnitude: int = 0  # integer seconds corresponding to current ts_width
         self._buf: list[str] = []
+        self._ts_magnitude: int = 0  # integer seconds corresponding to current ts_width
+        self._buf: list[str] = []
 
     def write_frame(self, frame: CanLogFrame) -> None:
         if self.base_timestamp_us is None:
@@ -532,8 +604,24 @@ class VectorAsciiWriter:
             self.file.writelines(self._buf)
             self._buf.clear()
 
+        ts_s = (frame.timestamp_us - self.base_timestamp_us) // 1_000_000
+        if ts_s > self._ts_magnitude:
+            needed_width = len(str(ts_s)) + 7  # digits + dot + 6 decimals
+            if needed_width > self.ts_width:
+                self.ts_width = needed_width
+            self._ts_magnitude = 10 ** (len(str(ts_s))) - 1
+
+        self._buf.append(_format_vector_ascii_frame(self.base_timestamp_us, frame, self.ts_width))
+        self._buf.append("\n")
+        if len(self._buf) >= _WRITE_BATCH * 2:
+            self.file.writelines(self._buf)
+            self._buf.clear()
+
     def close(self) -> None:
         if self.file:
+            if self._buf:
+                self.file.writelines(self._buf)
+                self._buf.clear()
             if self._buf:
                 self.file.writelines(self._buf)
                 self._buf.clear()
@@ -688,6 +776,7 @@ examples:
     preview: List[CanLogFrame] = []
     tail_buf: Deque[CanLogFrame] = deque(maxlen=tail) if tail else deque()
     asc_writer = VectorAsciiWriter(_asc_path(), args.relative_ts) if args.write_asc and not args.split_epochs else None
+    asc_writer = VectorAsciiWriter(_asc_path(), args.relative_ts) if args.write_asc and not args.split_epochs else None
     current_epoch: int | None = None
     epoch_seq = 0
 
@@ -708,6 +797,7 @@ examples:
                         writer = epoch_writers.get(frame.epoch)
                         if not writer:
                             writer = VectorAsciiWriter(_asc_path(frame.epoch), args.relative_ts)
+                            writer = VectorAsciiWriter(_asc_path(frame.epoch), args.relative_ts)
                             epoch_writers[frame.epoch] = writer
                         writer.write_frame(frame)
                 else:
@@ -720,11 +810,13 @@ examples:
                                 writer.close()
                             epoch_seq += 1
                             writer = VectorAsciiWriter(_asc_path(frame.epoch, epoch_seq), args.relative_ts)
+                            writer = VectorAsciiWriter(_asc_path(frame.epoch, epoch_seq), args.relative_ts)
                             current_epoch = frame.epoch
                         writer.write_frame(frame)
                     if writer:
                         writer.close()
             else:
+                asc_writer = VectorAsciiWriter(_asc_path(), args.relative_ts)
                 asc_writer = VectorAsciiWriter(_asc_path(), args.relative_ts)
                 for frame in frames:
                     asc_writer.write_frame(frame)
@@ -743,6 +835,7 @@ examples:
                         writer = epoch_writers.get(frame.epoch)
                         if not writer:
                             writer = VectorAsciiWriter(_asc_path(frame.epoch), args.relative_ts)
+                            writer = VectorAsciiWriter(_asc_path(frame.epoch), args.relative_ts)
                             epoch_writers[frame.epoch] = writer
                         writer.write_frame(frame)
                     else:
@@ -750,6 +843,7 @@ examples:
                             if asc_writer:
                                 asc_writer.close()
                             epoch_seq += 1
+                            asc_writer = VectorAsciiWriter(_asc_path(frame.epoch, epoch_seq), args.relative_ts)
                             asc_writer = VectorAsciiWriter(_asc_path(frame.epoch, epoch_seq), args.relative_ts)
                             current_epoch = frame.epoch
                         if asc_writer:
@@ -783,9 +877,12 @@ examples:
         if args.split_epochs:
             if args.merge_scattered_epochs:
                 print(f"Wrote Vector ASCII logs merged by epoch into {asc_out_dir}/")
+                print(f"Wrote Vector ASCII logs merged by epoch into {asc_out_dir}/")
             else:
                 print(f"Wrote Vector ASCII logs split by epoch into {asc_out_dir}/")
+                print(f"Wrote Vector ASCII logs split by epoch into {asc_out_dir}/")
         else:
+            print(f"Wrote Vector ASCII log to {_asc_path()}")
             print(f"Wrote Vector ASCII log to {_asc_path()}")
 
     if args.collect_all:

@@ -29,12 +29,14 @@ from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 
 @dataclass(slots=True)
+@dataclass(slots=True)
 class Frame:
     """Minimal frame info extracted from a CAN log."""
 
     timestamp: float
     channel: int
     can_id: int
+    counter: Optional[int]  # None when DLC=0 (no payload to read counter from)
     counter: Optional[int]  # None when DLC=0 (no payload to read counter from)
     line_no: int
     position_unit: str = "line"
@@ -75,6 +77,8 @@ def parse_vector_ascii(path: Path) -> Iterable[Frame]:
         for line_no, raw in enumerate(fh, start=1):
             parts = raw.split()  # split() strips whitespace implicitly
             if len(parts) < 6:
+            parts = raw.split()  # split() strips whitespace implicitly
+            if len(parts) < 6:
                 continue
 
             try:
@@ -89,7 +93,9 @@ def parse_vector_ascii(path: Path) -> Iterable[Frame]:
             data_tokens = parts[6 : 6 + dlc]
             try:
                 counter: Optional[int] = int(data_tokens[0], 16) if data_tokens else None
+                counter: Optional[int] = int(data_tokens[0], 16) if data_tokens else None
             except ValueError:
+                counter = None
                 counter = None
 
             yield Frame(timestamp=timestamp, channel=channel, can_id=can_id, counter=counter, line_no=line_no)
@@ -180,7 +186,12 @@ def parse_input(
 @dataclass(slots=True)
 class Gap:
     """Represents a missing-counter (or missing-ID) gap between two consecutive frames."""
+    """Represents a missing-counter (or missing-ID) gap between two consecutive frames."""
 
+    key: Tuple[int, int]  # (channel, can_id); can_id == -1 for ID-sequence gaps
+    missing_start: int    # first missing value
+    missing_count: int    # number of missing values
+    modulo: int           # wrap-around modulus used to generate values
     key: Tuple[int, int]  # (channel, can_id); can_id == -1 for ID-sequence gaps
     missing_start: int    # first missing value
     missing_count: int    # number of missing values
@@ -188,6 +199,20 @@ class Gap:
     previous: Frame
     current: Frame
 
+
+def _missing_preview(gap: Gap, preview_values: int) -> tuple[list[int], int]:
+    """Return (values_to_show, extra_count) without building the full missing list."""
+    n = min(preview_values, gap.missing_count)
+    values = [(gap.missing_start + i) % gap.modulo for i in range(n)]
+    return values, gap.missing_count - n
+
+
+def find_all_gaps(
+    frames: Iterable[Frame],
+    check_id_seq: bool = False,
+    id_modulo: int = 256,
+    on_flush: Callable[[List[Gap], List[Gap]], None] | None = None,
+) -> Tuple[int, int, int, Dict[Tuple[int, int], int], int, Dict[int, int]]:
 
 def _missing_preview(gap: Gap, preview_values: int) -> tuple[list[int], int]:
     """Return (values_to_show, extra_count) without building the full missing list."""
@@ -211,7 +236,18 @@ def find_all_gaps(
     Returns (frame_count, frames_with_counter, n_counter_gaps, missing_by_key, n_id_gaps, missing_by_channel).
     """
     last_counter: Dict[Tuple[int, int], Frame] = {}
+    last_counter: Dict[Tuple[int, int], Frame] = {}
     missing_by_key: Dict[Tuple[int, int], int] = defaultdict(int)
+    n_counter_gaps = 0
+    frames_with_counter = 0
+
+    last_id: Dict[int, Frame] = {}
+    missing_by_channel: Dict[int, int] = defaultdict(int)
+    n_id_gaps = 0
+
+    pending_counter: List[Gap] = []
+    pending_id: List[Gap] = []
+    last_flush = time.monotonic()
     n_counter_gaps = 0
     frames_with_counter = 0
 
@@ -502,6 +538,10 @@ def format_gap(gap: Gap, preview_values: int = 16) -> str:
     missing = " ".join(f"{v:02X}" for v in values)
     if extra:
         missing += f" ... (+{extra} more)"
+    values, extra = _missing_preview(gap, preview_values)
+    missing = " ".join(f"{v:02X}" for v in values)
+    if extra:
+        missing += f" ... (+{extra} more)"
     return (
         f"Ch{channel} ID=0x{can_id:08X} "
         f"{gap.previous.counter:02X}->{gap.current.counter:02X} "
@@ -635,6 +675,13 @@ def main() -> None:
     elif n_counter_gaps == 0:
         print(f"Counter check: no missing frames in {args.path} (checked {frames_with_counter} frames with payload).")
     else:
+        skipped = n_counter_gaps - counter_shown
+        print(f"\nCounter check: {n_counter_gaps} gap(s) in {frame_count} frames ({counter_shown} shown"
+              + (f", {skipped} skipped — use --show-all to print everything" if skipped > 0 else "") + ").")
+        print("\nMissing frame counts by (channel, CAN ID):")
+        for key, count in sorted(missing_by_key.items()):
+            channel, can_id = key
+            print(f"  Ch{channel} ID=0x{can_id:08X}: {count} missing frame(s)")
         skipped = n_counter_gaps - counter_shown
         print(f"\nCounter check: {n_counter_gaps} gap(s) in {frame_count} frames ({counter_shown} shown"
               + (f", {skipped} skipped — use --show-all to print everything" if skipped > 0 else "") + ").")
