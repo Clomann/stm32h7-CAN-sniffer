@@ -16,16 +16,17 @@ static void srv_txt(struct mdns_service *service, void *txt_userdata)
     err_t res;
     LWIP_UNUSED_ARG(txt_userdata);
     res = mdns_resp_add_service_txtitem(service, "path=/", 6);
-    // LWIP_ERROR("mdns add service txt failed\n", (res == ERR_OK), return);
+    LWIP_ERROR("mdns add service txt failed\n", (res == ERR_OK), return);
 }
 #endif
 
 #if LWIP_MDNS_RESPONDER
 static void app_mdns_report(struct netif *netif, u8_t result)
 {
-    // some diag output function
-    volatile int dbg_here;
-    (void)dbg_here;
+    /* Name-conflict / registration result callback. Currently a no-op;
+     * add diagnostics here if needed. */
+    LWIP_UNUSED_ARG(netif);
+    LWIP_UNUSED_ARG(result);
 }
 
 static void mdns_kick_timer(void *arg)
