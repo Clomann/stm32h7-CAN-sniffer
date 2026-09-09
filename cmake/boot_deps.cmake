@@ -214,6 +214,12 @@ list(APPEND include_path_DIRS ${boot_include_path_DIRS})
 
 set(boot_target_sources_SRCS "${sources_SRCS}")
 set(boot_target_include_path_DIRS "${include_path_DIRS}")
+
+# Silence warnings in vendored sources; our own code keeps -Wall -Wextra -Wpedantic
+set(_boot_vendor_SRCS ${boot_target_sources_SRCS})
+list(FILTER _boot_vendor_SRCS INCLUDE REGEX "/libs/")
+set_source_files_properties(${_boot_vendor_SRCS}
+    PROPERTIES COMPILE_OPTIONS "-w")
 set(boot_target_compile_defs
     MBEDTLS_CONFIG_FILE=\"${PROJ_PATH}/bootloader/mbedtls_config.h\"
 )
