@@ -31,7 +31,7 @@ HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef *handle)
     return Spi_Init_return_value;
 }
 
-HAL_StatusTypeDef Spi_SendReceiveMsg(
+comm_status_t Spi_SendReceiveMsg(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
@@ -53,10 +53,10 @@ HAL_StatusTypeDef Spi_SendReceiveMsg(
         memcpy(pRxBuffer, Spi_SendReceiveMsg_last_rx, Size);
     }
 
-    return HAL_OK;
+    return COMM_SUCCESS;
 }
 
-uint8_t Spi_SendPoll(
+comm_status_t Spi_SendPoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *buffer,
     uint16_t len,
@@ -67,7 +67,7 @@ uint8_t Spi_SendPoll(
     return Spi_Send(handle, (uint8_t *)buffer, len);
 }
 
-uint8_t Spi_ReceivePoll(
+comm_status_t Spi_ReceivePoll(
     SPI_HandleTypeDef *handle,
     uint8_t *buffer,
     uint16_t len,
@@ -78,7 +78,7 @@ uint8_t Spi_ReceivePoll(
     return Spi_Receive(handle, buffer, len);
 }
 
-uint8_t Spi_SendReceivePoll(
+comm_status_t Spi_SendReceivePoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
@@ -87,10 +87,11 @@ uint8_t Spi_SendReceivePoll(
 )
 {
     (void)timeout;
-    return (uint8_t)Spi_SendReceiveMsg(handle, pTxBuffer, pRxBuffer, len);
+    return Spi_SendReceiveMsg(handle, pTxBuffer, pRxBuffer, len);
 }
 
-uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
+comm_status_t
+Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 {
     Spi_Receive_call_count++;
     Spi_Receive_last_len = len;
@@ -102,13 +103,13 @@ uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
     }
 
     (void)handle;
-    return HAL_OK;
+    return COMM_SUCCESS;
 }
 
-uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
+comm_status_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 {
     (void)handle;
     (void)buffer;
     (void)len;
-    return HAL_OK;
+    return COMM_SUCCESS;
 }

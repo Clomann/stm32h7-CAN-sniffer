@@ -60,9 +60,25 @@ uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
 void SPI1_DMA_RX_IRQHandler(void);
 void SPI1_DMA_TX_IRQHandler(void);
 
-static uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
-static uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi);
-static uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
+static comm_status_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
+static comm_status_t m_NotifyTransferError(SPI_HandleTypeDef *hspi);
+static comm_status_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
+
+/* Map an STM32 HAL status onto the comm layer status codes. */
+static inline comm_status_t m_HalToComm(HAL_StatusTypeDef hal)
+{
+    switch (hal)
+    {
+    case HAL_OK:
+        return COMM_SUCCESS;
+    case HAL_TIMEOUT:
+        return COMM_TIMEOUT;
+    case HAL_BUSY:
+    case HAL_ERROR:
+    default:
+        return COMM_ERROR;
+    }
+}
 
 static inline uint8_t is_in_dma_nocache(const void *addr, size_t len)
 {
@@ -167,9 +183,9 @@ static inline bool m_IsCacheAligned(const void *ptr, size_t size)
     return ((addr & CACHE_LINE_MASK) == 0) && ((size & CACHE_LINE_MASK) == 0);
 }
 
-uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
+comm_status_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 {
-    uint8_t RetVal;
+    HAL_StatusTypeDef RetVal;
 
     Spi_Lock(0);
 
@@ -190,14 +206,14 @@ uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
         /* Transfer error in transmission process */
         Spi_ErrorHandlerHook();
         Spi_Unlock(0);
-        return HAL_ERROR;
+        return COMM_ERROR;
     }
 
-    if (m_NotifyTransferIssued(handle) != 0)
+    if (m_NotifyTransferIssued(handle) != COMM_SUCCESS)
     {
         // Handle timeout
         Spi_Unlock(0);
-        return HAL_TIMEOUT;
+        return COMM_TIMEOUT;
     }
 
     if (!is_in_dma_nocache((void *)aTxBuffer, len))
@@ -209,17 +225,17 @@ uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     Spi_NotifyRxData(handle, 0);
 
-    return RetVal;
+    return m_HalToComm(RetVal);
 }
 
-uint8_t Spi_SendReceiveMsg(
+comm_status_t Spi_SendReceiveMsg(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
     uint16_t TxBytes
 )
 {
-    uint8_t RetVal;
+    HAL_StatusTypeDef RetVal;
 
     Spi_Lock(0);
 
@@ -238,15 +254,15 @@ uint8_t Spi_SendReceiveMsg(
         /* Transfer error in transmission process */
         Spi_ErrorHandlerHook();
         Spi_Unlock(0);
-        return HAL_ERROR;
+        return COMM_ERROR;
     }
 
-    if (m_NotifyTransferIssued(handle) != 0)
+    if (m_NotifyTransferIssued(handle) != COMM_SUCCESS)
     {
         // Handle timeout
         Spi_Unlock(0);
         Spi_NotifyRxData(handle, 1);
-        return HAL_TIMEOUT;
+        return COMM_TIMEOUT;
     }
 
     if (!is_in_dma_nocache((void *)aRxBuffer, TxBytes))
@@ -260,30 +276,31 @@ uint8_t Spi_SendReceiveMsg(
 
     Spi_NotifyRxData(handle, 0);
 
-    return RetVal;
+    return m_HalToComm(RetVal);
 }
 
-uint8_t Spi_SendPoll(
+comm_status_t Spi_SendPoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *buffer,
     uint16_t len,
     uint32_t timeout
 )
 {
-    return HAL_SPI_Transmit(handle, (uint8_t *)buffer, len, timeout);
+    return m_HalToComm(HAL_SPI_Transmit(handle, (uint8_t *)buffer, len, timeout)
+    );
 }
 
-uint8_t Spi_ReceivePoll(
+comm_status_t Spi_ReceivePoll(
     SPI_HandleTypeDef *handle,
     uint8_t *buffer,
     uint16_t len,
     uint32_t timeout
 )
 {
-    return HAL_SPI_Receive(handle, buffer, len, timeout);
+    return m_HalToComm(HAL_SPI_Receive(handle, buffer, len, timeout));
 }
 
-uint8_t Spi_SendReceivePoll(
+comm_status_t Spi_SendReceivePoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
@@ -291,18 +308,19 @@ uint8_t Spi_SendReceivePoll(
     uint32_t timeout
 )
 {
-    return HAL_SPI_TransmitReceive(
+    return m_HalToComm(HAL_SPI_TransmitReceive(
         handle,
         (uint8_t *)pTxBuffer,
         pRxBuffer,
         len,
         timeout
-    );
+    ));
 }
 
-uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
+comm_status_t
+Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 {
-    uint8_t RetVal;
+    HAL_StatusTypeDef RetVal;
 
     Spi_Lock(0);
 
@@ -316,14 +334,14 @@ uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
         /* Transfer error in transmission process */
         Spi_ErrorHandlerHook();
         Spi_Unlock(0);
-        return HAL_ERROR;
+        return COMM_ERROR;
     }
 
-    if (m_NotifyTransferIssued(handle) != 0)
+    if (m_NotifyTransferIssued(handle) != COMM_SUCCESS)
     {
         // Handle timeout
         Spi_Unlock(0);
-        return HAL_TIMEOUT;
+        return COMM_TIMEOUT;
     }
 
     if (!is_in_dma_nocache((void *)aRxBuffer, len))
@@ -337,7 +355,7 @@ uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     Spi_NotifyRxData(handle, 0);
 
-    return RetVal;
+    return m_HalToComm(RetVal);
 }
 
 uint8_t
@@ -359,9 +377,9 @@ Spi_ParseResponse(const uint8_t *buffer, uint8_t length, uint8_t *response)
     return RetVal;
 }
 
-uint8_t Spi_readByte(SPI_HandleTypeDef *handle, uint8_t *pResponse)
+comm_status_t Spi_readByte(SPI_HandleTypeDef *handle, uint8_t *pResponse)
 {
-    uint8_t RetVal;
+    comm_status_t RetVal;
     const uint16_t Bytes = 1;
 
     RetVal = Spi_SendReceiveMsg(
@@ -376,9 +394,9 @@ uint8_t Spi_readByte(SPI_HandleTypeDef *handle, uint8_t *pResponse)
     return RetVal;
 }
 
-uint8_t Spi_writByte(SPI_HandleTypeDef *handle, const uint8_t *data)
+comm_status_t Spi_writByte(SPI_HandleTypeDef *handle, const uint8_t *data)
 {
-    uint8_t RetVal;
+    comm_status_t RetVal;
     uint8_t RespDummy = 0U;
 
     (void)RespDummy;
@@ -393,10 +411,10 @@ uint8_t Spi_writByte(SPI_HandleTypeDef *handle, const uint8_t *data)
     return RetVal;
 }
 
-uint8_t Spi_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
+comm_status_t Spi_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
 {
     uint8_t NoResponseReceived;
-    uint8_t RetVal;
+    comm_status_t RetVal;
     uint8_t counter;
     const uint8_t RetryCount = 10;
 
@@ -417,11 +435,11 @@ uint8_t Spi_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
 
     if (0 == NoResponseReceived)
     {
-        RetVal = 0;
+        RetVal = COMM_SUCCESS;
     }
     else
     {
-        RetVal = 1;
+        RetVal = COMM_TIMEOUT;
     }
 
     return RetVal;
@@ -461,13 +479,12 @@ uint8_t Spi_PollTillIdle(SPI_HandleTypeDef *handle, uint8_t *pResponse)
     return RetVal;
 }
 
-uint8_t Spi_goHighSpeed(SPI_HandleTypeDef *handle)
+comm_status_t Spi_goHighSpeed(SPI_HandleTypeDef *handle)
 {
-    uint8_t res;
+    uint8_t rcc_res;
+    HAL_StatusTypeDef hal_res;
     volatile uint32_t SpiClock;
     uint64_t RccInstance;
-
-    res = 0U;
 
     __disable_irq();
 
@@ -476,47 +493,44 @@ uint8_t Spi_goHighSpeed(SPI_HandleTypeDef *handle)
         Spi_ErrorHandlerHook();
     }
 
-    res = m_GetRccInstance(handle, &RccInstance);
+    rcc_res = m_GetRccInstance(handle, &RccInstance);
 
-    if (HAL_OK != res)
+    if (0U != rcc_res)
     {
-        return res;
+        __enable_irq();
+        return COMM_INVALID_PARAMETER;
     }
 
     SpiClock = HAL_RCCEx_GetPeriphCLKFreq(RccInstance);
 
     handle->Init.BaudRatePrescaler =
         SpiUtils_ComputePrescaler(SpiClock, 25000000U);
-    res = HAL_SPI_Init(handle);
+    hal_res = HAL_SPI_Init(handle);
     __enable_irq();
 
-    if (res != HAL_OK)
+    if (hal_res != HAL_OK)
     {
         Spi_ErrorHandlerHook();
     }
 
-    return res;
+    return m_HalToComm(hal_res);
 }
 
-uint8_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+comm_status_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
-    uint8_t res = 0;
-    res         = Spi_NotifyTransferIssued(hspi);
-    return res;
+    return Spi_NotifyTransferIssued(hspi);
 }
 
-uint8_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+comm_status_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
-    uint8_t res = 0;
     Spi_NotifyTransferComplete(hspi);
-    return res;
+    return COMM_SUCCESS;
 }
 
-uint8_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
+comm_status_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
-    uint8_t res = 0;
     Spi_NotifyTransferError(hspi);
-    return res;
+    return COMM_SUCCESS;
 }
 
 /**

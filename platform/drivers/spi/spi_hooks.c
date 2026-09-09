@@ -4,7 +4,8 @@
 /* transfer state */
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 
-uint8_t __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+comm_status_t __attribute__((weak))
+Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     while (wTransferState == TRANSFER_WAIT)
     {
@@ -14,20 +15,21 @@ uint8_t __attribute__((weak)) Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
     while (HAL_SPI_GetState(pSpiHandle1) != HAL_SPI_STATE_READY)
     {
     }
-    return (uint8_t)0;
+    return COMM_SUCCESS;
 }
 
-uint8_t __attribute__((weak)) Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi
-)
+comm_status_t __attribute__((weak))
+Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     wTransferState = TRANSFER_COMPLETE;
-    return (uint8_t)0;
+    return COMM_SUCCESS;
 }
 
-uint8_t __attribute__((weak)) Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
+comm_status_t __attribute__((weak))
+Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     wTransferState = TRANSFER_ERROR;
-    return (uint8_t)0;
+    return COMM_SUCCESS;
 }
 
 __attribute__((weak)) void Spi_Lock(uint8_t id)

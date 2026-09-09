@@ -52,9 +52,11 @@ comm_status_t SPI_Init(CommDriver *drv)
 
     instance = (SpiInstanceType *)drv->instance;
 
-    res = (comm_status_t)Spi_Init((SPI_HandleTypeDef *)&instance->hspi);
+    res = (HAL_OK == Spi_Init((SPI_HandleTypeDef *)&instance->hspi))
+              ? COMM_SUCCESS
+              : COMM_ERROR;
 
-    if (0 == res)
+    if (COMM_SUCCESS == res)
     {
         drv->state = DRIVER_STATE_INITIALIZED;
     }
@@ -391,13 +393,13 @@ void SPI_Poll(CommDriver *drv)
     case SPI_DIR_TX_ONLY:
         if (Transaction->use_poll)
         {
-            res = (comm_status_t)Spi_SendPoll(
+            res = Spi_SendPoll(
                 &instance->hspi,
                 txSlot->data,
                 Transaction->length,
                 Transaction->timeout
             );
-            Spi_NotifyRxData(&instance->hspi, res != HAL_OK ? 1U : 0U);
+            Spi_NotifyRxData(&instance->hspi, res != COMM_SUCCESS ? 1U : 0U);
             res = COMM_SUCCESS;
         }
         else
@@ -409,13 +411,13 @@ void SPI_Poll(CommDriver *drv)
     case SPI_DIR_RX_ONLY:
         if (Transaction->use_poll)
         {
-            res = (comm_status_t)Spi_ReceivePoll(
+            res = Spi_ReceivePoll(
                 &instance->hspi,
                 rxSlot->data,
                 Transaction->length,
                 Transaction->timeout
             );
-            Spi_NotifyRxData(&instance->hspi, res != HAL_OK ? 1U : 0U);
+            Spi_NotifyRxData(&instance->hspi, res != COMM_SUCCESS ? 1U : 0U);
             res = COMM_SUCCESS;
         }
         else
@@ -428,14 +430,14 @@ void SPI_Poll(CommDriver *drv)
     case SPI_DIR_TX_RX:
         if (Transaction->use_poll)
         {
-            res = (comm_status_t)Spi_SendReceivePoll(
+            res = Spi_SendReceivePoll(
                 &instance->hspi,
                 txSlot->data,
                 rxSlot->data,
                 Transaction->length,
                 Transaction->timeout
             );
-            Spi_NotifyRxData(&instance->hspi, res != HAL_OK ? 1U : 0U);
+            Spi_NotifyRxData(&instance->hspi, res != COMM_SUCCESS ? 1U : 0U);
             res = COMM_SUCCESS;
         }
         else
@@ -529,9 +531,9 @@ CommDriver *m_FindCorrespondingDriver(SPI_HandleTypeDef *hspi)
     return pDrv;
 }
 
-uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
+comm_status_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
 {
-    uint8_t res         = 0;
+    comm_status_t res   = COMM_SUCCESS;
     CommDriver *pDrv    = NULL;
     RingBuffer *rxSlots = NULL;
     SpiSlotType *rxSlot = {0};

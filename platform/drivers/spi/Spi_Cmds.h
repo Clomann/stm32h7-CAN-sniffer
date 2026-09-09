@@ -25,76 +25,80 @@ extern const uint8_t aTxSpiInit[18];
 extern uint8_t aRxSpiDummy[1024];
 extern uint8_t aRxSpiSink[1024];
 
-static inline uint8_t Spi_PwrOn()
+static inline comm_status_t Spi_PwrOn(void)
 {
     HAL_GPIO_WritePin(SPI1_PWR_GPIO_PORT, SPI1_PWR_PIN, GPIO_PIN_SET);
-    return 0;
+    return COMM_SUCCESS;
 }
 
-static inline uint8_t Spi_PwrOff()
+static inline comm_status_t Spi_PwrOff(void)
 {
     HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_PWR_PIN, GPIO_PIN_RESET);
-    return 0;
+    return COMM_SUCCESS;
 }
 
-static inline uint8_t Spi_CsEnable()
+static inline comm_status_t Spi_CsEnable(void)
 {
 #if CS_ACTIVE_HIGH
     HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
 #else
     HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
 #endif
-    return 0;
+    return COMM_SUCCESS;
 }
 
-static inline uint8_t Spi_CsDisable()
+static inline comm_status_t Spi_CsDisable(void)
 {
 #if CS_ACTIVE_HIGH
     HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_RESET);
 #else
     HAL_GPIO_WritePin(SPI1_SS_GPIO_PORT, SPI1_SS_PIN, GPIO_PIN_SET);
 #endif
-    return 0;
+    return COMM_SUCCESS;
 }
 
+/* Thin wrapper around HAL_SPI_Init(); keeps the HAL status by design. */
 HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef *);
 
-uint8_t Spi_readByte(SPI_HandleTypeDef *handle, uint8_t *pResponse);
-uint8_t Spi_writByte(SPI_HandleTypeDef *handle, const uint8_t *data);
-uint8_t Spi_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse);
-uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
-uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
-uint8_t Spi_SendReceiveMsg(
+comm_status_t Spi_readByte(SPI_HandleTypeDef *handle, uint8_t *pResponse);
+comm_status_t Spi_writByte(SPI_HandleTypeDef *handle, const uint8_t *data);
+comm_status_t
+Spi_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse);
+comm_status_t
+Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
+comm_status_t
+Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
+comm_status_t Spi_SendReceiveMsg(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
     uint16_t TxBytes
 );
-uint8_t Spi_SendPoll(
+comm_status_t Spi_SendPoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *buffer,
     uint16_t len,
     uint32_t timeout
 );
-uint8_t Spi_ReceivePoll(
+comm_status_t Spi_ReceivePoll(
     SPI_HandleTypeDef *handle,
     uint8_t *buffer,
     uint16_t len,
     uint32_t timeout
 );
-uint8_t Spi_SendReceivePoll(
+comm_status_t Spi_SendReceivePoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
     uint16_t len,
     uint32_t timeout
 );
-uint8_t Spi_goHighSpeed(SPI_HandleTypeDef *handle);
+comm_status_t Spi_goHighSpeed(SPI_HandleTypeDef *handle);
 
-uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
-uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
-uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi);
-uint8_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err);
+comm_status_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi);
+comm_status_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
+comm_status_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi);
+comm_status_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err);
 
 void Spi_ErrorHandlerHook(void);
 

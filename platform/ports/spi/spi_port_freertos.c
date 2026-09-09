@@ -96,7 +96,7 @@ static inline SemaphoreHandle_t prvGetSem(SPI_HandleTypeDef *hspi)
 }
 
 /* ---------- task-side: called after the DMA transfer is started ------ */
-uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+comm_status_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     BaseType_t res;
 
@@ -113,14 +113,14 @@ uint8_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 #endif
     if (res != pdTRUE)
     {
-        return 1; /* timeout (shouldn’t happen) */
+        return COMM_TIMEOUT; /* timeout (shouldn’t happen) */
     }
 
-    return 0;
+    return COMM_SUCCESS;
 }
 
 /* ---------- ISR side: successful completion -------------------------- */
-uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+comm_status_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     BaseType_t xHigherPrioTaskWoken = pdFALSE;
     volatile uint32_t IrqPrio       = NVIC_GetPriority(SPI1_IRQn);
@@ -145,11 +145,11 @@ uint8_t Spi_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
     vTaskNotifyGiveFromISR(*pCanBridgeTaskHdl, &xHigherPrioTaskWoken);
 #endif
     portYIELD_FROM_ISR(xHigherPrioTaskWoken);
-    return 0;
+    return COMM_SUCCESS;
 }
 
 /* ---------- ISR side: error path ------------------------------------- */
-uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
+comm_status_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     BaseType_t xHigherPrioTaskWoken = pdFALSE;
 
@@ -170,7 +170,7 @@ uint8_t Spi_NotifyTransferError(SPI_HandleTypeDef *hspi)
     vTaskNotifyGiveFromISR(*pCanBridgeTaskHdl, &xHigherPrioTaskWoken);
 #endif
     portYIELD_FROM_ISR(xHigherPrioTaskWoken);
-    return 0;
+    return COMM_SUCCESS;
 }
 #endif
 

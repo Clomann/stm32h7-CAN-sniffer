@@ -29,32 +29,34 @@ extern uint8_t Spi_Receive_last_rx_buffer[512];
 
 HAL_StatusTypeDef Spi_Init(SPI_HandleTypeDef *handle);
 
-HAL_StatusTypeDef Spi_SendReceiveMsg(
+comm_status_t Spi_SendReceiveMsg(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
     uint16_t TxBytes
 );
-uint8_t Spi_SendPoll(
+comm_status_t Spi_SendPoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *buffer,
     uint16_t len,
     uint32_t timeout
 );
-uint8_t Spi_ReceivePoll(
+comm_status_t Spi_ReceivePoll(
     SPI_HandleTypeDef *handle,
     uint8_t *buffer,
     uint16_t len,
     uint32_t timeout
 );
-uint8_t Spi_SendReceivePoll(
+comm_status_t Spi_SendReceivePoll(
     SPI_HandleTypeDef *handle,
     const uint8_t *pTxBuffer,
     uint8_t *pRxBuffer,
     uint16_t len,
     uint32_t timeout
 );
-uint8_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
-uint8_t Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
+comm_status_t
+Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
+comm_status_t
+Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len);
 
 void Spi_ErrorHandler(void);
