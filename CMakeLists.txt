@@ -128,7 +128,7 @@ elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
 
         # This needs attention to properly set for used MCU
         -mcpu=cortex-m4                 # Modified
-        -mfpu=fpv5-d16                  # Modified
+        -mfpu=fpv4-sp-d16               # Modified
         -mfloat-abi=hard                # Modified
     )
 
