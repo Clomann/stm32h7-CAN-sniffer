@@ -333,7 +333,7 @@ endif()
 function(configure_firmware_target target_name)
     set(options)
     set(oneValueArgs LINKER_SCRIPT USE_PRINTF_FLOAT)
-    set(multiValueArgs SOURCES INCLUDES LIBS COMPILE_DEFS)
+    set(multiValueArgs SOURCES INCLUDES SYSTEM_INCLUDES LIBS COMPILE_DEFS)
     cmake_parse_arguments(FW "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     if(NOT FW_SOURCES)
@@ -346,7 +346,10 @@ function(configure_firmware_target target_name)
         target_link_libraries(${target_name} PRIVATE ${FW_LIBS})
     endif()
 
-    # Include paths
+    # Include paths (vendored headers via -isystem so their warnings stay out of our build)
+    if(FW_SYSTEM_INCLUDES)
+        target_include_directories(${target_name} SYSTEM PRIVATE ${FW_SYSTEM_INCLUDES})
+    endif()
     target_include_directories(${target_name} PRIVATE ${FW_INCLUDES})
     target_include_directories(${target_name} PRIVATE ${CMAKE_BINARY_DIR}/generated)
 
@@ -396,16 +399,6 @@ function(configure_firmware_target target_name)
         -Wl,--no-undefined
         # -Wl,--gc-sections,--print-gc-sections
     )
-
-    if(FW_USE_MALLOC)
-        # target_link_options(${target_name} PRIVATE
-        #     --specs=nano.specs
-        # )
-    else()
-        target_link_options(${target_name} PRIVATE
-            --specs=nosys.specs
-        )
-    endif()
 
     if(FW_USE_PRINTF_FLOAT AND NOT FW_USE_MALLOC)
         message(FATAL_ERROR "USE_PRINTF_FLOAT requires FW_USE_MALLOC=ON (newlib-nano float formatting uses malloc)")
@@ -496,6 +489,7 @@ if(IS_BOTH_BUILD)
         LINKER_SCRIPT ${linker_script_boot}
         SOURCES ${boot_target_sources_SRCS}
         INCLUDES ${boot_target_include_path_DIRS}
+        SYSTEM_INCLUDES ${boot_target_system_include_path_DIRS}
         COMPILE_DEFS ${boot_target_compile_defs}
         LIBS ${boot_link_libs}
         USE_PRINTF_FLOAT OFF
@@ -517,6 +511,7 @@ elseif(IS_BOOTLOADER_BUILD)
         LINKER_SCRIPT ${linker_script_boot}
         SOURCES ${boot_target_sources_SRCS}
         INCLUDES ${boot_target_include_path_DIRS}
+        SYSTEM_INCLUDES ${boot_target_system_include_path_DIRS}
         COMPILE_DEFS ${boot_target_compile_defs}
         LIBS ${boot_link_libs}
         USE_PRINTF_FLOAT OFF

@@ -212,14 +212,19 @@ add_subdirectory(bootloader)
 list(APPEND sources_SRCS ${boot_sources_SRCS})
 list(APPEND include_path_DIRS ${boot_include_path_DIRS})
 
-set(boot_target_sources_SRCS "${sources_SRCS}")
-set(boot_target_include_path_DIRS "${include_path_DIRS}")
-
-# Silence warnings in vendored sources; our own code keeps -Wall -Wextra -Wpedantic
-set(_boot_vendor_SRCS ${boot_target_sources_SRCS})
+# Keep third-party warnings out of our build: vendored (libs/) sources compile with -w,
+# vendored headers are consumed via -isystem. First-party code keeps the full warning set.
+set(_boot_vendor_SRCS ${sources_SRCS})
 list(FILTER _boot_vendor_SRCS INCLUDE REGEX "/libs/")
-set_source_files_properties(${_boot_vendor_SRCS}
-    PROPERTIES COMPILE_OPTIONS "-w")
+set_source_files_properties(${_boot_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w")
+
+set(_boot_system_include_path_DIRS ${include_path_DIRS})
+list(FILTER _boot_system_include_path_DIRS INCLUDE REGEX "/libs/")
+list(FILTER include_path_DIRS              EXCLUDE REGEX "/libs/")
+
+set(boot_target_sources_SRCS             "${sources_SRCS}")
+set(boot_target_include_path_DIRS        "${include_path_DIRS}")
+set(boot_target_system_include_path_DIRS "${_boot_system_include_path_DIRS}")
 set(boot_target_compile_defs
     MBEDTLS_CONFIG_FILE=\"${PROJ_PATH}/bootloader/mbedtls_config.h\"
 )

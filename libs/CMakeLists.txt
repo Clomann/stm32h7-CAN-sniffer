@@ -393,11 +393,17 @@ add_library(third_party_interface INTERFACE)
 
 target_sources(third_party_interface INTERFACE ${sources_SRCS})
 
-target_include_directories(third_party_interface INTERFACE ${include_path_DIRS})
+# Vendored (libs/) headers are consumed via -isystem so their warnings stay out of
+# consumers' builds; first-party include dirs stay on the normal search path.
+set(_tpi_system_include_path_DIRS ${include_path_DIRS})
+list(FILTER _tpi_system_include_path_DIRS INCLUDE REGEX "/libs/")
+list(FILTER include_path_DIRS             EXCLUDE REGEX "/libs/")
+target_include_directories(third_party_interface SYSTEM INTERFACE ${_tpi_system_include_path_DIRS})
+target_include_directories(third_party_interface        INTERFACE ${include_path_DIRS})
 
 target_compile_definitions(third_party_interface INTERFACE ${symbols_SYMB})
 
 target_compile_options(third_party_interface INTERFACE
-    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-parameter>
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-w>
     $<$<CXX_COMPILER_ID:MSVC>:/wd4100>
 )

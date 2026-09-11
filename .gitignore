@@ -18,9 +18,6 @@ tests/build/
 .vscode/c_cpp_properties.json
 
 CMakeCache.txt
-*.cmake
-!cmake/mcuboot_signing.cmake
-!cmake/mcuboot_keys.cmake
 CMakeFiles/*
 */CMakeFiles/*
 
