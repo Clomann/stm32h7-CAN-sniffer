@@ -43,13 +43,23 @@ BtlErrorType bootloader_run(void)
 {
     struct boot_rsp rsp;
     BtlErrorType rv;
+    fih_ret rv_boot;
 
     rv = bootloader_init();
 
     if (BTL_E_OK == rv)
     {
         boot_activate_pending_if_image_present();
-        rv = boot_go(&rsp);
+        rv_boot = boot_go(&rsp);
+
+        if (FIH_EQ(rv_boot, FIH_SUCCESS))
+        {
+            rv = BTL_E_OK;
+        }
+        else
+        {
+            rv = BTL_E_NOT_OK;
+        }
     }
 
     if (BTL_E_OK == rv)

@@ -37,7 +37,7 @@ uint32_t flash_area_get_off(const struct flash_area *fa);
 uint32_t flash_area_get_size(const struct flash_area *fa);
 
 //! Opens the area for use. id is one of the `fa_id`s */
-int flash_area_open(uint8_t id, const struct flash_area **area_outp);
+int flash_area_open(int8_t id, const struct flash_area **area_outp);
 void flash_area_close(const struct flash_area *fa);
 
 //! Reads `len` bytes of flash memory at `off` to the buffer at `dst`
@@ -64,7 +64,7 @@ uint8_t flash_area_erased_val(const struct flash_area *area);
 
 //! Given flash area ID, return info about sectors within the area
 int flash_area_get_sectors(
-    int fa_id,
+    int8_t fa_id,
     uint32_t *count,
     struct flash_sector *sectors
 );

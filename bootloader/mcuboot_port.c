@@ -180,7 +180,7 @@ static void Error_Handler(int code)
     (void)code;
 }
 
-static const struct flash_area *prv_lookup_flash_area(uint8_t id)
+static const struct flash_area *prv_lookup_flash_area(int8_t id)
 {
     for (size_t i = 0; i < ARRAY_SIZE(s_flash_areas); i++)
     {
@@ -193,7 +193,7 @@ static const struct flash_area *prv_lookup_flash_area(uint8_t id)
     return NULL;
 }
 
-WEAK int flash_area_open(uint8_t id, const struct flash_area **area_outp)
+WEAK int flash_area_open(int8_t id, const struct flash_area **area_outp)
 {
     const struct flash_area *area = prv_lookup_flash_area(id);
     if (area_outp != NULL)
@@ -375,7 +375,9 @@ WEAK uint32_t flash_area_align(const struct flash_area *area)
 
     if (FLASH_E_OK != res)
     {
-        return -1;
+        /* trap in debug, and fall back to byte alignment. */
+        assert(0);
+        return 1;
     }
     else
     {
@@ -413,8 +415,11 @@ WEAK uint32_t flash_area_get_off(const struct flash_area *fa)
     return fa ? fa->fa_off : 0u;
 }
 
-WEAK int
-flash_area_get_sectors(int fa_id, uint32_t *count, struct flash_sector *sectors)
+WEAK int flash_area_get_sectors(
+    int8_t fa_id,
+    uint32_t *count,
+    struct flash_sector *sectors
+)
 {
     const struct flash_area *fa = prv_lookup_flash_area(fa_id);
     if (fa == NULL || count == NULL)
@@ -481,12 +486,12 @@ WEAK int flash_area_get_sector(
         return -1;
     }
 
-    if ((uint32_t)off >= fa->fa_size)
+    if ((uintmax_t)off > UINT32_MAX || (uintmax_t)off >= (uintmax_t)fa->fa_size)
     {
         return -1;
     }
 
-    sector_abs_addr = FLASH_DEVICE_BASE_ADDR + fa->fa_off + off;
+    sector_abs_addr = FLASH_DEVICE_BASE_ADDR + fa->fa_off + (uint32_t)off;
 
     if (FLASH_E_OK == Flash_GetSectorByAddr(sector_abs_addr, &sector))
     {
