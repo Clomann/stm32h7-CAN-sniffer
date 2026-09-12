@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "syscalls.h"
+
 int _close(int file)
 {
     (void)file;

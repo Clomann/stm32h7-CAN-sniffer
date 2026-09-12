@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <sys/types.h>
 
+#include "syscalls.h"
+
 extern char _end; /* Provided by the linker */
 extern char _estack; /* Provided by the linker */
 
