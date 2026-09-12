@@ -513,18 +513,18 @@ WEAK int flash_area_id_from_multi_image_slot(int image_index, int slot)
 {
     switch (slot)
     {
-    case 0:
+    case BOOT_SLOT_PRIMARY:
         return FLASH_AREA_IMAGE_PRIMARY(image_index);
-    case 1:
+    case BOOT_SLOT_SECONDARY:
         return FLASH_AREA_IMAGE_SECONDARY(image_index);
+    default:
+        MCUBOOT_LOG_ERR(
+            "Unexpected Request: image_index=%d, slot=%d",
+            image_index,
+            slot
+        );
+        return -1; /* flash_area_open will fail on that */
     }
-
-    MCUBOOT_LOG_ERR(
-        "Unexpected Request: image_index=%d, slot=%d",
-        image_index,
-        slot
-    );
-    return -1; /* flash_area_open will fail on that */
 }
 
 WEAK int flash_area_id_from_image_slot(int slot)
