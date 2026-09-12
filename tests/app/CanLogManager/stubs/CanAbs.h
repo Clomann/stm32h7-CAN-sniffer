@@ -66,3 +66,8 @@ uint8_t CanAbs_GetFdcanHealth_Can1(CanAbsFdcanHealthStatsType *stats);
 uint8_t CanAbs_GetFdcanHealth_Can2(CanAbsFdcanHealthStatsType *stats);
 void CanAbs_ResetFdcanHealth(void);
 void CanAbs_Drain(void);
+
+/* The real CanAbs.h reaches this through fdcan.h, which cannot be included in
+ * the host build. CanLogManager.c calls it, so the stub must declare it; the
+ * definition lives in stubs/instrumentation.c. */
+uint64_t FDCAN_GetTimestampHook(void);

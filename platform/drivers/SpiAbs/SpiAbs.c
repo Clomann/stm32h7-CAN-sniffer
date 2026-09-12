@@ -107,13 +107,6 @@ int SpiAbs_Init(
     uint8_t *rx
 );
 
-uint8_t SpiAbs_SendWithCallback(
-    enum SPIABS_DEVICE dev,
-    SpiTransactionType *transaction,
-    const uint8_t *pTxBuffer,
-    uint16_t TxBytes
-);
-
 static CommDriver *m_GetDriver(enum SPIABS_DEVICE dev)
 {
     CommDriver *pDrv;

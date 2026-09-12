@@ -37,8 +37,6 @@ extern SPI_HandleTypeDef SpiHandle4;
 
 /* Private function prototypes -----------------------------------------------*/
 void SPI4_IRQHandler(void);
-void SPI4_DMA_RX_IRQHandler(void);
-void SPI4_DMA_TX_IRQHandler(void);
 
 /* Private functions ---------------------------------------------------------*/
 

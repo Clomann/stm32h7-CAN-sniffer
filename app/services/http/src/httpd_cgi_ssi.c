@@ -21,6 +21,7 @@
 #include "lwip/tcp.h"
 #include "lwip/apps/httpd.h"
 #include "http_cgi_ssi.h"
+#include "WebInterface.h"
 
 #include <string.h>
 #include <stdlib.h>

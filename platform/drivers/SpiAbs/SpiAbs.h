@@ -15,8 +15,6 @@ enum SPIABS_DEVICE
     SPIABS_DEVICEn
 };
 
-extern uint8_t aRxSpiDummy[1024];
-
 uint8_t SpiAbs_Init_Spi1(void);
 void *SpiAbs_GetHandle_Spi1(void);
 
@@ -55,10 +53,3 @@ void SpiAbs_Task(void *parameters);
 void __attribute__((weak)) SpiAbs_TaskControlCallback(uint32_t timeout);
 
 void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback(void);
-
-void SpiAbs_Send_Spi1_CompleteCallback_Task0(
-    void *context,
-    uint32_t status,
-    const uint8_t *data,
-    uint32_t len
-);

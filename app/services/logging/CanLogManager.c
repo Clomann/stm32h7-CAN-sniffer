@@ -86,8 +86,6 @@ static bool CanLogManager_StaticReplayIdCheck(
 #define CLM_ABS_TIME_TO_ABS_HIGH(x) ((uint32_t)((x) >> 32U))
 #define CLM_SYNC_EMIT_INTERVAL_US   (30ULL * 60ULL * 1000000ULL)
 
-extern uint64_t FDCAN_GetTimestampHook(void);
-
 void CanLogManager_InstrumentationFlushStartHook(void);
 void CanLogManager_InstrumentationFlushEndHook(void);
 void CanLogManager_DrainPortStartHook(void);

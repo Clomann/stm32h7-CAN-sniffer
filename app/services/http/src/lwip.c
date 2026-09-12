@@ -35,7 +35,6 @@
 /* Private function prototypes -----------------------------------------------*/
 static void ethernet_link_status_updated(struct netif *netif);
 /* ETH Variables initialization ----------------------------------------------*/
-extern void Error_Handler(void);
 
 /* USER CODE BEGIN 1 */
 

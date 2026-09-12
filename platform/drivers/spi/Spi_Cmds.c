@@ -57,8 +57,6 @@ ALIGN_32BYTES(uint8_t DMA_BUFFER aRxBuffer[BUFFER_ALIGNED_SIZE]);
 
 uint8_t Spi_PollTillIdle(SPI_HandleTypeDef *handle, uint8_t *);
 uint8_t Spi_ParseResponse(const uint8_t *, uint8_t, uint8_t *);
-void SPI1_DMA_RX_IRQHandler(void);
-void SPI1_DMA_TX_IRQHandler(void);
 
 static comm_status_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi);
 static comm_status_t m_NotifyTransferError(SPI_HandleTypeDef *hspi);

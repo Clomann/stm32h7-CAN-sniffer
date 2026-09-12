@@ -40,7 +40,6 @@ void ethernet_link_thread(void *argument);
 void ethernet_link_check_state(struct netif *netif);
 void send_udp_message(void);
 
-void Error_Handler(void);
 u32_t sys_jiffies(void);
 u32_t sys_now(void);
 
