@@ -783,16 +783,6 @@ comm_status_t FDCAN_Read(CommDriver *dev, void *pFrame, uint32_t RxFifo0ITs)
     return RetVal;
 }
 
-comm_status_t FDCAN_RegisterTxMessage(Message *pMsg)
-{
-    return COMM_ERROR;
-}
-
-comm_status_t FDCAN_RegisterRxMessage(Message *pMsg)
-{
-    return COMM_ERROR;
-}
-
 uint64_t FDCAN_GetMostRecentInterruptTimestamp(CommDriver *dev)
 {
     return ((FdcanInstanceType *)dev->instance)->mostRecentInterrupTimestamp;
