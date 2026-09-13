@@ -1292,7 +1292,7 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
     }
     else if (CanLogReadFileDevice.readTargetSize - ByteCount > (uint32_t)count)
     {
-        len = count;
+        len = (uint32_t)count;
     }
     else
     {
@@ -1309,7 +1309,7 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count)
     state->callcount++;
     state->byteCount += len;
 
-    return len; // triggers send
+    return (int)len; // triggers send
 }
 
 void fs_close_custom(struct fs_file *file)

@@ -45,22 +45,38 @@ u32_t sys_now(void);
 
 /* USER CODE BEGIN 1 */
 
+/* SCB_*DCache_by_Addr() silently no-ops on a negative dsize (core_cm7.h);
+ * clamp rather than let an oversized len wrap and skip cache maintenance. */
+static inline int32_t m_ClampAlignedSizeToInt32(uintptr_t aligned_size)
+{
+    return (aligned_size > (uintptr_t)INT32_MAX) ? INT32_MAX
+                                                 : (int32_t)aligned_size;
+}
+
 static inline void AddressAligned_CleanDCache(void *addr, uint32_t len)
 {
     uintptr_t raw_addr     = (uintptr_t)addr;
-    uintptr_t aligned_addr = raw_addr & ~0x1F;
-    uintptr_t aligned_size = ((raw_addr + len + 31) & ~0x1F) - aligned_addr;
+    uintptr_t aligned_addr = raw_addr & (uintptr_t)~0x1F;
+    uintptr_t aligned_size =
+        ((raw_addr + len + 31) & (uintptr_t)~0x1F) - aligned_addr;
 
-    SCB_CleanDCache_by_Addr((uint32_t *)aligned_addr, aligned_size);
+    SCB_CleanDCache_by_Addr(
+        (uint32_t *)aligned_addr,
+        m_ClampAlignedSizeToInt32(aligned_size)
+    );
 }
 
 static inline void AddressAligned_InvalidateDCache(void *addr, uint32_t len)
 {
     uintptr_t raw_addr     = (uintptr_t)addr;
-    uintptr_t aligned_addr = raw_addr & ~0x1F;
-    uintptr_t aligned_size = ((raw_addr + len + 31) & ~0x1F) - aligned_addr;
+    uintptr_t aligned_addr = raw_addr & (uintptr_t)~0x1F;
+    uintptr_t aligned_size =
+        ((raw_addr + len + 31) & (uintptr_t)~0x1F) - aligned_addr;
 
-    SCB_InvalidateDCache_by_Addr((uint32_t *)aligned_addr, aligned_size);
+    SCB_InvalidateDCache_by_Addr(
+        (uint32_t *)aligned_addr,
+        m_ClampAlignedSizeToInt32(aligned_size)
+    );
 }
 
 /* USER CODE END 1 */

@@ -105,7 +105,7 @@ static void consume_param_values(char *param, char *value)
             AppSettings->updated = 1U;
         }
 
-        pCanConfig->mode = NewMode;
+        pCanConfig->mode = (uint8_t)NewMode;
     }
     else if (strcmp(param, "action") == 0)
     {
@@ -155,73 +155,73 @@ int http_app_get_setting(int iIndex, char *pcInsert, int iInsertLen)
     case 0: // "naud1"
         if (AppSettings->can1.baudrate == 250000)
         {
-            snprintf(pcInsert, iInsertLen, "250 kbit/s");
+            snprintf(pcInsert, (size_t)iInsertLen, "250 kbit/s");
         }
         else if (AppSettings->can1.baudrate == 500000)
         {
-            snprintf(pcInsert, iInsertLen, "500 kbit/s");
+            snprintf(pcInsert, (size_t)iInsertLen, "500 kbit/s");
         }
         else if (AppSettings->can1.baudrate == 1000000)
         {
-            snprintf(pcInsert, iInsertLen, "1 Mbit/s");
+            snprintf(pcInsert, (size_t)iInsertLen, "1 Mbit/s");
         }
         else
         {
-            snprintf(pcInsert, iInsertLen, "n/a");
+            snprintf(pcInsert, (size_t)iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);
     case 1: // "mode1"
         if (AppSettings->can1.mode == 1)
         {
-            snprintf(pcInsert, iInsertLen, "normal");
+            snprintf(pcInsert, (size_t)iInsertLen, "normal");
         }
         else if (AppSettings->can1.mode == 2)
         {
-            snprintf(pcInsert, iInsertLen, "listen only");
+            snprintf(pcInsert, (size_t)iInsertLen, "listen only");
         }
         else if (AppSettings->can1.mode == 3)
         {
-            snprintf(pcInsert, iInsertLen, "off");
+            snprintf(pcInsert, (size_t)iInsertLen, "off");
         }
         else
         {
-            snprintf(pcInsert, iInsertLen, "n/a");
+            snprintf(pcInsert, (size_t)iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);
     case 2: // "baud2"
         if (AppSettings->can2.baudrate == 250000)
         {
-            snprintf(pcInsert, iInsertLen, "250 kbit/s");
+            snprintf(pcInsert, (size_t)iInsertLen, "250 kbit/s");
         }
         else if (AppSettings->can2.baudrate == 500000)
         {
-            snprintf(pcInsert, iInsertLen, "500 kbit/s");
+            snprintf(pcInsert, (size_t)iInsertLen, "500 kbit/s");
         }
         else if (AppSettings->can2.baudrate == 1000000)
         {
-            snprintf(pcInsert, iInsertLen, "1 Mbit/s");
+            snprintf(pcInsert, (size_t)iInsertLen, "1 Mbit/s");
         }
         else
         {
-            snprintf(pcInsert, iInsertLen, "n/a");
+            snprintf(pcInsert, (size_t)iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);
     case 3: // "mode2"
         if (AppSettings->can2.mode == 1)
         {
-            snprintf(pcInsert, iInsertLen, "normal");
+            snprintf(pcInsert, (size_t)iInsertLen, "normal");
         }
         else if (AppSettings->can2.mode == 2)
         {
-            snprintf(pcInsert, iInsertLen, "listen only");
+            snprintf(pcInsert, (size_t)iInsertLen, "listen only");
         }
         else if (AppSettings->can2.mode == 3)
         {
-            snprintf(pcInsert, iInsertLen, "off");
+            snprintf(pcInsert, (size_t)iInsertLen, "off");
         }
         else
         {
-            snprintf(pcInsert, iInsertLen, "n/a");
+            snprintf(pcInsert, (size_t)iInsertLen, "n/a");
         }
         return (uint16_t)strlen(pcInsert);
     default:
@@ -342,6 +342,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         );
         if (JSONSuccess == result)
         {
+            // TODO: valueLength not bounds-checked against sizeof(TmpBuf) -> possible overflow
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == FileHandler_ConvertToInteger(TmpBuf, &Baudrate, 10U))
@@ -360,11 +361,12 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         );
         if (JSONSuccess == result)
         {
+            // TODO: valueLength not bounds-checked against sizeof(TmpBuf) -> possible overflow
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == FileHandler_ConvertToInteger(TmpBuf, &Mode, 10U))
             {
-                cfg->can1.mode = Mode;
+                cfg->can1.mode = (uint8_t)Mode;
             }
         }
 
@@ -378,6 +380,7 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         );
         if (JSONSuccess == result)
         {
+            // TODO: valueLength not bounds-checked against sizeof(TmpBuf) -> possible overflow
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == FileHandler_ConvertToInteger(TmpBuf, &Baudrate, 10U))
@@ -396,11 +399,12 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         );
         if (JSONSuccess == result)
         {
+            // TODO: valueLength not bounds-checked against sizeof(TmpBuf) -> possible overflow
             strncpy(TmpBuf, value, valueLength);
             TmpBuf[valueLength] = '\0';
             if (0U == FileHandler_ConvertToInteger(TmpBuf, &Mode, 10U))
             {
-                cfg->can2.mode = Mode;
+                cfg->can2.mode = (uint8_t)Mode;
             }
         }
 
@@ -414,7 +418,8 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
         );
         if (JSONSuccess == result)
         {
-            if (0U == IpStringToIntArray(value, valueLength, IP))
+            // TODO: (uint8_t) truncates valueLength > 255 -> mis-parsed IP instead of rejected
+            if (0U == IpStringToIntArray(value, (uint8_t)valueLength, IP))
             {
                 memcpy(cfg->ip, IP, 4U);
             }

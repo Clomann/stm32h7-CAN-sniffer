@@ -124,7 +124,7 @@ FRESULT FatFS_SD_OpenFileForWrite(FatFsDeviceType *dev, const char *name)
     FRESULT fr;
 
     dev->fflags = FA_OPEN_APPEND | FA_WRITE;
-    fr          = f_open(&dev->file, name, dev->fflags);
+    fr          = f_open(&dev->file, name, (BYTE)dev->fflags);
 
 #if FATFS_SEEK_ON_WRITE_APPEND
     if (FR_OK == fr)
@@ -180,13 +180,13 @@ FRESULT FatFS_SD_OpenFileForOverWrite(FatFsDeviceType *dev, const char *name)
     dev->fflags     = FA_WRITE;
     dev->writeIndex = 0;
 
-    fr = f_open(&dev->file, name, dev->fflags);
+    fr = f_open(&dev->file, name, (BYTE)dev->fflags);
 
     if (FR_OK != fr)
     {
         FRESULT open_fr = fr;
 
-        fr = f_open(&dev->file, name, dev->fflags | FA_CREATE_ALWAYS);
+        fr = f_open(&dev->file, name, (BYTE)(dev->fflags | FA_CREATE_ALWAYS));
         if (FR_OK != fr)
         {
             FATFS_SD_SET_ERROR_CONTEXT(
@@ -250,7 +250,7 @@ FRESULT FatFS_SD_OpenFileForRead(FatFsDeviceType *dev, const char *name)
     FRESULT fr;
 
     dev->fflags = FA_READ;
-    fr          = f_open(&dev->file, name, dev->fflags); /* Create a file */
+    fr = f_open(&dev->file, name, (BYTE)dev->fflags); /* Create a file */
 
     return fr;
 }

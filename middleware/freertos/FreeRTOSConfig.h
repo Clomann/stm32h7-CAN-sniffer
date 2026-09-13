@@ -43,7 +43,16 @@
 /* Ensure stdint is only used by the compiler, and not the assembler. */
 #if defined(__ICCARM__) || defined(__CC_ARM) || defined(__GNUC__)
 #include <stdint.h>
+
+/* Also declared by CMSIS's system_stm32h7xx.h, which every app/bootloader
+ * translation unit already pulls in via the HAL - genuinely redundant there.
+ * Kept here (and only warned about, not removed) because the FreeRTOS kernel
+ * port (port.c, built standalone with no CMSIS on its include path) reaches
+ * this symbol through configCPU_CLOCK_HZ below and needs this declaration. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wredundant-decls"
 extern uint32_t SystemCoreClock;
+#pragma GCC diagnostic pop
 
 void vGenerateCore2Interrupt(void *xUpdatedMessageBuffer);
 #endif

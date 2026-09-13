@@ -1831,17 +1831,17 @@ static void appCanLogFillEntry(
     uint8_t Dlc;
     uint8_t DataLen;
 
-    Dlc   = FDCAN_GET_DLC(frame);
-    Flags = FDCAN_GET_BRS(frame) << CAN_FLAG_BRS_Pos
-            | FDCAN_GET_ESI(frame) << CAN_FLAG_ESI_Pos
-            | FDCAN_GET_FDF(frame) << CAN_FLAG_RTR_FDF_Pos
-            | FDCAN_GET_IDE(frame) << CAN_FLAG_IDE_Pos;
+    Dlc     = FDCAN_GET_DLC(frame);
+    Flags   = (ClbDlcFlagsType)(FDCAN_GET_BRS(frame) << CAN_FLAG_BRS_Pos
+                              | FDCAN_GET_ESI(frame) << CAN_FLAG_ESI_Pos
+                              | FDCAN_GET_FDF(frame) << CAN_FLAG_RTR_FDF_Pos
+                              | FDCAN_GET_IDE(frame) << CAN_FLAG_IDE_Pos);
     DataLen = FDCAN_GET_DATA_LEN(frame);
 
     entry->header.header_len = sizeof(entry->header);
     entry->header.type       = CLB_ENTRY_TYPE_FRAME;
     entry->header.total_len  = sizeof(CanLogEntryType) + DataLen;
-    entry->timestamp         = timestamp;
+    entry->timestamp         = (uint32_t)timestamp;
     entry->channel           = channel;
     entry->dlc_flags         = MAKE_DLC_FLAGS(Dlc, Flags);
     entry->data_len          = DataLen;
@@ -2154,14 +2154,14 @@ CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
         if (IsExtended)
         {
             // Extended ID: 1 + 32 + 2 + 1 + 1 + 4 + data + CRC + 2 + 7 + 3 = 53 + data + CRC
-            FrameBits = 53 + (Dlc * 8);
+            FrameBits = (uint32_t)(53 + (Dlc * 8));
             // CRC: 17 bits for ≤16 bytes, 21 bits for >16 bytes
             FrameBits += (Dlc <= 16) ? 17 : 21;
         }
         else
         {
             // Standard ID: 1 + 12 + 2 + 1 + 1 + 4 + data + CRC + 2 + 7 + 3 = 33 + data + CRC
-            FrameBits = 33 + (Dlc * 8);
+            FrameBits = (uint32_t)(33 + (Dlc * 8));
             FrameBits += (Dlc <= 16) ? 17 : 21;
         }
     }
@@ -2171,12 +2171,12 @@ CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
         if (IsExtended)
         {
             // Extended: 1 + 32 + 6 + data + 15 + 1 + 2 + 7 + 3 = 67 + data
-            FrameBits = 67 + (Dlc * 8);
+            FrameBits = (uint32_t)(67 + (Dlc * 8));
         }
         else
         {
             // Standard: 1 + 11 + 6 + data + 15 + 1 + 2 + 7 + 3 = 47 + data
-            FrameBits = 47 + (Dlc * 8);
+            FrameBits = (uint32_t)(47 + (Dlc * 8));
         }
     }
 
@@ -2240,9 +2240,10 @@ CanLogResult m_ComputeBusLoad(CanStatusDataType *can, CanLogEntryType *frame)
     // Update every 1 second
     if (can->accumulatedTime >= 1000000U)
     {
-        Period = can->accumulatedTime / 1000000.0f;
-        can->busLoad =
-            ((can->accumulatedBits * 1.1f) / (can->baudrate * Period)) * 100.0f;
+        Period       = (float)can->accumulatedTime / 1000000.0f;
+        can->busLoad = (((float)can->accumulatedBits * 1.1f)
+                        / ((float)can->baudrate * Period))
+                       * 100.0f;
 
         if (can->busLoad > 0.0f && can->busLoad < 0.01f)
         {

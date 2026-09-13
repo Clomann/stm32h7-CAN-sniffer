@@ -206,8 +206,10 @@ typedef uint8_t SdSpiTranSpeed;
 #define GET_BYTE_INDEX(bitpos, elemSize) ((bitpos) / elemSize)
 
 #define EXTRACT_CSD_BITS(array, mask, start)                                   \
-    (array[GET_BYTE_INDEX(start, 8U)]                                          \
-         >> (start - (GET_BYTE_INDEX(start, 8U) * 8U))                         \
-     & mask)
+    ((uint8_t)(                                                               \
+        (array[GET_BYTE_INDEX(start, 8U)]                                     \
+             >> (start - (GET_BYTE_INDEX(start, 8U) * 8U)))                   \
+        & (mask)                                                              \
+    ))
 
 #endif /* CM7_INC_SDTYPES_H_ */

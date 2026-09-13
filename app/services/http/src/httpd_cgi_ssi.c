@@ -68,7 +68,7 @@ tCGI CGI_TAB[] = {CAN_CTL_CGI, CAN_CFG_CGI};
   */
 u16_t Handler(int iIndex, char *pcInsert, int iInsertLen)
 {
-    return http_app_get_setting(iIndex, pcInsert, iInsertLen);
+    return (u16_t)http_app_get_setting(iIndex, pcInsert, iInsertLen);
 }
 
 const char *CAN_config_CGI_Handler(

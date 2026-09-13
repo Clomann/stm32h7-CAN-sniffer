@@ -467,12 +467,13 @@ int CanAbs_Init(
         res = 1;
     }
 
-    return res;
+    return (int)res;
 }
 
 int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrameType *frame)
 {
-    return ring_buffer_pop((RingBuffer *)dev->RxFrameBuffer, (void *)frame);
+    return (int
+    )ring_buffer_pop((RingBuffer *)dev->RxFrameBuffer, (void *)frame);
 }
 
 comm_status_t CanAbs_Send(CommDriver *dev, FDCAN_Message *msg)
@@ -772,14 +773,14 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
             switch (channel)
             {
             case 1U:
-                NewFrame.timestamp = ReconstructFullTimestamp(
+                NewFrame.timestamp = (uint32_t)ReconstructFullTimestamp(
                     HardwareTimestamp,
                     GlobalTimestamp,
                     &LastHardwareTimestampCan1
                 );
                 break;
             case 2U:
-                NewFrame.timestamp = ReconstructFullTimestamp(
+                NewFrame.timestamp = (uint32_t)ReconstructFullTimestamp(
                     HardwareTimestamp,
                     GlobalTimestamp,
                     &LastHardwareTimestampCan2

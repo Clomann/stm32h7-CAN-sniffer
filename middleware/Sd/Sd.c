@@ -191,7 +191,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD9:
         buffer[1] = 0x49;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -223,7 +223,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD16:
         buffer[1] = 0x50;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -231,7 +231,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD17:
         buffer[1] = 0x51;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -239,7 +239,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD18:
         buffer[1] = 0x52;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -247,7 +247,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD24:
         buffer[1] = 0x58;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -255,7 +255,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD25:
         buffer[1] = 0x59;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -263,7 +263,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD32:
         buffer[1] = 0x40 + 32U;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -271,7 +271,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD33:
         buffer[1] = 0x40 + 33U;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -279,7 +279,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_CMD38:
         buffer[1] = 0x40 + 38U;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -303,7 +303,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
         break;
     case SD_SPI_ACMD41:
         buffer[1] = 0x69;
-        buffer[2] = (payload >> 24) & 0xFF;
+        buffer[2] = (uint8_t)((payload >> 24) & 0xFF);
         buffer[3] = (payload >> 16) & 0xFF;
         buffer[4] = (payload >> 8) & 0xFF;
         buffer[5] = payload & 0xFF;
@@ -324,18 +324,18 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
 
 static void SD_Spi_Ocr2Bitfield(uint32_t ocr, OCR_Register *out)
 {
-    out->ccs             = IS_CARD_SDHX(ocr);
-    out->cpusb           = IS_CARD_READY(ocr);
-    out->switching_1_8_V = IS_SWITCH_1_8V(ocr);
-    out->uhs_ii_card     = IS_UHSII_CARD(ocr);
-    out->voltage_2_7_2_8 = IS_VOLTAGE_2_7_2_8(ocr);
-    out->voltage_2_8_2_9 = IS_VOLTAGE_2_8_2_9(ocr);
-    out->voltage_2_9_3_0 = IS_VOLTAGE_2_9_3_0(ocr);
-    out->voltage_3_0_3_1 = IS_VOLTAGE_3_0_3_1(ocr);
-    out->voltage_3_2_3_3 = IS_VOLTAGE_3_2_3_3(ocr);
-    out->voltage_3_3_3_4 = IS_VOLTAGE_3_3_3_4(ocr);
-    out->voltage_3_4_3_5 = IS_VOLTAGE_3_4_3_5(ocr);
-    out->voltage_3_5_3_6 = IS_VOLTAGE_3_5_3_6(ocr);
+    out->ccs             = (uint32_t)IS_CARD_SDHX(ocr);
+    out->cpusb           = (uint32_t)IS_CARD_READY(ocr);
+    out->switching_1_8_V = (uint32_t)IS_SWITCH_1_8V(ocr);
+    out->uhs_ii_card     = (uint32_t)IS_UHSII_CARD(ocr);
+    out->voltage_2_7_2_8 = (uint32_t)IS_VOLTAGE_2_7_2_8(ocr);
+    out->voltage_2_8_2_9 = (uint32_t)IS_VOLTAGE_2_8_2_9(ocr);
+    out->voltage_2_9_3_0 = (uint32_t)IS_VOLTAGE_2_9_3_0(ocr);
+    out->voltage_3_0_3_1 = (uint32_t)IS_VOLTAGE_3_0_3_1(ocr);
+    out->voltage_3_2_3_3 = (uint32_t)IS_VOLTAGE_3_2_3_3(ocr);
+    out->voltage_3_3_3_4 = (uint32_t)IS_VOLTAGE_3_3_3_4(ocr);
+    out->voltage_3_4_3_5 = (uint32_t)IS_VOLTAGE_3_4_3_5(ocr);
+    out->voltage_3_5_3_6 = (uint32_t)IS_VOLTAGE_3_5_3_6(ocr);
 }
 
 /**
@@ -432,7 +432,7 @@ static uint8_t SD_Spi_WaitBusy(uint32_t maxAttempts)
         }
     } while (++attempts < maxAttempts);
 
-    return (resp == 0xFF) ? 0U : 1U;
+    return (uint8_t)((resp == 0xFF) ? 0U : 1U);
 }
 
 uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
@@ -1024,7 +1024,10 @@ uint8_t SD_Spi_readSingleBlock(uint32_t address, Spi_R1Response *pResponse)
             }
             else
             {
-                SpiAbs_Receive_Spi1_Task0(&readBuffer[i], SD_SECTOR_LENGTH - i);
+                SpiAbs_Receive_Spi1_Task0(
+                    &readBuffer[i],
+                    (uint16_t)(SD_SECTOR_LENGTH - i)
+                );
             }
         }
 
@@ -1261,7 +1264,7 @@ SpiAbs_waitTillNotBusy(uint8_t *buffer, uint16_t min_bytes, uint16_t bytes)
         memcpy(buffer, &Buf[index + 1], BytesRemaining);
         SpiAbs_Receive_Spi1_Task0(
             &buffer[BytesRemaining],
-            bytes - BytesRemaining
+            (uint16_t)(bytes - BytesRemaining)
         );
     }
 
@@ -1425,7 +1428,10 @@ uint8_t SD_Spi_writeBlock(uint32_t address, uint8_t const *buff)
             }
             else
             {
-                SpiAbs_Send_Spi1_Task0(&buff[i], SD_SECTOR_LENGTH - i);
+                SpiAbs_Send_Spi1_Task0(
+                    &buff[i],
+                    (uint16_t)(SD_SECTOR_LENGTH - i)
+                );
             }
         }
 

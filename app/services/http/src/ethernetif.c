@@ -168,7 +168,11 @@ extern u8_t memp_memory_RX_POOL_base[];
 __attribute__((at(0x30040200)) extern u8_t memp_memory_RX_POOL_base[];
 
 #elif defined(__GNUC__) /* GNU Compiler */
+/* The redundant attributed re-declaration is the LwIP intended idiomatic way */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wredundant-decls"
 extern u8_t memp_memory_RX_POOL_base[] ETH_RX_POOL;
+#pragma GCC diagnostic pop
 #endif
 /* USER CODE END 2 */
 
@@ -854,7 +858,7 @@ int32_t ETH_PHY_IO_WriteReg(uint32_t DevAddr, uint32_t RegAddr, uint32_t RegVal)
   */
 int32_t ETH_PHY_IO_GetTick(void)
 {
-    return HAL_GetTick();
+    return (int32_t)HAL_GetTick();
 }
 
 void send_udp_message(void)
@@ -869,7 +873,7 @@ void send_udp_message(void)
     IP4_ADDR(&dest_ip, 192, 168, 1, 100); // PC or target IP
 
     const char *msg = "Hello from STM32!";
-    struct pbuf *p  = pbuf_alloc(PBUF_TRANSPORT, strlen(msg), PBUF_POOL);
+    struct pbuf *p  = pbuf_alloc(PBUF_TRANSPORT, (u16_t)strlen(msg), PBUF_POOL);
     if (!p)
     {
         udp_remove(pcb);

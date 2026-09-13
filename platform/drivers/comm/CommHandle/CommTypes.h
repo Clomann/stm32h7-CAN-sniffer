@@ -53,29 +53,41 @@ typedef uint16_t DlcDlFlagsType;
 
 // --- SET macros ---
 #define FDCAN_SET_DLC(frame, val)                                              \
-    ((frame)->dlc_dl_flags = ((frame)->dlc_dl_flags & ~FDCAN_DLC_MASK)         \
-                             | (((val) << FDCAN_DLC_POS) & FDCAN_DLC_MASK))
+    ((frame)->dlc_dl_flags =                                                   \
+         (DlcDlFlagsType)(((frame)->dlc_dl_flags                               \
+                           & (DlcDlFlagsType)~FDCAN_DLC_MASK)                  \
+                          | (((val) << FDCAN_DLC_POS) & FDCAN_DLC_MASK)))
 
 #define FDCAN_SET_DATA_LEN(frame, val)                                         \
     ((frame)->dlc_dl_flags =                                                   \
-         ((frame)->dlc_dl_flags & ~FDCAN_DATA_LEN_MASK)                        \
-         | (((val) << FDCAN_DATA_LEN_POS) & FDCAN_DATA_LEN_MASK))
+         (DlcDlFlagsType)(((frame)->dlc_dl_flags                               \
+                           & (DlcDlFlagsType)~FDCAN_DATA_LEN_MASK)             \
+                          | (((val) << FDCAN_DATA_LEN_POS)                     \
+                             & FDCAN_DATA_LEN_MASK)))
 
 #define FDCAN_SET_FDF(frame, val)                                              \
-    ((frame)->dlc_dl_flags = ((frame)->dlc_dl_flags & ~FDCAN_FDF_MASK)         \
-                             | (((val) << FDCAN_FDF_POS) & FDCAN_FDF_MASK))
+    ((frame)->dlc_dl_flags =                                                   \
+         (DlcDlFlagsType)(((frame)->dlc_dl_flags                               \
+                           & (DlcDlFlagsType)~FDCAN_FDF_MASK)                  \
+                          | (((val) << FDCAN_FDF_POS) & FDCAN_FDF_MASK)))
 
 #define FDCAN_SET_BRS(frame, val)                                              \
-    ((frame)->dlc_dl_flags = ((frame)->dlc_dl_flags & ~FDCAN_BRS_MASK)         \
-                             | (((val) << FDCAN_BRS_POS) & FDCAN_BRS_MASK))
+    ((frame)->dlc_dl_flags =                                                   \
+         (DlcDlFlagsType)(((frame)->dlc_dl_flags                               \
+                           & (DlcDlFlagsType)~FDCAN_BRS_MASK)                  \
+                          | (((val) << FDCAN_BRS_POS) & FDCAN_BRS_MASK)))
 
 #define FDCAN_SET_ESI(frame, val)                                              \
-    ((frame)->dlc_dl_flags = ((frame)->dlc_dl_flags & ~FDCAN_ESI_MASK)         \
-                             | (((val) << FDCAN_ESI_POS) & FDCAN_ESI_MASK))
+    ((frame)->dlc_dl_flags =                                                   \
+         (DlcDlFlagsType)(((frame)->dlc_dl_flags                               \
+                           & (DlcDlFlagsType)~FDCAN_ESI_MASK)                  \
+                          | (((val) << FDCAN_ESI_POS) & FDCAN_ESI_MASK)))
 
 #define FDCAN_SET_IDE(frame, val)                                              \
-    ((frame)->dlc_dl_flags = ((frame)->dlc_dl_flags & ~FDCAN_IDE_MASK)         \
-                             | (((val) << FDCAN_IDE_POS) & FDCAN_IDE_MASK))
+    ((frame)->dlc_dl_flags =                                                   \
+         (DlcDlFlagsType)(((frame)->dlc_dl_flags                               \
+                           & (DlcDlFlagsType)~FDCAN_IDE_MASK)                  \
+                          | (((val) << FDCAN_IDE_POS) & FDCAN_IDE_MASK)))
 
 // --- FLAG macros (for setting/clearing flags) ---
 #define FDCAN_SET_FLAG(frame, flag_mask) ((frame)->dlc_dl_flags |= (flag_mask))

@@ -202,7 +202,7 @@ int main(void)
 void HAL_HSEM_FreeCallback(uint32_t SemMask)
 {
     (void)SemMask;
-    
+
     Notif_Recieved = 1;
 }
 

@@ -279,7 +279,7 @@ void TIM_GetCounterValueAndUpdateInterruptFlag(uint32_t *cnt, uint32_t *uifcpy)
 
 void TIM_GetArrValue(uint16_t *arr)
 {
-    *arr = __HAL_TIM_GetAutoreload(&TimHandle);
+    *arr = (uint16_t)__HAL_TIM_GetAutoreload(&TimHandle);
 }
 
 uint8_t TIM_HAL_Init(uint32_t freq)

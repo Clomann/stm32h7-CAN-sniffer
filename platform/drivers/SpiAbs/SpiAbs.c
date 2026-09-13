@@ -159,7 +159,7 @@ uint8_t SpiAbs_Init_Spi1()
 {
     uint8_t res;
 
-    res = SpiAbs_Init(
+    res = (uint8_t)SpiAbs_Init(
         &Spi1Driver,
         &Spi1Config,
         (uint8_t *)Spi1TxBinsRingBuffer,
@@ -508,8 +508,8 @@ void SpiAbs_Send_Spi1_CompleteCallback_Task0(
     if (NULL != context)
     {
         pTaskContext         = (TaskContextType *)context;
-        pTaskContext->status = status;
-        pTaskContext->bytes  = len;
+        pTaskContext->status = (uint8_t)status;
+        pTaskContext->bytes  = (uint16_t)len;
         memcpy(pTaskContext->data, data, len);
         __DMB();
 
@@ -566,8 +566,8 @@ void SpiAbs_Receive_Spi1_CompleteCallback_Task0(
     if (NULL != context)
     {
         pTaskContext         = (TaskContextType *)context;
-        pTaskContext->status = status;
-        pTaskContext->bytes  = len;
+        pTaskContext->status = (uint8_t)status;
+        pTaskContext->bytes  = (uint16_t)len;
         memcpy(pTaskContext->data, data, len);
 
         __DMB();
@@ -886,7 +886,7 @@ int SpiAbs_Init(
         res = 1;
     }
 
-    return res;
+    return (int)res;
 }
 
 uint8_t SpiAbs_Poll(void)

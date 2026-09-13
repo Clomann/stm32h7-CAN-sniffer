@@ -52,7 +52,7 @@ int32_t GPIO_Dbg_Init(uint32_t nbr)
     gpio_init_structure.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 
     HAL_GPIO_Init(DBG_GPIO_PORT, &gpio_init_structure);
-    HAL_GPIO_WritePin(DBG_GPIO_PORT, nbr, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(DBG_GPIO_PORT, (uint16_t)nbr, GPIO_PIN_RESET);
 
     return ret;
 }
@@ -98,7 +98,7 @@ int32_t GPIO_Dbg_DeInit(uint32_t nbr)
     }
 
     /* Turn off LED */
-    HAL_GPIO_WritePin(DBG_GPIO_PORT, nbr, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(DBG_GPIO_PORT, (uint16_t)nbr, GPIO_PIN_RESET);
     /* DeInit the GPIO_LED pin */
     gpio_init_structure.Pin = nbr;
     HAL_GPIO_DeInit(DBG_GPIO_PORT, gpio_init_structure.Pin);
@@ -126,7 +126,7 @@ int32_t GPIO_Dbg_On(uint32_t nbr)
         return ret;
     }
 
-    HAL_GPIO_WritePin(DBG_GPIO_PORT, nbr, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(DBG_GPIO_PORT, (uint16_t)nbr, GPIO_PIN_SET);
 
     return ret;
 }
@@ -151,7 +151,7 @@ int32_t GPIO_Dbg_Off(uint32_t nbr)
         return ret;
     }
 
-    HAL_GPIO_WritePin(DBG_GPIO_PORT, nbr, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(DBG_GPIO_PORT, (uint16_t)nbr, GPIO_PIN_RESET);
 
     return ret;
 }
@@ -176,7 +176,7 @@ int32_t GPIO_Dbg_Toggle(uint32_t nbr)
         return ret;
     }
 
-    HAL_GPIO_TogglePin(DBG_GPIO_PORT, nbr);
+    HAL_GPIO_TogglePin(DBG_GPIO_PORT, (uint16_t)nbr);
 
     return ret;
 }
@@ -201,7 +201,7 @@ int32_t GPIO_Dbg_GetState(uint32_t nbr)
         return ret;
     }
 
-    ret = (int32_t)HAL_GPIO_ReadPin(DBG_GPIO_PORT, nbr);
+    ret = (int32_t)HAL_GPIO_ReadPin(DBG_GPIO_PORT, (uint16_t)nbr);
 
     return ret;
 }

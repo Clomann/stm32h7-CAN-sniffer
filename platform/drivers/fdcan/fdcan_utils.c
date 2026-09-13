@@ -132,8 +132,9 @@ uint8_t CANFD_CalculateBitTimingRegister(
             continue;
         }
 
-        uint8_t seg1 = (tq_num * sample_point) / SAMPLE_POINT_FACTOR - SyncSeg;
-        uint8_t seg2 = tq_num - seg1 - 1;
+        uint8_t seg1 =
+            (uint8_t)((tq_num * sample_point) / SAMPLE_POINT_FACTOR - SyncSeg);
+        uint8_t seg2 = (uint8_t)(tq_num - seg1 - 1);
 
         if (seg1 > 0 && seg2 > 0)
         {
@@ -150,17 +151,17 @@ uint8_t CANFD_CalculateBitTimingRegister(
 
             if (is_data_phase)
             {
-                reg_value = ((prescaler - 1) << FDCAN_DBTP_DBRP_Pos)
-                            | ((Sjw - 1) << FDCAN_DBTP_DSJW_Pos)
-                            | ((seg1 - 1) << FDCAN_DBTP_DTSEG1_Pos)
-                            | ((seg2 - 1) << FDCAN_DBTP_DTSEG2_Pos);
+                reg_value = ((uint32_t)(prescaler - 1) << FDCAN_DBTP_DBRP_Pos)
+                            | ((uint32_t)(Sjw - 1) << FDCAN_DBTP_DSJW_Pos)
+                            | ((uint32_t)(seg1 - 1) << FDCAN_DBTP_DTSEG1_Pos)
+                            | ((uint32_t)(seg2 - 1) << FDCAN_DBTP_DTSEG2_Pos);
             }
             else
             {
-                reg_value = ((prescaler - 1) << FDCAN_NBTP_NBRP_Pos)
-                            | ((Sjw - 1) << FDCAN_NBTP_NSJW_Pos)
-                            | ((seg1 - 1) << FDCAN_NBTP_NTSEG1_Pos)
-                            | ((seg2 - 1) << FDCAN_NBTP_NTSEG2_Pos);
+                reg_value = ((uint32_t)(prescaler - 1) << FDCAN_NBTP_NBRP_Pos)
+                            | ((uint32_t)(Sjw - 1) << FDCAN_NBTP_NSJW_Pos)
+                            | ((uint32_t)(seg1 - 1) << FDCAN_NBTP_NTSEG1_Pos)
+                            | ((uint32_t)(seg2 - 1) << FDCAN_NBTP_NTSEG2_Pos);
             }
 
             // Output 4 bytes little-endian
