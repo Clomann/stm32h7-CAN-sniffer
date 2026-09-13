@@ -143,7 +143,6 @@ comm_status_t SPI_Send(CommDriver *dev, const void *);
 comm_status_t SPI_Read(
     CommDriver *drv,
     void *msg,
-    uint8_t length, /* for comapitibilty (fdcan) */
     uint32_t RxFifo0ITs /* for comapitibilty (fdcan) */
 );
 

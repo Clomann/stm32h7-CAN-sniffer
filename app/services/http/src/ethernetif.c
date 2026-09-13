@@ -211,10 +211,9 @@ void pbuf_free_custom(struct pbuf *p);
   */
 void HAL_ETH_RxCpltCallback(ETH_HandleTypeDef *handlerEth)
 {
+    (void)handlerEth;
+
     // osSemaphoreRelease(RxPktSemaphore);
-    volatile uint32_t tmp = 0;
-    tmp                   = tmp;
-    (void)tmp;
 }
 /**
   * @brief  Ethernet Tx Transfer completed callback
@@ -223,6 +222,8 @@ void HAL_ETH_RxCpltCallback(ETH_HandleTypeDef *handlerEth)
   */
 void HAL_ETH_TxCpltCallback(ETH_HandleTypeDef *handlerEth)
 {
+    (void)handlerEth;
+
     // osSemaphoreRelease(TxPktSemaphore);
 }
 /**

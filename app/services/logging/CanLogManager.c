@@ -2317,6 +2317,8 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
     static uint32_t LastFrameTimestamp      = 0;
     static bool LastFrameTimestampValid     = false;
 
+    (void)data;
+
     if (CanLogCtrlData.runCanTracerOld == *CanLogCtrlData.runCanTracer)
     {
     }

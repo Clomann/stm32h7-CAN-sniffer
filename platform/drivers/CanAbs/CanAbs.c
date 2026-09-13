@@ -761,7 +761,7 @@ static uint32_t CanAbs_ReadAllAvailableFrames(
             break;
         }
 
-        if (driver->interface->read(driver, (void *)&NewFrame, 8u, RxFifo0ITs)
+        if (driver->interface->read(driver, (void *)&NewFrame, RxFifo0ITs)
             == COMM_SUCCESS)
         {
             NewFrame.channel = channel;
@@ -850,6 +850,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
     if (FDCAN_1 == hfdcantmp->Instance)
 #else
+    (void)hfdcan;
     (void)fdcan_get_can(&Fdcan1Driver, &hfdcantmp);
 #endif
     {

@@ -34,7 +34,6 @@ typedef comm_status_t (*Comm_Send)(CommDriver *handle, const void *msg);
 typedef comm_status_t (*Comm_Read)(
     CommDriver *handle,
     void *data,
-    uint8_t length,
     uint32_t RxFifo0ITs
 );
 typedef comm_status_t (*Comm_Control)(

@@ -201,6 +201,8 @@ int main(void)
   */
 void HAL_HSEM_FreeCallback(uint32_t SemMask)
 {
+    (void)SemMask;
+    
     Notif_Recieved = 1;
 }
 
@@ -213,6 +215,8 @@ void HAL_HSEM_FreeCallback(uint32_t SemMask)
   */
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
+    (void)hspi;
+
     /* Turn LED1 on: Transfer in transmission process is complete */
     BSP_LED_On(LED1);
     /* Turn LED2 on: Transfer in reception process is complete */
@@ -229,6 +233,8 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
+    (void)hspi;
+
     wTransferState = TRANSFER_ERROR;
 }
 

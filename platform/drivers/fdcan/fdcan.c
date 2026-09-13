@@ -634,8 +634,7 @@ comm_status_t FDCAN_Send(CommDriver *dev, const void *pMsg)
 #endif
 }
 
-comm_status_t
-FDCAN_Read(CommDriver *dev, void *pFrame, uint8_t length, uint32_t RxFifo0ITs)
+comm_status_t FDCAN_Read(CommDriver *dev, void *pFrame, uint32_t RxFifo0ITs)
 {
     comm_status_t RetVal;
     uint8_t Data[64];

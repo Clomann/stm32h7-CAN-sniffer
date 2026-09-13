@@ -538,7 +538,7 @@ void test_SPI_Read_sets_rx_only_direction_and_reserves_slot(void)
     msg.msgBase.length = 10;
     msg.transaction    = &transaction;
 
-    rc = Spi1Driver.interface->read(&Spi1Driver, &msg, 0, 0);
+    rc = Spi1Driver.interface->read(&Spi1Driver, &msg, 0);
 
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
@@ -573,7 +573,7 @@ void test_SPI_Read_null_tx_slots_calls_error_handler(void)
 
     g_spi_error_handler_calls = 0;
 
-    rc = SPI_Read(&driver, &msg, 0, 0);
+    rc = SPI_Read(&driver, &msg, 0);
 
     TEST_ASSERT_EQUAL_INT(COMM_NULL_POINTER, rc);
     TEST_ASSERT_TRUE_MESSAGE(
@@ -609,7 +609,7 @@ void test_SPI_Read_no_available_slots_calls_error_handler(void)
 
     g_spi_error_handler_calls = 0;
 
-    rc = SPI_Read(&Spi1Driver, &msg, 0, 0);
+    rc = SPI_Read(&Spi1Driver, &msg, 0);
 
     TEST_ASSERT_EQUAL(COMM_TX_FULL, rc);
     TEST_ASSERT_EQUAL_INT(g_spi_error_handler_calls, 0);
@@ -634,7 +634,7 @@ void test_SPI_Read_calls_spi_receive_when_polled(void)
     msg.transaction    = &transaction;
 
     // Queue a read operation
-    rc = Spi1Driver.interface->read(&Spi1Driver, &msg, 0, 0);
+    rc = Spi1Driver.interface->read(&Spi1Driver, &msg, 0);
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     // Verify transaction was set up correctly
@@ -677,7 +677,7 @@ void test_SPI_Read_sets_transaction_length_correctly(void)
     // Test different message lengths
     msg1.msgBase.length = 15;
     msg1.transaction    = &transaction1;
-    rc                  = Spi1Driver.interface->read(&Spi1Driver, &msg1, 0, 0);
+    rc                  = Spi1Driver.interface->read(&Spi1Driver, &msg1, 0);
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 0);
@@ -687,7 +687,7 @@ void test_SPI_Read_sets_transaction_length_correctly(void)
 
     msg2.msgBase.length = 32;
     msg2.transaction    = &transaction2;
-    rc                  = Spi1Driver.interface->read(&Spi1Driver, &msg2, 0, 0);
+    rc                  = Spi1Driver.interface->read(&Spi1Driver, &msg2, 0);
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 1);
@@ -697,7 +697,7 @@ void test_SPI_Read_sets_transaction_length_correctly(void)
 
     msg3.msgBase.length = 1;
     msg3.transaction    = &transaction3;
-    rc                  = Spi1Driver.interface->read(&Spi1Driver, &msg3, 0, 0);
+    rc                  = Spi1Driver.interface->read(&Spi1Driver, &msg3, 0);
     TEST_ASSERT_EQUAL(COMM_SUCCESS, rc);
 
     txSlot = (SpiSlotType *)ring_buffer_peek_at(txSlots, 2);

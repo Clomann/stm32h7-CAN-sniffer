@@ -669,6 +669,9 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
     uint8_t ocr[4];
     uint8_t buffer[4];
 
+    /* TODO: kept for later per-device extension (not yet implemented) */
+    (void) CsLine;
+
     RetVal = 0x00;
 
     HAL_Delay(100);

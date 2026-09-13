@@ -130,7 +130,7 @@ comm_status_t FDCAN_DeInit(CommDriver *dev);
 
 comm_status_t FDCAN_Send(CommDriver *dev, const void *);
 
-comm_status_t FDCAN_Read(CommDriver *dev, void *, uint8_t, uint32_t);
+comm_status_t FDCAN_Read(CommDriver *dev, void *, uint32_t);
 
 comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan);
 

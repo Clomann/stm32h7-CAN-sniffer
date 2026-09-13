@@ -185,14 +185,12 @@ comm_status_t SPI_Send(CommDriver *drv, const void *msg)
 comm_status_t SPI_Read(
     CommDriver *drv,
     void *msg,
-    uint8_t length, /* for comapitibilty (fdcan) */
     uint32_t RxFifo0ITs /* for comapitibilty (fdcan) */
 )
 {
     SPI_Message *pMsg;
     SpiSlotType *txSlot;
 
-    (void)length;
     (void)RxFifo0ITs;
 
     pMsg = (SPI_Message *)msg;
