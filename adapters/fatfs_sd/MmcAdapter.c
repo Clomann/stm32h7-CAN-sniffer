@@ -123,7 +123,8 @@ uint8_t MMCAdapter_CtrlSync(void)
 
 uint8_t MMCAdapter_GetSectorCount(void *buff)
 {
-    uint32_t SectorCount;
+    LBA_t SectorCount;
+    uint64_t RawSectorCount;
 
     if (NULL == buff || 0 == Csd_Sd1.cSize)
     {
@@ -135,7 +136,15 @@ uint8_t MMCAdapter_GetSectorCount(void *buff)
     {
         // CSD v2.0
         // SectorCount = (cSize + 1) * 1024; Capacity = SectorCount * 512 bytes
-        SectorCount = (Csd_Sd1.cSize + 1) * 1024;
+        RawSectorCount = ((uint64_t)Csd_Sd1.cSize + 1U) * 1024U;
+
+        if (RawSectorCount > (uint64_t)(LBA_t)-1)
+        {
+            // Doesn't fit in this build's LBA_t
+            return RES_ERROR;
+        }
+
+        SectorCount = (LBA_t)RawSectorCount;
         memcpy(buff, &SectorCount, sizeof(SectorCount));
 
         return RES_OK;
