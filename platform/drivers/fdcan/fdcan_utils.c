@@ -110,7 +110,7 @@ uint8_t CANFD_CalculateBitTimingRegister(
         MaxTq = 512U;
     }
 
-    for (uint8_t tq_num = MaxTq; tq_num >= 8; tq_num--)
+    for (uint32_t tq_num = MaxTq; tq_num >= 8; tq_num--)
     {
         uint32_t total_tq_freq = bitrate * tq_num;
         uint32_t prescaler     = clock_hz / total_tq_freq;
