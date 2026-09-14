@@ -429,14 +429,19 @@ int fs_open_custom(struct fs_file *file, const char *name)
             return 0;
         }
 
-        (void)FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize);
+        if (FR_OK != FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize)
+            || FileSize > INT_MAX)
+        {
+            (void)FatFS_SD_CloseFile(&CanLogReadFileDevice);
+            return 0;
+        }
 
         CanLogReadFileDevice.readTargetSize = FileSize;
 
-        file->pextension     = &reqState;
-        file->data           = NULL;
-        file->len            = FileSize; // tell lwip the total file size
-        file->index          = 0;
+        file->pextension = &reqState;
+        file->data       = NULL;
+        file->len        = (int32_t)FileSize; // tell lwip the total file size
+        file->index      = 0;
         file->is_custom_file = 1;
 
         return 1;
