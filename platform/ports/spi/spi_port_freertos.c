@@ -5,6 +5,7 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
+#include <stdint.h>
 
 #ifndef MAX_SPI_INSTANCES /* tune to your MCU */
 #define MAX_SPI_INSTANCES 3
@@ -98,23 +99,24 @@ static inline SemaphoreHandle_t prvGetSem(SPI_HandleTypeDef *hspi)
 /* ---------- task-side: called after the DMA transfer is started ------ */
 comm_status_t Spi_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
-    BaseType_t res;
-
     (void)(hspi);
 
 #if SPI_PORT_USE_SEMAPHORE
     SemaphoreHandle_t xSem = prvGetSem(hspi);
-    configASSERT(xSem); /* forgot to register?   */
+    configASSERT(xSem); /* forgot to register? */
 
-    res = xSemaphoreTake(xSem, portMAX_DELAY);
-#else
-    ;
-    res = ulTaskNotifyTake(pdTRUE /*clearOnExit*/, portMAX_DELAY);
-#endif
-    if (res != pdTRUE)
+    if (xSemaphoreTake(xSem, portMAX_DELAY) != pdTRUE)
     {
-        return COMM_TIMEOUT; /* timeout (shouldn’t happen) */
+        return COMM_TIMEOUT; /* timeout (shouldn't happen) */
     }
+#else
+    /* TODO: takes from the calling task, but both ISR paths give to
+     * *pCanBridgeTaskHdl - any other caller blocks here forever */
+    if (0 == ulTaskNotifyTake(pdTRUE /*clearOnExit*/, portMAX_DELAY))
+    {
+        return COMM_TIMEOUT; /* timeout (shouldn't happen) */
+    }
+#endif
 
     return COMM_SUCCESS;
 }
