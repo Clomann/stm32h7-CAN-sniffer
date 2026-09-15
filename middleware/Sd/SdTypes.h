@@ -46,44 +46,42 @@ typedef union {
 } OCR_Register;
 
 /**
- * Card-Specific Data (CSD) register structure v. 2.0
+ * Decoded Card-Specific Data (CSD) register fields, v. 2.0
+ *
+ * \note This is a decoded view, not a memory overlay of the register: the
+ *       fields are extracted individually by SD_Spi_Csd2Bitfield(). The bit
+ *       ranges below refer to positions in the raw 128-bit register.
  *
  * \note Detailed information: http://problemkaputt.de/gbatek-dsi-sd-mmc-protocol-csd-register-128bit-card-specific-data-version-2-0.htm
  */
 typedef struct
 {
-    uint8_t csdStructure : 2; /*!< [127:126] CSD structure version */
-    uint8_t reserved1 : 6; /*!< [125:120] Reserved bits */
-    uint8_t taac : 8; /*!< [119:112] Data read access time 1 */
-    uint8_t nsac : 8; /*!< [111:104] Data read access time 2 in CLK cycles */
-    uint8_t tranSpeed : 8; /*!< [103:96] Max data transfer rate */
-    uint16_t ccc : 12; /*!< [95:84] Card command classes */
-    uint8_t readBlLen : 4; /*!< [83:80] Max read data block length */
-    uint8_t readBlPartial : 1; /*!< [79] Partial block read allowed */
-    uint8_t writeBlkMisalign : 1; /*!< [78] Write block misalignment */
-    uint8_t readBlkMisalign : 1; /*!< [77] Read block misalignment */
-    uint8_t dsrImp : 1; /*!< [76] DSR implemented */
-    uint8_t reserved2 : 6; /*!< [75:70] Reserved bits */
+    uint8_t csdStructure; /*!< [127:126] CSD structure version */
+    uint8_t taac; /*!< [119:112] Data read access time 1 */
+    uint8_t nsac; /*!< [111:104] Data read access time 2 in CLK cycles */
+    uint8_t tranSpeed; /*!< [103:96] Max data transfer rate */
+    uint16_t ccc; /*!< [95:84] Card command classes */
+    uint8_t readBlLen; /*!< [83:80] Max read data block length */
+    uint8_t readBlPartial; /*!< [79] Partial block read allowed */
+    uint8_t writeBlkMisalign; /*!< [78] Write block misalignment */
+    uint8_t readBlkMisalign; /*!< [77] Read block misalignment */
+    uint8_t dsrImp; /*!< [76] DSR implemented */
     uint32_t
-        cSize : 22; /*!< [69:48] Device size (memory capacity = (C_SIZE+1) * 512KByte) */
-    uint8_t reserved3 : 1;
-    uint8_t eraseBlkEn : 1; /*!< [46] Erase single block enable */
-    uint8_t sectorSize : 7; /*!< [45:39] Erase sector size */
-    uint8_t wpGrpSize : 7; /*!< [38:32] Write protect group size */
-    uint8_t wpGrpEnable : 1; /*!< [31] Write protect group enable */
-    uint8_t reserved4 : 2; /*!< [30:29] Reserved bits */
-    uint8_t r2wFactor : 3; /*!< [28:26] Write speed factor */
-    uint8_t writeBlLen : 4; /*!< [25:22] Max write block length */
-    uint8_t writeBlPartial : 1; /*!< [21] Partial block write allowed */
-    uint8_t reserved5 : 5; /*!< [20:16] Reserved bits */
-    uint8_t fileFormatGrp : 1; /*!< [15] File format group */
-    uint8_t copy : 1; /*!< [14] Copy flag */
-    uint8_t permWriteProtect : 1; /*!< [13] Permanent write protection */
-    uint8_t tempWriteProtect : 1; /*!< [12] Temporary write protection */
-    uint8_t fileFormat : 2; /*!< [11:10] File format */
-    uint8_t reserved6 : 2;
-    uint8_t crc : 7; /*!< [7:1] CRC checksum */
-    uint8_t always1 : 1; /*!< [0] Always 1 */
+        cSize; /*!< [69:48] Device size (memory capacity = (C_SIZE+1) * 512KByte) */
+    uint8_t eraseBlkEn; /*!< [46] Erase single block enable */
+    uint8_t sectorSize; /*!< [45:39] Erase sector size */
+    uint8_t wpGrpSize; /*!< [38:32] Write protect group size */
+    uint8_t wpGrpEnable; /*!< [31] Write protect group enable */
+    uint8_t r2wFactor; /*!< [28:26] Write speed factor */
+    uint8_t writeBlLen; /*!< [25:22] Max write block length */
+    uint8_t writeBlPartial; /*!< [21] Partial block write allowed */
+    uint8_t fileFormatGrp; /*!< [15] File format group */
+    uint8_t copy; /*!< [14] Copy flag */
+    uint8_t permWriteProtect; /*!< [13] Permanent write protection */
+    uint8_t tempWriteProtect; /*!< [12] Temporary write protection */
+    uint8_t fileFormat; /*!< [11:10] File format */
+    uint8_t crc; /*!< [7:1] CRC checksum */
+    uint8_t always1; /*!< [0] Always 1 */
 } SdCsdRegisterType;
 
 /**

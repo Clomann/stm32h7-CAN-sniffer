@@ -368,7 +368,7 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
         EXTRACT_CSD_BITS(buf, SD_CSD_TRAN_SPEED_MSK, SD_CSD_TRAN_SPEED_START);
     CccByte1 = EXTRACT_CSD_BITS(buf, SD_CSD_CCC1_MSK, SD_CSD_CCC1_START);
     CccByte0 = EXTRACT_CSD_BITS(buf, SD_CSD_CCC0_MSK, SD_CSD_CCC0_START);
-    out->ccc = (CccByte0 << 8U) | CccByte1;
+    out->ccc = (uint16_t)(((uint16_t)CccByte0 << 8U) | CccByte1);
     out->readBlLen =
         EXTRACT_CSD_BITS(buf, SD_CSD_READ_BL_LEN_MSK, SD_CSD_READ_BL_LEN_START);
     out->readBlPartial = EXTRACT_CSD_BITS(
@@ -385,7 +385,8 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
         EXTRACT_CSD_BITS(buf, SD_CSD_C_SIZE1_MSK, SD_CSD_C_SIZE1_START);
     CSizeByte2 =
         EXTRACT_CSD_BITS(buf, SD_CSD_C_SIZE2_MSK, SD_CSD_C_SIZE2_START);
-    out->cSize = (CSizeByte2 << 16U) | (CSizeByte1 << 8U) | (CSizeByte0);
+    out->cSize = ((uint32_t)CSizeByte2 << 16U) | ((uint32_t)CSizeByte1 << 8U)
+                 | (uint32_t)CSizeByte0;
     //	out->vddRCurrMin
     //	out->vddRCurrMax
     //	out->vddWCurrMin
@@ -399,7 +400,6 @@ static void SD_Spi_Csd2Bitfield(uint8_t *csd, SdCsdRegisterType *out)
         EXTRACT_CSD_BITS(buf, SD_CSD_SECTOR_SIZE_MSK, SD_CSD_SECTOR_SIZE_START);
     //	out->wpGrpSize = EXTRACT_CSD_BITS(buf, SD_CSD_, SD_CSD_FILE_);
     //	out->wpGrpEnable = EXTRACT_CSD_BITS(buf, SD_CSD_, SD_CSD_FILE_);
-    //	out->reserved3 = EXTRACT_CSD_BITS(buf, SD_CSD_, SD_CSD_FILE_);
     //	out->r2wFactor = EXTRACT_CSD_BITS(buf, SD_CSD_, SD_CSD_FILE_);
     //	out->writeBlLen = EXTRACT_CSD_BITS(buf, SD_CSD_, SD_CSD_FILE_);
     //	out->writeBlPartial = EXTRACT_CSD_BITS(buf, SD_CSD_, SD_CSD_FILE_);
