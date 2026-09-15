@@ -28,6 +28,8 @@
 #include "lwip/ethip6.h"
 #include "ethernetif.h"
 #include "lan8742.h"
+#include <assert.h>
+#include <stdint.h>
 #include <string.h>
 #include "lwip/tcpip.h"
 
@@ -1025,14 +1027,22 @@ void HAL_ETH_RxLinkCallback(
     struct pbuf **ppStart = (struct pbuf **)pStart;
     struct pbuf **ppEnd   = (struct pbuf **)pEnd;
     struct pbuf *p        = NULL;
+    RxBuff_t *rx          = NULL;
+    const size_t offset   = offsetof(
+        RxBuff_t,
+        buff
+    ); /* buff points to the buff member of an RxBuff_t object. */
 
-    /* Get the struct pbuf from the buff address. */
-    // p = (struct pbuf *)(buff - offsetof(RxBuff_t, buff));
-    RxBuff_t *rx = (RxBuff_t *)(buff - offsetof(RxBuff_t, buff));
-    p            = (struct pbuf *)&rx->pbuf_custom;
-    p->next      = NULL;
-    p->tot_len   = 0;
-    p->len       = Length;
+    assert((uintptr_t)buff >= offset);
+
+    uintptr_t base_addr = (uintptr_t)buff - offset;
+    assert((base_addr % _Alignof(RxBuff_t)) == 0U);
+
+    rx         = (RxBuff_t *)base_addr;
+    p          = (struct pbuf *)&rx->pbuf_custom;
+    p->next    = NULL;
+    p->tot_len = 0;
+    p->len     = Length;
 
     /* Chain the buffer. */
     if (!*ppStart)
@@ -1055,7 +1065,7 @@ void HAL_ETH_RxLinkCallback(
     }
 
     /* Invalidate data cache because Rx DMA's writing to physical memory makes it stale. */
-    SCB_InvalidateDCache_by_Addr((uint32_t *)buff, Length);
+    SCB_InvalidateDCache_by_Addr(buff, Length);
 
     /* USER CODE END HAL ETH RxLinkCallback */
 }

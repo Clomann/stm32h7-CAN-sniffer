@@ -21,6 +21,29 @@ enum
     TRANSFER_ERROR
 };
 
+/* --- D-cache maintenance ---------------------------------------------------
+ * SCB_*DCache_by_Addr() operate on 32-byte cache lines, so the address they
+ * are given must be 32-byte aligned. Carrying the alignment in the pointer type
+ * lets the compiler verify the cast.
+ */
+typedef uint8_t Spi_Aligned32Type __attribute__((aligned(32)));
+
+static inline void
+Spi_CleanDCacheByAddr(const Spi_Aligned32Type *addr, int32_t len)
+{
+    assert_param(((uintptr_t)addr & 31U) == 0U);
+
+    SCB_CleanDCache_by_Addr((uint32_t *)addr, len);
+}
+
+static inline void
+Spi_InvalidateDCacheByAddr(Spi_Aligned32Type *addr, int32_t len)
+{
+    assert_param(((uintptr_t)addr & 31U) == 0U);
+
+    SCB_InvalidateDCache_by_Addr(addr, len);
+}
+
 /* SPI handler declaration */
 static SPI_HandleTypeDef *pSpiHandle1;
 
@@ -191,7 +214,7 @@ comm_status_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     if (!is_in_dma_nocache((void *)aTxBuffer, len))
     {
-        SCB_CleanDCache_by_Addr((uint32_t *)aTxBuffer, len);
+        Spi_CleanDCacheByAddr(aTxBuffer, len);
     }
 
     RetVal = HAL_SPI_Transmit_DMA(handle, aTxBuffer, len);
@@ -216,7 +239,7 @@ comm_status_t Spi_Send(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     if (!is_in_dma_nocache((void *)aTxBuffer, len))
     {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)aTxBuffer, len);
+        Spi_InvalidateDCacheByAddr(aTxBuffer, len);
     }
 
     Spi_Unlock(0);
@@ -237,9 +260,12 @@ comm_status_t Spi_SendReceiveMsg(
 
     Spi_Lock(0);
 
+    /* TODO: pTxBuffer is caller-supplied and its 32-byte alignment is not
+     * enforced at this API boundary. Either bounce through aTxBuffer or reject
+     * unaligned input with a status code. */
     if (!is_in_dma_nocache((void *)pTxBuffer, TxBytes))
     {
-        SCB_CleanDCache_by_Addr((uint32_t *)pTxBuffer, TxBytes);
+        Spi_CleanDCacheByAddr(pTxBuffer, TxBytes);
     }
 
     RetVal = HAL_SPI_TransmitReceive_DMA(handle, pTxBuffer, aRxBuffer, TxBytes);
@@ -265,7 +291,7 @@ comm_status_t Spi_SendReceiveMsg(
 
     if (!is_in_dma_nocache((void *)aRxBuffer, TxBytes))
     {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)aRxBuffer, TxBytes);
+        Spi_InvalidateDCacheByAddr(aRxBuffer, TxBytes);
     }
 
     memcpy(pRxBuffer, aRxBuffer, TxBytes);
@@ -344,7 +370,7 @@ Spi_Receive(SPI_HandleTypeDef *handle, uint8_t *buffer, uint16_t len)
 
     if (!is_in_dma_nocache((void *)aRxBuffer, len))
     {
-        SCB_InvalidateDCache_by_Addr((uint32_t *)aRxBuffer, len);
+        Spi_InvalidateDCacheByAddr(aRxBuffer, len);
     }
 
     memcpy(buffer, aRxBuffer, len);

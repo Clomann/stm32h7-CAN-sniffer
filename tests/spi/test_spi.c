@@ -7,7 +7,7 @@
 #include "buffers.h"
 #include "spi_utils.h"
 
-extern RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio);
+extern RingBuffer *Spi_GetSlots(const void *const buf, SpiPriorityType prio);
 
 extern volatile int Spi_Init_return_value;
 extern volatile int Spi_Init_call_count;

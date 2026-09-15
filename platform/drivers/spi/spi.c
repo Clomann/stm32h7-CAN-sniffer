@@ -22,7 +22,7 @@ static SpiInstanceType spi_instances[SPI_MAX_INSTANCES] = {
 
 static CommInterface SpiInterface;
 
-RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio);
+RingBuffer *Spi_GetSlots(const void *const buf, SpiPriorityType prio);
 
 comm_status_t m_find_free(SpiInstanceType **handle)
 {
@@ -620,7 +620,7 @@ comm_status_t Spi_NotifyRxData(SPI_HandleTypeDef *hspi, uint8_t err)
     return res;
 }
 
-RingBuffer *Spi_GetSlots(const uint8_t *const buf, SpiPriorityType prio)
+RingBuffer *Spi_GetSlots(const void *const buf, SpiPriorityType prio)
 {
     SpiBinType *txBins;
 

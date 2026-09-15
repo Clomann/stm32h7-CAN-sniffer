@@ -38,14 +38,14 @@ typedef struct CommDriver
     void *instance;
     CommProtocolType protocol;
     CommDriverStatesType state;
-    uint8_t *RxFrameBuffer;
-    uint8_t *TxFrameBuffer;
+    void *RxFrameBuffer;
+    void *TxFrameBuffer;
 } CommDriver;
 
 comm_status_t CommManager_Init(
     CommDriver *drv,
     const void *cfg,
     size_t cfg_size,
-    uint8_t *tx,
-    uint8_t *rx
+    void *tx,
+    void *rx
 );

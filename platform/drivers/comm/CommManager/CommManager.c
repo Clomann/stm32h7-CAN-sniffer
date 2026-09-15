@@ -12,8 +12,8 @@ comm_status_t CommManager_Init(
     CommDriver *drv,
     const void *cfg,
     size_t cfg_size,
-    uint8_t *tx,
-    uint8_t *rx
+    void *tx,
+    void *rx
 )
 {
     const CommFactoryEntry *e = CommFactory_Find(drv->protocol);
