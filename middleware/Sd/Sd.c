@@ -739,14 +739,6 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
                         OcrByte = (buffer[0] << 24) | (buffer[1] << 16)
                                   | (buffer[2] << 8) | buffer[3];
                         SD_Spi_Ocr2Bitfield(OcrByte, &OcrResponse);
-                        if (IS_CARD_READY(OcrByte))
-                        {
-                            // card is a ver. 2.0 or later high capacity SD card (SDHC) or extended capacity SD card (SCXC)
-                        }
-                        else
-                        {
-                            // card is a ver. 2.0 or later standard capacity SD memory card
-                        }
                     }
                 }
             }
