@@ -1747,7 +1747,7 @@ FRESULT appCanLogHandlerInit(CanLogControlDataType *data)
 
     LogMetaData.epoch++;
 
-    CanLogBuffer_SetEpochCount(LogMetaData.epoch);
+    CanLogBuffer_SetEpochCount((uint8_t)LogMetaData.epoch);
 
     m_MetaDataStore(&LogMetaData);
 #endif
@@ -1840,7 +1840,7 @@ static void appCanLogFillEntry(
 
     entry->header.header_len = sizeof(entry->header);
     entry->header.type       = CLB_ENTRY_TYPE_FRAME;
-    entry->header.total_len  = sizeof(CanLogEntryType) + DataLen;
+    entry->header.total_len  = (uint8_t)(sizeof(CanLogEntryType) + DataLen);
     entry->timestamp         = (uint32_t)timestamp;
     entry->channel           = channel;
     entry->dlc_flags         = MAKE_DLC_FLAGS(Dlc, Flags);

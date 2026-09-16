@@ -54,7 +54,8 @@ void update_task_stats(void)
             g_task_stats[i].name[15]   = '\0';
             g_task_stats[i].runtime_us = task_array[i].ulRunTimeCounter;
             g_task_stats[i].percentage =
-                (task_array[i].ulRunTimeCounter * 100) / total_runtime;
+                (uint32_t)((task_array[i].ulRunTimeCounter * 100)
+                           / total_runtime);
         }
     }
 }

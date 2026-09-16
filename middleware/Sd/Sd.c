@@ -149,18 +149,18 @@ static uint8_t SD_Crc7(const uint8_t *data, uint8_t len)
 
         for (uint8_t i = 0; i < 8; i++)
         {
-            crc <<= 1;
+            crc = (uint8_t)(crc << 1);
 
             if ((d ^ crc) & 0x80)
             {
                 crc ^= 0x09;
             }
 
-            d <<= 1;
+            d = (uint8_t)(d << 1);
         }
     }
 
-    return (crc << 1) | 1; // append end bit
+    return (uint8_t)((crc << 1) | 1); // append end bit
 }
 
 static uint8_t
@@ -325,7 +325,7 @@ SD_Spi_CreateCommand(uint8_t cmd, uint32_t payload, uint8_t *buffer)
 static void SD_Spi_Ocr2Bitfield(uint32_t ocr, OCR_Register *out)
 {
     out->ccs             = (uint32_t)IS_CARD_SDHX(ocr);
-    out->cpusb           = (uint32_t)IS_CARD_READY(ocr);
+    out->cpusb           = (uint8_t)IS_CARD_READY(ocr);
     out->switching_1_8_V = (uint32_t)IS_SWITCH_1_8V(ocr);
     out->uhs_ii_card     = (uint32_t)IS_UHSII_CARD(ocr);
     out->voltage_2_7_2_8 = (uint32_t)IS_VOLTAGE_2_7_2_8(ocr);
@@ -839,9 +839,9 @@ static void SD_Spi_Cid2Fields(const uint8_t *raw, SdCidRegisterType *out)
                         | ((uint32_t)raw[11] << 8) | (uint32_t)raw[12];
 
     /* MDT spans bits [19:8]: year in [19:12] (offset from 2000), month [11:8]. */
-    out->manufacturingYear = (uint16_t)(2000U
-                                        + (((uint16_t)(raw[13] & 0x0FU) << 4)
-                                           | (uint16_t)(raw[14] >> 4)));
+    out->manufacturingYear  = (uint16_t)(2000U
+                                        + ((((uint32_t)raw[13] & 0x0FU) << 4)
+                                           | ((uint32_t)raw[14] >> 4)));
     out->manufacturingMonth = (uint8_t)(raw[14] & 0x0FU);
 }
 

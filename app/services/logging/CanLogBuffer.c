@@ -458,7 +458,7 @@ CanLogBuffer_ReadNextBlock(uint8_t **data, uint32_t *len, uint32_t *frame_count)
         BlockHeader.cnt         = BlockCount++;
         BlockHeader.epoch       = EpochCount;
 
-        BlockHeader.ingress_frames = CanLogBuffer_FrameCount1;
+        BlockHeader.ingress_frames = (uint32_t)CanLogBuffer_FrameCount1;
         BlockHeader.entries_count  = entries_count;
 
         memcpy(block_ptr, &BlockHeader, sizeof(BlockHeader));

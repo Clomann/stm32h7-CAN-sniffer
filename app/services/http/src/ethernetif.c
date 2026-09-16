@@ -1061,7 +1061,7 @@ void HAL_ETH_RxLinkCallback(
    * set to its own length, plus the length of all the following pbufs in the chain. */
     for (p = *ppStart; p != NULL; p = p->next)
     {
-        p->tot_len += Length;
+        p->tot_len = (u16_t)(p->tot_len + Length);
     }
 
     /* Invalidate data cache because Rx DMA's writing to physical memory makes it stale. */

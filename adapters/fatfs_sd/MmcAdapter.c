@@ -202,7 +202,7 @@ uint8_t MMCAdapter_GetBlockSize(void *buff)
     if (Csd_Sd1.csdStructure >= 1)
     {
         // CSD v2.0
-        BlockSize = 1 << Csd_Sd1.readBlLen;
+        BlockSize = (uint32_t)1U << Csd_Sd1.readBlLen;
         memcpy(buff, &BlockSize, sizeof(BlockSize));
 
         return RES_OK;

@@ -81,7 +81,8 @@ uint8_t ErrorRecorder_GetSnapshot(ErrorRecorderSnapshotType *snapshot)
     start = (RecentCount == ERROR_RECORDER_RECENT_COUNT) ? RecentNext : 0U;
     for (uint8_t i = 0U; i < RecentCount; i++)
     {
-        uint8_t index = (uint8_t)((start + i) % ERROR_RECORDER_RECENT_COUNT);
+        uint8_t index =
+            (uint8_t)((uint32_t)(start + i) % ERROR_RECORDER_RECENT_COUNT);
         snapshot->recent[i] = RecentErrors[index];
     }
 

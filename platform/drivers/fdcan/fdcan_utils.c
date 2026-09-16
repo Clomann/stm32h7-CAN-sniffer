@@ -35,11 +35,13 @@ uint16_t CANFD_GetPrescaler(const uint8_t reg_value[4], bool is_data_phase)
     uint32_t reg = CANFD_MergeRegisterFromArray(reg_value);
     if (is_data_phase)
     {
-        return ((reg & FDCAN_DBTP_DBRP_Msk) >> FDCAN_DBTP_DBRP_Pos) + 1;
+        return (uint16_t)(((reg & FDCAN_DBTP_DBRP_Msk) >> FDCAN_DBTP_DBRP_Pos)
+                          + 1);
     }
     else
     {
-        return ((reg & FDCAN_NBTP_NBRP_Msk) >> FDCAN_NBTP_NBRP_Pos) + 1;
+        return (uint16_t)(((reg & FDCAN_NBTP_NBRP_Msk) >> FDCAN_NBTP_NBRP_Pos)
+                          + 1);
     }
 }
 
@@ -48,7 +50,9 @@ uint8_t CANFD_GetSeg1(const uint8_t reg_value[4], bool is_data_phase)
     uint32_t reg = CANFD_MergeRegisterFromArray(reg_value);
     if (is_data_phase)
     {
-        return ((reg & FDCAN_DBTP_DTSEG1_Msk) >> FDCAN_DBTP_DTSEG1_Pos) + 1;
+        return (uint8_t)(((reg & FDCAN_DBTP_DTSEG1_Msk) >> FDCAN_DBTP_DTSEG1_Pos
+                         )
+                         + 1);
     }
     else
     {
@@ -61,11 +65,15 @@ uint8_t CANFD_GetSeg2(const uint8_t reg_value[4], bool is_data_phase)
     uint32_t reg = CANFD_MergeRegisterFromArray(reg_value);
     if (is_data_phase)
     {
-        return ((reg & FDCAN_DBTP_DTSEG2_Msk) >> FDCAN_DBTP_DTSEG2_Pos) + 1;
+        return (uint8_t)(((reg & FDCAN_DBTP_DTSEG2_Msk) >> FDCAN_DBTP_DTSEG2_Pos
+                         )
+                         + 1);
     }
     else
     {
-        return ((reg & FDCAN_NBTP_NTSEG2_Msk) >> FDCAN_NBTP_NTSEG2_Pos) + 1;
+        return (uint8_t)(((reg & FDCAN_NBTP_NTSEG2_Msk) >> FDCAN_NBTP_NTSEG2_Pos
+                         )
+                         + 1);
     }
 }
 
@@ -74,11 +82,13 @@ uint8_t CANFD_GetSJW(const uint8_t reg_value[4], bool is_data_phase)
     uint32_t reg = CANFD_MergeRegisterFromArray(reg_value);
     if (is_data_phase)
     {
-        return ((reg & FDCAN_DBTP_DSJW_Msk) >> FDCAN_DBTP_DSJW_Pos) + 1;
+        return (uint8_t)(((reg & FDCAN_DBTP_DSJW_Msk) >> FDCAN_DBTP_DSJW_Pos)
+                         + 1);
     }
     else
     {
-        return ((reg & FDCAN_NBTP_NSJW_Msk) >> FDCAN_NBTP_NSJW_Pos) + 1;
+        return (uint8_t)(((reg & FDCAN_NBTP_NSJW_Msk) >> FDCAN_NBTP_NSJW_Pos)
+                         + 1);
     }
 }
 
