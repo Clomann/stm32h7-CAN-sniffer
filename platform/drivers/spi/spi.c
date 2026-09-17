@@ -306,7 +306,7 @@ __attribute__((weak)) void SPI_ErrorHandler(void)
     ;
 }
 
-void SPI_InitTask()
+void SPI_InitTask(void)
 {
 }
 

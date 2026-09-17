@@ -165,7 +165,7 @@ enum SD_Spi_Commands
 uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload);
 uint8_t SD_Spi_PowerUp(void);
 uint8_t SD_Spi_Initialize(uint8_t);
-uint8_t SD_Spi_WaitTillIdle();
+uint8_t SD_Spi_WaitTillIdle(void);
 uint8_t SD_Spi_GoIdleState(Spi_R1Response *pResponse);
 uint8_t SD_Spi_SendIfCond(Spi_R1Response *pResponse);
 uint8_t SD_Spi_SendApp(Spi_R1Response *pResponse);

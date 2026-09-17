@@ -150,7 +150,7 @@ void Instrumentation_ErrorHandlerHook(ErrorContextType *context)
 }
 #endif
 
-void SettingsHandler_ApplyRequestCallback()
+void SettingsHandler_ApplyRequestCallback(void)
 {
     AppCtrlData.applyConfig = 1;
 }

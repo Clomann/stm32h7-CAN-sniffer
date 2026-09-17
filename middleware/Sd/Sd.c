@@ -478,7 +478,7 @@ uint8_t SD_Spi_PowerUp(void)
     return 0;
 }
 
-uint8_t SD_Spi_WaitTillIdle()
+uint8_t SD_Spi_WaitTillIdle(void)
 {
     uint8_t RetVal  = 1;
     uint8_t counter = 0;

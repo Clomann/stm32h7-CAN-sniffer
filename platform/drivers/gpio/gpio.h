@@ -29,4 +29,4 @@ int32_t GPIO_Dbg_Toggle(uint32_t nbr);
 
 int32_t GPIO_Dbg_GetState(uint32_t nbr);
 
-int32_t GPIO_Mco1_Init();
+int32_t GPIO_Mco1_Init(void);

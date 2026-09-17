@@ -42,4 +42,4 @@ int SettingsHandler_CreateJsonString(
 );
 
 /* Shim functions needed to be implemented by the caller */
-void SettingsHandler_ApplyRequestCallback();
+void SettingsHandler_ApplyRequestCallback(void);

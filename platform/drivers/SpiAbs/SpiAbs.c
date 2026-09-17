@@ -141,7 +141,7 @@ static SPI_HandleTypeDef *m_GetHandle(enum SPIABS_DEVICE dev)
     return hdl;
 }
 
-void Spi_ErrorHandler()
+void Spi_ErrorHandler(void)
 {
     SpiAbs_ErrorHandler();
 }

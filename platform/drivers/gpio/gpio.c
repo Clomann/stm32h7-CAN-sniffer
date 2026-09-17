@@ -57,7 +57,7 @@ int32_t GPIO_Dbg_Init(uint32_t nbr)
     return ret;
 }
 
-int32_t GPIO_Mco1_Init()
+int32_t GPIO_Mco1_Init(void)
 {
     int32_t ret = BSP_ERROR_NONE;
     GPIO_InitTypeDef gpio_init_structure;
