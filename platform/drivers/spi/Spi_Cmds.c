@@ -110,7 +110,7 @@ static inline uint8_t is_in_dma_nocache(const void *addr, size_t len)
                      && (end < (uintptr_t)&__dma_buffers_end));
 }
 
-uint8_t m_GetRccInstance(SPI_HandleTypeDef *handle, uint64_t *instance)
+static uint8_t m_GetRccInstance(SPI_HandleTypeDef *handle, uint64_t *instance)
 {
     uint8_t res = 0;
 
@@ -540,18 +540,18 @@ comm_status_t Spi_goHighSpeed(SPI_HandleTypeDef *handle)
     return m_HalToComm(hal_res);
 }
 
-comm_status_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
+static comm_status_t m_NotifyTransferIssued(SPI_HandleTypeDef *hspi)
 {
     return Spi_NotifyTransferIssued(hspi);
 }
 
-comm_status_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
+static comm_status_t m_NotifyTransferComplete(SPI_HandleTypeDef *hspi)
 {
     Spi_NotifyTransferComplete(hspi);
     return COMM_SUCCESS;
 }
 
-comm_status_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
+static comm_status_t m_NotifyTransferError(SPI_HandleTypeDef *hspi)
 {
     Spi_NotifyTransferError(hspi);
     return COMM_SUCCESS;

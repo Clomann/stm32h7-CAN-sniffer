@@ -24,7 +24,7 @@ static CommInterface SpiInterface;
 
 RingBuffer *Spi_GetSlots(const void *const buf, SpiPriorityType prio);
 
-comm_status_t m_find_free(SpiInstanceType **handle)
+static comm_status_t m_find_free(SpiInstanceType **handle)
 {
     comm_status_t res = COMM_ERROR;
 
@@ -306,10 +306,6 @@ __attribute__((weak)) void SPI_ErrorHandler(void)
     ;
 }
 
-void SPI_InitTask(void)
-{
-}
-
 void SPI_Poll(CommDriver *drv)
 {
     comm_status_t res = COMM_ERROR;
@@ -505,7 +501,7 @@ void SPI_Poll(CommDriver *drv)
     ring_buffer_pop_ptr(txSlots);
 }
 
-CommDriver *m_FindCorrespondingDriver(SPI_HandleTypeDef *hspi)
+static CommDriver *m_FindCorrespondingDriver(SPI_HandleTypeDef *hspi)
 {
     uint32_t index;
     CommDriver *pDrv;

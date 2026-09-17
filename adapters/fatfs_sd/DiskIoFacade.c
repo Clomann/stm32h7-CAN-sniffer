@@ -65,6 +65,7 @@ __attribute__((weak)) void MMC_ErrorHandler(ErrorContextType *context)
     __asm volatile("nop");
 }
 
+#if !FF_FS_READONLY && !FF_FS_NORTC
 /**
   * @brief  Gets Time from RTC (generated when FS_NORTC==0; see ff.c)
   * @param  None
@@ -76,6 +77,7 @@ DWORD get_fattime(void)
     return 0;
     /* USER CODE END get_fattime */
 }
+#endif
 
 uint8_t MMC_disk_status(void)
 {

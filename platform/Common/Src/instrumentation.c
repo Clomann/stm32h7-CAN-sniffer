@@ -73,6 +73,7 @@ void FileHandler_InstrumentationWriteEndHook(void);
 void CanLogManager_InstrumentationFlushStartHook(void);
 void CanLogManager_InstrumentationFlushEndHook(void);
 void CanLogManager_DrainPortStartHook(void);
+void CanLogManager_DrainPortEndHook(void);
 void FdcanMsgPort_InstrumentationUsedBytesHook(uint32_t used_bytes);
 void CanLogManager_InstrumentationFdcanMsgPortPeakHook(
     uint32_t timestamp_us,

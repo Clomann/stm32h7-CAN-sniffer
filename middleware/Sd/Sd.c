@@ -454,7 +454,7 @@ uint8_t SD_Spi_SendCommand(uint8_t cmd, uint32_t payload)
     return res;
 }
 
-uint8_t
+static uint8_t
 SD_Spi_SendCommandPollResponse(uint8_t cmd, uint32_t payload, uint8_t *resp)
 {
     // assert chip select
@@ -631,13 +631,6 @@ uint8_t SD_Spi_ReadOCR(Spi_R1Response *pResponse)
     // deassert chip select
 
     SpiAbs_CsDisable(SPIABS_DEVICE_1);
-
-    return 0;
-}
-
-uint8_t SD_Spi_SendCSDRequest(Spi_R1Response *pResponse)
-{
-    SD_Spi_SendCommandPollResponse(SD_SPI_CMD9, 0x00000000, &pResponse->byte);
 
     return 0;
 }

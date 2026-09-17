@@ -84,3 +84,7 @@ int FileHandler_GetValue(
 int FileHandler_ConvertToInteger(char *data, uint32_t *val, uint8_t base);
 
 void FileHandler_ErrorHandler(ErrorContextType *context);
+
+/* Weak instrumentation hooks, overridable by the application layer. */
+void FileHandler_InstrumentationWriteStartHook(void);
+void FileHandler_InstrumentationWriteEndHook(void);

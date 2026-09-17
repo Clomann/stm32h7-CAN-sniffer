@@ -1,6 +1,6 @@
 #include "gpio.h"
 
-int32_t m_check_pin(uint32_t nbr)
+static int32_t m_check_pin(uint32_t nbr)
 {
     int32_t ret = 0;
 

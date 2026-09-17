@@ -22,6 +22,7 @@
 #include "fdcan.h"
 #include "fs_custom.h"
 #include "timer.h"
+#include "DiskIoFacade.h"
 #include "gpio.h"
 #include "httpd_post.h"
 #include "core_json.h"
@@ -85,22 +86,22 @@ void SpiTask_ErrorHandlerHook(void)
     Error_Handler();
 }
 
-void CANCONTROL_ErrorHandlerHook()
+void CANCONTROL_ErrorHandlerHook(void)
 {
     Error_Handler();
 }
 
-void CanLogFileManager_ErrorHandler()
+void CanLogFileManager_ErrorHandler(void)
 {
     Error_Handler();
 }
 
-void FDCAN_ErrorHandler()
+void FDCAN_ErrorHandler(void)
 {
     Error_Handler();
 }
 
-void TIM_ErrorHandler()
+void TIM_ErrorHandler(void)
 {
     Error_Handler();
 }

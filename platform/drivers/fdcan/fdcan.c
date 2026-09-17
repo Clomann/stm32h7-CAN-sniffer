@@ -49,7 +49,7 @@ CommDriverConfigType Can1Cfg;
 /* Private function prototypes -----------------------------------------------*/
 comm_status_t FDCAN_Ioctl(CommDriver *handle, int cmd, void *argument);
 
-comm_status_t fdcan_find_free(FdcanInstanceType **handle)
+static comm_status_t fdcan_find_free(FdcanInstanceType **handle)
 {
     comm_status_t res = COMM_ERROR;
 
@@ -82,7 +82,7 @@ comm_status_t fdcan_get_can(CommDriver *dev, FDCAN_HandleTypeDef **fdcan)
     return COMM_SUCCESS;
 }
 
-comm_status_t
+static comm_status_t
 fdcan_get_handle(FDCAN_GlobalTypeDef *fdcan, FdcanInstanceType **handle)
 {
     if (NULL == fdcan)
@@ -1332,7 +1332,7 @@ static inline void gpio_clk_enable(GPIO_TypeDef *port)
 #endif
 }
 
-HAL_StatusTypeDef FDCAN_GpioClck(FDCAN_GlobalTypeDef *fdcan)
+static HAL_StatusTypeDef FDCAN_GpioClck(FDCAN_GlobalTypeDef *fdcan)
 {
     HAL_StatusTypeDef res;
 
@@ -1356,7 +1356,7 @@ HAL_StatusTypeDef FDCAN_GpioClck(FDCAN_GlobalTypeDef *fdcan)
     return res;
 }
 
-HAL_StatusTypeDef FDCAN_InitGpio(FDCAN_GlobalTypeDef *fdcan)
+static HAL_StatusTypeDef FDCAN_InitGpio(FDCAN_GlobalTypeDef *fdcan)
 {
     HAL_StatusTypeDef res;
 
@@ -1398,7 +1398,7 @@ HAL_StatusTypeDef FDCAN_InitGpio(FDCAN_GlobalTypeDef *fdcan)
     return res;
 }
 
-HAL_StatusTypeDef FDCAN_Nvic(FDCAN_GlobalTypeDef *fdcan)
+static HAL_StatusTypeDef FDCAN_Nvic(FDCAN_GlobalTypeDef *fdcan)
 {
     HAL_StatusTypeDef res;
 
@@ -1580,7 +1580,7 @@ comm_status_t fdcan_init_tx_header(
     return RetVal;
 }
 
-comm_status_t ram_usage(FDCAN_GlobalTypeDef *fdcan, uint32_t *size)
+static comm_status_t ram_usage(FDCAN_GlobalTypeDef *fdcan, uint32_t *size)
 {
     comm_status_t res;
 

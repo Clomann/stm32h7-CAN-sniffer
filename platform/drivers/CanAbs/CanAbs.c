@@ -443,7 +443,7 @@ static void CanAbs_ClearRxFifo0IrqIfEmpty(CommDriver *driver)
 }
 #endif
 
-int CanAbs_Init(
+static int CanAbs_Init(
     CommDriver *dev,
     CommDriverConfigType *cfg,
     uint8_t *tx,
@@ -470,35 +470,35 @@ int CanAbs_Init(
     return (int)res;
 }
 
-int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrameType *frame)
+static int CanAbs_Receive(CommDriver *dev, FDCAN_ClassicFrameType *frame)
 {
     return (int
     )ring_buffer_pop((RingBuffer *)dev->RxFrameBuffer, (void *)frame);
 }
 
-comm_status_t CanAbs_Send(CommDriver *dev, FDCAN_Message *msg)
+static comm_status_t CanAbs_Send(CommDriver *dev, FDCAN_Message *msg)
 {
     return dev->interface->send(dev, msg);
 }
 
-comm_status_t CanAbs_Start(CommDriver *dev)
+static comm_status_t CanAbs_Start(CommDriver *dev)
 {
     uint32_t val = 1;
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_START, &val);
 }
 
-comm_status_t CanAbs_Stop(CommDriver *dev)
+static comm_status_t CanAbs_Stop(CommDriver *dev)
 {
     uint32_t val = 1;
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_STOP, &val);
 }
 
-comm_status_t CanAbs_SetBaudrate(CommDriver *dev, uint32_t baudrate)
+static comm_status_t CanAbs_SetBaudrate(CommDriver *dev, uint32_t baudrate)
 {
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_BAUDRATE, &baudrate);
 }
 
-comm_status_t CanAbs_SetMode(CommDriver *dev, uint32_t mode)
+static comm_status_t CanAbs_SetMode(CommDriver *dev, uint32_t mode)
 {
     return dev->interface->ioctl(dev, CANABS_IOCTL_CMD_SET_MODE, &mode);
 }
@@ -618,7 +618,7 @@ void CANABS_CheckIsrPollPeriod(uint64_t timestamp, uint64_t timerPeriod)
 #endif
 }
 
-void NotifyConsumerTask(void)
+static void NotifyConsumerTask(void)
 {
     CanAbs_RxNotificationCallback();
 }

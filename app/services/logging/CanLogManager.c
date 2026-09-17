@@ -2108,7 +2108,7 @@ void SdBridgeTask_ActionHook(void)
     } while (0U != block_ready);
 }
 
-CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
+static CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
 {
     CanLogResult res = CAN_LOG_OK;
     uint8_t Dlc;
@@ -2185,7 +2185,8 @@ CanLogResult m_ComputeFrameBits(CanLogEntryType *frame, uint32_t *bits)
     return res;
 }
 
-CanLogResult m_ComputeBusLoad(CanStatusDataType *can, CanLogEntryType *frame)
+static CanLogResult
+m_ComputeBusLoad(CanStatusDataType *can, CanLogEntryType *frame)
 {
     CanLogResult res   = CAN_LOG_OK;
     float Period       = 0.0f; // in seconds
@@ -2257,17 +2258,19 @@ CanLogResult m_ComputeBusLoad(CanStatusDataType *can, CanLogEntryType *frame)
     return res;
 }
 
-CanLogResult m_ComputeBusLoad1(CanStatusDataType *can, CanLogEntryType *frame)
+static CanLogResult
+m_ComputeBusLoad1(CanStatusDataType *can, CanLogEntryType *frame)
 {
     return m_ComputeBusLoad(can, frame);
 }
 
-CanLogResult m_ComputeBusLoad2(CanStatusDataType *can, CanLogEntryType *frame)
+static CanLogResult
+m_ComputeBusLoad2(CanStatusDataType *can, CanLogEntryType *frame)
 {
     return m_ComputeBusLoad(can, frame);
 }
 
-void m_DecayBusLoad(CanStatusDataType *can, uint32_t currentTime)
+static void m_DecayBusLoad(CanStatusDataType *can, uint32_t currentTime)
 {
     int64_t TimeDiff;
 

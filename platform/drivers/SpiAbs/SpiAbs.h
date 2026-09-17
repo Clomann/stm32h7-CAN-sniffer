@@ -53,3 +53,6 @@ void SpiAbs_Task(void *parameters);
 void __attribute__((weak)) SpiAbs_TaskControlCallback(uint32_t timeout);
 
 void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback(void);
+
+/* Defined in SpiAbs.c, called from the SPI port layer. */
+void Spi_ErrorHandler(void);

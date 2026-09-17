@@ -8,7 +8,7 @@
 TIM_HandleTypeDef TimHandle;
 TIM_HandleTypeDef TimHalHandle; /* timer used to feed HAL tick */
 
-uint32_t GetTimerMaxARR(TIM_TypeDef *htim)
+static uint32_t GetTimerMaxARR(TIM_TypeDef *htim)
 {
     if (htim == TIM2 || htim == TIM5)
     {
@@ -20,7 +20,7 @@ uint32_t GetTimerMaxARR(TIM_TypeDef *htim)
     }
 }
 
-uint32_t GetTimerInputClock(TIM_TypeDef *htim)
+static uint32_t GetTimerInputClock(TIM_TypeDef *htim)
 {
     RCC_ClkInitTypeDef clkconfig;
     uint32_t flash_latency;
@@ -64,7 +64,7 @@ uint32_t GetTimerInputClock(TIM_TypeDef *htim)
  * 
  * @return uint8_t        0 if successful, 1 if no suitable values were found.
  */
-uint8_t ComputePrescalerAndARR(
+static uint8_t ComputePrescalerAndARR(
     uint32_t timer_clk,
     uint64_t target_freq,
     uint32_t max_arr,

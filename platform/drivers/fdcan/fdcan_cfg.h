@@ -111,8 +111,11 @@
 #define FDCAN_1_RX_AF        GPIO_AF9_FDCAN1
 
 /* Definition for FDCAN1's NVIC IRQ and IRQ Handlers */
-#define FDCAN_1_IRQn          FDCAN1_IT0_IRQn
-#define FDCAN_1_IRQHandler    FDCAN1_IT0_IRQHandler
+#define FDCAN_1_IRQn       FDCAN1_IT0_IRQn
+#define FDCAN_1_IRQHandler FDCAN1_IT0_IRQHandler
+
+/* Defined via the FDCAN_1_IRQHandler macro in fdcan.c. */
+void FDCAN_1_IRQHandler(void);
 #define FDCAN_1_TX_IRQn       FDCAN1_IT1_IRQn
 #define FDCAN_1_TX_IRQHandler FDCAN1_IT1_IRQHandler
 
@@ -133,8 +136,11 @@
 #define FDCAN_2_RX_AF        GPIO_AF9_FDCAN2
 
 /* Definition for FDCAN2's NVIC IRQ and IRQ Handlers */
-#define FDCAN_2_IRQn          FDCAN2_IT0_IRQn
-#define FDCAN_2_IRQHandler    FDCAN2_IT0_IRQHandler
+#define FDCAN_2_IRQn       FDCAN2_IT0_IRQn
+#define FDCAN_2_IRQHandler FDCAN2_IT0_IRQHandler
+
+/* Defined via the FDCAN_2_IRQHandler macro in fdcan.c. */
+void FDCAN_2_IRQHandler(void);
 #define FDCAN_2_TX_IRQn       FDCAN2_IT1_IRQn
 #define FDCAN_2_TX_IRQHandler FDCAN2_IT1_IRQHandler
 

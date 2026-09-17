@@ -54,6 +54,9 @@
 #define SPI1_IRQn       SPI1_IRQn
 #define SPI1_IRQHandler SPI1_IRQHandler
 
+/* Defined via the SPI1_IRQHandler macro in Spi_Cmds.c. */
+void SPI1_IRQHandler(void);
+
 #define CS_ACTIVE_HIGH 0
 
 #ifndef SPI_USE_RTOS

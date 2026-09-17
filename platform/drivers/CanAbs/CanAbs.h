@@ -81,3 +81,7 @@ uint64_t CANABS_ConvertCountToTimestampHook(uint32_t cnt);
   * @note This function runs in the ISR context. 
   */
 void CanAbs_RxNotificationCallback(void);
+
+/* Weak instrumentation hooks, overridable by the application layer. */
+void CanAbs_InstrumentationIsrStartHook(void);
+void CanAbs_InstrumentationIsrEndHook(void);

@@ -6,6 +6,9 @@
 #define DEFERRED_IRQn       UART5_IRQn
 #define DEFERRED_IRQHandler UART5_IRQHandler
 
+/* Defined via the DEFERRED_IRQHandler macro in CanBridgeTask.c. */
+void DEFERRED_IRQHandler(void);
+
 #define CORE0_TASK0_FUNCTION CanBridgeTask
 #define CORE0_TASK1_FUNCTION CanSendTask
 #define CORE0_TASK2_FUNCTION Core0Task0Main

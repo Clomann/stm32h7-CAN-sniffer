@@ -436,40 +436,6 @@ int SettingsHandler_ParseConfig(char *buffer, uint32_t len, AppConfigType *cfg)
     }
 }
 
-int FatFS_SD_LoadConfig(FatFsDeviceType *dev, char *data, uint32_t *len)
-{
-    FRESULT fr;
-    FATFS FatFs;
-    UINT BytesRead    = 0U;
-    uint32_t FileSize = 0U;
-
-    fr = f_mount(
-        &FatFs,
-        SETTINGSHANDLER_PARTITION_NO,
-        0U
-    ); /* Give a work area to the default drive */
-
-    if (fr == FR_OK)
-    {
-        fr = f_open(
-            &dev->file,
-            SETTINGSHANDLER_PARTITION_NO "conf.txt",
-            FA_READ | FA_OPEN_EXISTING
-        ); /* Create a file */
-    }
-
-    if (fr == FR_OK)
-    {
-        FileSize = f_size(&dev->file);
-        f_read(&dev->file, data, FileSize, &BytesRead);
-        fr = f_close(&dev->file); /* Close the file */
-    }
-
-    *len = BytesRead;
-
-    return fr;
-}
-
 uint8_t SettingsHandler_Init(AppConfigType *cfg)
 {
     AppSettings = cfg;

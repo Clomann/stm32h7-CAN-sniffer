@@ -413,7 +413,7 @@ typedef struct
 } SpiSendReceiveContextType;
 
 /* Dummy function so that SPI driver doesnt drop the Rx slot internally  */
-void SpiAbs_SendReceiveMsgCallback(
+static void SpiAbs_SendReceiveMsgCallback(
     void *context,
     uint32_t status,
     const uint8_t *rx_data,
@@ -613,7 +613,7 @@ uint8_t SpiAbs_Receive_Spi1_Task0(uint8_t *data, uint16_t bytes)
     return res;
 }
 
-uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse);
+static uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse);
 
 uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t *pResponse)
 {
@@ -629,7 +629,7 @@ uint8_t SpiAbs_PollForResponse(enum SPIABS_DEVICE dev, uint8_t *pResponse)
     return m_PollForResponse(hdl, pResponse);
 }
 
-uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
+static uint8_t m_PollForResponse(SPI_HandleTypeDef *handle, uint8_t *pResponse)
 {
     uint8_t res;
     CommDriver *pDrv;

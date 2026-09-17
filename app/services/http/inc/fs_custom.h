@@ -138,3 +138,12 @@ uint8_t FsCustom_SetDebugProvider(const FsCustomDebugProviderType *provider);
 
 uint8_t FsCustom_IsTracerRunning(uint8_t *running);
 _Bool FsCustom_IsAnyFrameLostFlag(void);
+
+/* lwIP httpd custom-file hooks.
+ * Defined in fs_custom.c and called from lwIP's own fs.c, so these must keep
+ * external linkage. The vendored lwIP copy under libs/STM32_HAL is too old to
+ * declare them in lwip/apps/fs.h, hence the prototypes here. */
+struct fs_file;
+int fs_open_custom(struct fs_file *file, const char *name);
+int fs_read_custom(struct fs_file *file, char *buffer, int count);
+void fs_close_custom(struct fs_file *file);

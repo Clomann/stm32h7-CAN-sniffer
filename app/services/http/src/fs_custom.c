@@ -1258,18 +1258,6 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
 #define CAN_LOG_BUFFER_SIZE 8U
 
-void fs_state_free(struct fs_file *file, void *state)
-{
-    LWIP_UNUSED_ARG(file);
-    if (state != NULL)
-    {
-        if (state == &reqState)
-        {
-            (void)FatFS_SD_CloseFile(&CanLogReadFileDevice);
-        }
-    }
-}
-
 int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
     FRESULT fr;
