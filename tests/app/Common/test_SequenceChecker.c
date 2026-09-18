@@ -130,7 +130,7 @@ void RunAllTests(void)
     RUN_TEST(test_SequenceChecker_DuplicateFrames);
 }
 
-void test_SequenceChecker()
+void test_SequenceChecker(void)
 {
     RunAllTests();
 }

@@ -427,7 +427,7 @@ static void CanLogManager_UpdateRb1BytesHighWater(void)
     }
 }
 
-void __attribute__((weak)) CanLogFileManager_ErrorHandler()
+void __attribute__((weak)) CanLogFileManager_ErrorHandler(void)
 {
     __asm volatile("nop");
 }

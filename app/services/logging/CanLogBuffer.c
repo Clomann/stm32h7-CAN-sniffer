@@ -16,7 +16,7 @@ static const uint8_t PaddingChunk[32] = {
 };
 static const uint8_t HeaderPlaceholder[sizeof(CanLogBlockHeaderType)] = {0};
 
-uint8_t CanLogBuffer_Init()
+uint8_t CanLogBuffer_Init(void)
 {
     return lwrb_init(&Rb1, CanLogBuf1, sizeof(CanLogBuf1));
 }

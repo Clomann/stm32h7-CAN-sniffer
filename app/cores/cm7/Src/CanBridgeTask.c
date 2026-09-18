@@ -10,7 +10,7 @@
 
 TASK_VARIABLES(CORE0_TASK0_FUNCTION, CORE0_TASK0_STACK_SIZE)
 
-void CanBridgeTaskInit()
+void CanBridgeTaskInit(void)
 {
     HAL_NVIC_SetPriority(
         DEFERRED_IRQn,
@@ -83,7 +83,7 @@ void DEFERRED_IRQHandler(void)
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void CanAbs_RxNotificationCallback()
+void CanAbs_RxNotificationCallback(void)
 {
     __DSB(); /* ensure writes complete */
     HAL_NVIC_SetPendingIRQ(DEFERRED_IRQn);

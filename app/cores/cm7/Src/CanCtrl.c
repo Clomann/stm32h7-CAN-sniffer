@@ -171,7 +171,7 @@ void TIM_InterruptCallback(void)
     CANABS_CheckIsrPollPeriod(Time, Period);
 }
 
-void TIM_HAL_InterruptCallback()
+void TIM_HAL_InterruptCallback(void)
 {
     HAL_IncTick();
 }

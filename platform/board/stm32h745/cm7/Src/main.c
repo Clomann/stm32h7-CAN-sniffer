@@ -62,7 +62,7 @@ static void CPU_CACHE_Enable(void);
 
 /* Private functions ---------------------------------------------------------*/
 
-void Tasks_ErrorHandler()
+void Tasks_ErrorHandler(void)
 {
     Error_Handler();
 }

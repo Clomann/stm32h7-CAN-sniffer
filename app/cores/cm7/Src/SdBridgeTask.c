@@ -9,7 +9,7 @@
 
 TASK_VARIABLES(CORE0_TASK5_FUNCTION, CORE0_TASK5_STACK_SIZE)
 
-void SdBridgeTask_Init()
+void SdBridgeTask_Init(void)
 {
 
     TASK_CREATE_STATIC(
@@ -45,7 +45,7 @@ void SdBridgeTask(void *arg)
     }
 }
 
-void SdBridgeTask_Notify()
+void SdBridgeTask_Notify(void)
 {
     if (NULL != SdBridgeTaskHdl)
     {

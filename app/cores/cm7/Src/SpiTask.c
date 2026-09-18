@@ -9,7 +9,7 @@
 
 TASK_VARIABLES(CORE0_TASK4_FUNCTION, CORE0_TASK4_STACK_SIZE)
 
-void SpiTask_Init()
+void SpiTask_Init(void)
 {
     TASK_CREATE_STATIC(
         CORE0_TASK4_FUNCTION,
@@ -18,7 +18,7 @@ void SpiTask_Init()
     );
 }
 
-void SpiTask_PortInit()
+void SpiTask_PortInit(void)
 {
     HAL_StatusTypeDef HalStatus;
 
@@ -33,7 +33,7 @@ void SpiTask_PortInit()
     SpiAbs_PwrOn(SPIABS_DEVICE_1);
 }
 
-void SpiAbs_PortDeInit()
+void SpiAbs_PortDeInit(void)
 {
     SpiAbs_PwrOff(SPIABS_DEVICE_1);
 }
@@ -57,7 +57,7 @@ void SpiAbs_TaskControlCallback(uint32_t timeout)
     ulTaskNotifyTake(pdTRUE, timeout);
 }
 
-void SpiAbs_TaskSendReceiveCallback()
+void SpiAbs_TaskSendReceiveCallback(void)
 {
     if (SpiTaskHdl != NULL)
     {

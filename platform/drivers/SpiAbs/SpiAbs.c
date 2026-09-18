@@ -146,7 +146,7 @@ void Spi_ErrorHandler(void)
     SpiAbs_ErrorHandler();
 }
 
-void *SpiAbs_GetHandle_Spi1()
+void *SpiAbs_GetHandle_Spi1(void)
 {
     SPI_HandleTypeDef *hdl;
 
@@ -155,7 +155,7 @@ void *SpiAbs_GetHandle_Spi1()
     return (void *)hdl;
 }
 
-uint8_t SpiAbs_Init_Spi1()
+uint8_t SpiAbs_Init_Spi1(void)
 {
     uint8_t res;
 
@@ -924,7 +924,7 @@ void SpiAbs_Task(void *parameters)
 //     (void) timeout;
 // }
 
-// void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback()
+// void __attribute__((weak)) SpiAbs_TaskSendReceiveCallback(void)
 // {
 //     ;
 // }

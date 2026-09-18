@@ -788,7 +788,7 @@ void RunAllTests(void)
     RUN_TEST(test_ErrorHandling_FileOpenFailure);
 }
 
-void test_CanLogBuffer()
+void test_CanLogBuffer(void)
 {
     RunAllTests();
 }

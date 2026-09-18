@@ -931,12 +931,12 @@ comm_status_t CanAbs_Receive_Can1(FDCAN_ClassicFrameType *frame)
     return CanAbs_Receive(&Fdcan1Driver, frame);
 }
 
-comm_status_t CanAbs_Start_Can1()
+comm_status_t CanAbs_Start_Can1(void)
 {
     return CanAbs_Start(&Fdcan1Driver);
 }
 
-comm_status_t CanAbs_Stop_Can1()
+comm_status_t CanAbs_Stop_Can1(void)
 {
     return CanAbs_Stop(&Fdcan1Driver);
 }
@@ -996,12 +996,12 @@ comm_status_t CanAbs_Receive_Can2(FDCAN_ClassicFrameType *frame)
     return CanAbs_Receive(&Fdcan2Driver, frame);
 }
 
-comm_status_t CanAbs_Start_Can2()
+comm_status_t CanAbs_Start_Can2(void)
 {
     return CanAbs_Start(&Fdcan2Driver);
 }
 
-comm_status_t CanAbs_Stop_Can2()
+comm_status_t CanAbs_Stop_Can2(void)
 {
     return CanAbs_Stop(&Fdcan2Driver);
 }

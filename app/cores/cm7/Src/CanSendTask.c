@@ -11,7 +11,7 @@ static _Bool SendingActive = 0;
 
 TASK_VARIABLES(CORE0_TASK1_FUNCTION, CORE0_TASK1_STACK_SIZE)
 
-void CanSendTaskInit()
+void CanSendTaskInit(void)
 {
     TASK_CREATE_STATIC(
         CORE0_TASK1_FUNCTION,
@@ -20,7 +20,7 @@ void CanSendTaskInit()
     );
 }
 
-void CanSendTask_Notify()
+void CanSendTask_Notify(void)
 {
     xTaskNotifyGive(CanSendTaskHdl);
 }

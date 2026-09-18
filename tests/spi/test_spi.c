@@ -16,9 +16,9 @@ extern size_t Spi_SendReceiveMsg_last_len;
 
 static int g_spi_error_handler_calls = 0;
 
-void init_driver_instance();
-void deinit_driver_instance();
-void reset_rx_tx_buffers();
+void init_driver_instance(void);
+void deinit_driver_instance(void);
+void reset_rx_tx_buffers(void);
 
 void SPI_ErrorHandler(void)
 {
@@ -183,13 +183,13 @@ static CommDriverConfigType Spi1Config = {
 
 static CommDriver Spi2Driver;
 
-void init_driver_instance()
+void init_driver_instance(void)
 {
     memset(&Spi1Driver, 0, sizeof(Spi1Driver));
     memset(&Spi2Driver, 0, sizeof(Spi2Driver));
 }
 
-void deinit_driver_instance()
+void deinit_driver_instance(void)
 {
     if (NULL != Spi1Driver.instance)
     {
@@ -202,7 +202,7 @@ void deinit_driver_instance()
     }
 }
 
-void reset_rx_tx_buffers()
+void reset_rx_tx_buffers(void)
 {
     uint32_t index;
 
@@ -840,7 +840,7 @@ void test_SPI_Send_returns_rx_full_when_rx_slots_full(void)
     TEST_ASSERT_EQUAL(0, Spi_SendReceiveMsg_call_count);
 }
 
-void test_SpiUtils_ComputePrescaler()
+void test_SpiUtils_ComputePrescaler(void)
 {
     TEST_ASSERT_EQUAL_INT(
         SPI_BAUDRATEPRESCALER_2,

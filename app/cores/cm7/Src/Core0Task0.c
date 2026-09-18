@@ -692,7 +692,7 @@ static void Core0Task0Main(void *parameters)
     SpiAbs_PortDeInit();
 }
 
-void Core0Task0Init()
+void Core0Task0Init(void)
 {
     CanBridgeTaskInit();
 
