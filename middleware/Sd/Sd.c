@@ -729,8 +729,10 @@ uint8_t SD_Spi_Initialize(uint8_t CsLine)
                     {
 
                         SD_Spi_ReadRes7(buffer);
-                        OcrByte = (buffer[0] << 24) | (buffer[1] << 16)
-                                  | (buffer[2] << 8) | buffer[3];
+                        OcrByte = ((uint32_t)buffer[0] << 24)
+                                  | ((uint32_t)buffer[1] << 16)
+                                  | ((uint32_t)buffer[2] << 8)
+                                  | (uint32_t)buffer[3];
                         SD_Spi_Ocr2Bitfield(OcrByte, &OcrResponse);
                     }
                 }
