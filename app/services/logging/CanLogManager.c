@@ -868,7 +868,8 @@ static unsigned int appCanLogOpenMostRecentFile(CanLogControlDataType *data)
     lastUsed = 0U;
 #endif
 
-    CanLogCtrlData.CanLog.fileHeadIndex = lastUsed;
+    CanLogCtrlData.CanLog.fileHeadIndex =
+        (lastUsed < 0) ? 0U : (uint32_t)lastUsed;
 
     // Build candidate filename
     snprintf(
