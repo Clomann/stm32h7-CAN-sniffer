@@ -364,853 +364,890 @@ static bool FsCustom_BuildErrorRecorderJson(
     return true;
 }
 
-int fs_open_custom(struct fs_file *file, const char *name)
+/* accept only files inside /logs/ and beginning with CAN.LOG ---- */
+static int FsCustomLogs_OpenFile(struct fs_file *file, const char *name)
 {
-    uint32_t FileSize = 0U;
+    uint32_t FileSize                     = 0U;
+    char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
 
-    memset(file, 0, sizeof(*file));
+    reqState.index     = 0;
+    reqState.stage     = 0;
+    reqState.callcount = 0;
+    reqState.byteCount = 0;
 
-    /* accept only files inside /logs/ and beginning with CAN.LOG ---- */
-    if (0 == strncmp(name, CANLOG_FILE_PATH, sizeof(CANLOG_FILE_PATH) - 1))
+    strncat(FileName, name, sizeof(FileName) - strlen(FileName) - 1);
+    strncpy((char *)reqState.name, FileName, sizeof(reqState.name) - 1);
+    reqState.name[sizeof(reqState.name) - 1] = '\0';
+
+    if (0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, FileName))
     {
-        char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
-
-        reqState.index     = 0;
-        reqState.stage     = 0;
-        reqState.callcount = 0;
-        reqState.byteCount = 0;
-
-        strncat(FileName, name, sizeof(FileName) - strlen(FileName) - 1);
-        strncpy((char *)reqState.name, FileName, sizeof(reqState.name) - 1);
-        reqState.name[sizeof(reqState.name) - 1] = '\0';
-
-        if (0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, FileName))
-        {
-            return 0;
-        }
-
-        if (FR_OK != FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize)
-            || FileSize > INT_MAX)
-        {
-            (void)FatFS_SD_CloseFile(&CanLogReadFileDevice);
-            return 0;
-        }
-
-        CanLogReadFileDevice.readTargetSize = FileSize;
-
-        file->pextension = &reqState;
-        file->data       = NULL;
-        file->len        = (int32_t)FileSize; // tell lwip the total file size
-        file->index      = 0;
-        file->is_custom_file = 1;
-
-        return 1;
+        return 0;
     }
-    else if (0
-             == strncmp(
-                 name,
-                 CANLOG_META_DATA_PATH,
-                 sizeof(CANLOG_META_DATA_PATH) - 1
-             ))
+
+    if (FR_OK != FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize)
+        || FileSize > INT_MAX)
     {
-        uint32_t HeadIndex;
-        uint32_t TailIndex;
-        uint32_t Capacity;
-        uint32_t Progression;
-        int DataSize;
-
-        (void)FsCustom_GetCanLogHeadIndex(&HeadIndex);
-        (void)FsCustom_GetCanLogTailIndex(&TailIndex);
-        (void)FsCustom_GetCanLogCapacity(&Capacity);
-
-        if (HeadIndex >= TailIndex)
-        {
-            Progression = HeadIndex - TailIndex + 1;
-        }
-        else if (HeadIndex < TailIndex)
-        {
-            Progression = Capacity + (HeadIndex - TailIndex + 1);
-        }
-
-        if (Progression < 2)
-        {
-            HeadIndex = TailIndex;
-        }
-
-        DataSize = snprintf(
-            MetaData,
-            sizeof MetaData,
-            CANLOG_META_DATA_STRING,
-            (unsigned long int)HeadIndex,
-            (unsigned long int)TailIndex,
-            (unsigned long int)Capacity,
-            (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
-            (unsigned long int)(appCanLogGetLogFileSize())
-        );
-
-        if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData))
-        {
-            return 0; // Error: formatting failed or buffer too small
-        }
-
-        file->data           = MetaData;
-        file->len            = DataSize;
-        file->index          = 0;
-        file->is_custom_file = 0; /* httpd sends static buffer     */
-        return 1;
+        (void)FatFS_SD_CloseFile(&CanLogReadFileDevice);
+        return 0;
     }
-    else if (0
-             == strncmp(
-                 name,
-                 CANLOG_CONFIG_PATH,
-                 sizeof(CANLOG_CONFIG_PATH) - 1
-             ))
+
+    CanLogReadFileDevice.readTargetSize = FileSize;
+
+    file->pextension     = &reqState;
+    file->data           = NULL;
+    file->len            = (int32_t)FileSize; // tell lwip the total file size
+    file->index          = 0;
+    file->is_custom_file = 1;
+
+    return 1;
+}
+
+static int FsCustomLogs_OpenMeta(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    uint32_t HeadIndex;
+    uint32_t TailIndex;
+    uint32_t Capacity;
+    uint32_t Progression;
+    int DataSize;
+
+    (void)FsCustom_GetCanLogHeadIndex(&HeadIndex);
+    (void)FsCustom_GetCanLogTailIndex(&TailIndex);
+    (void)FsCustom_GetCanLogCapacity(&Capacity);
+
+    if (HeadIndex >= TailIndex)
     {
-        int DataSize;
-
-        DataSize = snprintf(
-            ConfigData,
-            sizeof ConfigData,
-            CANLOG_CONFIG_STRING,
-            (unsigned long int)(appCanLogGetClusterSize()),
-            (unsigned long int)(appCanLogGetLogFileSize()),
-            (unsigned long int)(appCanLogGetLogFileCount())
-        );
-
-        if (DataSize < 0 || (size_t)DataSize >= sizeof(ConfigData))
-        {
-            return 0; // Error: formatting failed or buffer too small
-        }
-
-        file->data           = ConfigData;
-        file->len            = DataSize;
-        file->index          = 0;
-        file->is_custom_file = 0; /* httpd sends static buffer     */
-        return 1;
+        Progression = HeadIndex - TailIndex + 1;
     }
-    else if (0
-             == strncmp(
-                 name,
-                 CANLOG_STATUS_PATH,
-                 sizeof(CANLOG_STATUS_PATH) - 1
-             ))
+    else if (HeadIndex < TailIndex)
     {
-        uint8_t IsTracerRunning                           = 1;
-        float BusLoadCan1                                 = 0.0;
-        float BusLoadCan2                                 = 0.0;
-        _Bool AnyFrameLost                                = false;
-        uint8_t PreallocErrors                            = 0U;
-        float Rb1BytesHighWaterPct                        = 0.0f;
-        uint32_t CanAbsRxHighWaterCan1                    = 0U;
-        uint32_t CanAbsRxHighWaterCan2                    = 0U;
-        uint32_t CanAbsRxCapacity                         = 0U;
-        float CanAbsRxHighWaterPctCan1                    = 0.0f;
-        float CanAbsRxHighWaterPctCan2                    = 0.0f;
-        uint32_t CanAbsHwRxFifoHighWaterCan1              = 0U;
-        uint32_t CanAbsHwRxFifoHighWaterCan2              = 0U;
-        uint32_t CanAbsHwRxFifoCapacity                   = 0U;
-        float CanAbsHwRxFifoHighWaterPctCan1              = 0.0f;
-        float CanAbsHwRxFifoHighWaterPctCan2              = 0.0f;
-        uint32_t FdcanMsgPortHighWater                    = 0U;
-        uint32_t FdcanMsgPortCapacity                     = 0U;
-        float FdcanMsgPortHighWaterPct                    = 0.0f;
-        uint64_t FrameCount                               = 0U;
-        unsigned long FrameCountHi                        = 0UL;
-        unsigned long FrameCountLo                        = 0UL;
-        uint32_t SdWriteMaxUs                             = 0U;
-        uint32_t SdSyncMaxUs                              = 0U;
-        uint32_t SdStoreBlockMaxUs                        = 0U;
-        FsCustomCanLogBufferTelemetryType BufferTelemetry = {0U};
-        FsCustomStaticTxReplayStatsType Can1TxReplayStats = {0U};
-        FsCustomStaticTxReplayStatsType Can2TxReplayStats = {0U};
-        FsCustomFdcanHealthStatsType Can1FdcanHealth      = {0U};
-        FsCustomFdcanHealthStatsType Can2FdcanHealth      = {0U};
-
-        if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
-        {
-            IsTracerRunning = 1;
-        }
-
-        AnyFrameLost = FsCustom_IsAnyFrameLostFlag();
-        (void)FsCustom_GetPreallocErrorFlag(&PreallocErrors);
-        FsCustom_GetBusloadCan1(&BusLoadCan1);
-        FsCustom_GetBusloadCan2(&BusLoadCan2);
-        if (0U != FsCustom_GetCanLogBufferTelemetry(&BufferTelemetry))
-        {
-            memset(&BufferTelemetry, 0, sizeof(BufferTelemetry));
-            BufferTelemetry.rb1_bytes_capacity = LOG_BUFFER_SIZE;
-        }
-        if (0U != FsCustom_GetCanAbsRxHighWaterCan1(&CanAbsRxHighWaterCan1))
-        {
-            CanAbsRxHighWaterCan1 = 0U;
-        }
-        if (0U != FsCustom_GetCanAbsRxHighWaterCan2(&CanAbsRxHighWaterCan2))
-        {
-            CanAbsRxHighWaterCan2 = 0U;
-        }
-        if (0U != FsCustom_GetCanAbsRxCapacity(&CanAbsRxCapacity))
-        {
-            CanAbsRxCapacity = 0U;
-        }
-        if (0U
-            != FsCustom_GetCanAbsHwRxFifoHighWaterCan1(
-                &CanAbsHwRxFifoHighWaterCan1
-            ))
-        {
-            CanAbsHwRxFifoHighWaterCan1 = 0U;
-        }
-        if (0U
-            != FsCustom_GetCanAbsHwRxFifoHighWaterCan2(
-                &CanAbsHwRxFifoHighWaterCan2
-            ))
-        {
-            CanAbsHwRxFifoHighWaterCan2 = 0U;
-        }
-        if (0U != FsCustom_GetCanAbsHwRxFifoCapacity(&CanAbsHwRxFifoCapacity))
-        {
-            CanAbsHwRxFifoCapacity = 0U;
-        }
-        if (0U != FsCustom_GetFdcanMsgPortHighWater(&FdcanMsgPortHighWater))
-        {
-            FdcanMsgPortHighWater = 0U;
-        }
-        if (0U != FsCustom_GetFdcanMsgPortCapacity(&FdcanMsgPortCapacity))
-        {
-            FdcanMsgPortCapacity = 0U;
-        }
-        if (0U != FsCustom_GetCanLogFrameCount(&FrameCount))
-        {
-            FrameCount = 0U;
-        }
-        if (0U
-            != FsCustom_GetCanLogSdTimingMaxUs(
-                &SdWriteMaxUs,
-                &SdSyncMaxUs,
-                &SdStoreBlockMaxUs
-            ))
-        {
-            SdWriteMaxUs      = 0U;
-            SdSyncMaxUs       = 0U;
-            SdStoreBlockMaxUs = 0U;
-        }
-        (void)FsCustom_GetStaticTxReplayStatsCan1(&Can1TxReplayStats);
-        (void)FsCustom_GetStaticTxReplayStatsCan2(&Can2TxReplayStats);
-        (void)FsCustom_GetCanAbsFdcanHealthCan1(&Can1FdcanHealth);
-        (void)FsCustom_GetCanAbsFdcanHealthCan2(&Can2FdcanHealth);
-        FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
-        FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
-
-        if (BufferTelemetry.rb1_bytes_capacity > 0U)
-        {
-            Rb1BytesHighWaterPct = (float)BufferTelemetry.rb1_bytes_highwater
-                                   * 100.0f
-                                   / (float)BufferTelemetry.rb1_bytes_capacity;
-        }
-        if (CanAbsRxCapacity > 0U)
-        {
-            CanAbsRxHighWaterPctCan1 =
-                (float)CanAbsRxHighWaterCan1 * 100.0f / (float)CanAbsRxCapacity;
-            CanAbsRxHighWaterPctCan2 =
-                (float)CanAbsRxHighWaterCan2 * 100.0f / (float)CanAbsRxCapacity;
-        }
-        if (CanAbsHwRxFifoCapacity > 0U)
-        {
-            CanAbsHwRxFifoHighWaterPctCan1 = (float)CanAbsHwRxFifoHighWaterCan1
-                                             * 100.0f
-                                             / (float)CanAbsHwRxFifoCapacity;
-            CanAbsHwRxFifoHighWaterPctCan2 = (float)CanAbsHwRxFifoHighWaterCan2
-                                             * 100.0f
-                                             / (float)CanAbsHwRxFifoCapacity;
-        }
-        if (FdcanMsgPortCapacity > 0U)
-        {
-            FdcanMsgPortHighWaterPct = (float)FdcanMsgPortHighWater * 100.0f
-                                       / (float)FdcanMsgPortCapacity;
-        }
-
-        int n = snprintf(
-            StatusData,
-            sizeof(StatusData),
-            CANLOG_STATUS_STRING,
-            IsTracerRunning ? "true" : "false",
-            AnyFrameLost ? "true" : "false",
-            PreallocErrors ? "true" : "false",
-            FrameCountHi,
-            FrameCountLo,
-            (double)BusLoadCan1,
-            (double)BusLoadCan2,
-            (unsigned long)BufferTelemetry.rb1_bytes_capacity,
-            (unsigned long)BufferTelemetry.rb1_bytes_now,
-            (unsigned long)BufferTelemetry.rb1_bytes_highwater,
-            (double)Rb1BytesHighWaterPct,
-            (unsigned long)BufferTelemetry.rb1_bytes_min_since_status,
-            (unsigned long)BufferTelemetry.rb1_bytes_max_since_status,
-            (unsigned long)BufferTelemetry.rb1_bytes_at_last_sd_block_start,
-            (unsigned long
-            )BufferTelemetry.rb1_bytes_at_last_sd_block_end_before_consume,
-            (unsigned long
-            )BufferTelemetry.rb1_bytes_at_last_sd_block_end_after_consume,
-            (unsigned long)BufferTelemetry.sd_block_attempts_since_status,
-            (unsigned long)BufferTelemetry.sd_blocks_written_since_status,
-            (unsigned long)BufferTelemetry.sd_block_errors_since_status,
-            (unsigned long)BufferTelemetry.sd_last_block_frames,
-            (unsigned long)BufferTelemetry.sd_write_last_us,
-            (unsigned long)BufferTelemetry.sd_sync_last_us,
-            (unsigned long)BufferTelemetry.sd_store_block_last_us,
-            (unsigned long)BufferTelemetry.sd_write_max_since_status_us,
-            (unsigned long)BufferTelemetry.sd_sync_max_since_status_us,
-            (unsigned long)BufferTelemetry.sd_store_block_max_since_status_us,
-            (unsigned long)BufferTelemetry.sd_store_block_avg_since_status_us,
-            (unsigned long)BufferTelemetry.sd_sync_skipped_since_status,
-            (double)CanAbsRxHighWaterPctCan1,
-            (double)CanAbsRxHighWaterPctCan2,
-            (double)CanAbsHwRxFifoHighWaterPctCan1,
-            (double)CanAbsHwRxFifoHighWaterPctCan2,
-            (double)FdcanMsgPortHighWaterPct,
-            (unsigned long)Can1FdcanHealth.protocol_status,
-            (unsigned long)Can1FdcanHealth.error_counter,
-            (unsigned long)Can1FdcanHealth.rx_fifo0_status,
-            (unsigned long)Can1FdcanHealth.interrupt_flags,
-            (unsigned long)Can1FdcanHealth.protocol_status_latched,
-            (unsigned long)Can1FdcanHealth.error_counter_latched,
-            (unsigned long)Can1FdcanHealth.rx_fifo0_status_latched,
-            (unsigned long)Can1FdcanHealth.interrupt_flags_latched,
-            (unsigned long)Can2FdcanHealth.protocol_status,
-            (unsigned long)Can2FdcanHealth.error_counter,
-            (unsigned long)Can2FdcanHealth.rx_fifo0_status,
-            (unsigned long)Can2FdcanHealth.interrupt_flags,
-            (unsigned long)Can2FdcanHealth.protocol_status_latched,
-            (unsigned long)Can2FdcanHealth.error_counter_latched,
-            (unsigned long)Can2FdcanHealth.rx_fifo0_status_latched,
-            (unsigned long)Can2FdcanHealth.interrupt_flags_latched,
-            (unsigned long)SdWriteMaxUs,
-            (unsigned long)SdSyncMaxUs,
-            (unsigned long)SdStoreBlockMaxUs,
-            (unsigned long)Can1TxReplayStats.requests,
-            (unsigned long)Can1TxReplayStats.completed,
-            (unsigned long)Can1TxReplayStats.irqs,
-            (unsigned long)Can1TxReplayStats.last_completed_mask,
-            (unsigned long)Can1TxReplayStats.buffer_mask,
-            (unsigned long)Can1TxReplayStats.next_id_offset,
-            (unsigned long)Can1TxReplayStats.tx_pending,
-            (unsigned long)Can1TxReplayStats.tx_occurred,
-            (unsigned long)Can1TxReplayStats.tx_cancelled,
-            (unsigned long)Can1TxReplayStats.protocol_status,
-            (unsigned long)Can1TxReplayStats.error_counter,
-            (unsigned long)Can1TxReplayStats.reload_errors,
-            Can1TxReplayStats.active ? "true" : "false",
-            (unsigned long)Can2TxReplayStats.requests,
-            (unsigned long)Can2TxReplayStats.completed,
-            (unsigned long)Can2TxReplayStats.irqs,
-            (unsigned long)Can2TxReplayStats.last_completed_mask,
-            (unsigned long)Can2TxReplayStats.buffer_mask,
-            (unsigned long)Can2TxReplayStats.next_id_offset,
-            (unsigned long)Can2TxReplayStats.tx_pending,
-            (unsigned long)Can2TxReplayStats.tx_occurred,
-            (unsigned long)Can2TxReplayStats.tx_cancelled,
-            (unsigned long)Can2TxReplayStats.protocol_status,
-            (unsigned long)Can2TxReplayStats.error_counter,
-            (unsigned long)Can2TxReplayStats.reload_errors,
-            Can2TxReplayStats.active ? "true" : "false"
-        );
-
-        if (n < 0 || (size_t)n >= sizeof(StatusData))
-        {
-            return 0;
-        }
-
-        file->data           = StatusData;
-        file->len            = n;
-        file->index          = 0;
-        file->is_custom_file = 0; /* httpd sends static buffer     */
-        return 1;
+        Progression = Capacity + (HeadIndex - TailIndex + 1);
     }
-    else if (0
-             == strncmp(name, CANLOG_DEBUG_PATH, sizeof(CANLOG_DEBUG_PATH) - 1))
+
+    if (Progression < 2)
     {
-        FsCustomDebugSnapshotType Snapshot;
-        char *DebugPayload = &DebugData[JSON_RESPONSE_HEADER_SIZE];
-        int n              = 0;
+        HeadIndex = TailIndex;
+    }
 
-        if ((NULL == DebugProvider.read)
-            || (0U != DebugProvider.read(DebugProvider.context, &Snapshot)))
+    DataSize = snprintf(
+        MetaData,
+        sizeof MetaData,
+        CANLOG_META_DATA_STRING,
+        (unsigned long int)HeadIndex,
+        (unsigned long int)TailIndex,
+        (unsigned long int)Capacity,
+        (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
+        (unsigned long int)(appCanLogGetLogFileSize())
+    );
+
+    if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData))
+    {
+        return 0; // Error: formatting failed or buffer too small
+    }
+
+    file->data           = MetaData;
+    file->len            = DataSize;
+    file->index          = 0;
+    file->is_custom_file = 0; /* httpd sends static buffer     */
+    return 1;
+}
+
+static int FsCustomLogs_OpenConfig(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    int DataSize;
+
+    DataSize = snprintf(
+        ConfigData,
+        sizeof ConfigData,
+        CANLOG_CONFIG_STRING,
+        (unsigned long int)(appCanLogGetClusterSize()),
+        (unsigned long int)(appCanLogGetLogFileSize()),
+        (unsigned long int)(appCanLogGetLogFileCount())
+    );
+
+    if (DataSize < 0 || (size_t)DataSize >= sizeof(ConfigData))
+    {
+        return 0; // Error: formatting failed or buffer too small
+    }
+
+    file->data           = ConfigData;
+    file->len            = DataSize;
+    file->index          = 0;
+    file->is_custom_file = 0; /* httpd sends static buffer     */
+    return 1;
+}
+
+static int FsCustomLogger_OpenStatus(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    uint8_t IsTracerRunning                           = 1;
+    float BusLoadCan1                                 = 0.0;
+    float BusLoadCan2                                 = 0.0;
+    _Bool AnyFrameLost                                = false;
+    uint8_t PreallocErrors                            = 0U;
+    float Rb1BytesHighWaterPct                        = 0.0f;
+    uint32_t CanAbsRxHighWaterCan1                    = 0U;
+    uint32_t CanAbsRxHighWaterCan2                    = 0U;
+    uint32_t CanAbsRxCapacity                         = 0U;
+    float CanAbsRxHighWaterPctCan1                    = 0.0f;
+    float CanAbsRxHighWaterPctCan2                    = 0.0f;
+    uint32_t CanAbsHwRxFifoHighWaterCan1              = 0U;
+    uint32_t CanAbsHwRxFifoHighWaterCan2              = 0U;
+    uint32_t CanAbsHwRxFifoCapacity                   = 0U;
+    float CanAbsHwRxFifoHighWaterPctCan1              = 0.0f;
+    float CanAbsHwRxFifoHighWaterPctCan2              = 0.0f;
+    uint32_t FdcanMsgPortHighWater                    = 0U;
+    uint32_t FdcanMsgPortCapacity                     = 0U;
+    float FdcanMsgPortHighWaterPct                    = 0.0f;
+    uint64_t FrameCount                               = 0U;
+    unsigned long FrameCountHi                        = 0UL;
+    unsigned long FrameCountLo                        = 0UL;
+    uint32_t SdWriteMaxUs                             = 0U;
+    uint32_t SdSyncMaxUs                              = 0U;
+    uint32_t SdStoreBlockMaxUs                        = 0U;
+    FsCustomCanLogBufferTelemetryType BufferTelemetry = {0U};
+    FsCustomStaticTxReplayStatsType Can1TxReplayStats = {0U};
+    FsCustomStaticTxReplayStatsType Can2TxReplayStats = {0U};
+    FsCustomFdcanHealthStatsType Can1FdcanHealth      = {0U};
+    FsCustomFdcanHealthStatsType Can2FdcanHealth      = {0U};
+
+    if (0 != FsCustom_IsTracerRunning(&IsTracerRunning))
+    {
+        IsTracerRunning = 1;
+    }
+
+    AnyFrameLost = FsCustom_IsAnyFrameLostFlag();
+    (void)FsCustom_GetPreallocErrorFlag(&PreallocErrors);
+    FsCustom_GetBusloadCan1(&BusLoadCan1);
+    FsCustom_GetBusloadCan2(&BusLoadCan2);
+    if (0U != FsCustom_GetCanLogBufferTelemetry(&BufferTelemetry))
+    {
+        memset(&BufferTelemetry, 0, sizeof(BufferTelemetry));
+        BufferTelemetry.rb1_bytes_capacity = LOG_BUFFER_SIZE;
+    }
+    if (0U != FsCustom_GetCanAbsRxHighWaterCan1(&CanAbsRxHighWaterCan1))
+    {
+        CanAbsRxHighWaterCan1 = 0U;
+    }
+    if (0U != FsCustom_GetCanAbsRxHighWaterCan2(&CanAbsRxHighWaterCan2))
+    {
+        CanAbsRxHighWaterCan2 = 0U;
+    }
+    if (0U != FsCustom_GetCanAbsRxCapacity(&CanAbsRxCapacity))
+    {
+        CanAbsRxCapacity = 0U;
+    }
+    if (0U
+        != FsCustom_GetCanAbsHwRxFifoHighWaterCan1(&CanAbsHwRxFifoHighWaterCan1
+        ))
+    {
+        CanAbsHwRxFifoHighWaterCan1 = 0U;
+    }
+    if (0U
+        != FsCustom_GetCanAbsHwRxFifoHighWaterCan2(&CanAbsHwRxFifoHighWaterCan2
+        ))
+    {
+        CanAbsHwRxFifoHighWaterCan2 = 0U;
+    }
+    if (0U != FsCustom_GetCanAbsHwRxFifoCapacity(&CanAbsHwRxFifoCapacity))
+    {
+        CanAbsHwRxFifoCapacity = 0U;
+    }
+    if (0U != FsCustom_GetFdcanMsgPortHighWater(&FdcanMsgPortHighWater))
+    {
+        FdcanMsgPortHighWater = 0U;
+    }
+    if (0U != FsCustom_GetFdcanMsgPortCapacity(&FdcanMsgPortCapacity))
+    {
+        FdcanMsgPortCapacity = 0U;
+    }
+    if (0U != FsCustom_GetCanLogFrameCount(&FrameCount))
+    {
+        FrameCount = 0U;
+    }
+    if (0U
+        != FsCustom_GetCanLogSdTimingMaxUs(
+            &SdWriteMaxUs,
+            &SdSyncMaxUs,
+            &SdStoreBlockMaxUs
+        ))
+    {
+        SdWriteMaxUs      = 0U;
+        SdSyncMaxUs       = 0U;
+        SdStoreBlockMaxUs = 0U;
+    }
+    (void)FsCustom_GetStaticTxReplayStatsCan1(&Can1TxReplayStats);
+    (void)FsCustom_GetStaticTxReplayStatsCan2(&Can2TxReplayStats);
+    (void)FsCustom_GetCanAbsFdcanHealthCan1(&Can1FdcanHealth);
+    (void)FsCustom_GetCanAbsFdcanHealthCan2(&Can2FdcanHealth);
+    FrameCountHi = (unsigned long)((FrameCount >> 32) & 0xFFFFFFFFULL);
+    FrameCountLo = (unsigned long)(FrameCount & 0xFFFFFFFFULL);
+
+    if (BufferTelemetry.rb1_bytes_capacity > 0U)
+    {
+        Rb1BytesHighWaterPct = (float)BufferTelemetry.rb1_bytes_highwater
+                               * 100.0f
+                               / (float)BufferTelemetry.rb1_bytes_capacity;
+    }
+    if (CanAbsRxCapacity > 0U)
+    {
+        CanAbsRxHighWaterPctCan1 =
+            (float)CanAbsRxHighWaterCan1 * 100.0f / (float)CanAbsRxCapacity;
+        CanAbsRxHighWaterPctCan2 =
+            (float)CanAbsRxHighWaterCan2 * 100.0f / (float)CanAbsRxCapacity;
+    }
+    if (CanAbsHwRxFifoCapacity > 0U)
+    {
+        CanAbsHwRxFifoHighWaterPctCan1 = (float)CanAbsHwRxFifoHighWaterCan1
+                                         * 100.0f
+                                         / (float)CanAbsHwRxFifoCapacity;
+        CanAbsHwRxFifoHighWaterPctCan2 = (float)CanAbsHwRxFifoHighWaterCan2
+                                         * 100.0f
+                                         / (float)CanAbsHwRxFifoCapacity;
+    }
+    if (FdcanMsgPortCapacity > 0U)
+    {
+        FdcanMsgPortHighWaterPct =
+            (float)FdcanMsgPortHighWater * 100.0f / (float)FdcanMsgPortCapacity;
+    }
+
+    int n = snprintf(
+        StatusData,
+        sizeof(StatusData),
+        CANLOG_STATUS_STRING,
+        IsTracerRunning ? "true" : "false",
+        AnyFrameLost ? "true" : "false",
+        PreallocErrors ? "true" : "false",
+        FrameCountHi,
+        FrameCountLo,
+        (double)BusLoadCan1,
+        (double)BusLoadCan2,
+        (unsigned long)BufferTelemetry.rb1_bytes_capacity,
+        (unsigned long)BufferTelemetry.rb1_bytes_now,
+        (unsigned long)BufferTelemetry.rb1_bytes_highwater,
+        (double)Rb1BytesHighWaterPct,
+        (unsigned long)BufferTelemetry.rb1_bytes_min_since_status,
+        (unsigned long)BufferTelemetry.rb1_bytes_max_since_status,
+        (unsigned long)BufferTelemetry.rb1_bytes_at_last_sd_block_start,
+        (unsigned long
+        )BufferTelemetry.rb1_bytes_at_last_sd_block_end_before_consume,
+        (unsigned long
+        )BufferTelemetry.rb1_bytes_at_last_sd_block_end_after_consume,
+        (unsigned long)BufferTelemetry.sd_block_attempts_since_status,
+        (unsigned long)BufferTelemetry.sd_blocks_written_since_status,
+        (unsigned long)BufferTelemetry.sd_block_errors_since_status,
+        (unsigned long)BufferTelemetry.sd_last_block_frames,
+        (unsigned long)BufferTelemetry.sd_write_last_us,
+        (unsigned long)BufferTelemetry.sd_sync_last_us,
+        (unsigned long)BufferTelemetry.sd_store_block_last_us,
+        (unsigned long)BufferTelemetry.sd_write_max_since_status_us,
+        (unsigned long)BufferTelemetry.sd_sync_max_since_status_us,
+        (unsigned long)BufferTelemetry.sd_store_block_max_since_status_us,
+        (unsigned long)BufferTelemetry.sd_store_block_avg_since_status_us,
+        (unsigned long)BufferTelemetry.sd_sync_skipped_since_status,
+        (double)CanAbsRxHighWaterPctCan1,
+        (double)CanAbsRxHighWaterPctCan2,
+        (double)CanAbsHwRxFifoHighWaterPctCan1,
+        (double)CanAbsHwRxFifoHighWaterPctCan2,
+        (double)FdcanMsgPortHighWaterPct,
+        (unsigned long)Can1FdcanHealth.protocol_status,
+        (unsigned long)Can1FdcanHealth.error_counter,
+        (unsigned long)Can1FdcanHealth.rx_fifo0_status,
+        (unsigned long)Can1FdcanHealth.interrupt_flags,
+        (unsigned long)Can1FdcanHealth.protocol_status_latched,
+        (unsigned long)Can1FdcanHealth.error_counter_latched,
+        (unsigned long)Can1FdcanHealth.rx_fifo0_status_latched,
+        (unsigned long)Can1FdcanHealth.interrupt_flags_latched,
+        (unsigned long)Can2FdcanHealth.protocol_status,
+        (unsigned long)Can2FdcanHealth.error_counter,
+        (unsigned long)Can2FdcanHealth.rx_fifo0_status,
+        (unsigned long)Can2FdcanHealth.interrupt_flags,
+        (unsigned long)Can2FdcanHealth.protocol_status_latched,
+        (unsigned long)Can2FdcanHealth.error_counter_latched,
+        (unsigned long)Can2FdcanHealth.rx_fifo0_status_latched,
+        (unsigned long)Can2FdcanHealth.interrupt_flags_latched,
+        (unsigned long)SdWriteMaxUs,
+        (unsigned long)SdSyncMaxUs,
+        (unsigned long)SdStoreBlockMaxUs,
+        (unsigned long)Can1TxReplayStats.requests,
+        (unsigned long)Can1TxReplayStats.completed,
+        (unsigned long)Can1TxReplayStats.irqs,
+        (unsigned long)Can1TxReplayStats.last_completed_mask,
+        (unsigned long)Can1TxReplayStats.buffer_mask,
+        (unsigned long)Can1TxReplayStats.next_id_offset,
+        (unsigned long)Can1TxReplayStats.tx_pending,
+        (unsigned long)Can1TxReplayStats.tx_occurred,
+        (unsigned long)Can1TxReplayStats.tx_cancelled,
+        (unsigned long)Can1TxReplayStats.protocol_status,
+        (unsigned long)Can1TxReplayStats.error_counter,
+        (unsigned long)Can1TxReplayStats.reload_errors,
+        Can1TxReplayStats.active ? "true" : "false",
+        (unsigned long)Can2TxReplayStats.requests,
+        (unsigned long)Can2TxReplayStats.completed,
+        (unsigned long)Can2TxReplayStats.irqs,
+        (unsigned long)Can2TxReplayStats.last_completed_mask,
+        (unsigned long)Can2TxReplayStats.buffer_mask,
+        (unsigned long)Can2TxReplayStats.next_id_offset,
+        (unsigned long)Can2TxReplayStats.tx_pending,
+        (unsigned long)Can2TxReplayStats.tx_occurred,
+        (unsigned long)Can2TxReplayStats.tx_cancelled,
+        (unsigned long)Can2TxReplayStats.protocol_status,
+        (unsigned long)Can2TxReplayStats.error_counter,
+        (unsigned long)Can2TxReplayStats.reload_errors,
+        Can2TxReplayStats.active ? "true" : "false"
+    );
+
+    if (n < 0 || (size_t)n >= sizeof(StatusData))
+    {
+        return 0;
+    }
+
+    file->data           = StatusData;
+    file->len            = n;
+    file->index          = 0;
+    file->is_custom_file = 0; /* httpd sends static buffer     */
+    return 1;
+}
+
+static int FsCustomLogger_OpenDebug(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    FsCustomDebugSnapshotType Snapshot;
+    char *DebugPayload = &DebugData[JSON_RESPONSE_HEADER_SIZE];
+    int n              = 0;
+
+    if ((NULL == DebugProvider.read)
+        || (0U != DebugProvider.read(DebugProvider.context, &Snapshot)))
+    {
+        return 0;
+    }
+
+    memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
+
+    n = snprintf(
+        DebugPayload,
+        CANLOG_MAX_DEBUG_SIZE,
+        CANLOG_DEBUG_STRING,
+        U64_HI(Snapshot.can_rx_frames),
+        U64_LO(Snapshot.can_rx_frames),
+        U64_HI(Snapshot.can_rx_dropped_frames),
+        U64_LO(Snapshot.can_rx_dropped_frames),
+        U64_HI(Snapshot.can1_rx_dropped_frames),
+        U64_LO(Snapshot.can1_rx_dropped_frames),
+        U64_HI(Snapshot.can2_rx_dropped_frames),
+        U64_LO(Snapshot.can2_rx_dropped_frames),
+        U64_HI(Snapshot.bridge_ingress_frames),
+        U64_LO(Snapshot.bridge_ingress_frames),
+        U64_HI(Snapshot.logger_ingress_frames),
+        U64_LO(Snapshot.logger_ingress_frames),
+        U64_HI(Snapshot.bridge_logger_backlog_frames),
+        U64_LO(Snapshot.bridge_logger_backlog_frames),
+        U64_HI(Snapshot.logger_buffer_rejected_frames),
+        U64_LO(Snapshot.logger_buffer_rejected_frames),
+        U64_HI(Snapshot.logger_buffer_full_frames),
+        U64_LO(Snapshot.logger_buffer_full_frames),
+        U64_HI(Snapshot.can1_sequence_gap_frames),
+        U64_LO(Snapshot.can1_sequence_gap_frames),
+        U64_HI(Snapshot.can2_sequence_gap_frames),
+        U64_LO(Snapshot.can2_sequence_gap_frames),
+        U64_HI(Snapshot.can1_id_sequence_errors),
+        U64_LO(Snapshot.can1_id_sequence_errors),
+        U64_HI(Snapshot.can2_id_sequence_errors),
+        U64_LO(Snapshot.can2_id_sequence_errors),
+        U64_HI(Snapshot.sd_buffer_ingress_frames),
+        U64_LO(Snapshot.sd_buffer_ingress_frames),
+        U64_HI(Snapshot.sd_buffer_egress_frames),
+        U64_LO(Snapshot.sd_buffer_egress_frames),
+        U64_HI(Snapshot.sd_buffer_dropped_frames),
+        U64_LO(Snapshot.sd_buffer_dropped_frames),
+        U64_HI(Snapshot.sd_blocks_written),
+        U64_LO(Snapshot.sd_blocks_written),
+        U64_HI(Snapshot.message_port_dropped_frames),
+        U64_LO(Snapshot.message_port_dropped_frames),
+        U64_HI(Snapshot.runtime_check_error_calls),
+        U64_LO(Snapshot.runtime_check_error_calls),
+        U64_HI(Snapshot.can1_rx_fifo0_lost_events),
+        U64_LO(Snapshot.can1_rx_fifo0_lost_events),
+        U64_HI(Snapshot.can2_rx_fifo0_lost_events),
+        U64_LO(Snapshot.can2_rx_fifo0_lost_events),
+        U64_HI(Snapshot.can1_protocol_error_events),
+        U64_LO(Snapshot.can1_protocol_error_events),
+        U64_HI(Snapshot.can2_protocol_error_events),
+        U64_LO(Snapshot.can2_protocol_error_events),
+        U64_HI(Snapshot.can1_error_warning_events),
+        U64_LO(Snapshot.can1_error_warning_events),
+        U64_HI(Snapshot.can2_error_warning_events),
+        U64_LO(Snapshot.can2_error_warning_events),
+        U64_HI(Snapshot.can1_error_passive_events),
+        U64_LO(Snapshot.can1_error_passive_events),
+        U64_HI(Snapshot.can2_error_passive_events),
+        U64_LO(Snapshot.can2_error_passive_events),
+        U64_HI(Snapshot.can1_bus_off_events),
+        U64_LO(Snapshot.can1_bus_off_events),
+        U64_HI(Snapshot.can2_bus_off_events),
+        U64_LO(Snapshot.can2_bus_off_events)
+    );
+
+    if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
+    {
+        unsigned long PayloadSize = 0UL;
+        const char *Reason        = "debug_payload_format_failed";
+
+        if (n >= 0)
         {
-            return 0;
+            PayloadSize = (unsigned long)n;
+            Reason      = "debug_payload_too_large";
         }
-
-        memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
 
         n = snprintf(
             DebugPayload,
             CANLOG_MAX_DEBUG_SIZE,
-            CANLOG_DEBUG_STRING,
-            U64_HI(Snapshot.can_rx_frames),
-            U64_LO(Snapshot.can_rx_frames),
-            U64_HI(Snapshot.can_rx_dropped_frames),
-            U64_LO(Snapshot.can_rx_dropped_frames),
-            U64_HI(Snapshot.can1_rx_dropped_frames),
-            U64_LO(Snapshot.can1_rx_dropped_frames),
-            U64_HI(Snapshot.can2_rx_dropped_frames),
-            U64_LO(Snapshot.can2_rx_dropped_frames),
-            U64_HI(Snapshot.bridge_ingress_frames),
-            U64_LO(Snapshot.bridge_ingress_frames),
-            U64_HI(Snapshot.logger_ingress_frames),
-            U64_LO(Snapshot.logger_ingress_frames),
-            U64_HI(Snapshot.bridge_logger_backlog_frames),
-            U64_LO(Snapshot.bridge_logger_backlog_frames),
-            U64_HI(Snapshot.logger_buffer_rejected_frames),
-            U64_LO(Snapshot.logger_buffer_rejected_frames),
-            U64_HI(Snapshot.logger_buffer_full_frames),
-            U64_LO(Snapshot.logger_buffer_full_frames),
-            U64_HI(Snapshot.can1_sequence_gap_frames),
-            U64_LO(Snapshot.can1_sequence_gap_frames),
-            U64_HI(Snapshot.can2_sequence_gap_frames),
-            U64_LO(Snapshot.can2_sequence_gap_frames),
-            U64_HI(Snapshot.can1_id_sequence_errors),
-            U64_LO(Snapshot.can1_id_sequence_errors),
-            U64_HI(Snapshot.can2_id_sequence_errors),
-            U64_LO(Snapshot.can2_id_sequence_errors),
-            U64_HI(Snapshot.sd_buffer_ingress_frames),
-            U64_LO(Snapshot.sd_buffer_ingress_frames),
-            U64_HI(Snapshot.sd_buffer_egress_frames),
-            U64_LO(Snapshot.sd_buffer_egress_frames),
-            U64_HI(Snapshot.sd_buffer_dropped_frames),
-            U64_LO(Snapshot.sd_buffer_dropped_frames),
-            U64_HI(Snapshot.sd_blocks_written),
-            U64_LO(Snapshot.sd_blocks_written),
-            U64_HI(Snapshot.message_port_dropped_frames),
-            U64_LO(Snapshot.message_port_dropped_frames),
-            U64_HI(Snapshot.runtime_check_error_calls),
-            U64_LO(Snapshot.runtime_check_error_calls),
-            U64_HI(Snapshot.can1_rx_fifo0_lost_events),
-            U64_LO(Snapshot.can1_rx_fifo0_lost_events),
-            U64_HI(Snapshot.can2_rx_fifo0_lost_events),
-            U64_LO(Snapshot.can2_rx_fifo0_lost_events),
-            U64_HI(Snapshot.can1_protocol_error_events),
-            U64_LO(Snapshot.can1_protocol_error_events),
-            U64_HI(Snapshot.can2_protocol_error_events),
-            U64_LO(Snapshot.can2_protocol_error_events),
-            U64_HI(Snapshot.can1_error_warning_events),
-            U64_LO(Snapshot.can1_error_warning_events),
-            U64_HI(Snapshot.can2_error_warning_events),
-            U64_LO(Snapshot.can2_error_warning_events),
-            U64_HI(Snapshot.can1_error_passive_events),
-            U64_LO(Snapshot.can1_error_passive_events),
-            U64_HI(Snapshot.can2_error_passive_events),
-            U64_LO(Snapshot.can2_error_passive_events),
-            U64_HI(Snapshot.can1_bus_off_events),
-            U64_LO(Snapshot.can1_bus_off_events),
-            U64_HI(Snapshot.can2_bus_off_events),
-            U64_LO(Snapshot.can2_bus_off_events)
+            CANLOG_DEBUG_ERROR_STRING,
+            Reason,
+            PayloadSize,
+            (unsigned long)CANLOG_MAX_DEBUG_SIZE
         );
-
         if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
         {
-            unsigned long PayloadSize = 0UL;
-            const char *Reason        = "debug_payload_format_failed";
-
-            if (n >= 0)
-            {
-                PayloadSize = (unsigned long)n;
-                Reason      = "debug_payload_too_large";
-            }
-
-            n = snprintf(
-                DebugPayload,
-                CANLOG_MAX_DEBUG_SIZE,
-                CANLOG_DEBUG_ERROR_STRING,
-                Reason,
-                PayloadSize,
-                (unsigned long)CANLOG_MAX_DEBUG_SIZE
-            );
-            if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
-            {
-                return 0;
-            }
+            return 0;
         }
-
-        file->data  = DebugData;
-        file->len   = (int)JSON_RESPONSE_HEADER_SIZE + n;
-        file->index = 0;
-        file->flags =
-            FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
-        file->is_custom_file = 0; /* httpd sends static buffer     */
-        return 1;
     }
-    else if (0
-             == strncmp(
-                 name,
-                 ERRORRECORDER_PATH,
-                 sizeof(ERRORRECORDER_PATH) - 1
-             ))
+
+    file->data  = DebugData;
+    file->len   = (int)JSON_RESPONSE_HEADER_SIZE + n;
+    file->index = 0;
+    file->flags =
+        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
+    file->is_custom_file = 0; /* httpd sends static buffer     */
+    return 1;
+}
+
+static int FsCustomLogger_OpenErrors(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    char *ErrorPayload      = &DebugData[JSON_RESPONSE_HEADER_SIZE];
+    size_t ErrorPayloadSize = 0U;
+    int ErrorDataSize;
+
+    memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
+
+    if (FsCustom_BuildErrorRecorderJson(
+            ErrorPayload,
+            ERRORRECORDER_MAX_SIZE,
+            &ErrorPayloadSize
+        ))
     {
-        char *ErrorPayload      = &DebugData[JSON_RESPONSE_HEADER_SIZE];
-        size_t ErrorPayloadSize = 0U;
-        int ErrorDataSize;
-
-        memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
-
-        if (FsCustom_BuildErrorRecorderJson(
-                ErrorPayload,
-                ERRORRECORDER_MAX_SIZE,
-                &ErrorPayloadSize
-            ))
-        {
-            ErrorDataSize = (int)ErrorPayloadSize;
-        }
-        else
-        {
-            ErrorDataSize = snprintf(
-                ErrorPayload,
-                ERRORRECORDER_MAX_SIZE,
-                CANLOG_DEBUG_ERROR_STRING,
-                "error_recorder_payload_build_failed",
-                (unsigned long)ErrorPayloadSize,
-                (unsigned long)ERRORRECORDER_MAX_SIZE
-            );
-
-            if ((ErrorDataSize < 0)
-                || ((size_t)ErrorDataSize >= ERRORRECORDER_MAX_SIZE))
-            {
-                return 0;
-            }
-        }
-
-        file->data  = DebugData;
-        file->len   = (int)JSON_RESPONSE_HEADER_SIZE + ErrorDataSize;
-        file->index = 0;
-        file->flags =
-            FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
-        file->is_custom_file = 0; /* httpd sends static buffer     */
-        return 1;
+        ErrorDataSize = (int)ErrorPayloadSize;
     }
-    else if (0 == strncmp(name, IAP_STATUS_PATH, sizeof(IAP_STATUS_PATH) - 1))
+    else
     {
-        uint8_t is_logger_active      = 1u;
-        uint8_t upload_state          = HTTPD_IAP_UPLOAD_STATE_IDLE;
-        uint8_t upload_ready          = 0u;
-        uint8_t verify_state          = IAP_VERIFY_STATE_IDLE;
-        uint8_t is_verified           = 0u;
-        uint8_t apply_ready           = 0u;
-        uint8_t upload_error          = HTTPD_IAP_UPLOAD_ERROR_NONE;
-        uint8_t ingest_status         = 0u;
-        uint32_t upload_received      = 0u;
-        uint32_t upload_total         = 0u;
-        uint32_t verify_processed     = 0u;
-        uint32_t verify_total         = 0u;
-        const char *upload_state_name = "idle";
-        const char *verify_state_name = "idle";
-        const char *error_reason_name = "none";
-        int n                         = 0;
-
-        if (0 != FsCustom_IsTracerRunning(&is_logger_active))
-        {
-            is_logger_active = 1u;
-        }
-
-        HttpdPost_GetIapUploadState(
-            &upload_state,
-            &upload_received,
-            &upload_total
+        ErrorDataSize = snprintf(
+            ErrorPayload,
+            ERRORRECORDER_MAX_SIZE,
+            CANLOG_DEBUG_ERROR_STRING,
+            "error_recorder_payload_build_failed",
+            (unsigned long)ErrorPayloadSize,
+            (unsigned long)ERRORRECORDER_MAX_SIZE
         );
-        HttpdPost_GetIapUploadError(&upload_error, &ingest_status);
-        upload_ready = HttpdPost_IsIapUploadReady();
-        WebInterface_GetFirmwareVerifyStatusHook(
-            &verify_state,
-            &verify_processed,
-            &verify_total
-        );
-        is_verified = WebInterface_IsFirmwareVerifiedHook();
-        apply_ready = (is_logger_active == 0u && is_verified != 0u) ? 1u : 0u;
 
-        switch (upload_state)
+        if ((ErrorDataSize < 0)
+            || ((size_t)ErrorDataSize >= ERRORRECORDER_MAX_SIZE))
         {
-        case HTTPD_IAP_UPLOAD_STATE_IN_PROGRESS:
-            upload_state_name = "in_progress";
-            break;
-        case HTTPD_IAP_UPLOAD_STATE_READY:
-            upload_state_name = "ready";
-            break;
-        case HTTPD_IAP_UPLOAD_STATE_ERROR:
-            upload_state_name = "error";
-            break;
-        case HTTPD_IAP_UPLOAD_STATE_IDLE:
-        default:
-            upload_state_name = "idle";
-            break;
+            return 0;
         }
+    }
 
-        switch (verify_state)
-        {
-        case IAP_VERIFY_STATE_PENDING:
-            verify_state_name = "pending";
-            break;
-        case IAP_VERIFY_STATE_VERIFYING:
-            verify_state_name = "in_progress";
-            break;
-        case IAP_VERIFY_STATE_VERIFIED:
-            verify_state_name = "verified";
-            break;
-        case IAP_VERIFY_STATE_ERROR:
-            verify_state_name = "error";
-            break;
-        case IAP_VERIFY_STATE_IDLE:
-        default:
-            verify_state_name = "idle";
-            break;
-        }
+    file->data  = DebugData;
+    file->len   = (int)JSON_RESPONSE_HEADER_SIZE + ErrorDataSize;
+    file->index = 0;
+    file->flags =
+        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
+    file->is_custom_file = 0; /* httpd sends static buffer     */
+    return 1;
+}
 
-        switch (upload_error)
-        {
-        case HTTPD_IAP_UPLOAD_ERROR_BEGIN:
-            error_reason_name = "begin";
-            break;
-        case HTTPD_IAP_UPLOAD_ERROR_PUSH:
-            error_reason_name = "push";
-            break;
-        case HTTPD_IAP_UPLOAD_ERROR_INCOMPLETE:
-            error_reason_name = "incomplete";
-            break;
-        case HTTPD_IAP_UPLOAD_ERROR_FINISH:
-            error_reason_name = "finish";
-            break;
-        case HTTPD_IAP_UPLOAD_ERROR_NONE:
-        default:
-            error_reason_name = "none";
-            break;
-        }
+static int FsCustomIap_OpenStatus(struct fs_file *file, const char *name)
+{
+    (void)name;
 
+    uint8_t is_logger_active      = 1u;
+    uint8_t upload_state          = HTTPD_IAP_UPLOAD_STATE_IDLE;
+    uint8_t upload_ready          = 0u;
+    uint8_t verify_state          = IAP_VERIFY_STATE_IDLE;
+    uint8_t is_verified           = 0u;
+    uint8_t apply_ready           = 0u;
+    uint8_t upload_error          = HTTPD_IAP_UPLOAD_ERROR_NONE;
+    uint8_t ingest_status         = 0u;
+    uint32_t upload_received      = 0u;
+    uint32_t upload_total         = 0u;
+    uint32_t verify_processed     = 0u;
+    uint32_t verify_total         = 0u;
+    const char *upload_state_name = "idle";
+    const char *verify_state_name = "idle";
+    const char *error_reason_name = "none";
+    int n                         = 0;
+
+    if (0 != FsCustom_IsTracerRunning(&is_logger_active))
+    {
+        is_logger_active = 1u;
+    }
+
+    HttpdPost_GetIapUploadState(&upload_state, &upload_received, &upload_total);
+    HttpdPost_GetIapUploadError(&upload_error, &ingest_status);
+    upload_ready = HttpdPost_IsIapUploadReady();
+    WebInterface_GetFirmwareVerifyStatusHook(
+        &verify_state,
+        &verify_processed,
+        &verify_total
+    );
+    is_verified = WebInterface_IsFirmwareVerifiedHook();
+    apply_ready = (is_logger_active == 0u && is_verified != 0u) ? 1u : 0u;
+
+    switch (upload_state)
+    {
+    case HTTPD_IAP_UPLOAD_STATE_IN_PROGRESS:
+        upload_state_name = "in_progress";
+        break;
+    case HTTPD_IAP_UPLOAD_STATE_READY:
+        upload_state_name = "ready";
+        break;
+    case HTTPD_IAP_UPLOAD_STATE_ERROR:
+        upload_state_name = "error";
+        break;
+    case HTTPD_IAP_UPLOAD_STATE_IDLE:
+    default:
+        upload_state_name = "idle";
+        break;
+    }
+
+    switch (verify_state)
+    {
+    case IAP_VERIFY_STATE_PENDING:
+        verify_state_name = "pending";
+        break;
+    case IAP_VERIFY_STATE_VERIFYING:
+        verify_state_name = "in_progress";
+        break;
+    case IAP_VERIFY_STATE_VERIFIED:
+        verify_state_name = "verified";
+        break;
+    case IAP_VERIFY_STATE_ERROR:
+        verify_state_name = "error";
+        break;
+    case IAP_VERIFY_STATE_IDLE:
+    default:
+        verify_state_name = "idle";
+        break;
+    }
+
+    switch (upload_error)
+    {
+    case HTTPD_IAP_UPLOAD_ERROR_BEGIN:
+        error_reason_name = "begin";
+        break;
+    case HTTPD_IAP_UPLOAD_ERROR_PUSH:
+        error_reason_name = "push";
+        break;
+    case HTTPD_IAP_UPLOAD_ERROR_INCOMPLETE:
+        error_reason_name = "incomplete";
+        break;
+    case HTTPD_IAP_UPLOAD_ERROR_FINISH:
+        error_reason_name = "finish";
+        break;
+    case HTTPD_IAP_UPLOAD_ERROR_NONE:
+    default:
+        error_reason_name = "none";
+        break;
+    }
+
+    n = snprintf(
+        IapStatusData,
+        sizeof(IapStatusData),
+        IAP_STATUS_STRING,
+        APP_VERSION,
+        is_logger_active ? "true" : "false",
+        upload_ready ? "true" : "false",
+        upload_state_name,
+        (unsigned long)upload_received,
+        (unsigned long)upload_total,
+        (unsigned long)upload_received,
+        (unsigned long)upload_total,
+        verify_state_name,
+        (unsigned long)verify_processed,
+        (unsigned long)verify_total,
+        is_verified ? "true" : "false",
+        apply_ready ? "true" : "false",
+        error_reason_name,
+        (unsigned long)ingest_status
+    );
+    if (n < 0 || (size_t)n >= sizeof(IapStatusData))
+    {
         n = snprintf(
             IapStatusData,
             sizeof(IapStatusData),
-            IAP_STATUS_STRING,
-            APP_VERSION,
+            "{"
+            "\"logger_active\":%s,"
+            "\"upload_ready\":%s,"
+            "\"upload_state\":\"error\","
+            "\"upload_received\":%lu,"
+            "\"upload_total\":%lu,"
+            "\"received\":%lu,"
+            "\"total\":%lu,"
+            "\"verify_state\":\"error\","
+            "\"verify_processed\":%lu,"
+            "\"verify_total\":%lu,"
+            "\"verified\":%s,"
+            "\"apply_ready\":%s,"
+            "\"error_reason\":\"status_payload_too_large\","
+            "\"ingest_status\":%lu"
+            "}",
             is_logger_active ? "true" : "false",
             upload_ready ? "true" : "false",
-            upload_state_name,
             (unsigned long)upload_received,
             (unsigned long)upload_total,
             (unsigned long)upload_received,
             (unsigned long)upload_total,
-            verify_state_name,
             (unsigned long)verify_processed,
             (unsigned long)verify_total,
             is_verified ? "true" : "false",
             apply_ready ? "true" : "false",
-            error_reason_name,
             (unsigned long)ingest_status
         );
         if (n < 0 || (size_t)n >= sizeof(IapStatusData))
         {
-            n = snprintf(
-                IapStatusData,
-                sizeof(IapStatusData),
-                "{"
-                "\"logger_active\":%s,"
-                "\"upload_ready\":%s,"
-                "\"upload_state\":\"error\","
-                "\"upload_received\":%lu,"
-                "\"upload_total\":%lu,"
-                "\"received\":%lu,"
-                "\"total\":%lu,"
-                "\"verify_state\":\"error\","
-                "\"verify_processed\":%lu,"
-                "\"verify_total\":%lu,"
-                "\"verified\":%s,"
-                "\"apply_ready\":%s,"
-                "\"error_reason\":\"status_payload_too_large\","
-                "\"ingest_status\":%lu"
-                "}",
-                is_logger_active ? "true" : "false",
-                upload_ready ? "true" : "false",
-                (unsigned long)upload_received,
-                (unsigned long)upload_total,
-                (unsigned long)upload_received,
-                (unsigned long)upload_total,
-                (unsigned long)verify_processed,
-                (unsigned long)verify_total,
-                is_verified ? "true" : "false",
-                apply_ready ? "true" : "false",
-                (unsigned long)ingest_status
-            );
-            if (n < 0 || (size_t)n >= sizeof(IapStatusData))
-            {
-                return 0;
-            }
-        }
-
-        file->data           = IapStatusData;
-        file->len            = n;
-        file->index          = 0;
-        file->is_custom_file = 0;
-        return 1;
-    }
-    else if (0 == strncmp(name, APP_VERSION_PATH, sizeof(APP_VERSION_PATH) - 1))
-    {
-        file->data           = AppVersionData;
-        file->len            = (int)(sizeof(AppVersionData) - 1U);
-        file->index          = 0;
-        file->is_custom_file = 0;
-        return 1;
-    }
-    else if (0 == strncmp(name, APP_CARD_PATH, sizeof(APP_CARD_PATH) - 1))
-    {
-        SdCidRegisterType cid = {0};
-        uint32_t sector_count = 0U;
-        uint8_t have_cid      = (SD_E_OK == MMCAdapter_GetCardId(&cid));
-        int n;
-
-        (void)MMCAdapter_GetSectorCount(&sector_count);
-
-        n = snprintf(
-            StatusData,
-            sizeof(StatusData),
-            APP_CARD_STRING,
-            have_cid ? "true" : "false",
-            (unsigned)cid.manufacturerId,
-            FsCardAscii(cid.oemId[0]),
-            FsCardAscii(cid.oemId[1]),
-            FsCardAscii(cid.productName[0]),
-            FsCardAscii(cid.productName[1]),
-            FsCardAscii(cid.productName[2]),
-            FsCardAscii(cid.productName[3]),
-            FsCardAscii(cid.productName[4]),
-            (unsigned)cid.revisionMajor,
-            (unsigned)cid.revisionMinor,
-            (unsigned long)cid.serialNumber,
-            (unsigned)cid.manufacturingYear,
-            (unsigned)cid.manufacturingMonth,
-            (unsigned long)((uint64_t)sector_count / 2048U)
-        );
-
-        if (n < 0 || (size_t)n >= sizeof(StatusData))
-        {
             return 0;
         }
-
-        file->data           = StatusData;
-        file->len            = n;
-        file->index          = 0;
-        file->is_custom_file = 0;
-        return 1;
     }
-    else if (0 == strncmp(name, IAP_PREPARE_PATH, sizeof(IAP_PREPARE_PATH) - 1))
+
+    file->data           = IapStatusData;
+    file->len            = n;
+    file->index          = 0;
+    file->is_custom_file = 0;
+    return 1;
+}
+
+static int FsCustomApi_OpenVersion(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    file->data           = AppVersionData;
+    file->len            = (int)(sizeof(AppVersionData) - 1U);
+    file->index          = 0;
+    file->is_custom_file = 0;
+    return 1;
+}
+
+static int FsCustomApi_OpenCard(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    SdCidRegisterType cid = {0};
+    uint32_t sector_count = 0U;
+    uint8_t have_cid      = (SD_E_OK == MMCAdapter_GetCardId(&cid));
+    int n;
+
+    (void)MMCAdapter_GetSectorCount(&sector_count);
+
+    n = snprintf(
+        StatusData,
+        sizeof(StatusData),
+        APP_CARD_STRING,
+        have_cid ? "true" : "false",
+        (unsigned)cid.manufacturerId,
+        FsCardAscii(cid.oemId[0]),
+        FsCardAscii(cid.oemId[1]),
+        FsCardAscii(cid.productName[0]),
+        FsCardAscii(cid.productName[1]),
+        FsCardAscii(cid.productName[2]),
+        FsCardAscii(cid.productName[3]),
+        FsCardAscii(cid.productName[4]),
+        (unsigned)cid.revisionMajor,
+        (unsigned)cid.revisionMinor,
+        (unsigned long)cid.serialNumber,
+        (unsigned)cid.manufacturingYear,
+        (unsigned)cid.manufacturingMonth,
+        (unsigned long)((uint64_t)sector_count / 2048U)
+    );
+
+    if (n < 0 || (size_t)n >= sizeof(StatusData))
     {
-        uint8_t is_logger_active = 1u;
-        const char *reason       = "internal_error";
-        const char *ok_text      = "false";
-        int n                    = 0;
+        return 0;
+    }
 
-        if (0 != FsCustom_IsTracerRunning(&is_logger_active))
-        {
-            is_logger_active = 1u;
-        }
+    file->data           = StatusData;
+    file->len            = n;
+    file->index          = 0;
+    file->is_custom_file = 0;
+    return 1;
+}
 
-        if (0u != is_logger_active)
+static int FsCustomIap_OpenPrepare(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    uint8_t is_logger_active = 1u;
+    const char *reason       = "internal_error";
+    const char *ok_text      = "false";
+    int n                    = 0;
+
+    if (0 != FsCustom_IsTracerRunning(&is_logger_active))
+    {
+        is_logger_active = 1u;
+    }
+
+    if (0u != is_logger_active)
+    {
+        reason = "logger_running";
+    }
+    else
+    {
+        HttpdPost_ResetIapUploadSession();
+
+        if (0u == WebInterface_PrepareFirmwareUploadHook())
         {
-            reason = "logger_running";
+            reason = "prepare_failed";
         }
         else
         {
-            HttpdPost_ResetIapUploadSession();
-
-            if (0u == WebInterface_PrepareFirmwareUploadHook())
-            {
-                reason = "prepare_failed";
-            }
-            else
-            {
-                ok_text = "true";
-                reason  = "slot_erased";
-            }
-        }
-
-        n = snprintf(
-            IapPrepareResultData,
-            sizeof(IapPrepareResultData),
-            IAP_PREPARE_RESULT_STRING,
-            ok_text,
-            reason
-        );
-        if (n < 0 || (size_t)n >= sizeof(IapPrepareResultData))
-        {
-            return 0;
-        }
-
-        file->data           = IapPrepareResultData;
-        file->len            = n;
-        file->index          = 0;
-        file->is_custom_file = 0;
-        return 1;
-    }
-    else if (0 == strncmp(name, IAP_APPLY_PATH, sizeof(IAP_APPLY_PATH) - 1))
-    {
-        uint8_t is_logger_active = 1u;
-        uint8_t is_verified      = 0u;
-        const char *reason       = "internal_error";
-        const char *ok_text      = "false";
-        int n                    = 0;
-
-        if (0 != FsCustom_IsTracerRunning(&is_logger_active))
-        {
-            is_logger_active = 1u;
-        }
-
-        is_verified = WebInterface_IsFirmwareVerifiedHook();
-
-        if (0u != is_logger_active)
-        {
-            reason = "logger_running";
-        }
-        else if (0u == is_verified)
-        {
-            reason = "image_not_verified";
-        }
-        else
-        {
-            WebInterface_RequestFirmwareApplyHook();
-            HttpdPost_ClearIapUploadReady();
             ok_text = "true";
-            reason  = "reboot_requested";
+            reason  = "slot_erased";
         }
-
-        n = snprintf(
-            IapApplyResultData,
-            sizeof(IapApplyResultData),
-            IAP_APPLY_RESULT_STRING,
-            ok_text,
-            reason
-        );
-        if (n < 0 || (size_t)n >= sizeof(IapApplyResultData))
-        {
-            return 0;
-        }
-
-        file->data           = IapApplyResultData;
-        file->len            = n;
-        file->index          = 0;
-        file->is_custom_file = 0;
-        return 1;
     }
-    else if (0
-             == strncmp(
-                 name,
-                 CANLOG_POST_REDIRECT_PATH,
-                 sizeof(CANLOG_POST_REDIRECT_PATH) - 1
-             ))
+
+    n = snprintf(
+        IapPrepareResultData,
+        sizeof(IapPrepareResultData),
+        IAP_PREPARE_RESULT_STRING,
+        ok_text,
+        reason
+    );
+    if (n < 0 || (size_t)n >= sizeof(IapPrepareResultData))
     {
-        file->data = redirect_reply;
-        file->len  = sizeof(redirect_reply) - 1;
-        file->flags =
-            FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
-        file->index = 0;
+        return 0;
+    }
+
+    file->data           = IapPrepareResultData;
+    file->len            = n;
+    file->index          = 0;
+    file->is_custom_file = 0;
+    return 1;
+}
+
+static int FsCustomIap_OpenApply(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    uint8_t is_logger_active = 1u;
+    uint8_t is_verified      = 0u;
+    const char *reason       = "internal_error";
+    const char *ok_text      = "false";
+    int n                    = 0;
+
+    if (0 != FsCustom_IsTracerRunning(&is_logger_active))
+    {
+        is_logger_active = 1u;
+    }
+
+    is_verified = WebInterface_IsFirmwareVerifiedHook();
+
+    if (0u != is_logger_active)
+    {
+        reason = "logger_running";
+    }
+    else if (0u == is_verified)
+    {
+        reason = "image_not_verified";
+    }
+    else
+    {
+        WebInterface_RequestFirmwareApplyHook();
+        HttpdPost_ClearIapUploadReady();
+        ok_text = "true";
+        reason  = "reboot_requested";
+    }
+
+    n = snprintf(
+        IapApplyResultData,
+        sizeof(IapApplyResultData),
+        IAP_APPLY_RESULT_STRING,
+        ok_text,
+        reason
+    );
+    if (n < 0 || (size_t)n >= sizeof(IapApplyResultData))
+    {
+        return 0;
+    }
+
+    file->data           = IapApplyResultData;
+    file->len            = n;
+    file->index          = 0;
+    file->is_custom_file = 0;
+    return 1;
+}
+
+static int FsCustom_OpenPostRedirect(struct fs_file *file, const char *name)
+{
+    (void)name;
+
+    file->data = redirect_reply;
+    file->len  = sizeof(redirect_reply) - 1;
+    file->flags =
+        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
+    file->index = 0;
 #if LWIP_HTTPD_DYNAMIC_HEADERS
-        // file->http_header_included = 1;
+    // file->http_header_included = 1;
 #endif
 #if LWIP_HTTPD_CUSTOM_FILES
-        file->is_custom_file = 1;
+    file->is_custom_file = 1;
 #endif
-        return 1;
+    return 1;
+}
+
+typedef int (*FsCustomOpenFn)(struct fs_file *file, const char *name);
+
+typedef struct
+{
+    const char *path;
+    size_t path_length;
+    FsCustomOpenFn open;
+} FsCustomRouteType;
+
+#define FS_CUSTOM_ROUTE(path, handler) {(path), sizeof(path) - 1U, (handler)}
+
+/* Prefix match, first hit wins: keep the order. */
+static const FsCustomRouteType FsCustomRoutes[] = {
+    FS_CUSTOM_ROUTE(CANLOG_FILE_PATH, FsCustomLogs_OpenFile),
+    FS_CUSTOM_ROUTE(CANLOG_META_DATA_PATH, FsCustomLogs_OpenMeta),
+    FS_CUSTOM_ROUTE(CANLOG_CONFIG_PATH, FsCustomLogs_OpenConfig),
+    FS_CUSTOM_ROUTE(CANLOG_STATUS_PATH, FsCustomLogger_OpenStatus),
+    FS_CUSTOM_ROUTE(CANLOG_DEBUG_PATH, FsCustomLogger_OpenDebug),
+    FS_CUSTOM_ROUTE(ERRORRECORDER_PATH, FsCustomLogger_OpenErrors),
+    FS_CUSTOM_ROUTE(IAP_STATUS_PATH, FsCustomIap_OpenStatus),
+    FS_CUSTOM_ROUTE(APP_VERSION_PATH, FsCustomApi_OpenVersion),
+    FS_CUSTOM_ROUTE(APP_CARD_PATH, FsCustomApi_OpenCard),
+    FS_CUSTOM_ROUTE(IAP_PREPARE_PATH, FsCustomIap_OpenPrepare),
+    FS_CUSTOM_ROUTE(IAP_APPLY_PATH, FsCustomIap_OpenApply),
+    FS_CUSTOM_ROUTE(CANLOG_POST_REDIRECT_PATH, FsCustom_OpenPostRedirect),
+};
+
+int fs_open_custom(struct fs_file *file, const char *name)
+{
+    memset(file, 0, sizeof(*file));
+
+    for (uint32_t i = 0; i < LWIP_ARRAYSIZE(FsCustomRoutes); i++)
+    {
+        const FsCustomRouteType *route = &FsCustomRoutes[i];
+
+        if (0 == strncmp(name, route->path, route->path_length))
+        {
+            return route->open(file, name);
+        }
     }
 
     return 0; // Fallback to default file system
