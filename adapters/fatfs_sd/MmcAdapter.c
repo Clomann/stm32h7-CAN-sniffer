@@ -176,7 +176,7 @@ uint8_t MMCAdapter_GetSectorSize(void *buff)
     if (Csd_Sd1.csdStructure >= 1)
     {
         // CSD v2.0
-        SectorSize = 1 << Csd_Sd1.sectorSize;
+        SectorSize = (uint32_t)1U << Csd_Sd1.sectorSize;
         memcpy(buff, &SectorSize, sizeof(SectorSize));
 
         return RES_OK;

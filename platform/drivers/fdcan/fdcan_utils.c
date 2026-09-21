@@ -56,7 +56,9 @@ uint8_t CANFD_GetSeg1(const uint8_t reg_value[4], bool is_data_phase)
     }
     else
     {
-        return ((reg & FDCAN_NBTP_NTSEG1_Msk) >> FDCAN_NBTP_NTSEG1_Pos) + 1;
+        return (uint8_t)(((reg & FDCAN_NBTP_NTSEG1_Msk) >> FDCAN_NBTP_NTSEG1_Pos
+                         )
+                         + 1);
     }
 }
 
