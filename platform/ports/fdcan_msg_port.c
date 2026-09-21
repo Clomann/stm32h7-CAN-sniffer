@@ -48,7 +48,7 @@ FdcanMsgPort_InstrumentationUsedBytesHook(uint32_t used_bytes)
  * - ISR: adds frames, sends full pages
  * - Task: flushes partial pages (requires critical section)
  */
-static PageType Page = {.count = 0};
+static PageType PageReceive = {.count = 0};
 
 // STATIC_ASSERT( CAN_FRAME_BUFFER_SIZE >= 2U * sizeof(FDCAN_ClassicFrameType) );
 
@@ -96,17 +96,17 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame)
     BaseType_t xHigher = pdFALSE;
     size_t bytes_sent  = 0;
 
-    if (Page.count >= CAN_FRAME_PAGE_MAX_ENTRIES)
+    if (PageReceive.count >= CAN_FRAME_PAGE_MAX_ENTRIES)
     {
         bytes_sent = xMessageBufferSendFromISR(
             CanFrameBuffer,
-            (uint8_t *)&Page,
-            sizeof(Page),
+            (uint8_t *)&PageReceive,
+            sizeof(PageReceive),
             &xHigher
         );
         if (bytes_sent > 0)
         {
-            Page.count = 0;
+            PageReceive.count = 0;
             fdcan_msg_port_update_highwater();
         }
         else
@@ -119,9 +119,9 @@ void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame)
         }
     }
 
-    if (Page.count < CAN_FRAME_PAGE_MAX_ENTRIES)
+    if (PageReceive.count < CAN_FRAME_PAGE_MAX_ENTRIES)
     {
-        AddEntryToPage(&Page, frame);
+        AddEntryToPage(&PageReceive, frame);
     }
 
     portYIELD_FROM_ISR(xHigher);
@@ -154,36 +154,36 @@ void fdcan_msg_port_init(void)
 
 size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds)
 {
-    size_t BytesReceived  = 0U;
-    static uint32_t Index = 0;
-    static PageType Page  = {0};
+    size_t BytesReceived      = 0U;
+    static uint32_t IndexRead = 0;
+    static PageType PageRead  = {0};
 
-    if (Index == 0)
+    if (IndexRead == 0)
     {
         BytesReceived = xMessageBufferReceive(
             CanFrameBuffer,
-            &Page,
-            sizeof(Page),
+            &PageRead,
+            sizeof(PageRead),
             pdMS_TO_TICKS(milliSeconds)
         );
 
         if (BytesReceived > 0)
         {
-            Index = Page.count;
+            IndexRead = PageRead.count;
             fdcan_msg_port_update_highwater();
         }
         else
         {
-            Index = 0;
+            IndexRead = 0;
         }
     }
 
-    if (Index > 0)
+    if (IndexRead > 0)
     {
-        *dst          = &Page.frames[Page.count - Index].frame;
-        BytesReceived = sizeof(Page.frames[Page.count - Index].frame
-        ); // Page.frames[Page.count - Index].size;
-        Index--;
+        *dst = &PageRead.frames[PageRead.count - IndexRead].frame;
+        BytesReceived =
+            sizeof(PageRead.frames[PageRead.count - IndexRead].frame);
+        IndexRead--;
     }
 
     return BytesReceived;
@@ -193,22 +193,22 @@ void fdcan_msg_port_flush(void)
 {
     size_t bytes_sent;
 
-    if (Page.count > 0)
+    if (PageReceive.count > 0)
     {
         bytes_sent = xMessageBufferSend(
             CanFrameBuffer,
-            (uint8_t *)&Page,
-            sizeof(Page),
+            (uint8_t *)&PageReceive,
+            sizeof(PageReceive),
             portMAX_DELAY
         );
         if (bytes_sent > 0)
         {
-            Page.count = 0;
+            PageReceive.count = 0;
             fdcan_msg_port_update_highwater();
         }
         else
         {
-            FcdanMsgPort_FrameDropCount += Page.count;
+            FcdanMsgPort_FrameDropCount += PageReceive.count;
             CanAbs_ErrorHandler();
             return;
         }
