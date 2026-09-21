@@ -55,7 +55,7 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #endif
 
 #define CANLOG_MAX_PATH_LENGTH    64U
-#define CANLOG_MAX_META_DATA_SIZE 96U
+#define CANLOG_MAX_META_DATA_SIZE 128U
 #define CANLOG_MAX_STATUS_SIZE    5120U
 #define CANLOG_MAX_DEBUG_SIZE     4096U
 #define CANLOG_MAX_CONFIG_SIZE    96U
