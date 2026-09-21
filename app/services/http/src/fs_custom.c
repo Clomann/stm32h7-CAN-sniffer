@@ -6,10 +6,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <limits.h>
-#include <stdarg.h>
 #include <stdio.h>
 
 #include "fs_custom.h"
+#include "fs_custom_internal.h"
 #include "FileHandler.h"
 #include "MmcAdapter.h"
 #include "CanLogManager.h"
@@ -129,9 +129,6 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define CANLOG_CONFIG_STRING                                                   \
     "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
 
-#define U64_HI(value) ((unsigned long)(((value) >> 32) & 0xFFFFFFFFULL))
-#define U64_LO(value) ((unsigned long)((value) & 0xFFFFFFFFULL))
-
 #define CANLOG_DEBUG_COUNTER_PAIR(name)                                        \
     "\"" name "_hi\":%lu,\"" name "_lo\":%lu"
 
@@ -168,13 +165,6 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 
 #define CANLOG_DEBUG_ERROR_STRING                                              \
     "{\"error_reason\":\"%s\",\"payload_size\":%lu,\"max_size\":%lu}"
-
-#define JSON_RESPONSE_HEADER                                                   \
-    "HTTP/1.1 200 OK\r\n"                                                      \
-    "Content-Type: application/json\r\n"                                       \
-    "Connection: close\r\n"                                                    \
-    "\r\n"
-#define JSON_RESPONSE_HEADER_SIZE (sizeof(JSON_RESPONSE_HEADER) - 1U)
 
 #define IAP_STATUS_STRING                                                      \
     "{\"app_version\":\"%s\",\"logger_active\":%s,\"upload_ready\":%s,"        \
@@ -228,36 +218,6 @@ uint8_t FsCustom_SetDebugProvider(const FsCustomDebugProviderType *provider)
 
     DebugProvider = *provider;
     return 0U;
-}
-
-static bool FsCustom_AppendJson(
-    char *buffer,
-    size_t buffer_size,
-    size_t *offset,
-    const char *format,
-    ...
-)
-{
-    va_list args;
-    int n;
-
-    if ((NULL == buffer) || (NULL == offset) || (NULL == format)
-        || (*offset >= buffer_size))
-    {
-        return false;
-    }
-
-    va_start(args, format);
-    n = vsnprintf(&buffer[*offset], buffer_size - *offset, format, args);
-    va_end(args);
-
-    if ((n < 0) || ((size_t)n >= (buffer_size - *offset)))
-    {
-        return false;
-    }
-
-    *offset += (size_t)n;
-    return true;
 }
 
 static bool FsCustom_AppendErrorEntry(
