@@ -378,12 +378,14 @@ comm_status_t FDCAN_CreateDriver(
     if (sizeof(CommDriverConfigType) != cfg_size)
     {
         FDCAN_ErrorHandler();
+        return COMM_ERROR;
     }
 
     if (COMM_SUCCESS != fdcan_find_free(&instance))
     {
         RetVal = COMM_ERROR;
         FDCAN_ErrorHandler();
+        return COMM_ERROR;
     }
 
     switch (pDriver->config->devNbr)
@@ -401,24 +403,26 @@ comm_status_t FDCAN_CreateDriver(
         break;
     }
 
-    if (COMM_SUCCESS != RetVal)
+    if (COMM_SUCCESS == RetVal)
+    {
+        pDriver->instance = (void *)instance;
+
+        pDriver->interface->init  = FDCAN_Init;
+        pDriver->interface->send  = FDCAN_Send;
+        pDriver->interface->read  = FDCAN_Read;
+        pDriver->interface->ioctl = FDCAN_Ioctl;
+        pDriver->state            = DRIVER_STATE_UNINITIALIZED;
+        pDriver->protocol         = DRIVER_FDCAN;
+        pDriver->TxFrameBuffer    = tx;
+        pDriver->RxFrameBuffer    = rx;
+
+        pDriver->state = DRIVER_STATE_INITIALIZED;
+        RetVal         = COMM_SUCCESS;
+    }
+    else
     {
         FDCAN_ErrorHandler();
     }
-
-    pDriver->instance = (void *)instance;
-
-    pDriver->interface->init  = FDCAN_Init;
-    pDriver->interface->send  = FDCAN_Send;
-    pDriver->interface->read  = FDCAN_Read;
-    pDriver->interface->ioctl = FDCAN_Ioctl;
-    pDriver->state            = DRIVER_STATE_UNINITIALIZED;
-    pDriver->protocol         = DRIVER_FDCAN;
-    pDriver->TxFrameBuffer    = tx;
-    pDriver->RxFrameBuffer    = rx;
-
-    pDriver->state = DRIVER_STATE_INITIALIZED;
-    RetVal         = COMM_SUCCESS;
 
     return RetVal;
 }
@@ -943,27 +947,31 @@ void FDCAN_1_IRQHandler(void)
 {
     FdcanInstanceType *instance;
 
-    if (COMM_SUCCESS != fdcan_get_handle(FDCAN1, &instance))
+    if (COMM_SUCCESS == fdcan_get_handle(FDCAN1, &instance))
+    {
+        /* capture timestamp at the moment of the interrupt */
+        instance->mostRecentInterrupTimestamp = SampleTime();
+        HAL_FDCAN_IRQHandler(&instance->hfdcan);
+    }
+    else
     {
         FDCAN_ErrorHandler();
     }
-
-    /* capture timestamp at the moment of the interrupt */
-    instance->mostRecentInterrupTimestamp = SampleTime();
-    HAL_FDCAN_IRQHandler(&instance->hfdcan);
 }
 
 void FDCAN_2_IRQHandler(void)
 {
     FdcanInstanceType *instance;
 
-    if (COMM_SUCCESS != fdcan_get_handle(FDCAN2, &instance))
+    if (COMM_SUCCESS == fdcan_get_handle(FDCAN2, &instance))
+    {
+        instance->mostRecentInterrupTimestamp = SampleTime();
+        HAL_FDCAN_IRQHandler(&instance->hfdcan);
+    }
+    else
     {
         FDCAN_ErrorHandler();
     }
-
-    instance->mostRecentInterrupTimestamp = SampleTime();
-    HAL_FDCAN_IRQHandler(&instance->hfdcan);
 }
 
 #if CAN_STATIC_TX_REPLAY_ENABLE
