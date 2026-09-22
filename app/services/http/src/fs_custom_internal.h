@@ -26,3 +26,17 @@ bool FsCustom_AppendJson(
     const char *format,
     ...
 ) __attribute__((format(printf, 4, 5)));
+
+struct fs_file;
+
+/* Endpoint handlers, one section per fs_custom_<scope>.c file. Open handlers
+ * set up the lwIP file themselves; render handlers write their payload into
+ * buffer and report its length (see FsCustom_OpenRendered). */
+
+/* fs_custom_api.c: /api/... */
+int FsCustomApi_OpenVersion(struct fs_file *file, const char *name);
+bool FsCustomApi_RenderCard(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);

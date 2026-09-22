@@ -32,6 +32,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/app_mdns.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/ethernetif.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom_api.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom_json.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/httpd_cgi_ssi.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/httpd_post.c
