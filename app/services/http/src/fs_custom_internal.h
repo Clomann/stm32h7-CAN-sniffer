@@ -40,3 +40,20 @@ bool FsCustomApi_RenderCard(
     size_t buffer_size,
     size_t *payload_size
 );
+
+/* fs_custom_iap.c: /iap/... */
+bool FsCustomIap_RenderStatus(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
+bool FsCustomIap_RenderPrepare(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
+bool FsCustomIap_RenderApply(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);

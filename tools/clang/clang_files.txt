@@ -46,6 +46,7 @@ app/services/http/src/app_mdns.c
 app/services/http/src/ethernetif.c
 app/services/http/src/fs_custom.c
 app/services/http/src/fs_custom_api.c
+app/services/http/src/fs_custom_iap.c
 app/services/http/src/fs_custom_internal.h
 app/services/http/src/fs_custom_json.c
 app/services/http/src/httpd_cgi_ssi.c
