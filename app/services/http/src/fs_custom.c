@@ -32,16 +32,6 @@ static char FsCardAscii(char c)
     return (u >= 0x20U && u < 0x7FU) ? (char)u : '?';
 }
 
-struct fs_custom_data
-{
-    FILE *f;
-#if LWIP_HTTPD_EXAMPLE_CUSTOMFILES_DELAYED
-    int delay_read;
-    fs_wait_cb callback_fn;
-    void *callback_arg;
-#endif
-};
-
 static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
                                      "Location: /can.shtml\r\n"
                                      "Connection: close\r\n"
@@ -1305,8 +1295,6 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
     return 0; // Fallback to default file system
 }
-
-#define CAN_LOG_BUFFER_SIZE 8U
 
 int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
