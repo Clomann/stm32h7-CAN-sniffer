@@ -59,7 +59,6 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define CANLOG_MAX_STATUS_SIZE    5120U
 #define CANLOG_MAX_DEBUG_SIZE     4096U
 #define CANLOG_MAX_CONFIG_SIZE    96U
-#define ERRORRECORDER_MAX_SIZE    CANLOG_MAX_DEBUG_SIZE
 #define IAP_STATUS_MAX_SIZE       640U
 #define CANLOG_FILE_PATH          "/logs/CAN.LOG"
 #define CANLOG_META_DATA_PATH     "/logs/meta"
@@ -402,10 +401,9 @@ static int FsCustomLogs_OpenFile(struct fs_file *file, const char *name)
     return 1;
 }
 
-static int FsCustomLogs_OpenMeta(struct fs_file *file, const char *name)
+static bool
+FsCustomLogs_RenderMeta(char *buffer, size_t buffer_size, size_t *payload_size)
 {
-    (void)name;
-
     uint32_t HeadIndex;
     uint32_t TailIndex;
     uint32_t Capacity;
@@ -431,8 +429,8 @@ static int FsCustomLogs_OpenMeta(struct fs_file *file, const char *name)
     }
 
     DataSize = snprintf(
-        MetaData,
-        sizeof MetaData,
+        buffer,
+        buffer_size,
         CANLOG_META_DATA_STRING,
         (unsigned long int)HeadIndex,
         (unsigned long int)TailIndex,
@@ -441,49 +439,47 @@ static int FsCustomLogs_OpenMeta(struct fs_file *file, const char *name)
         (unsigned long int)(appCanLogGetLogFileSize())
     );
 
-    if (DataSize < 0 || (size_t)DataSize >= sizeof(MetaData))
+    if (DataSize < 0 || (size_t)DataSize >= buffer_size)
     {
-        return 0; // Error: formatting failed or buffer too small
+        return false; // Error: formatting failed or buffer too small
     }
 
-    file->data           = MetaData;
-    file->len            = DataSize;
-    file->index          = 0;
-    file->is_custom_file = 0; /* httpd sends static buffer     */
-    return 1;
+    *payload_size = (size_t)DataSize;
+    return true;
 }
 
-static int FsCustomLogs_OpenConfig(struct fs_file *file, const char *name)
+static bool FsCustomLogs_RenderConfig(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+)
 {
-    (void)name;
-
     int DataSize;
 
     DataSize = snprintf(
-        ConfigData,
-        sizeof ConfigData,
+        buffer,
+        buffer_size,
         CANLOG_CONFIG_STRING,
         (unsigned long int)(appCanLogGetClusterSize()),
         (unsigned long int)(appCanLogGetLogFileSize()),
         (unsigned long int)(appCanLogGetLogFileCount())
     );
 
-    if (DataSize < 0 || (size_t)DataSize >= sizeof(ConfigData))
+    if (DataSize < 0 || (size_t)DataSize >= buffer_size)
     {
-        return 0; // Error: formatting failed or buffer too small
+        return false; // Error: formatting failed or buffer too small
     }
 
-    file->data           = ConfigData;
-    file->len            = DataSize;
-    file->index          = 0;
-    file->is_custom_file = 0; /* httpd sends static buffer     */
-    return 1;
+    *payload_size = (size_t)DataSize;
+    return true;
 }
 
-static int FsCustomLogger_OpenStatus(struct fs_file *file, const char *name)
+static bool FsCustomLogger_RenderStatus(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+)
 {
-    (void)name;
-
     uint8_t IsTracerRunning                           = 1;
     float BusLoadCan1                                 = 0.0;
     float BusLoadCan2                                 = 0.0;
@@ -616,8 +612,8 @@ static int FsCustomLogger_OpenStatus(struct fs_file *file, const char *name)
     }
 
     int n = snprintf(
-        StatusData,
-        sizeof(StatusData),
+        buffer,
+        buffer_size,
         CANLOG_STATUS_STRING,
         IsTracerRunning ? "true" : "false",
         AnyFrameLost ? "true" : "false",
@@ -701,37 +697,33 @@ static int FsCustomLogger_OpenStatus(struct fs_file *file, const char *name)
         Can2TxReplayStats.active ? "true" : "false"
     );
 
-    if (n < 0 || (size_t)n >= sizeof(StatusData))
+    if (n < 0 || (size_t)n >= buffer_size)
     {
-        return 0;
+        return false;
     }
 
-    file->data           = StatusData;
-    file->len            = n;
-    file->index          = 0;
-    file->is_custom_file = 0; /* httpd sends static buffer     */
-    return 1;
+    *payload_size = (size_t)n;
+    return true;
 }
 
-static int FsCustomLogger_OpenDebug(struct fs_file *file, const char *name)
+static bool FsCustomLogger_RenderDebug(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+)
 {
-    (void)name;
-
     FsCustomDebugSnapshotType Snapshot;
-    char *DebugPayload = &DebugData[JSON_RESPONSE_HEADER_SIZE];
-    int n              = 0;
+    int n = 0;
 
     if ((NULL == DebugProvider.read)
         || (0U != DebugProvider.read(DebugProvider.context, &Snapshot)))
     {
-        return 0;
+        return false;
     }
 
-    memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
-
     n = snprintf(
-        DebugPayload,
-        CANLOG_MAX_DEBUG_SIZE,
+        buffer,
+        buffer_size,
         CANLOG_DEBUG_STRING,
         U64_HI(Snapshot.can_rx_frames),
         U64_LO(Snapshot.can_rx_frames),
@@ -793,7 +785,7 @@ static int FsCustomLogger_OpenDebug(struct fs_file *file, const char *name)
         U64_LO(Snapshot.can2_bus_off_events)
     );
 
-    if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
+    if (n < 0 || (size_t)n >= buffer_size)
     {
         unsigned long PayloadSize = 0UL;
         const char *Reason        = "debug_payload_format_failed";
@@ -805,77 +797,59 @@ static int FsCustomLogger_OpenDebug(struct fs_file *file, const char *name)
         }
 
         n = snprintf(
-            DebugPayload,
-            CANLOG_MAX_DEBUG_SIZE,
+            buffer,
+            buffer_size,
             CANLOG_DEBUG_ERROR_STRING,
             Reason,
             PayloadSize,
-            (unsigned long)CANLOG_MAX_DEBUG_SIZE
+            (unsigned long)buffer_size
         );
-        if (n < 0 || (size_t)n >= CANLOG_MAX_DEBUG_SIZE)
+        if (n < 0 || (size_t)n >= buffer_size)
         {
-            return 0;
+            return false;
         }
     }
 
-    file->data  = DebugData;
-    file->len   = (int)JSON_RESPONSE_HEADER_SIZE + n;
-    file->index = 0;
-    file->flags =
-        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
-    file->is_custom_file = 0; /* httpd sends static buffer     */
-    return 1;
+    *payload_size = (size_t)n;
+    return true;
 }
 
-static int FsCustomLogger_OpenErrors(struct fs_file *file, const char *name)
+static bool FsCustomLogger_RenderErrors(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+)
 {
-    (void)name;
-
-    char *ErrorPayload      = &DebugData[JSON_RESPONSE_HEADER_SIZE];
     size_t ErrorPayloadSize = 0U;
     int ErrorDataSize;
 
-    memcpy(DebugData, JSON_RESPONSE_HEADER, JSON_RESPONSE_HEADER_SIZE);
-
-    if (FsCustom_BuildErrorRecorderJson(
-            ErrorPayload,
-            ERRORRECORDER_MAX_SIZE,
-            &ErrorPayloadSize
-        ))
+    if (FsCustom_BuildErrorRecorderJson(buffer, buffer_size, &ErrorPayloadSize))
     {
-        ErrorDataSize = (int)ErrorPayloadSize;
-    }
-    else
-    {
-        ErrorDataSize = snprintf(
-            ErrorPayload,
-            ERRORRECORDER_MAX_SIZE,
-            CANLOG_DEBUG_ERROR_STRING,
-            "error_recorder_payload_build_failed",
-            (unsigned long)ErrorPayloadSize,
-            (unsigned long)ERRORRECORDER_MAX_SIZE
-        );
-
-        if ((ErrorDataSize < 0)
-            || ((size_t)ErrorDataSize >= ERRORRECORDER_MAX_SIZE))
-        {
-            return 0;
-        }
+        *payload_size = ErrorPayloadSize;
+        return true;
     }
 
-    file->data  = DebugData;
-    file->len   = (int)JSON_RESPONSE_HEADER_SIZE + ErrorDataSize;
-    file->index = 0;
-    file->flags =
-        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT;
-    file->is_custom_file = 0; /* httpd sends static buffer     */
-    return 1;
+    ErrorDataSize = snprintf(
+        buffer,
+        buffer_size,
+        CANLOG_DEBUG_ERROR_STRING,
+        "error_recorder_payload_build_failed",
+        (unsigned long)ErrorPayloadSize,
+        (unsigned long)buffer_size
+    );
+
+    if ((ErrorDataSize < 0) || ((size_t)ErrorDataSize >= buffer_size))
+    {
+        return false;
+    }
+
+    *payload_size = (size_t)ErrorDataSize;
+    return true;
 }
 
-static int FsCustomIap_OpenStatus(struct fs_file *file, const char *name)
+static bool
+FsCustomIap_RenderStatus(char *buffer, size_t buffer_size, size_t *payload_size)
 {
-    (void)name;
-
     uint8_t is_logger_active      = 1u;
     uint8_t upload_state          = HTTPD_IAP_UPLOAD_STATE_IDLE;
     uint8_t upload_ready          = 0u;
@@ -967,8 +941,8 @@ static int FsCustomIap_OpenStatus(struct fs_file *file, const char *name)
     }
 
     n = snprintf(
-        IapStatusData,
-        sizeof(IapStatusData),
+        buffer,
+        buffer_size,
         IAP_STATUS_STRING,
         APP_VERSION,
         is_logger_active ? "true" : "false",
@@ -986,11 +960,11 @@ static int FsCustomIap_OpenStatus(struct fs_file *file, const char *name)
         error_reason_name,
         (unsigned long)ingest_status
     );
-    if (n < 0 || (size_t)n >= sizeof(IapStatusData))
+    if (n < 0 || (size_t)n >= buffer_size)
     {
         n = snprintf(
-            IapStatusData,
-            sizeof(IapStatusData),
+            buffer,
+            buffer_size,
             "{"
             "\"logger_active\":%s,"
             "\"upload_ready\":%s,"
@@ -1019,17 +993,14 @@ static int FsCustomIap_OpenStatus(struct fs_file *file, const char *name)
             apply_ready ? "true" : "false",
             (unsigned long)ingest_status
         );
-        if (n < 0 || (size_t)n >= sizeof(IapStatusData))
+        if (n < 0 || (size_t)n >= buffer_size)
         {
-            return 0;
+            return false;
         }
     }
 
-    file->data           = IapStatusData;
-    file->len            = n;
-    file->index          = 0;
-    file->is_custom_file = 0;
-    return 1;
+    *payload_size = (size_t)n;
+    return true;
 }
 
 static int FsCustomApi_OpenVersion(struct fs_file *file, const char *name)
@@ -1043,10 +1014,9 @@ static int FsCustomApi_OpenVersion(struct fs_file *file, const char *name)
     return 1;
 }
 
-static int FsCustomApi_OpenCard(struct fs_file *file, const char *name)
+static bool
+FsCustomApi_RenderCard(char *buffer, size_t buffer_size, size_t *payload_size)
 {
-    (void)name;
-
     SdCidRegisterType cid = {0};
     uint32_t sector_count = 0U;
     uint8_t have_cid      = (SD_E_OK == MMCAdapter_GetCardId(&cid));
@@ -1055,8 +1025,8 @@ static int FsCustomApi_OpenCard(struct fs_file *file, const char *name)
     (void)MMCAdapter_GetSectorCount(&sector_count);
 
     n = snprintf(
-        StatusData,
-        sizeof(StatusData),
+        buffer,
+        buffer_size,
         APP_CARD_STRING,
         have_cid ? "true" : "false",
         (unsigned)cid.manufacturerId,
@@ -1075,22 +1045,21 @@ static int FsCustomApi_OpenCard(struct fs_file *file, const char *name)
         (unsigned long)((uint64_t)sector_count / 2048U)
     );
 
-    if (n < 0 || (size_t)n >= sizeof(StatusData))
+    if (n < 0 || (size_t)n >= buffer_size)
     {
-        return 0;
+        return false;
     }
 
-    file->data           = StatusData;
-    file->len            = n;
-    file->index          = 0;
-    file->is_custom_file = 0;
-    return 1;
+    *payload_size = (size_t)n;
+    return true;
 }
 
-static int FsCustomIap_OpenPrepare(struct fs_file *file, const char *name)
+static bool FsCustomIap_RenderPrepare(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+)
 {
-    (void)name;
-
     uint8_t is_logger_active = 1u;
     const char *reason       = "internal_error";
     const char *ok_text      = "false";
@@ -1121,28 +1090,24 @@ static int FsCustomIap_OpenPrepare(struct fs_file *file, const char *name)
     }
 
     n = snprintf(
-        IapPrepareResultData,
-        sizeof(IapPrepareResultData),
+        buffer,
+        buffer_size,
         IAP_PREPARE_RESULT_STRING,
         ok_text,
         reason
     );
-    if (n < 0 || (size_t)n >= sizeof(IapPrepareResultData))
+    if (n < 0 || (size_t)n >= buffer_size)
     {
-        return 0;
+        return false;
     }
 
-    file->data           = IapPrepareResultData;
-    file->len            = n;
-    file->index          = 0;
-    file->is_custom_file = 0;
-    return 1;
+    *payload_size = (size_t)n;
+    return true;
 }
 
-static int FsCustomIap_OpenApply(struct fs_file *file, const char *name)
+static bool
+FsCustomIap_RenderApply(char *buffer, size_t buffer_size, size_t *payload_size)
 {
-    (void)name;
-
     uint8_t is_logger_active = 1u;
     uint8_t is_verified      = 0u;
     const char *reason       = "internal_error";
@@ -1172,23 +1137,14 @@ static int FsCustomIap_OpenApply(struct fs_file *file, const char *name)
         reason  = "reboot_requested";
     }
 
-    n = snprintf(
-        IapApplyResultData,
-        sizeof(IapApplyResultData),
-        IAP_APPLY_RESULT_STRING,
-        ok_text,
-        reason
-    );
-    if (n < 0 || (size_t)n >= sizeof(IapApplyResultData))
+    n = snprintf(buffer, buffer_size, IAP_APPLY_RESULT_STRING, ok_text, reason);
+    if (n < 0 || (size_t)n >= buffer_size)
     {
-        return 0;
+        return false;
     }
 
-    file->data           = IapApplyResultData;
-    file->len            = n;
-    file->index          = 0;
-    file->is_custom_file = 0;
-    return 1;
+    *payload_size = (size_t)n;
+    return true;
 }
 
 static int FsCustom_OpenPostRedirect(struct fs_file *file, const char *name)
@@ -1210,31 +1166,127 @@ static int FsCustom_OpenPostRedirect(struct fs_file *file, const char *name)
 }
 
 typedef int (*FsCustomOpenFn)(struct fs_file *file, const char *name);
+typedef bool (*FsCustomRenderFn)(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
 
 typedef struct
 {
     const char *path;
     size_t path_length;
-    FsCustomOpenFn open;
+    FsCustomOpenFn open; /* stream / const data; NULL for rendered routes */
+    FsCustomRenderFn render; /* fills buffer; used when open == NULL */
+    char *buffer;
+    size_t buffer_size;
+    uint8_t flags; /* FS_FILE_FLAGS_HEADER_INCLUDED: JSON header is prepended */
 } FsCustomRouteType;
 
-#define FS_CUSTOM_ROUTE(path, handler) {(path), sizeof(path) - 1U, (handler)}
+#define FS_CUSTOM_ROUTE(path, handler)                                         \
+    {                                                                          \
+        (path), sizeof(path) - 1U, (handler), NULL, NULL, 0U, 0U               \
+    }
+#define FS_CUSTOM_RENDER_ROUTE(path, render, buffer, flags)                    \
+    {                                                                          \
+        (path), sizeof(path) - 1U, NULL, (render), (buffer), sizeof(buffer),   \
+            (flags)                                                            \
+    }
 
 /* Prefix match, first hit wins: keep the order. */
 static const FsCustomRouteType FsCustomRoutes[] = {
     FS_CUSTOM_ROUTE(CANLOG_FILE_PATH, FsCustomLogs_OpenFile),
-    FS_CUSTOM_ROUTE(CANLOG_META_DATA_PATH, FsCustomLogs_OpenMeta),
-    FS_CUSTOM_ROUTE(CANLOG_CONFIG_PATH, FsCustomLogs_OpenConfig),
-    FS_CUSTOM_ROUTE(CANLOG_STATUS_PATH, FsCustomLogger_OpenStatus),
-    FS_CUSTOM_ROUTE(CANLOG_DEBUG_PATH, FsCustomLogger_OpenDebug),
-    FS_CUSTOM_ROUTE(ERRORRECORDER_PATH, FsCustomLogger_OpenErrors),
-    FS_CUSTOM_ROUTE(IAP_STATUS_PATH, FsCustomIap_OpenStatus),
+    FS_CUSTOM_RENDER_ROUTE(
+        CANLOG_META_DATA_PATH,
+        FsCustomLogs_RenderMeta,
+        MetaData,
+        0U
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        CANLOG_CONFIG_PATH,
+        FsCustomLogs_RenderConfig,
+        ConfigData,
+        0U
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        CANLOG_STATUS_PATH,
+        FsCustomLogger_RenderStatus,
+        StatusData,
+        0U
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        CANLOG_DEBUG_PATH,
+        FsCustomLogger_RenderDebug,
+        DebugData,
+        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        ERRORRECORDER_PATH,
+        FsCustomLogger_RenderErrors,
+        DebugData,
+        FS_FILE_FLAGS_HEADER_INCLUDED | FS_FILE_FLAGS_HEADER_PERSISTENT
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        IAP_STATUS_PATH,
+        FsCustomIap_RenderStatus,
+        IapStatusData,
+        0U
+    ),
     FS_CUSTOM_ROUTE(APP_VERSION_PATH, FsCustomApi_OpenVersion),
-    FS_CUSTOM_ROUTE(APP_CARD_PATH, FsCustomApi_OpenCard),
-    FS_CUSTOM_ROUTE(IAP_PREPARE_PATH, FsCustomIap_OpenPrepare),
-    FS_CUSTOM_ROUTE(IAP_APPLY_PATH, FsCustomIap_OpenApply),
+    FS_CUSTOM_RENDER_ROUTE(
+        APP_CARD_PATH,
+        FsCustomApi_RenderCard,
+        StatusData,
+        0U
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        IAP_PREPARE_PATH,
+        FsCustomIap_RenderPrepare,
+        IapPrepareResultData,
+        0U
+    ),
+    FS_CUSTOM_RENDER_ROUTE(
+        IAP_APPLY_PATH,
+        FsCustomIap_RenderApply,
+        IapApplyResultData,
+        0U
+    ),
     FS_CUSTOM_ROUTE(CANLOG_POST_REDIRECT_PATH, FsCustom_OpenPostRedirect),
 };
+
+/* Render into the route's buffer and publish it. For routes with
+ * FS_FILE_FLAGS_HEADER_INCLUDED the JSON response header goes first and the
+ * payload follows it. */
+static int
+FsCustom_OpenRendered(struct fs_file *file, const FsCustomRouteType *route)
+{
+    size_t HeaderSize  = 0U;
+    size_t PayloadSize = 0U;
+
+    if (0U != (route->flags & FS_FILE_FLAGS_HEADER_INCLUDED))
+    {
+        HeaderSize = JSON_RESPONSE_HEADER_SIZE;
+    }
+
+    if ((route->buffer_size <= HeaderSize)
+        || !route->render(
+            &route->buffer[HeaderSize],
+            route->buffer_size - HeaderSize,
+            &PayloadSize
+        ))
+    {
+        return 0;
+    }
+
+    memcpy(route->buffer, JSON_RESPONSE_HEADER, HeaderSize);
+
+    file->data           = route->buffer;
+    file->len            = (int)(HeaderSize + PayloadSize);
+    file->index          = 0;
+    file->flags          = route->flags;
+    file->is_custom_file = 0; /* httpd sends static buffer */
+    return 1;
+}
 
 int fs_open_custom(struct fs_file *file, const char *name)
 {
@@ -1246,7 +1298,8 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
         if (0 == strncmp(name, route->path, route->path_length))
         {
-            return route->open(file, name);
+            return (NULL != route->open) ? route->open(file, name)
+                                         : FsCustom_OpenRendered(file, route);
         }
     }
 
