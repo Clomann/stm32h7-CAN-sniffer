@@ -57,3 +57,20 @@ bool FsCustomIap_RenderApply(
     size_t buffer_size,
     size_t *payload_size
 );
+
+/* fs_custom_logger.c: /logger/... */
+bool FsCustomLogger_RenderStatus(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
+bool FsCustomLogger_RenderDebug(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
+bool FsCustomLogger_RenderErrors(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
