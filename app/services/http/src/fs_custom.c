@@ -1,17 +1,12 @@
-#include "ff.h"
 #include "lwip/apps/fs.h"
 #include "lwip/def.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <limits.h>
-#include <stdio.h>
 
 #include "fs_custom.h"
 #include "fs_custom_internal.h"
-#include "FileHandler.h"
-#include "CanLogManager.h"
 
 static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
                                      "Location: /can.shtml\r\n"
@@ -25,7 +20,6 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #warning "LWIP_HTTPD_DYNAMIC_FILE_READ is NOT enabled!"
 #endif
 
-#define CANLOG_MAX_PATH_LENGTH    64U
 #define CANLOG_MAX_META_DATA_SIZE 128U
 #define CANLOG_MAX_STATUS_SIZE    5120U
 #define CANLOG_MAX_DEBUG_SIZE     4096U
@@ -44,25 +38,6 @@ static const char redirect_reply[] = "HTTP/1.1 303 See Other\r\n"
 #define APP_VERSION_PATH          "/api/version"
 #define APP_CARD_PATH             "/api/card"
 
-#define CANLOG_META_DATA_STRING                                                \
-    "{\"head\":%lu,\"tail\":%lu,\"capacity\":%lu,\"latest\":\"CAN.LOG%lu\","   \
-    "\"file_size\":\"%lu\"}"
-
-#define CANLOG_CONFIG_STRING                                                   \
-    "{\"cluster_size\":%lu,\"log_file_size\":%lu,\"log_file_count\":%lu}"
-
-typedef struct
-{
-    uint8_t stage;
-    uint32_t index;
-    uint32_t callcount;
-    uint32_t byteCount;
-    char name[CANLOG_MAX_PATH_LENGTH];
-} CustomHandlerState;
-
-static CustomHandlerState reqState;
-static FatFsDeviceType CanLogReadFileDevice;
-
 /* WARNING: Not thread-safe. MetaData/StatusData shared across requests.
  * Assumes single-threaded or serialized HTTP request processing. */
 static char MetaData[CANLOG_MAX_META_DATA_SIZE];
@@ -72,117 +47,6 @@ static char ConfigData[CANLOG_MAX_CONFIG_SIZE];
 static char IapStatusData[IAP_STATUS_MAX_SIZE];
 static char IapPrepareResultData[96U];
 static char IapApplyResultData[96U];
-
-/* accept only files inside /logs/ and beginning with CAN.LOG ---- */
-static int FsCustomLogs_OpenFile(struct fs_file *file, const char *name)
-{
-    uint32_t FileSize                     = 0U;
-    char FileName[CANLOG_MAX_PATH_LENGTH] = FILEHANDLER_PARTITION_NO;
-
-    reqState.index     = 0;
-    reqState.stage     = 0;
-    reqState.callcount = 0;
-    reqState.byteCount = 0;
-
-    strncat(FileName, name, sizeof(FileName) - strlen(FileName) - 1);
-    strncpy((char *)reqState.name, FileName, sizeof(reqState.name) - 1);
-    reqState.name[sizeof(reqState.name) - 1] = '\0';
-
-    if (0 != FatFS_SD_OpenFileForRead(&CanLogReadFileDevice, FileName))
-    {
-        return 0;
-    }
-
-    if (FR_OK != FatFS_SD_GetFileSize(&CanLogReadFileDevice, &FileSize)
-        || FileSize > INT_MAX)
-    {
-        (void)FatFS_SD_CloseFile(&CanLogReadFileDevice);
-        return 0;
-    }
-
-    CanLogReadFileDevice.readTargetSize = FileSize;
-
-    file->pextension     = &reqState;
-    file->data           = NULL;
-    file->len            = (int32_t)FileSize; // tell lwip the total file size
-    file->index          = 0;
-    file->is_custom_file = 1;
-
-    return 1;
-}
-
-static bool
-FsCustomLogs_RenderMeta(char *buffer, size_t buffer_size, size_t *payload_size)
-{
-    uint32_t HeadIndex;
-    uint32_t TailIndex;
-    uint32_t Capacity;
-    uint32_t Progression;
-    int DataSize;
-
-    (void)FsCustom_GetCanLogHeadIndex(&HeadIndex);
-    (void)FsCustom_GetCanLogTailIndex(&TailIndex);
-    (void)FsCustom_GetCanLogCapacity(&Capacity);
-
-    if (HeadIndex >= TailIndex)
-    {
-        Progression = HeadIndex - TailIndex + 1;
-    }
-    else if (HeadIndex < TailIndex)
-    {
-        Progression = Capacity + (HeadIndex - TailIndex + 1);
-    }
-
-    if (Progression < 2)
-    {
-        HeadIndex = TailIndex;
-    }
-
-    DataSize = snprintf(
-        buffer,
-        buffer_size,
-        CANLOG_META_DATA_STRING,
-        (unsigned long int)HeadIndex,
-        (unsigned long int)TailIndex,
-        (unsigned long int)Capacity,
-        (unsigned long int)((HeadIndex + Capacity - 1) % Capacity),
-        (unsigned long int)(appCanLogGetLogFileSize())
-    );
-
-    if (DataSize < 0 || (size_t)DataSize >= buffer_size)
-    {
-        return false; // Error: formatting failed or buffer too small
-    }
-
-    *payload_size = (size_t)DataSize;
-    return true;
-}
-
-static bool FsCustomLogs_RenderConfig(
-    char *buffer,
-    size_t buffer_size,
-    size_t *payload_size
-)
-{
-    int DataSize;
-
-    DataSize = snprintf(
-        buffer,
-        buffer_size,
-        CANLOG_CONFIG_STRING,
-        (unsigned long int)(appCanLogGetClusterSize()),
-        (unsigned long int)(appCanLogGetLogFileSize()),
-        (unsigned long int)(appCanLogGetLogFileCount())
-    );
-
-    if (DataSize < 0 || (size_t)DataSize >= buffer_size)
-    {
-        return false; // Error: formatting failed or buffer too small
-    }
-
-    *payload_size = (size_t)DataSize;
-    return true;
-}
 
 static int FsCustom_OpenPostRedirect(struct fs_file *file, const char *name)
 {
@@ -345,55 +209,12 @@ int fs_open_custom(struct fs_file *file, const char *name)
 
 int fs_read_custom(struct fs_file *file, char *buffer, int count)
 {
-    FRESULT fr;
-    uint32_t len              = 0U;
-    CustomHandlerState *state = (CustomHandlerState *)file->pextension;
-    uint32_t ByteCount;
-
-    if (state == NULL)
-    {
-        return FS_READ_EOF;
-    }
-
-    ByteCount = state->byteCount;
-
-    if (ByteCount >= CanLogReadFileDevice.readTargetSize)
-    {
-        state->callcount = 0;
-        state->byteCount = 0;
-        return FS_READ_EOF;
-    }
-
-    if (count <= 0)
-    {
-        return FS_READ_EOF;
-    }
-    else if (CanLogReadFileDevice.readTargetSize - ByteCount > (uint32_t)count)
-    {
-        len = (uint32_t)count;
-    }
-    else
-    {
-        len = CanLogReadFileDevice.readTargetSize - ByteCount;
-    }
-
-    fr = FatFS_SD_ReadFile(&CanLogReadFileDevice, buffer, len);
-
-    if (FR_OK != fr)
-    {
-        return FS_READ_EOF;
-    }
-
-    state->callcount++;
-    state->byteCount += len;
-
-    return (int)len; // triggers send
+    return FsCustomLogs_Read(file, buffer, count);
 }
 
 void fs_close_custom(struct fs_file *file)
 {
-    FatFS_SD_CloseFile(&CanLogReadFileDevice);
-    file->pextension = NULL; // optional cleanup
+    FsCustomLogs_Close(file);
 }
 
 #endif

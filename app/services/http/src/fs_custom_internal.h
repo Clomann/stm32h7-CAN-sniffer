@@ -74,3 +74,18 @@ bool FsCustomLogger_RenderErrors(
     size_t buffer_size,
     size_t *payload_size
 );
+
+/* fs_custom_logs.c: /logs/... (CAN.LOG downloads keep state across reads) */
+int FsCustomLogs_OpenFile(struct fs_file *file, const char *name);
+int FsCustomLogs_Read(struct fs_file *file, char *buffer, int count);
+void FsCustomLogs_Close(struct fs_file *file);
+bool FsCustomLogs_RenderMeta(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);
+bool FsCustomLogs_RenderConfig(
+    char *buffer,
+    size_t buffer_size,
+    size_t *payload_size
+);

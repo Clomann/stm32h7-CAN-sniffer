@@ -36,6 +36,7 @@ list(APPEND sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom_iap.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom_json.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom_logger.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/fs_custom_logs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/httpd_cgi_ssi.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/httpd_post.c
     ${CMAKE_CURRENT_SOURCE_DIR}/services/http/src/lwip.c
