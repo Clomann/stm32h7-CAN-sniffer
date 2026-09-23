@@ -288,13 +288,13 @@ WEAK int flash_area_write(
     );
     boot_internal_flash_write(addr, src, len);
 
-#if VALIDATE_PROGRAM_OP
+    /* boot_internal_flash_write reports nothing, so the read-back is the only
+     * way a failed program is noticed. */
     if (memcmp((void *)addr, src, len) != 0)
     {
         MCUBOOT_LOG_ERR("%s: Program Failed", __func__);
-        assert(0);
+        return -1;
     }
-#endif
 
     return 0;
 }
@@ -348,17 +348,19 @@ flash_area_erase(const struct flash_area *fa, uint32_t off, uint32_t len)
         boot_internal_flash_erase_sector(addr);
     }
 
-#if VALIDATE_PROGRAM_OP
     for (size_t i = 0; i < len; i++)
     {
-        uint8_t *val = (void *)(start_addr + i);
+        const uint8_t *val = (const void *)(start_addr + i);
         if (*val != 0xff)
         {
-            MCUBOOT_LOG_ERR("%s: Erase at 0x%x Failed", __func__, (int)val);
-            assert(0);
+            MCUBOOT_LOG_ERR(
+                "%s: Erase at 0x%x Failed",
+                __func__,
+                (unsigned)(uintptr_t)val
+            );
+            return -1;
         }
     }
-#endif
 
     return 0;
 }
