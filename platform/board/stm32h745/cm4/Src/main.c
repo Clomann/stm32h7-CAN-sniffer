@@ -112,22 +112,19 @@ int main(void)
     /* Set the SPI3 parameters */
     SpiHandle4.Instance  = SPI4;
     SpiHandle4.Init.Mode = SPI_MODE_SLAVE;
-#if TEST_SPI_PLL2
-    SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
-#else
+    /* Slave mode: the prescaler is unused, the master drives SCK. */
     SpiHandle4.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-#endif
-    SpiHandle4.Init.Direction      = SPI_DIRECTION_2LINES;
-    SpiHandle4.Init.CLKPhase       = SPI_PHASE_1EDGE;
-    SpiHandle4.Init.CLKPolarity    = SPI_POLARITY_LOW;
-    SpiHandle4.Init.DataSize       = SPI_DATASIZE_8BIT;
-    SpiHandle4.Init.FirstBit       = SPI_FIRSTBIT_MSB;
-    SpiHandle4.Init.TIMode         = SPI_TIMODE_DISABLE;
-    SpiHandle4.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-    SpiHandle4.Init.CRCPolynomial  = 7;
-    SpiHandle4.Init.CRCLength      = SPI_CRC_LENGTH_8BIT;
-    SpiHandle4.Init.NSS            = SPI_NSS_HARD_INPUT;
-    SpiHandle4.Init.NSSPMode       = SPI_NSS_PULSE_DISABLE;
+    SpiHandle4.Init.Direction         = SPI_DIRECTION_2LINES;
+    SpiHandle4.Init.CLKPhase          = SPI_PHASE_1EDGE;
+    SpiHandle4.Init.CLKPolarity       = SPI_POLARITY_LOW;
+    SpiHandle4.Init.DataSize          = SPI_DATASIZE_8BIT;
+    SpiHandle4.Init.FirstBit          = SPI_FIRSTBIT_MSB;
+    SpiHandle4.Init.TIMode            = SPI_TIMODE_DISABLE;
+    SpiHandle4.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
+    SpiHandle4.Init.CRCPolynomial     = 7;
+    SpiHandle4.Init.CRCLength         = SPI_CRC_LENGTH_8BIT;
+    SpiHandle4.Init.NSS               = SPI_NSS_HARD_INPUT;
+    SpiHandle4.Init.NSSPMode          = SPI_NSS_PULSE_DISABLE;
     SpiHandle4.Init.MasterKeepIOState =
         SPI_MASTER_KEEP_IO_STATE_ENABLE; /* Recommended setting to avoid glitches */
 
