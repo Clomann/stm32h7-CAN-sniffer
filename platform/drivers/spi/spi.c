@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "spi.h"
@@ -139,6 +140,14 @@ static comm_status_t m_PrepareTxSlot(
         return COMM_RX_FULL;
     }
 
+    if (pMsg->msgBase.length > (txSlots->stride - SPI_SLOT_META_BYTES)
+        || pMsg->msgBase.length > (rxSlots->stride - SPI_SLOT_META_BYTES)
+        || pMsg->msgBase.length > UINT16_MAX)
+    {
+        *out_slot = NULL;
+        return COMM_INVALID_PARAMETER;
+    }
+
     txSlot = (SpiSlotType *)ring_buffer_reserve(txSlots);
 
     if (txSlot == NULL)
@@ -152,9 +161,9 @@ static comm_status_t m_PrepareTxSlot(
 
     /* Tx/Rx is kept here for compatibility with functions in SD.c */
     txSlot->transaction.direction = direction;
-    txSlot->transaction.length    = pMsg->msgBase.length;
+    txSlot->transaction.length    = (uint16_t)pMsg->msgBase.length;
 
-    txSlot->used_len = pMsg->msgBase.length;
+    txSlot->used_len = (uint16_t)pMsg->msgBase.length;
 
     *out_slot = txSlot;
 
