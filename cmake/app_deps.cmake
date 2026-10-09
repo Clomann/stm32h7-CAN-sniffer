@@ -32,6 +32,14 @@ add_subdirectory(libs)
 add_subdirectory(middleware)
 add_subdirectory(platform/ports)
 
+# Keep third-party warnings out of our build: vendored (libs/) sources compile with -w,
+# vendored headers are consumed via -isystem. First-party code keeps the full warning set.
+# third_party_interface's sources are added here (this directory, via app_deps.cmake being
+# include()'d into the root) so the property is visible to the app target created later.
+get_target_property(_app_vendor_SRCS third_party_interface INTERFACE_SOURCES)
+list(FILTER _app_vendor_SRCS INCLUDE REGEX "/libs/")
+set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w")
+
 set(app_sources_SRCS "${sources_SRCS}")
 set(app_include_path_DIRS "${include_path_DIRS}")
 set(app_link_libs lwrb freertos_kernel freertos_config third_party_interface)

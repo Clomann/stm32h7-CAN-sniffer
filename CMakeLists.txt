@@ -255,6 +255,10 @@ set(FREERTOS_HEAP 4            CACHE STRING "" FORCE)
 
 FetchContent_MakeAvailable(freertos_kernel)
 
+get_target_property(_frt_inc freertos_kernel INTERFACE_INCLUDE_DIRECTORIES)
+set_target_properties(freertos_kernel PROPERTIES
+    INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_frt_inc}")
+
 # Set linker script
 if(CORE STREQUAL "CM7")
     set(linker_script_app               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld)
@@ -326,6 +330,14 @@ elseif(CORE STREQUAL "CM4")
     add_subdirectory(libs)
 
     if(IS_APP_BUILD)
+        # Keep third-party warnings out of our build: vendored (libs/) sources compile
+        # with -w, vendored headers are consumed via -isystem. First-party code keeps
+        # the full warning set. Set here (this directory) so the property is visible
+        # to the app target created later in this same file.
+        get_target_property(_app_vendor_SRCS third_party_interface INTERFACE_SOURCES)
+        list(FILTER _app_vendor_SRCS INCLUDE REGEX "/libs/")
+        set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w")
+
         set(app_sources_SRCS ${sources_SRCS})
         set(app_include_path_DIRS ${include_path_DIRS})
         set(app_link_libs lwrb freertos_kernel freertos_config third_party_interface)

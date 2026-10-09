@@ -403,7 +403,8 @@ target_include_directories(third_party_interface        INTERFACE ${include_path
 
 target_compile_definitions(third_party_interface INTERFACE ${symbols_SYMB})
 
-target_compile_options(third_party_interface INTERFACE
-    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-w>
-    $<$<CXX_COMPILER_ID:MSVC>:/wd4100>
-)
+# Warning suppression for these vendored sources is applied from the root
+# CMakeLists.txt (via set_source_files_properties on third_party_interface's
+# INTERFACE_SOURCES) instead of here: source file properties are scoped to the
+# directory that sets them, and the app/bootloader targets that actually
+# compile these files are defined in the root directory, not this one.
