@@ -181,7 +181,7 @@ uint8_t CanLogBuffer_IsBlockReady(uint8_t *rdy)
     return 0;
 }
 
-uint8_t CanLogBuffer_UsedSlots(uint8_t *slots)
+uint8_t CanLogBuffer_UsedSlots(uint32_t *slots)
 {
     uint32_t EntriesRead = 0;
     CanLogEntryStackBufferType EntryBuffer;

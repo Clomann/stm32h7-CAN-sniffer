@@ -2596,7 +2596,7 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
 
     if (*(CanLogCtrlData.commitLog))
     {
-        CanLogBuffer_UsedSlots((uint8_t *)&SlotsToWrite);
+        CanLogBuffer_UsedSlots(&SlotsToWrite);
 
         if (SlotsToWrite > 0)
         {

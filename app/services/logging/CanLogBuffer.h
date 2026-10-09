@@ -102,7 +102,7 @@ uint8_t CanLogBuffer_FillBlockWithPadding(void);
 
 uint8_t CanLogBuffer_IsBlockReady(uint8_t *rdy);
 
-uint8_t CanLogBuffer_UsedSlots(uint8_t *slots);
+uint8_t CanLogBuffer_UsedSlots(uint32_t *slots);
 uint8_t CanLogBuffer_UsedBytes(uint32_t *bytes);
 
 uint8_t CanLogBuffer_GetCurrentBlockIndex(uint32_t *index);
