@@ -105,7 +105,11 @@ typedef struct
 } RxBuff_t;
 
 /* Memory Pool Declaration */
-#define ETH_RX_BUFFER_CNT 12U
+/* Must be between ETH_RX_DESC_CNT and 2*ETH_RX_DESC_CNT (see note 2.a above).
+ * At exactly 1x, every pbuf lwIP still holds leaves a descriptor that cannot be
+ * refilled, RxAllocStatus latches RX_ALLOC_ERROR, and low_level_input() then
+ * refuses to drain - which is also what would have freed a buffer. Keep slack. */
+#define ETH_RX_BUFFER_CNT 24U
 LWIP_MEMPOOL_DECLARE(
     RX_POOL,
     ETH_RX_BUFFER_CNT,

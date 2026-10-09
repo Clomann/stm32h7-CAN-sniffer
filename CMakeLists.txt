@@ -78,7 +78,9 @@ set(STM32_HAL_PATH                  ${CMAKE_CURRENT_SOURCE_DIR}/libs/STM32_HAL/S
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJ_PATH}/_bin/${CMAKE_BUILD_TYPE})
 
-set(LWIP_HEAP_SIZE 0x1ffe8)
+# Must keep _ebss below the ALIGN(16K) boundary at 0x30044000 that .dma_buffer
+# sits on, or .dma_buffer jumps a full 16K and overruns RAM_D2.
+set(LWIP_HEAP_SIZE 0x1afe8)
 
 message("Build type: "              ${CMAKE_BUILD_TYPE})
 

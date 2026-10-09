@@ -287,6 +287,7 @@ SECTIONS
     . = ALIGN(4);
     *(.ram_d2)
     . = ALIGN(4);
+    __ram_d2_end__ = .;
   } >RAM_D2
 
   /* Reserved at a fixed 16K, MPU-region-aligned budget: RAM_D2 starts at a
@@ -302,6 +303,13 @@ SECTIONS
 
   ASSERT(__dma_buffers_end__ - __dma_buffers_start__ <= 16K,
          "dma_buffer section exceeds its 16K MPU-region budget - bump ALIGN() here and MPU_InitStruct.Size in MPU_Config()")
+
+  /* Everything ahead of .dma_buffer (lwip_sec, .data, .bss, .ram_d2) must end
+     inside the same 16K block, or the ALIGN(16K) above silently burns up to 16K
+     of padding. RAM_D2 then overflows and the linker blames .dma_buffer instead
+     of whatever actually grew. Headroom is thin by design - see LWIP_HEAP_SIZE in CMakeLists.txt. */
+  ASSERT(__dma_buffers_start__ - __ram_d2_end__ < 8K,
+         "RAM_D2 content crossed the 16K boundary .dma_buffer aligns to, costing up to 16K of alignment padding - reduce LWIP_HEAP_SIZE (CMakeLists.txt) or ETH_RX_BUFFER_CNT (ethernetif.c) to pull __ram_d2_end__ back below the boundary")
 
   PROVIDE(__dma_buffers_start = __dma_buffers_start__);
   PROVIDE(__dma_buffers_end   = __dma_buffers_end__);
