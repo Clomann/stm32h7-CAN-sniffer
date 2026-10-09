@@ -199,6 +199,15 @@ int FsCustomLogs_Read(struct fs_file *file, char *buffer, int count)
 
 void FsCustomLogs_Close(struct fs_file *file)
 {
+    /* lwip's fs_open() forces is_custom_file to 1 for every fs_open_custom()
+     * route, so fs_close() lands here for the rendered endpoints too. Only the
+     * streamed CAN.LOG route owns CanLogReadFileDevice; closing it for anything
+     * else aborts a download that is still in progress. */
+    if (&reqState != file->pextension)
+    {
+        return;
+    }
+
     FatFS_SD_CloseFile(&CanLogReadFileDevice);
     file->pextension = NULL; // optional cleanup
 }
