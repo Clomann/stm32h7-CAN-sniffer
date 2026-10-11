@@ -108,7 +108,7 @@ static comm_status_t m_PrepareTxSlot(
 
     res = COMM_SUCCESS;
 
-    if (drv == NULL || drv->TxFrameBuffer == NULL)
+    if (drv == NULL || drv->TxFrameBuffer == NULL || drv->RxFrameBuffer == NULL)
     {
         res = COMM_NULL_POINTER;
         SPI_ErrorHandler();
@@ -127,13 +127,17 @@ static comm_status_t m_PrepareTxSlot(
     }
 
     txSlots = (RingBuffer *)Spi_GetSlots(drv->TxFrameBuffer, Prio);
+    rxSlots = (RingBuffer *)Spi_GetSlots(drv->RxFrameBuffer, Prio);
+
+    if (NULL == txSlots || NULL == rxSlots)
+    {
+        return COMM_NULL_POINTER;
+    }
 
     if (txSlots->isFull)
     {
         return COMM_TX_FULL;
     }
-
-    rxSlots = (RingBuffer *)Spi_GetSlots(drv->RxFrameBuffer, Prio);
 
     if (rxSlots->isFull)
     {
