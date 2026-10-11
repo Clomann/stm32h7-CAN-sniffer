@@ -64,6 +64,7 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "FW_ENABLE_ANALYZER": "ON",
                 "CORE": "CM7",
                 "DUAL_CORE": "true",
                 "MCUBOOT_ENABLE_ENCRYPTION": "ON"
@@ -74,6 +75,7 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "FW_ENABLE_ANALYZER": "ON",
                 "CORE": "CM7",
                 "DUAL_CORE": "true",
                 "MCUBOOT_ENABLE_ENCRYPTION": "ON",
@@ -85,6 +87,7 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "FW_ENABLE_ANALYZER": "ON",
                 "CORE": "CM7",
                 "DUAL_CORE": "true",
                 "BUILD_TARGET": "bootloader",
@@ -96,6 +99,7 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "FW_ENABLE_ANALYZER": "ON",
                 "CORE": "CM7",
                 "DUAL_CORE": "true",
                 "BUILD_TARGET": "both",
@@ -107,6 +111,7 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "FW_ENABLE_ANALYZER": "ON",
                 "CORE": "CM4",
                 "DUAL_CORE": "true"
             }
@@ -115,6 +120,7 @@
             "name": "Pre_Release_CM7",
             "inherits": "Release_CM7",
             "cacheVariables": {
+                "FW_ENABLE_ANALYZER": "OFF",
                 "CAN_STATIC_TX_REPLAY_ENABLE": "ON",
                 "CAN_STATIC_TX_REPLAY_CHANNEL_MASK": "3U",
                 "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE": "1U",

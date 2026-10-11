@@ -38,7 +38,7 @@ add_subdirectory(platform/ports)
 # include()'d into the root) so the property is visible to the app target created later.
 get_target_property(_app_vendor_SRCS third_party_interface INTERFACE_SOURCES)
 list(FILTER _app_vendor_SRCS INCLUDE REGEX "/libs/")
-set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w")
+set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w;-fno-analyzer")
 
 set(app_sources_SRCS "${sources_SRCS}")
 set(app_include_path_DIRS "${include_path_DIRS}")

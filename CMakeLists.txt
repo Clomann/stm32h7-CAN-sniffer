@@ -14,6 +14,7 @@ set(APP_VERSION "auto" CACHE STRING "Application version string exposed via HTTP
 set(FW_USE_PRINTF_FLOAT ON CACHE BOOL "Enable printf float formatting (requires FW_USE_MALLOC)")
 set(FW_USE_MALLOC ${FW_USE_PRINTF_FLOAT} CACHE BOOL "Enable newlib heap (malloc/free) via sysmem.c")
 set(FW_LINKER_TRACE OFF CACHE BOOL "Enable linker --trace output and symbol tracing")
+set(FW_ENABLE_ANALYZER OFF CACHE BOOL "Run GCC static analyzer (-fanalyzer) on first-party sources")
 set(DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE "0U" CACHE STRING "Enable CAN frame ID sequence debug checking")
 set(DEBUG_CAN_ID_SEQUENCE_MAX_ID "0xFFU" CACHE STRING "Maximum CAN ID used by sequence debug checking")
 set(MAX_LOG_FILE_COUNT_DEFAULT "640U")
@@ -336,7 +337,7 @@ elseif(CORE STREQUAL "CM4")
         # to the app target created later in this same file.
         get_target_property(_app_vendor_SRCS third_party_interface INTERFACE_SOURCES)
         list(FILTER _app_vendor_SRCS INCLUDE REGEX "/libs/")
-        set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w")
+        set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w;-fno-analyzer")
 
         set(app_sources_SRCS ${sources_SRCS})
         set(app_include_path_DIRS ${include_path_DIRS})
@@ -430,6 +431,11 @@ function(configure_firmware_target target_name)
         target_link_options(${target_name} PRIVATE
             -u _printf_float                # STDIO float formatting support
         )
+    endif()
+
+    # Vendored sources opt out again via -fno-analyzer in their COMPILE_OPTIONS
+    if(FW_ENABLE_ANALYZER)
+        target_compile_options(${target_name} PRIVATE -fanalyzer)
     endif()
 
     # Execute post-build to print size

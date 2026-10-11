@@ -216,7 +216,7 @@ list(APPEND include_path_DIRS ${boot_include_path_DIRS})
 # vendored headers are consumed via -isystem. First-party code keeps the full warning set.
 set(_boot_vendor_SRCS ${sources_SRCS})
 list(FILTER _boot_vendor_SRCS INCLUDE REGEX "/libs/")
-set_source_files_properties(${_boot_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w")
+set_source_files_properties(${_boot_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w;-fno-analyzer")
 
 set(_boot_system_include_path_DIRS ${include_path_DIRS})
 list(FILTER _boot_system_include_path_DIRS INCLUDE REGEX "/libs/")
