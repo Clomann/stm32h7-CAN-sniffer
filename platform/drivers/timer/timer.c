@@ -134,7 +134,7 @@ uint8_t TIMx_Init(uint32_t resolution)
     uint32_t MaxArr;
     uint32_t Arr;
     uint32_t Prescaler;
-    volatile uint64_t freq;
+    volatile uint64_t freq = 0;
     volatile uint64_t freq_int;
 
     InputClock = GetTimerInputClock(TIMx);
@@ -159,6 +159,7 @@ uint8_t TIMx_Init(uint32_t resolution)
     if (0 == Arr)
     {
         TIM_ErrorHandlerHook();
+        return 1;
     }
 
     res = ComputePrescalerAndARR(InputClock, freq, MaxArr, &Prescaler, &Arr);
