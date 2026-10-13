@@ -2418,7 +2418,6 @@ ClmErrorType appCanLogHandlerPoll(CanLogControlDataType *data)
         fdcan_msg_port_flush();
     }
 
-    (void)LocalFrameCount;
     LocalFrameCount = 0;
 
     AbsTime = FDCAN_GetTimestampHook();

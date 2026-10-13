@@ -398,13 +398,6 @@ static void low_level_init(struct netif *netif)
             HAL_ETH_SetMACConfig(&heth, &MACConf);
 
             HAL_ETH_Start_IT(&heth);
-            volatile uint32_t tmp;
-            (void)tmp;
-            for (int i = 0; i < ETH_RX_DESC_CNT; i++)
-            {
-                tmp = (DMARxDscrTab[i].DESC0 >> 31) & 0x1;
-                tmp = (uint32_t)DMARxDscrTab[i].BackupAddr0;
-            }
             netif_set_up(netif);
             netif_set_link_up(netif);
 
