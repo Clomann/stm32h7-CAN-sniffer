@@ -119,6 +119,9 @@ void FDCAN_1_IRQHandler(void);
 #define FDCAN_1_TX_IRQn       FDCAN1_IT1_IRQn
 #define FDCAN_1_TX_IRQHandler FDCAN1_IT1_IRQHandler
 
+/* Defined via the FDCAN_1_TX_IRQHandler macro in fdcan.c. */
+void FDCAN_1_TX_IRQHandler(void);
+
 #define FDCAN_1_MAX_MSG_COUNT 10u
 
 /* FDCAN 2 ========================================= */
@@ -143,6 +146,9 @@ void FDCAN_1_IRQHandler(void);
 void FDCAN_2_IRQHandler(void);
 #define FDCAN_2_TX_IRQn       FDCAN2_IT1_IRQn
 #define FDCAN_2_TX_IRQHandler FDCAN2_IT1_IRQHandler
+
+/* Defined via the FDCAN_2_TX_IRQHandler macro in fdcan.c. */
+void FDCAN_2_TX_IRQHandler(void);
 
 #define FDCAN_2_MAX_MSG_COUNT 10u
 

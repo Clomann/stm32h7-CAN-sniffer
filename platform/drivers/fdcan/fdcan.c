@@ -280,7 +280,8 @@ fdcan_static_replay_rearm(FdcanInstanceType *instance, uint32_t mask)
     }
 
     instance->hfdcan.Instance->TXBAR = request_mask;
-    instance->staticReplayRequests += __builtin_popcount(request_mask);
+    instance->staticReplayRequests +=
+        (uint32_t)__builtin_popcount(request_mask);
 }
 
 static void fdcan_static_replay_rearm_completed(
@@ -331,7 +332,8 @@ static void fdcan_static_replay_rearm_completed(
         }
     }
 
-    instance->staticReplayCompleted += __builtin_popcount(completed_mask);
+    instance->staticReplayCompleted +=
+        (uint32_t)__builtin_popcount(completed_mask);
     fdcan_static_replay_rearm(instance, request_mask);
 }
 #endif
