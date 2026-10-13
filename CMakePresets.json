@@ -125,7 +125,7 @@
                 "CAN_STATIC_TX_REPLAY_CHANNEL_MASK": "3U",
                 "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE": "1U",
                 "CAN_STATIC_TX_REPLAY_FDCAN_MODE": "FDCAN_MODE_EXTERNAL_LOOPBACK",
-                "COMPONENT_TRACE": "COMPONENT_TRACE_NONE"
+                "COMPONENT_TRACE": "COMPONENT_TRACE_FILEHANDLER"
             }
         }
     ],
