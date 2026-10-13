@@ -5,3 +5,6 @@ libs
 middleware/
 STM32CubeIDE/
 tests/_deps/
+_deps/
+.venv/
+generated/

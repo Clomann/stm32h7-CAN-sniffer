@@ -93,6 +93,7 @@ bootloader/hal/bootloader_uart.c
 bootloader/hal/bootloader_uart.h
 bootloader/hal/logging.h
 bootloader/irq_handlers.c
+bootloader/irq_handlers.h
 bootloader/mbedtls_config.h
 bootloader/mbedtls_platform.h
 bootloader/mcuboot_config/keys.c
@@ -102,6 +103,7 @@ bootloader/mcuboot_config/mcuboot_logging.h
 bootloader/mcuboot_port.c
 bootloader/os/os_malloc.h
 bootloader/syscalls.c
+bootloader/syscalls.h
 bootloader/sysflash/sysflash.h
 bootloader/sysmem.c
 platform/Common/Inc/FwUpdateHandoff.h
