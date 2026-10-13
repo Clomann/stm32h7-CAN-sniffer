@@ -382,15 +382,45 @@ function(configure_firmware_target target_name)
         -Wextra
         -Wpedantic
         -Werror=implicit-function-declaration
-        # -Wtype-limits 
-        # -Wsign-compare 
-        # -Wconversion
+        -Werror=incompatible-pointer-types
+        -Werror=int-conversion
+        -Werror=return-type
+        -Werror=implicit-int
         # Full debug configuration
         $<$<CONFIG:Release>:-O1;-g3;-ggdb>
         $<$<CONFIG:Debug>:-Og;-g3;-ggdb>
         -fstack-usage
         -ffunction-sections
         -fdata-sections
+
+        -Wundef                     # undefined macro in #if
+        -Wcast-align                # pointer cast raising alignment req -> Cortex-M fault risk
+        # -Wcast-qual                 # casting away const/volatile
+        -Wnull-dereference
+        -Wlogical-op                # & vs &&, suspicious ranges
+        -Wduplicated-cond -Wduplicated-branches
+        -Wredundant-decls
+        -Wjump-misses-init
+        -Wvla                       # variable-length arrays (unbounded stack)
+        -Wwrite-strings             # string literals become const char*
+        -Wswitch
+        -Wswitch-default
+        # -Wswitch-enum
+        -Wshift-overflow=2
+        -Wstack-usage=2048          # fail if a frame exceeds budget; start high, ratchet down
+        $<$<COMPILE_LANGUAGE:C>:-Wold-style-definition>
+
+        -Wconversion -Wsign-conversion -Warith-conversion
+
+        -Wdouble-promotion          # float math silently widened to double
+        -Wformat=2 -Wformat-truncation=2 -Wformat-overflow=2
+        $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+        $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+
+        -Wshadow
+        -Wimplicit-fallthrough=5    # require the attribute, not a comment
+
+        # -Werror
     )
 
     # Linker options
