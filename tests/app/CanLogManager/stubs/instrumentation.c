@@ -1,9 +1,11 @@
 #include "instrumentation.h"
 
-InstrErrorType Instrumentation_SerializeHook(uint8_t *buf, uint32_t *size)
+InstrErrorType
+Instrumentation_SerializeHook(const uint8_t **buf, uint32_t *size)
 {
     if (buf && size)
     {
+        *buf  = NULL;
         *size = 0;
     }
     return 0;

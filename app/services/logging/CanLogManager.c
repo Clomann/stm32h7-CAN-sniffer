@@ -1858,14 +1858,15 @@ static InstrErrorType appPersistInstrumentationData(void)
     FRESULT res;
     FatFsDeviceType File;
     uint32_t BytesToWrite = 0;
-    uint8_t *Data         = NULL;
+    const uint8_t *Data   = NULL;
     const char FileName[] = "InstrumentationData.bin";
 
     res = FatFS_SD_OpenFileForOverWrite(&File, FileName);
 
-    if (FR_OK == res)
+    if ((FR_OK == res)
+        && (INSTR_E_OK == Instrumentation_SerializeHook(&Data, &BytesToWrite))
+        && (NULL != Data))
     {
-        Instrumentation_SerializeHook(Data, &BytesToWrite);
         FatFS_SD_WriteFile(&File, (const char *)Data, BytesToWrite);
     }
 

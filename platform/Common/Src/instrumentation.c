@@ -100,22 +100,21 @@ __attribute__((weak)) void CanLogManager_InstrumentationFdcanMsgPortPeakHook(
 #define INSTR_DATA_CONTENT ""
 
 __attribute__((weak)) InstrErrorType
-Instrumentation_SerializeHook(uint8_t *buf, uint32_t *size)
+Instrumentation_SerializeHook(const uint8_t **buf, uint32_t *size)
 {
-    InstrErrorType res;
+    if ((NULL == buf) || (NULL == size))
+    {
+        return INSTR_E_NOT_OK;
+    }
 
-    (void)buf;
-
-    buf = (uint8_t *)TraceData;
+    *buf = (const uint8_t *)TraceData;
 #if TRACE_SELECTED(COMPONENT_TRACE_FDCANMSGPORT)
     *size = FdcanTraceStoredCount * sizeof(TraceData[0]);
 #else
     *size = sizeof(TraceData);
 #endif
 
-    res = INSTR_E_OK;
-
-    return res;
+    return INSTR_E_OK;
 }
 #endif
 
