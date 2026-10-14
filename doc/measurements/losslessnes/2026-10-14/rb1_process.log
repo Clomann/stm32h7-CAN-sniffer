@@ -1,0 +1,9 @@
+Device API reachable.
+Requested API version via http://can-sniffer.local/api/version
+Requested API card info via http://can-sniffer.local/api/card
+Requested logger debug via http://can-sniffer.local/logger/debug
+Requested logger errors via http://can-sniffer.local/logger/errors
+curl: (28) Connection timed out after 15002 milliseconds
+Requested API card info via http://can-sniffer.local/api/card
+Requested logger debug via http://can-sniffer.local/logger/debug
+Requested logger errors via http://can-sniffer.local/logger/errors
