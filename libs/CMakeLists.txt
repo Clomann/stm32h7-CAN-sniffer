@@ -8,7 +8,6 @@ list(APPEND sources_SRCS
     ${PROJ_PATH}/libs/ff15a/source/ffunicode.c
 
     ${PROJ_PATH}/libs/coreJSON/source/core_json.c
-
     # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/bridgeif_fdb.c 
     # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/bridgeif.c 
     # ${PROJ_PATH}/libs/lwip-tcpip/src/netif/ethernet.c 
@@ -56,7 +55,9 @@ list(APPEND sources_SRCS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/tcp.c 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/timeouts.c 
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/core/udp.c
+)
 
+list(APPEND sources_SRCS
     ${STM32_HAL_PATH}/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.c
     ${STM32_HAL_PATH}/Drivers/BSP/Components/lan8742/lan8742.c
 
@@ -210,7 +211,9 @@ list(APPEND include_path_DIRS
     ${PROJ_PATH}/libs/ff15a/source/
 
     ${PROJ_PATH}/libs/coreJSON/source/include/
+)
 
+list(APPEND include_path_DIRS
     # LwIP dependencies
     # ${PROJ_PATH}/libs/lwip-tcpip/src/include
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include
@@ -218,6 +221,18 @@ list(APPEND include_path_DIRS
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/
     ${STM32_HAL_PATH}/Middlewares/Third_Party/LwIP/src/include/lwip/apps
     ${STM32_HAL_PATH}Middlewares/Third_Party/LwIP/src/apps/http/
+)
+
+list(APPEND include_path_DIRS
+    # MCUboot deps
+    ${PROJ_PATH}/bootloader
+    ${PROJ_PATH}/bootloader/flash_map_backend
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include/bootutil
+    ${PROJ_PATH}/libs/mcuboot/boot/bootutil/include/bootutil/crypto
+
+    #mbedtls
+    ${PROJ_PATH}/libs/mbedtls/include
 )
 
 endif() 
@@ -378,11 +393,18 @@ add_library(third_party_interface INTERFACE)
 
 target_sources(third_party_interface INTERFACE ${sources_SRCS})
 
-target_include_directories(third_party_interface INTERFACE ${include_path_DIRS})
+# Vendored (libs/) headers are consumed via -isystem so their warnings stay out of
+# consumers' builds; first-party include dirs stay on the normal search path.
+set(_tpi_system_include_path_DIRS ${include_path_DIRS})
+list(FILTER _tpi_system_include_path_DIRS INCLUDE REGEX "/libs/")
+list(FILTER include_path_DIRS             EXCLUDE REGEX "/libs/")
+target_include_directories(third_party_interface SYSTEM INTERFACE ${_tpi_system_include_path_DIRS})
+target_include_directories(third_party_interface        INTERFACE ${include_path_DIRS})
 
 target_compile_definitions(third_party_interface INTERFACE ${symbols_SYMB})
 
-target_compile_options(third_party_interface INTERFACE
-    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-parameter>
-    $<$<CXX_COMPILER_ID:MSVC>:/wd4100>
-)
+# Warning suppression for these vendored sources is applied from the root
+# CMakeLists.txt (via set_source_files_properties on third_party_interface's
+# INTERFACE_SOURCES) instead of here: source file properties are scoped to the
+# directory that sets them, and the app/bootloader targets that actually
+# compile these files are defined in the root directory, not this one.

@@ -1,0 +1,22 @@
+#ifndef BUILD_MANIFEST_H
+#define BUILD_MANIFEST_H
+
+/* Generated from build_manifest.h.in at CMake configure time. Do not edit.
+ *
+ * Open JSON fragment: identity plus the build options the cache also feeds to
+ * the compiler. The firmware appends the effective instrumentation selection
+ * and closes the object. */
+
+#define BUILD_MANIFEST_JSON_HEAD                                               \
+    "{"                                                                        \
+    "\"app_version\":\"@APP_VERSION_RESOLVED@\","                              \
+    "\"build_type\":\"@CMAKE_BUILD_TYPE@\","                                   \
+    "\"core\":\"@CORE@\","                                                     \
+    "\"configured_utc\":\"@BUILD_CONFIGURE_UTC@\","                            \
+    "\"options\":{"                                                            \
+    "\"can_static_tx_replay\":\"@CAN_STATIC_TX_REPLAY_ENABLE@\","              \
+    "\"can_static_tx_replay_channel_mask\":\"@CAN_STATIC_TX_REPLAY_CHANNEL_MASK@\"," \
+    "\"can_static_tx_replay_fdcan_mode\":\"@CAN_STATIC_TX_REPLAY_FDCAN_MODE@\"," \
+    "\"debug_check_can_frame_id_sequence\":\"@DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE@\""
+
+#endif /* BUILD_MANIFEST_H */

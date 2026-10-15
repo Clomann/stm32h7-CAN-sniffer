@@ -1,32 +1,109 @@
-name: test
+name: build and test
 
 on: 
   push: { branches: [ integration, main, ci_cd_pipeline ] }
-  pull_request:  { branches: [ main ] }
+  pull_request:  { branches: [ integration, main ] }
   workflow_dispatch:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cmake gcc make clang-format-18 python3-venv curl xz-utils coreutils
+        
+        TOOLCHAIN_VER=13.3.rel1
+        TOOLCHAIN_DIR=/opt/arm-gnu-toolchain-${TOOLCHAIN_VER}
+        BASE_URL="https://developer.arm.com/-/media/Files/downloads/gnu/${TOOLCHAIN_VER}/binrel"
+        TARBALL="arm-gnu-toolchain-${TOOLCHAIN_VER}-x86_64-arm-none-eabi.tar.xz"
+        echo Downloading ARM GNU toolchain ...
+        curl -fL "${BASE_URL}/${TARBALL}" -o "/tmp/${TARBALL}"
+        curl -fL "${BASE_URL}/${TARBALL}.sha256asc" -o "/tmp/${TARBALL}.sha256asc"
+
+        set -euo pipefail
+        EXPECTED_SHA="$(awk 'NF{print $1; exit}' "/tmp/${TARBALL}.sha256asc")"
+        ACTUAL_SHA="$(sha256sum "/tmp/${TARBALL}" | awk '{print $1}')"
+        if [ "${ACTUAL_SHA}" = "${EXPECTED_SHA}" ]; then
+          sudo mkdir -p "${TOOLCHAIN_DIR}"
+          sudo tar -xJf "/tmp/${TARBALL}" --strip-components=1 -C "${TOOLCHAIN_DIR}"
+        else
+          echo "Checksum verification failed for ${TARBALL}" >&2
+          echo "expected: ${EXPECTED_SHA}" >&2
+          echo "actual:   ${ACTUAL_SHA}" >&2
+          exit 1
+        fi
+
+        echo "${TOOLCHAIN_DIR}/bin" >> "$GITHUB_PATH"
+
+    - name: Verify compiler in PATH
+      run: |
+        which arm-none-eabi-gcc
+        arm-none-eabi-gcc --version | head -n1
+
+    - name: Show clang-format version
+      run: clang-format-18 --version
+
     - name: Checkout repository
       uses: actions/checkout@v4
+
     - name: Init required submodules
       run: |
         git submodule sync --recursive
         git submodule update --init --recursive libs/coreJSON
         git submodule update --init --depth 1 libs/STM32_HAL/STM32H7
+        git submodule update --init --depth 1 libs/mcuboot 
+        git submodule update --init --recursive libs/mbedtls 
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/STM32H7xx_Nucleo
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/lan8742
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/CMSIS/Device/ST/STM32H7xx
         git -C libs/STM32_HAL/STM32H7 submodule update --init --recursive --depth 1 Drivers/BSP/Components/Common
+    
+    - name: Check formatting (clang-format)
+      run: |
+        find . -type f \( -name '*.c' -o -name '*.h' \) -print | sed 's#^\./##' | grep -vFf tools/clang/format_exclude.txt | LC_ALL=C sort | awk 'NR==1{printf "%s",$0; next} {printf "\n%s",$0}' > tools/clang/clang_files.txt
+        clang-format-18 -style=file --dry-run --Werror --files=./tools/clang/clang_files.txt
 
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y cmake gcc make
+    - name: Setup Python venv
+      run: |
+        python3 -m venv .venv
+        echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
+        echo "MCUBOOT_PYTHON=${GITHUB_WORKSPACE}/.venv/bin/python" >> "$GITHUB_ENV"
+
+    - name: Install imgtool dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r ./libs/mcuboot/scripts/requirements.txt
+
+    - name: Generate temporary MCUboot test keys
+      run: |
+        rm -f .keys/*.pem
+        mkdir -p .keys
+        python ./libs/mcuboot/scripts/imgtool.py keygen -k .keys/sign-ecdsa-p256.priv.pem -t ecdsa-p256
+        python ./libs/mcuboot/scripts/imgtool.py keygen -k .keys/enc-ecies-p256.priv.pem -t ecdsa-p256
+        python ./libs/mcuboot/scripts/imgtool.py getpub -k .keys/enc-ecies-p256.priv.pem -e pem -o .keys/enc-ecies-p256.pub.pem
+        grep -q "BEGIN PUBLIC KEY" .keys/enc-ecies-p256.pub.pem
+
+    - name: Configure and build Release CM4
+      run: |
+        cmake --fresh --preset Release_CM4
+        cmake --build --preset release-build-cm4
+
+    - name: Configure and build Release CM7 Boot
+      run: |
+        cmake --fresh --preset Release_CM7_Boot
+        cmake --build --preset release-build-cm7-boot
+
+    - name: Configure and build Release CM7
+      run: |
+        cmake --fresh --preset Release_CM7
+        cmake --build --preset release-build-cm7
 
     - name: Configure with CMake
-      run: cmake -S tests -B build
+      run: cmake -S tests -B build -DMCUBOOT_PYTHON="${MCUBOOT_PYTHON}" -DCMAKE_OBJCOPY="$(command -v arm-none-eabi-objcopy)"
 
     - name: Build tests
       run: cmake --build build

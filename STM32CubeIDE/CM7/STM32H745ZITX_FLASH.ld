@@ -6,7 +6,7 @@
 **
 **
 **  Abstract    : Linker script for STM32H7 series
-**                1024Kbytes FLASH and 192Kbytes RAM_D1
+**                1024Kbytes FLASH and 512Kbytes RAM_D1
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -35,7 +35,15 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-PROVIDE(_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1));
+PROVIDE(_estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM));
+
+_Boot_Flash_Size     = 0x20000 ; /* required amount of flash for bootloader */
+_Header_Flash_Size   = 0x400 ; /* required amount of flash for image header */
+_App_Flash_Size      = 0x60000 ; /* required amount of flash for app */
+_Scratch_Flash_Size  = 0x0 ; /* overwrite-only: no scratch */
+_Flash_Sector_Size   = 0x20000 ; /* STM32H7 flash sector size (128KB) */
+__flash_base__ = ORIGIN(FLASH);
+PROVIDE(__flash_base = __flash_base__);
 
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200 ;      /* required amount of heap  */
@@ -47,30 +55,64 @@ _Lwip_Heap_Size = LWIP_HEAP_SIZE ; /* required amount of heap for LwIP stack */
 MEMORY
 {
   FLASH (rx)        : ORIGIN = 0x08000000, LENGTH = 1024K
+  FLASH_BOOT (rx)   : ORIGIN = ORIGIN(FLASH), LENGTH = _Boot_Flash_Size
+  FLASH_PRIMARY (rx): ORIGIN = ORIGIN(FLASH_BOOT) + LENGTH(FLASH_BOOT), LENGTH = _App_Flash_Size
+  FLASH_SECONDARY (rx): ORIGIN = ORIGIN(FLASH_PRIMARY) + LENGTH(FLASH_PRIMARY), LENGTH = _App_Flash_Size
+  FLASH_SCRATCH (rx): ORIGIN = ORIGIN(FLASH_SECONDARY) + LENGTH(FLASH_SECONDARY), LENGTH = _Scratch_Flash_Size
   DTCMRAM (xrw)     : ORIGIN = 0x20000000, LENGTH = 128K
   RAM_D1 (xrw)      : ORIGIN = 0x24000000, LENGTH = 512K
   RAM_D2 (xrw)      : ORIGIN = 0x30000000, LENGTH = 288K
-  RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 64K
+  RAM_D3 (xrw)      : ORIGIN = 0x38000000, LENGTH = 32K /* reserve half of D3 RAM for CM4 */
   ITCMRAM (xrw)     : ORIGIN = 0x00000000, LENGTH = 64K
 }
 
 /* Define output sections */
 SECTIONS
 {
+  __boot_start__ = ORIGIN(FLASH_BOOT);
+  __boot_end__   = ORIGIN(FLASH_BOOT) + LENGTH(FLASH_BOOT);
+  __boot_size__ = LENGTH(FLASH_BOOT);
+  __boot_off__ = __boot_start__ - __flash_base__;
+
+  __app_primary_start__ = ORIGIN(FLASH_PRIMARY);
+  __app_primary_end__ = ORIGIN(FLASH_PRIMARY) + LENGTH(FLASH_PRIMARY);
+  __app_primary_size__ = LENGTH(FLASH_PRIMARY);
+  __app_primary_off__ = __app_primary_start__ - __flash_base__;
+
+  __app_secondary_start__ = ORIGIN(FLASH_SECONDARY);
+  __app_secondary_end__ = ORIGIN(FLASH_SECONDARY) + LENGTH(FLASH_SECONDARY);
+  __app_secondary_size__ = LENGTH(FLASH_SECONDARY);
+  __app_secondary_off__ = __app_secondary_start__ - __flash_base__;
+
+  __scratch_start__ = ORIGIN(FLASH_SCRATCH);
+  __scratch_end__ = ORIGIN(FLASH_SCRATCH) + LENGTH(FLASH_SCRATCH);
+  __scratch_size__ = LENGTH(FLASH_SCRATCH);
+  __scratch_off__ = __scratch_start__ - __flash_base__;
+
+  .boot __boot_start__ :
+  {
+    . = . + __boot_size__;
+  } >FLASH_BOOT
+
   /* The startup code goes first into FLASH */
-  .isr_vector :
+  .isr_vector __app_primary_start__ :
   {
     . = ALIGN(4);
+    . = . + _Header_Flash_Size;
+    __app_vector_start__ = .;
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH_PRIMARY
+
+  ASSERT(__app_vector_start__ == (__app_primary_start__ + _Header_Flash_Size), "Vector table not after MCUboot header")
 
   /* The program code and other data goes into FLASH */
   .text :
   {
     . = ALIGN(4);
-    *(.text)           /* .text sections (code) */
-    *(.text*)          /* .text* sections (code) */
+
+    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .text .text.*)
+
     *(.glue_7)         /* glue arm to thumb code */
     *(.glue_7t)        /* glue thumb to arm code */
     *(.eh_frame)
@@ -80,47 +122,84 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >FLASH_PRIMARY
 
   /* Constant data goes into FLASH */
   .rodata :
   {
     . = ALIGN(4);
+    
     __start_comm_factory = .;
     KEEP(*(.comm_factory))
     __stop_comm_factory = .;
-    *(.rodata)         /* .rodata sections (constants, strings, etc.) */
-    *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
-    . = ALIGN(4);
-  } >FLASH
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH
+    . = ALIGN(4);
+    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .rodata .rodata.*)
+    . = ALIGN(4);
+  } >FLASH_PRIMARY
+
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >FLASH_PRIMARY
   .ARM (READONLY) : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >FLASH
+  } >FLASH_PRIMARY
 
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >FLASH
+  } >FLASH_PRIMARY
   .init_array (READONLY) :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >FLASH
+  } >FLASH_PRIMARY
   .fini_array (READONLY) :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(SORT(.fini_array.*)))
     KEEP (*(.fini_array*))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >FLASH
+  } >FLASH_PRIMARY
+
+  PROVIDE(__app_primary_start = __app_primary_start__);
+  PROVIDE(__app_primary_end__ = __app_primary_end__);
+  PROVIDE(__app_primary_size = __app_primary_size__);
+  PROVIDE(__app_primary_off = __app_primary_off__);
+  PROVIDE(__app_secondary_start = __app_secondary_start__);
+  PROVIDE(__app_secondary_end__ = __app_secondary_end__);
+  PROVIDE(__app_secondary_size = __app_secondary_size__);
+  PROVIDE(__app_secondary_off = __app_secondary_off__);
+  PROVIDE(__scratch_start = __scratch_start__);
+  PROVIDE(__scratch_end = __scratch_end__);
+  PROVIDE(__scratch_size = __scratch_size__);
+  PROVIDE(__scratch_off = __scratch_off__);
+
+  .secondary_reserve __app_secondary_start__ (NOLOAD) :
+  {
+    . = . + _App_Flash_Size;
+  } >FLASH_SECONDARY
+
+  .scratch_reserve __scratch_start__ (NOLOAD) :
+  {
+    . = ALIGN(4);
+    . = . + _Scratch_Flash_Size;
+  } >FLASH_SCRATCH
+
+  ASSERT(__app_primary_start__ % _Flash_Sector_Size == 0, "Primary start not sector aligned")
+  ASSERT(__app_primary_size__ % _Flash_Sector_Size == 0, "Primary size not sector aligned")
+  ASSERT(__app_secondary_start__ % _Flash_Sector_Size == 0, "Secondary start not sector aligned")
+  ASSERT(__app_secondary_size__ % _Flash_Sector_Size == 0, "Secondary size not sector aligned")
+  ASSERT(__scratch_start__ % _Flash_Sector_Size == 0, "Scratch start not sector aligned")
+  ASSERT(__scratch_size__ % _Flash_Sector_Size == 0, "Scratch size not sector aligned")
+  ASSERT(__app_primary_end__ == __app_secondary_start__, "Primary and secondary overlap/gap")
+  ASSERT(__app_secondary_end__ == __scratch_start__, "Secondary and scratch overlap/gap")
+  ASSERT(__app_secondary_end__ <= (ORIGIN(FLASH) + LENGTH(FLASH)), "Secondary exceeds FLASH size")
+  ASSERT(__scratch_end__ <= (ORIGIN(FLASH) + LENGTH(FLASH)), "Flash layout exceeds FLASH size")
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
@@ -131,45 +210,7 @@ SECTIONS
     . = ALIGN(4);
   } >DTCMRAM
 
-  /* Initialized data sections goes into RAM_D1, load LMA copy after code */
-  .data : 
-  {
-    . = ALIGN(4);
-    _sdata = .;        /* create a global symbol at data start */
-    *(.data)           /* .data sections */
-    *(.data*)          /* .data* sections */
-    . = ALIGN(32);
-    __dma_ro_start = .;
-    KEEP(*(.dma_buffer.ro))
-    __dma_ro_end = .;
-    . = ALIGN(4);
-    _edata = .;        /* define a global symbol at data end */
-  } >RAM_D1 AT> FLASH
-
-  
-  /* Uninitialized data section */
-  . = ALIGN(4);
-  .bss :
-  {
-    /* This is used by the startup in order to initialize the .bss section */
-    _sbss = .;         /* define a global symbol at bss start */
-    __bss_start__ = _sbss;
-    *(.bss)
-    *(.bss*)
-    *(COMMON)
-
-    . = ALIGN(4);
-    _ebss = .;         /* define a global symbol at bss end */
-    __bss_end__ = _ebss;
-  } >RAM_D1
-
-  .ram_d1 (NOLOAD): {
-    . = ALIGN(4);
-    *(.ram_d1)
-    . = ALIGN(4);
-  } >RAM_D1
-
-  /* User_heap_stack section, used to check that there is enough RAM_D1 left */
+  /* User_heap_stack section, used to check that there is enough DTCMRAM left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -178,6 +219,12 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
+  } >DTCMRAM
+
+  .ram_d1 (NOLOAD): {
+    . = ALIGN(4);
+    *(.ram_d1)
+    . = ALIGN(4);
   } >RAM_D1
 
   .lwip_sec (NOLOAD): {
@@ -200,26 +247,72 @@ SECTIONS
     __lwip_sec_end__ = .;
   } >RAM_D2
 
+  PROVIDE(__lwip_sec_start = __lwip_sec_start__);
+  PROVIDE(__lwip_sec_end   = __lwip_sec_end__);
   PROVIDE(__lwip_heap_start = __lwip_heap_start__);
   PROVIDE(__lwip_heap_end   = __lwip_heap_end__);
+
+  /* Initialized data sections goes into RAM_D2, load LMA copy after code */
+  .data : 
+  {
+    . = ALIGN(4);
+    _sdata = .;        /* create a global symbol at data start */
+
+    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .data .data.*)
+
+    . = ALIGN(32);
+    __dma_ro_start = .;
+    KEEP(*(.dma_buffer.ro))
+    __dma_ro_end = .;
+    . = ALIGN(4);
+    _edata = .;        /* define a global symbol at data end */
+  } >RAM_D2 AT> FLASH_PRIMARY
+
+  /* Uninitialized data section */
+  . = ALIGN(4);
+  .bss :
+  {
+    /* This is used by the startup in order to initialize the .bss section */
+    _sbss = .;         /* define a global symbol at bss start */
+    __bss_start__ = _sbss;
+    
+    *(EXCLUDE_FILE (*bootloader* *mcuboot*) .bss .bss.* COMMON)
+
+    . = ALIGN(4);
+    _ebss = .;         /* define a global symbol at bss end */
+    __bss_end__ = _ebss;
+  } >RAM_D2
 
   .ram_d2 (NOLOAD): {
     . = ALIGN(4);
     *(.ram_d2)
     . = ALIGN(4);
+    __ram_d2_end__ = .;
   } >RAM_D2
 
-  .dma_buffer (NOLOAD) : ALIGN(32) {
+  /* Reserved at a fixed 16K, MPU-region-aligned budget: RAM_D2 starts at a
+     16K-aligned address, so ALIGN(16K) here guarantees __dma_buffers_start
+     is a valid MPU region base with no runtime alignment needed. Bump this
+     ALIGN() and the matching ASSERT below (and MPU_InitStruct.Size in
+     MPU_Config(), main.c) together if .dma_buffer outgrows 16K. */
+  .dma_buffer (NOLOAD) : ALIGN(16K) {
     __dma_buffers_start__ = .;
     *(.dma_buffer)
     __dma_buffers_end__   = .;
   } >RAM_D2
 
+  ASSERT(__dma_buffers_end__ - __dma_buffers_start__ <= 16K,
+         "dma_buffer section exceeds its 16K MPU-region budget - bump ALIGN() here and MPU_InitStruct.Size in MPU_Config()")
+
+  /* Everything ahead of .dma_buffer (lwip_sec, .data, .bss, .ram_d2) must end
+     inside the same 16K block, or the ALIGN(16K) above silently burns up to 16K
+     of padding. RAM_D2 then overflows and the linker blames .dma_buffer instead
+     of whatever actually grew. Headroom is thin by design - see LWIP_HEAP_SIZE in CMakeLists.txt. */
+  ASSERT(__dma_buffers_start__ - __ram_d2_end__ < 8K,
+         "RAM_D2 content crossed the 16K boundary .dma_buffer aligns to, costing up to 16K of alignment padding - reduce LWIP_HEAP_SIZE (CMakeLists.txt) or ETH_RX_BUFFER_CNT (ethernetif.c) to pull __ram_d2_end__ back below the boundary")
+
   PROVIDE(__dma_buffers_start = __dma_buffers_start__);
   PROVIDE(__dma_buffers_end   = __dma_buffers_end__);
-
-  PROVIDE(__lwip_sec_start = __lwip_sec_start__);
-  PROVIDE(__lwip_sec_end   = __lwip_sec_end__);
 
   .ram_d3 (NOLOAD): {
     . = ALIGN(4);
@@ -237,5 +330,3 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 }
-
-

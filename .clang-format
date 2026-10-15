@@ -7,6 +7,9 @@ IndentWidth: 4
 UseTab: Never
 BreakBeforeBinaryOperators: NonAssignment
 
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+
 # C conventions
 PointerAlignment: Right
 SpaceAfterCStyleCast: false
@@ -44,7 +47,7 @@ AllowAllArgumentsOnNextLine: false
 PenaltyBreakBeforeFirstCallParameter: 0
 
 # Preprocessor readability
-IndentPPDirectives: AfterHash
+IndentPPDirectives: None
 AlignConsecutiveMacros:
   Enabled: true
   AcrossEmptyLines: false
@@ -61,4 +64,3 @@ AlignConsecutiveAssignments:
 InsertNewlineAtEOF: true
 MaxEmptyLinesToKeep: 1
 ...
-

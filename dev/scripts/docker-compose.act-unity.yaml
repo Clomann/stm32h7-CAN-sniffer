@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  act-unity-image:
+    image: local/act-unity:ubuntu-24.04
+    build:
+      context: ../..
+      dockerfile: dev/scripts/Dockerfile.act-unity
+    working_dir: /repo
+    command: ["bash", "-lc", "sleep infinity"]
+    stdin_open: true
+    tty: true
+    volumes:
+      - ../..:/repo
+      - act-cache:/root/.cache/act
+      - pip-cache:/root/.cache/pip
+
+volumes:
+  act-cache:
+  pip-cache:

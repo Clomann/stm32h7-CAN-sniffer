@@ -1,0 +1,26 @@
+FROM catthehacker/ubuntu:act-latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common \
+    && add-apt-repository -y universe \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        clang-format-18 \
+        cmake \
+        gcc \
+        make \
+        git \
+        python3 \
+        python3-venv \
+        python3-pip \
+        sudo \
+        gcc-arm-none-eabi \
+        binutils-arm-none-eabi \
+        libnewlib-arm-none-eabi \
+        libstdc++-arm-none-eabi-newlib \
+    && rm -rf /var/lib/apt/lists/*
+
+

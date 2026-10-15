@@ -18,9 +18,9 @@ void bittiming(void);
 int main(void)
 {
     UNITY_BEGIN();
-    
+
     RUN_TEST(bittiming);
-    
+
     return UNITY_END();
 }
 
@@ -33,7 +33,8 @@ void bittiming(void)
     uint8_t prscl;
     int result;
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 250000, 8750, 1, 0, timings);
+    result =
+        CANFD_CalculateBitTimingRegister(40000000, 250000, 8750, 1, 0, timings);
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);
@@ -48,7 +49,8 @@ void bittiming(void)
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, sjw, "Test 1: Bit timinng sjw");
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 250000, 7500, 1, 0, timings);
+    result =
+        CANFD_CalculateBitTimingRegister(40000000, 250000, 7500, 1, 0, timings);
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);
@@ -63,7 +65,8 @@ void bittiming(void)
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, sjw, "Test 2: Bit timinng sjw");
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 500000, 7500, 1, 0, timings);
+    result =
+        CANFD_CalculateBitTimingRegister(40000000, 500000, 7500, 1, 0, timings);
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);
@@ -78,7 +81,14 @@ void bittiming(void)
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, sjw, "Test 3: Bit timinng sjw");
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 500000, 7500, 10, 0, timings);
+    result = CANFD_CalculateBitTimingRegister(
+        40000000,
+        500000,
+        7500,
+        10,
+        0,
+        timings
+    );
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);
@@ -93,7 +103,14 @@ void bittiming(void)
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(10, sjw, "Test 4: Bit timinng sjw");
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 1000000, 7500, 1, 0, timings);
+    result = CANFD_CalculateBitTimingRegister(
+        40000000,
+        1000000,
+        7500,
+        1,
+        0,
+        timings
+    );
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);
@@ -108,7 +125,14 @@ void bittiming(void)
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, sjw, "Test 5: Bit timinng sjw");
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 1000000, 7500, 4, 0, timings);
+    result = CANFD_CalculateBitTimingRegister(
+        40000000,
+        1000000,
+        7500,
+        4,
+        0,
+        timings
+    );
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);
@@ -123,7 +147,14 @@ void bittiming(void)
     sjw = CANFD_GetSJW(timings, 0);
     TEST_ASSERT_EQUAL_INT_MESSAGE(4, sjw, "Test 6: Bit timinng sjw");
 
-    result = CANFD_CalculateBitTimingRegister(40000000, 1000000, 7500, 10, 0, timings);
+    result = CANFD_CalculateBitTimingRegister(
+        40000000,
+        1000000,
+        7500,
+        10,
+        0,
+        timings
+    );
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, result, "");
 
     prscl = CANFD_GetPrescaler(timings, 0);

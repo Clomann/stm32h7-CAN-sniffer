@@ -1,0 +1,34 @@
+#pragma once
+
+#include <stddef.h>
+#include "CanAbs.h"
+
+/**
+ * @brief Receives and buffers CAN frames from ISR
+ * 
+ * Accumulates frames into Page. Sends to CanFrameBuffer when full.
+ * 
+ * @param[in] frame Received CAN frame
+ * @note ISR context only
+ */
+void fdcan_msg_port_receive(FDCAN_ClassicFrameType *frame);
+
+/**
+ * @brief Flushes partial page from task context
+ * 
+ * Sends buffered frames to CanFrameBuffer. Call after disabling interrupts
+ * to avoid losing frames when stopping reception.
+ * 
+ * @note Task context only - uses critical section for thread safety
+ */
+void fdcan_msg_port_flush(void);
+
+void fdcan_msg_port_init(void);
+
+size_t fdcan_msg_port_read(FDCAN_ClassicFrameType **dst, uint32_t milliSeconds);
+
+uint8_t fdcan_msg_port_get_highwater_bytes(uint32_t *bytes);
+uint32_t fdcan_msg_port_get_capacity_bytes(void);
+
+/* Weak instrumentation hook, overridable by the application layer. */
+void FdcanMsgPort_InstrumentationUsedBytesHook(uint32_t used_bytes);

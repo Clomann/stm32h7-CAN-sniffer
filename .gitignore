@@ -6,14 +6,24 @@ build/*
 _bin/
 .DS_Store
 .cache
+.certs/**/*
+!.certs/.keep
+.keys/**/*
+!.keys/.keep
 _deps/
 tests/_deps
 tests/build/
 *.tar.zst
 
+.vscode/c_cpp_properties.json
+
 CMakeCache.txt
-*.cmake
 CMakeFiles/*
 */CMakeFiles/*
 
 */Testing/Temporary/*
+*.log
+logs/
+tmp/
+__pycache__
+.rb1_monitor_remote

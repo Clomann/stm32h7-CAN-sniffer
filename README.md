@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="app/fs/pages/files/logo.png" alt="CAN Sniffer Logo" width="120">
+  <img src="app/services/http/fs/pages/files/logo.png" alt="CAN Sniffer Logo" width="120">
   <h1>STM32H7 CAN sniffer</h1>
   <p><em>Dual-channel CAN logger with HTTP config UI and SD persistence</em></p>
 </div>
@@ -17,27 +17,7 @@ This project implements the software for a device that logs CAN traffic on two C
 
 **Table of contents**
 
-<!-- TOC -->
 
-- [Features](#features)
-    - [Measurements](#measurements)
-- [Quick start](#quick-start)
-    - [Run unit tests](#run-unit-tests)
-    - [Verify logging](#verify-logging)
-    - [System overview](#system-overview)
-    - [Prerequisites](#prerequisites)
-    - [Build the code](#build-the-code)
-    - [Download the code](#download-the-code)
-    - [Access the web GUI](#access-the-web-gui)
-- [Architecture](#architecture)
-    - [Software](#software)
-    - [Hardware](#hardware)
-    - [Tooling](#tooling)
-        - [Documentation tooling](#documentation-tooling)
-        - [Formatting tooling](#formatting-tooling)
-- [Future work](#future-work)
-
-<!-- /TOC -->
 
 # Features
 
@@ -52,6 +32,7 @@ The CAN sniffer can log CAN frames on two channels with the following specs:
     - download of logged data
     - manage SD card logging (format on next restart, log file size/count, cluster size)
     - client-side log data parser
+    - in-app-programming to update the firmware via web GUI
 
 **Web GUI**
 
@@ -83,7 +64,22 @@ This section briefly explains how to build and download the firmware using the t
 From the `tests` directory, generate and build the test binaries:
 
 ```sh
-cmake -B ./build/ && make -C ./build/
+cmake --preset Release_CM7 --fresh -B build/application \
+  -DPYTHON_EXE="$PWD/.env/bin/python" \
+  -DMCUBOOT_PYTHON="$PWD/.env/bin/python"
+cmake --build build/application -j
+
+cmake --preset "Release_CM4" -B ./build/application \
+  -DPYTHON_EXE="$PWD/.env/bin/python" \
+  -DMCUBOOT_PYTHON="$PWD/.env/bin/python"
+cmake --build build/application -j
+```
+
+and for the bootloader:
+
+```sh
+cmake --preset "Release_CM7_Boot" -B ./build/bootloader
+cmake --build build/bootloader -j
 ```
 
 Run the tests:
@@ -121,15 +117,25 @@ The following tool versions are used to develop, debug and run the program on th
 | GNU Tools for STM32 | 13.3.1 | build/ debug |
 | OpenOCD | 0.12.0 | download/ debug |
 | Cppcheck | 2.17.1 | develop |
-| clang-format | 20.1.8 | develop |
+| clang-format | 18.1.8 | develop |
 
 ## Build the code
 
 To create the software, you can use the following command from the repo's root directory:
 
 ```sh
-cmake --preset "Debug" -B ./build/
-``` 
+cmake --preset "Release_CM4" -B ./build/application && make -C ./build/application -B
+```
+
+and
+
+```sh
+cmake --preset "Release_CM7" -B ./build/application && make -C ./build/application -B
+```
+
+```sh
+cmake --preset "Release_CM7_Boot" -B ./build/bootloader && make -C ./build/bootloader -B   
+```
 
 Running this command might take a while because the following dependencies are pulled while generating the configuration:
 
@@ -299,40 +305,13 @@ flowchart TD
 ```
 > _Performance chart placeholder – add logic-analyzer capture showing CAN ISR latency and SD write timing (e.g., 1 Mbit/s @ 100 % bus load, block flush duration). See [arc42 measurement instrumentation](doc/arc42-template-EN.md#measurement-instrumentation) for the exact probe points._
 
-## Tooling
+# Contributing
 
-### Documentation tooling
-
-Mermaid diagrams live under doc/images/*.md.
-
-To regenerate the .svg outputs:
-
-1. Create/activate a virtual environment in dev/scripts:
-    > python -m venv .venv && source .venv/bin/activate
-2. Install the converter’s dependencies (inside dev/scripts): 
-    > pip install -r requirements.txt
-3. Start up docker from within dev/scripts
-    > docker-compose -f docker-compose.yaml up -d
-4. Run 
-    > python convert_mermaid.py --root ../doc/images
-    
-    The script scans for .md sources and emits .md.svg files with the same name.
-
-The docker-compose helper only provides a local Kroki + Mermaid renderer; the actual export still requires running `convert_mermaid.py` from inside `doc/scripts`.
-
-> NOTE: Usage of the Memaid CLI can be found here: 
-> https://doctoolchain.org/docToolchain/v2.0.x/020_tutorial/170_kroki-configuration.html
-
-### Formatting tooling
-
-```sh
-clang-format -i --files=tools/clang/clang_files.txt
-```
+Contributor workflows and tooling live in `CONTRIBUTING.md`.
 
 # Future work
 
 Planned features are:
-- in-app-programming to update the firmware via web GUI
 - Wi-Fi extension
 - SDIO interface to allow for lower-quality SD cards
 - external Realtime-Clock (RTC)

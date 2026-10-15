@@ -1,10 +1,53 @@
 cmake_minimum_required(VERSION 3.22)
 
 set(FETCHCONTENT_BASE_DIR "${CMAKE_BINARY_DIR}/_deps")
+set(IMGTOOL "${CMAKE_SOURCE_DIR}/libs/mcuboot/scripts/imgtool.py")
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/mcuboot_keys.cmake)
+mcuboot_keys_init(ROOT_DIR ${CMAKE_SOURCE_DIR})
 
 # Let callers override this: -DCPU_PARAMETERS=";-mthumb;-mcpu=cortex-m7;..."
 set(CPU_PARAMETERS "" CACHE STRING "Target CPU/ABI flags (list)")
 set(DUAL_CORE "" CACHE STRING "Configure two target cofiguration (true/false).")
+set(BUILD_TARGET "app" CACHE STRING "Build target: app, bootloader, or both")
+set_property(CACHE BUILD_TARGET PROPERTY STRINGS app bootloader both)
+set(APP_VERSION "auto" CACHE STRING "Application version string exposed via HTTP API (use 'auto' for git describe)")
+set(FW_USE_PRINTF_FLOAT ON CACHE BOOL "Enable printf float formatting (requires FW_USE_MALLOC)")
+set(FW_USE_MALLOC ${FW_USE_PRINTF_FLOAT} CACHE BOOL "Enable newlib heap (malloc/free) via sysmem.c")
+set(FW_LINKER_TRACE OFF CACHE BOOL "Enable linker --trace output and symbol tracing")
+set(FW_ENABLE_ANALYZER OFF CACHE BOOL "Run GCC static analyzer (-fanalyzer) on first-party sources")
+set(DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE "0U" CACHE STRING "Enable CAN frame ID sequence debug checking")
+set(DEBUG_CAN_ID_SEQUENCE_MAX_ID "0xFFU" CACHE STRING "Maximum CAN ID used by sequence debug checking")
+set(MAX_LOG_FILE_COUNT_DEFAULT "640U")
+set(MAX_LOG_FILE_COUNT "${MAX_LOG_FILE_COUNT_DEFAULT}" CACHE STRING "Override number of preallocated CAN log files")
+set(CAN_STATIC_TX_REPLAY_ENABLE OFF CACHE BOOL "Enable FDCAN static Tx replay from dedicated Tx buffers")
+set(CAN_STATIC_TX_REPLAY_TX_BUFFERS "32U" CACHE STRING "Number of dedicated FDCAN Tx buffers used for static replay")
+set(CAN_STATIC_TX_REPLAY_ID_COUNT "0xFFU" CACHE STRING "Configured standard ID wrap count for static replay")
+set(CAN_STATIC_TX_REPLAY_CHANNEL_MASK "0x3U" CACHE STRING "Replay channel bit mask: bit0 CAN1, bit1 CAN2")
+set(CAN_STATIC_TX_REPLAY_CAN1_BASE_ID "0x000U" CACHE STRING "Base standard ID for CAN1 static replay")
+set(CAN_STATIC_TX_REPLAY_CAN2_BASE_ID "0x000U" CACHE STRING "Base standard ID for CAN2 static replay")
+set(CAN_STATIC_TX_REPLAY_FDCAN_MODE "FDCAN_MODE_EXTERNAL_LOOPBACK" CACHE STRING "HAL FDCAN mode used by static replay")
+set_property(CACHE CAN_STATIC_TX_REPLAY_FDCAN_MODE PROPERTY STRINGS FDCAN_MODE_EXTERNAL_LOOPBACK FDCAN_MODE_NORMAL)
+set(COMPONENT_TRACE "" CACHE STRING "Instrumentation trace component (empty = instrumentation.h default)")
+set_property(CACHE COMPONENT_TRACE PROPERTY STRINGS
+    "" COMPONENT_TRACE_NONE COMPONENT_TRACE_FILEHANDLER COMPONENT_TRACE_FDCANMSGPORT)
+
+set(IS_APP_BUILD FALSE)
+set(IS_BOOTLOADER_BUILD FALSE)
+set(IS_BOTH_BUILD FALSE)
+if(BUILD_TARGET STREQUAL "app")
+    set(IS_APP_BUILD TRUE)
+    message(STATUS "Building application only.")
+elseif(BUILD_TARGET STREQUAL "bootloader")
+    set(IS_BOOTLOADER_BUILD TRUE)
+    message(STATUS "Building bootloader only.")
+elseif(BUILD_TARGET STREQUAL "both")
+    set(IS_APP_BUILD TRUE)
+    set(IS_BOOTLOADER_BUILD TRUE)
+    set(IS_BOTH_BUILD TRUE)
+    message(STATUS "Building application and bootloader.")
+else()
+    message(FATAL_ERROR "Unknown BUILD_TARGET='${BUILD_TARGET}'. Use app, bootloader, or both.")
+endif()
 
 set(IS_DUAL_CORE FALSE)
 if(DUAL_CORE_LOWER STREQUAL "true" OR DUAL_CORE_LOWER STREQUAL "on" OR DUAL_CORE_LOWER STREQUAL "1")
@@ -13,6 +56,15 @@ endif()
 
 if(NOT DEFINED CORE)
   message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
+endif()
+
+find_program(PYTHON_EXE NAMES python3 python py)
+find_program(GIT_EXE NAMES git)
+
+if(NOT PYTHON_EXE AND IS_APP_BUILD)
+    message(WARNING "No Python interpreter found - skipping signing step!")
+else(CORE STREQUAL "CM7" AND IS_APP_BUILD)
+    message(STATUS "Target will be signed.")
 endif()
 
 # Setup compiler settings
@@ -27,15 +79,20 @@ set(STM32_HAL_PATH                  ${CMAKE_CURRENT_SOURCE_DIR}/libs/STM32_HAL/S
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJ_PATH}/_bin/${CMAKE_BUILD_TYPE})
 
-set(LWIP_HEAP_SIZE 0x1ffe8)
+# Must keep _ebss below the ALIGN(16K) boundary at 0x30044000 that .dma_buffer
+# sits on, or .dma_buffer jumps a full 16K and overruns RAM_D2.
+set(LWIP_HEAP_SIZE 0x1afe8)
 
 message("Build type: "              ${CMAKE_BUILD_TYPE})
+
+include(${PROJ_PATH}/cmake/mcuboot_signing.cmake)
 
 #
 # Core project settings
 #
 project(SPI_FullDuplex_ComDMA_${CORE})          # Modified
 enable_language(C CXX ASM)
+include(CMakeParseArguments)
 
 #
 # Core MCU flags, CPU, instruction set and FPU setup
@@ -63,6 +120,9 @@ if(CORE STREQUAL "CM7" AND NOT CPU_PARAMETERS)
         "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
         "TARGET_STM32H7"
         "LWIP_HEAP_SIZE=${LWIP_HEAP_SIZE}"
+        "MBEDTLS_PLATFORM_MS_TIME_ALT"
+        "MAKEFS_SUPPORT_DEFLATE=1"
+        "LWIP_HTTPD_SSI_BY_FILE_EXTENSION=1"
     )
 
 elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
@@ -71,7 +131,7 @@ elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
 
         # This needs attention to properly set for used MCU
         -mcpu=cortex-m4                 # Modified
-        -mfpu=fpv5-d16                  # Modified
+        -mfpu=fpv4-sp-d16               # Modified
         -mfloat-abi=hard                # Modified
     )
 
@@ -86,10 +146,80 @@ elseif(CORE STREQUAL "CM4" AND NOT CPU_PARAMETERS)
         "USE_STM32H7XX_NUCLEO_144_MB1363"
         "FDCAN_MODE_DEFAULT=FDCAN_MODE_NORMAL"
         "TARGET_STM32H7"
+        "MBEDTLS_PLATFORM_MS_TIME_ALT"
     )
 else()
   message(FATAL_ERROR "Unknown CORE='${CORE}'. Use CM7 or CM4.")
 endif()
+
+set(APP_VERSION_RESOLVED "${APP_VERSION}")
+if(APP_VERSION STREQUAL "auto" OR APP_VERSION STREQUAL "")
+    set(APP_VERSION_RESOLVED "0.0.0-unknown")
+    if(GIT_EXE)
+        execute_process(
+            COMMAND ${GIT_EXE} -C ${CMAKE_SOURCE_DIR} describe --long --tags --dirty --always
+            RESULT_VARIABLE APP_VERSION_GIT_RC
+            OUTPUT_VARIABLE APP_VERSION_GIT
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(APP_VERSION_GIT_RC EQUAL 0 AND NOT APP_VERSION_GIT STREQUAL "")
+            set(APP_VERSION_RESOLVED "${APP_VERSION_GIT}")
+        endif()
+    endif()
+endif()
+
+message(STATUS "App version: ${APP_VERSION_RESOLVED}")
+
+# Build manifest: a generated header the HTTP version endpoint serves so every
+# device report carries the version, build type, configure time and the build
+# options that also become compiler definitions below.
+string(TIMESTAMP BUILD_CONFIGURE_UTC "%Y-%m-%dT%H:%M:%SZ" UTC)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_manifest.h.in
+    ${CMAKE_BINARY_DIR}/generated/build_manifest.h
+    @ONLY
+)
+
+string(REPLACE "\"" "\\\"" APP_VERSION_ESCAPED "${APP_VERSION_RESOLVED}")
+list(APPEND symbols_SYMB "APP_VERSION=\"${APP_VERSION_ESCAPED}\"")
+list(APPEND symbols_SYMB
+    "DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE=${DEBUG_CHECK_CAN_FRAME_ID_SEQUENCE}"
+    "DEBUG_CAN_ID_SEQUENCE_MAX_ID=${DEBUG_CAN_ID_SEQUENCE_MAX_ID}"
+)
+
+if(NOT "${MAX_LOG_FILE_COUNT}" STREQUAL "${MAX_LOG_FILE_COUNT_DEFAULT}")
+    list(APPEND symbols_SYMB "MAX_LOG_FILE_COUNT=${MAX_LOG_FILE_COUNT}")
+endif()
+
+# Empty keeps the instrumentation.h default; otherwise the value is passed
+# through verbatim and must name a component instrumentation.h knows.
+if(COMPONENT_TRACE)
+    set(_component_trace_values
+        COMPONENT_TRACE_NONE COMPONENT_TRACE_FILEHANDLER COMPONENT_TRACE_FDCANMSGPORT
+        0 1 2 0U 1U 2U)
+    if(NOT COMPONENT_TRACE IN_LIST _component_trace_values)
+        message(FATAL_ERROR
+            "COMPONENT_TRACE='${COMPONENT_TRACE}' is unknown. "
+            "Use COMPONENT_TRACE_NONE, COMPONENT_TRACE_FILEHANDLER or COMPONENT_TRACE_FDCANMSGPORT.")
+    endif()
+    list(APPEND symbols_SYMB "COMPONENT_TRACE=${COMPONENT_TRACE}")
+endif()
+
+if(CAN_STATIC_TX_REPLAY_ENABLE)
+    list(APPEND symbols_SYMB "CAN_STATIC_TX_REPLAY_ENABLE=1U")
+else()
+    list(APPEND symbols_SYMB "CAN_STATIC_TX_REPLAY_ENABLE=0U")
+endif()
+
+list(APPEND symbols_SYMB
+    "CAN_STATIC_TX_REPLAY_TX_BUFFERS=${CAN_STATIC_TX_REPLAY_TX_BUFFERS}"
+    "CAN_STATIC_TX_REPLAY_ID_COUNT=${CAN_STATIC_TX_REPLAY_ID_COUNT}"
+    "CAN_STATIC_TX_REPLAY_CHANNEL_MASK=${CAN_STATIC_TX_REPLAY_CHANNEL_MASK}"
+    "CAN_STATIC_TX_REPLAY_CAN1_BASE_ID=${CAN_STATIC_TX_REPLAY_CAN1_BASE_ID}"
+    "CAN_STATIC_TX_REPLAY_CAN2_BASE_ID=${CAN_STATIC_TX_REPLAY_CAN2_BASE_ID}"
+    "CAN_STATIC_TX_REPLAY_FDCAN_MODE=${CAN_STATIC_TX_REPLAY_FDCAN_MODE}"
+)
 
 # push flags to all targets
 add_compile_options(${CPU_PARAMETERS})
@@ -126,13 +256,18 @@ set(FREERTOS_HEAP 4            CACHE STRING "" FORCE)
 
 FetchContent_MakeAvailable(freertos_kernel)
 
+get_target_property(_frt_inc freertos_kernel INTERFACE_INCLUDE_DIRECTORIES)
+set_target_properties(freertos_kernel PROPERTIES
+    INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_frt_inc}")
+
 # Set linker script
 if(CORE STREQUAL "CM7")
-    set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld)
+    set(linker_script_app               ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH.ld)
+    set(linker_script_boot              ${PROJ_PATH}/STM32CubeIDE/CM7/STM32H745ZITX_FLASH_boot.ld)
 elseif(CORE STREQUAL "CM4")
-    set(linker_script_SRC               ${PROJ_PATH}/STM32CubeIDE/CM4/STM32H745ZITX_FLASH.ld)
+    set(linker_script_app               ${PROJ_PATH}/STM32CubeIDE/CM4/STM32H745ZITX_FLASH.ld)
+    set(linker_script_boot              ${linker_script_app})
 endif()
-
 set(EXECUTABLE                      ${CMAKE_PROJECT_NAME})
 
 if(CORE STREQUAL "CM7")
@@ -140,140 +275,295 @@ if(CORE STREQUAL "CM7")
     # List of source files to compile
     #
     set(sources_SRCS                    # Modified
-        ${PROJ_PATH}/CM7/Src/main.c
-        ${PROJ_PATH}/CM7/Src/stm32h7xx_hal_msp.c
-        ${PROJ_PATH}/CM7/Src/stm32h7xx_it.c
-        ${PROJ_PATH}/CM7/Src/Core0Task0.c
-        ${PROJ_PATH}/CM7/Src/Core0Task1.c
-        ${PROJ_PATH}/CM7/Src/SdBridgeTask.c
-        ${PROJ_PATH}/CM7/Src/CanBridgeTask.c
-        ${PROJ_PATH}/CM7/Src/CanSendTask.c
-        ${PROJ_PATH}/CM7/Src/CanCtrl.c
-        ${PROJ_PATH}/CM7/Src/SpiTask.c
-        ${PROJ_PATH}/CM7/Src/utils_mpu.c
-
-        ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
-        ${PROJ_PATH}/Common/Src/instrumentation.c
-
-        ${PROJ_PATH}/middleware/freertos/freertos_interface.c
-
-        ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/syscalls.c
-        ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/CM7/sysmem.c
-        ${PROJ_PATH}/STM32CubeIDE/CM7/Example/User/startup/startup_stm32h745zitx.s
+        ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/platform/Common/Src/SequenceChecker.c
     )
 
     #
     # Include directories
     #
     set(include_path_DIRS               # Modified
-        ${PROJ_PATH}/CM7/Inc
-        ${PROJ_PATH}/CM7/Src
-        ${PROJ_PATH}/Common/Inc
-        ${PROJ_PATH}/middleware/freertos
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Inc
+        ${PROJ_PATH}/platform/board/stm32h745/cm7/Src
+        ${PROJ_PATH}/platform/Common/Inc
     )
 
-    add_subdirectory(CM7)
-    add_subdirectory(adapters)
-    add_subdirectory(app)
-    add_subdirectory(drivers)
-    add_subdirectory(libs)
-    add_subdirectory(middleware)
-    add_subdirectory(ports)
+    set(common_sources_SRCS ${sources_SRCS})
+    set(common_include_path_DIRS ${include_path_DIRS})
+
+    if(IS_APP_BUILD)
+        include(${PROJ_PATH}/cmake/app_deps.cmake)
+    endif()
+
+    if(IS_BOOTLOADER_BUILD)
+        include(${PROJ_PATH}/cmake/boot_deps.cmake)
+    endif()
 
 elseif(CORE STREQUAL "CM4")
     #
     # List of source files to compile
     #
     set(sources_SRCS                    # Modified
-        ${PROJ_PATH}/CM4/Src/main.c
-        ${PROJ_PATH}/CM4/Src/stm32h7xx_hal_msp.c
-        ${PROJ_PATH}/CM4/Src/stm32h7xx_it.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Src/main.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Src/stm32h7xx_hal_msp.c
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Src/stm32h7xx_it.c
 
-        ${PROJ_PATH}/Common/Src/system_stm32h7xx.c
+        ${PROJ_PATH}/platform/Common/Src/system_stm32h7xx.c
 
         ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/syscalls.c
-        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/sysmem.c
-        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/startup/startup_stm32h745zitx.s
+        ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/Startup/startup_stm32h745zitx.s
     )
+
+    if(FW_USE_MALLOC)
+        list(APPEND sources_SRCS
+            ${PROJ_PATH}/STM32CubeIDE/CM4/Example/User/CM4/sysmem.c
+        )
+    endif()
 
     #
     # Include directories
     #
     set(include_path_DIRS               # Modified
-        ${PROJ_PATH}/CM4/Inc
-        ${PROJ_PATH}/Common/Inc
+        ${PROJ_PATH}/platform/board/stm32h745/cm4/Inc
+        ${PROJ_PATH}/platform/Common/Inc
     )
     
     add_subdirectory(libs)
+
+    if(IS_APP_BUILD)
+        # Keep third-party warnings out of our build: vendored (libs/) sources compile
+        # with -w, vendored headers are consumed via -isystem. First-party code keeps
+        # the full warning set. Set here (this directory) so the property is visible
+        # to the app target created later in this same file.
+        get_target_property(_app_vendor_SRCS third_party_interface INTERFACE_SOURCES)
+        list(FILTER _app_vendor_SRCS INCLUDE REGEX "/libs/")
+        set_source_files_properties(${_app_vendor_SRCS} PROPERTIES COMPILE_OPTIONS "-w;-fno-analyzer")
+
+        set(app_sources_SRCS ${sources_SRCS})
+        set(app_include_path_DIRS ${include_path_DIRS})
+        set(app_link_libs lwrb freertos_kernel freertos_config third_party_interface)
+    endif()
 endif()
 
-# Executable files
-add_executable(${EXECUTABLE} ${sources_SRCS})
+function(configure_firmware_target target_name)
+    set(options)
+    set(oneValueArgs LINKER_SCRIPT USE_PRINTF_FLOAT)
+    set(multiValueArgs SOURCES INCLUDES SYSTEM_INCLUDES LIBS COMPILE_DEFS)
+    cmake_parse_arguments(FW "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-target_link_libraries(${EXECUTABLE} 
-    PRIVATE 
-        lwrb 
-        freertos_kernel
-        freertos_config
-        third_party_interface
-)
+    if(NOT FW_SOURCES)
+        message(FATAL_ERROR "No sources provided for target '${target_name}'.")
+    endif()
 
-# Include paths
-target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})
+    add_executable(${target_name} ${FW_SOURCES})
 
-# Project symbols
-target_compile_definitions(${EXECUTABLE} PRIVATE ${symbols_SYMB})
+    if(FW_LIBS)
+        target_link_libraries(${target_name} PRIVATE ${FW_LIBS})
+    endif()
 
-# Compiler options
-target_compile_options(${EXECUTABLE} PRIVATE
-    ${CPU_PARAMETERS}
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Werror=implicit-function-declaration
-    # Full debug configuration
-    $<$<CONFIG:Release>:-O1;-g3;-ggdb>
-    $<$<CONFIG:Debug>:-Og;-g3;-ggdb>
-    -fstack-usage
-    -ffunction-sections
-    -fdata-sections
-)
+    # Include paths (vendored headers via -isystem so their warnings stay out of our build)
+    if(FW_SYSTEM_INCLUDES)
+        target_include_directories(${target_name} SYSTEM PRIVATE ${FW_SYSTEM_INCLUDES})
+    endif()
+    target_include_directories(${target_name} PRIVATE ${FW_INCLUDES})
+    target_include_directories(${target_name} PRIVATE ${CMAKE_BINARY_DIR}/generated)
 
-# Linker options
-target_link_options(${EXECUTABLE} PRIVATE
-    -T${linker_script_SRC}
-    ${CPU_PARAMETERS}
-    -Wl,--defsym=LWIP_HEAP_SIZE=${LWIP_HEAP_SIZE}
-    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_PROJECT_NAME}.map
-    --specs=nosys.specs
-    -u _printf_float                # STDIO float formatting support
-    -Wl,--start-group
-    -lc
-    -lm
-    -lstdc++
-    -lsupc++
-    -Wl,--end-group
-    -Wl,--print-memory-usage
-    -Wl,--error-unresolved-symbols
-    -Wl,--fatal-warnings
-    -Wl,--trace
-    -Wl,--no-undefined
-    # -Wl,--gc-sections,--print-gc-sections
-)
+    # Project symbols
+    target_compile_definitions(${target_name} PRIVATE ${symbols_SYMB})
 
+    if(FW_COMPILE_DEFS)
+        target_compile_definitions(${target_name} PRIVATE ${FW_COMPILE_DEFS})
+    endif()
 
+    # Compiler options
+    target_compile_options(${target_name} PRIVATE
+        ${CPU_PARAMETERS}
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror=implicit-function-declaration
+        -Werror=incompatible-pointer-types
+        -Werror=int-conversion
+        -Werror=return-type
+        -Werror=implicit-int
+        # Full debug configuration
+        $<$<CONFIG:Release>:-O1;-g3;-ggdb>
+        $<$<CONFIG:Debug>:-Og;-g3;-ggdb>
+        -fstack-usage
+        -ffunction-sections
+        -fdata-sections
 
-# Execute post-build to print size
-add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
-    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${EXECUTABLE}>
-)
+        -Wundef                     # undefined macro in #if
+        -Wcast-align                # pointer cast raising alignment req -> Cortex-M fault risk
+        # -Wcast-qual                 # casting away const/volatile
+        -Wnull-dereference
+        -Wlogical-op                # & vs &&, suspicious ranges
+        -Wduplicated-cond -Wduplicated-branches
+        -Wredundant-decls
+        -Wjump-misses-init
+        -Wvla                       # variable-length arrays (unbounded stack)
+        -Wwrite-strings             # string literals become const char*
+        -Wswitch
+        -Wswitch-default
+        # -Wswitch-enum
+        -Wshift-overflow=2
+        -Wstack-usage=2048          # fail if a frame exceeds budget; start high, ratchet down
+        $<$<COMPILE_LANGUAGE:C>:-Wold-style-definition>
 
-# Convert output to hex and binary
-add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${EXECUTABLE}> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${EXECUTABLE}.hex
-)
+        -Wconversion -Wsign-conversion -Warith-conversion
 
-# Convert to bin file -> add conditional check?
-add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${EXECUTABLE}> ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${EXECUTABLE}.bin
-)
+        -Wdouble-promotion          # float math silently widened to double
+        -Wformat=2 -Wformat-truncation=2 -Wformat-overflow=2
+        $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+        $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+
+        -Wshadow
+        -Wimplicit-fallthrough=5    # require the attribute, not a comment
+
+        # -Werror
+    )
+
+    # Linker options
+    target_link_options(${target_name} PRIVATE
+        -T${FW_LINKER_SCRIPT}
+        ${CPU_PARAMETERS}
+        -Wl,--defsym=LWIP_HEAP_SIZE=${LWIP_HEAP_SIZE}
+        -Wl,-Map=$<TARGET_FILE_DIR:${target_name}>/${target_name}.map
+        --specs=nosys.specs
+        -u _printf_float
+        -Wl,--start-group
+        -lc
+        -lm
+        -lstdc++
+        -lsupc++
+        -Wl,--end-group
+        -Wl,--print-memory-usage
+        -Wl,--error-unresolved-symbols
+        -Wl,--fatal-warnings
+        -Wl,--trace
+        -Wl,--no-undefined
+        # -Wl,--gc-sections,--print-gc-sections
+    )
+
+    if(FW_USE_PRINTF_FLOAT AND NOT FW_USE_MALLOC)
+        message(FATAL_ERROR "USE_PRINTF_FLOAT requires FW_USE_MALLOC=ON (newlib-nano float formatting uses malloc)")
+    endif()
+
+    if(FW_LINKER_TRACE)
+        target_link_options(${target_name} PRIVATE
+            -Wl,--trace
+            -Wl,--trace-symbol=malloc
+            -Wl,--trace-symbol=_sbrk
+        )
+    endif()
+
+    if(FW_USE_PRINTF_FLOAT)
+        target_link_options(${target_name} PRIVATE
+            -u _printf_float                # STDIO float formatting support
+        )
+    endif()
+
+    # Vendored sources opt out again via -fno-analyzer in their COMPILE_OPTIONS
+    if(FW_ENABLE_ANALYZER)
+        target_compile_options(${target_name} PRIVATE -fanalyzer)
+    endif()
+
+    # Execute post-build to print size
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${target_name}>
+    )
+
+    # Convert output to hex and binary
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${target_name}>
+        COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${target_name}> $<TARGET_FILE_DIR:${target_name}>/${target_name}.hex
+    )
+
+    # Convert to bin file -> add conditional check?
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${target_name}>
+        COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${target_name}> $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
+    )
+
+    if(PYTHON_EXE)
+        message(STATUS "Found Python: ${PYTHON_EXE}")
+
+        if (CORE STREQUAL "CM7" AND IS_APP_BUILD)
+            set(_mcuboot_sign_common_args
+                TARGET ${target_name}
+                INPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}.bin
+                PYTHON ${PYTHON_EXE}
+                IMGTOOL ${IMGTOOL}
+                HEADER_SIZE 0x400
+                ALIGN 4
+                SLOT_SIZE 0x60000
+                VERSION 0.4.0
+                OVERWRITE_ONLY
+                COMMENT "Signing image ${target_name}.bin"
+            )
+
+            set(_mcuboot_sign_plain_args
+                ${_mcuboot_sign_common_args}
+                OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed.bin
+            )
+            mcuboot_keys_append_signing_key_arg(_mcuboot_sign_plain_args)
+            mcuboot_add_imgtool_sign_command(${_mcuboot_sign_plain_args})
+
+            set(_mcuboot_sign_encrypted_args
+                ${_mcuboot_sign_common_args}
+                PAD
+                OUTPUT $<TARGET_FILE_DIR:${target_name}>/${target_name}-signed-encrypted-padded.bin
+            )
+
+            mcuboot_keys_append_signing_key_arg(_mcuboot_sign_encrypted_args)
+            mcuboot_keys_append_encryption_pubkey_arg(_mcuboot_sign_encrypted_args)
+
+            mcuboot_add_imgtool_sign_command(${_mcuboot_sign_encrypted_args})
+        endif()
+    endif()
+endfunction()
+
+if(IS_BOTH_BUILD)
+    set(APP_EXECUTABLE ${EXECUTABLE}_app)
+    set(BOOT_EXECUTABLE ${EXECUTABLE}_boot)
+
+    configure_firmware_target(${APP_EXECUTABLE}
+        LINKER_SCRIPT ${linker_script_app}
+        SOURCES ${app_sources_SRCS}
+        INCLUDES ${app_include_path_DIRS}
+        LIBS ${app_link_libs}
+        USE_PRINTF_FLOAT ${FW_USE_PRINTF_FLOAT}
+    )
+
+    configure_firmware_target(${BOOT_EXECUTABLE}
+        LINKER_SCRIPT ${linker_script_boot}
+        SOURCES ${boot_target_sources_SRCS}
+        INCLUDES ${boot_target_include_path_DIRS}
+        SYSTEM_INCLUDES ${boot_target_system_include_path_DIRS}
+        COMPILE_DEFS ${boot_target_compile_defs}
+        LIBS ${boot_link_libs}
+        USE_PRINTF_FLOAT OFF
+    )
+elseif(IS_APP_BUILD)
+    set(APP_EXECUTABLE ${EXECUTABLE}_app)
+
+    configure_firmware_target(${APP_EXECUTABLE}
+        LINKER_SCRIPT ${linker_script_app}
+        SOURCES ${app_sources_SRCS}
+        INCLUDES ${app_include_path_DIRS}
+        LIBS ${app_link_libs}
+        USE_PRINTF_FLOAT ${FW_USE_PRINTF_FLOAT}
+    )
+elseif(IS_BOOTLOADER_BUILD)
+    set(BOOT_EXECUTABLE ${EXECUTABLE}_boot)
+
+    configure_firmware_target(${BOOT_EXECUTABLE}
+        LINKER_SCRIPT ${linker_script_boot}
+        SOURCES ${boot_target_sources_SRCS}
+        INCLUDES ${boot_target_include_path_DIRS}
+        SYSTEM_INCLUDES ${boot_target_system_include_path_DIRS}
+        COMPILE_DEFS ${boot_target_compile_defs}
+        LIBS ${boot_link_libs}
+        USE_PRINTF_FLOAT OFF
+    )
+endif()

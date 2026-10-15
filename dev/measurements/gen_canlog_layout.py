@@ -1,5 +1,5 @@
 """
-Generate a Python layout module from app/CanLogBuffer.h.
+Generate a Python layout module from app/services/logging/CanLogBuffer.h.
 
 The generated module (`generated_canlog_layout.py` in the same directory)
 provides struct formats, sizes, and constants so log_parser.py stays in sync
@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HEADER_PATH = REPO_ROOT / "app/CanLogBuffer.h"
+HEADER_PATH = REPO_ROOT / "app/services/logging/CanLogBuffer.h"
 OUTPUT_PATH = Path(__file__).with_name("generated_canlog_layout.py")
 
 # Minimal type map for the header
@@ -39,13 +39,35 @@ class Field:
 
 def _strip_suffixes(value: str) -> str:
     """Remove common C integer suffixes to make expressions Python-evaluable."""
-    return re.sub(r"[uUlL]", "", value)
+    return re.sub(r"\b(0[xX][0-9A-Fa-f]+|\d+)([uUlL]+)\b", r"\1", value)
 
 
 def _eval_int_expr(expr: str, names: Dict[str, int] | None = None) -> int:
     cleaned = _strip_suffixes(expr)
     tree = ast.parse(cleaned, mode="eval")
-    allowed = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Num, ast.Constant, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.LShift, ast.RShift, ast.BitOr, ast.BitAnd, ast.BitXor, ast.USub, ast.UAdd, ast.Call, ast.Name)
+    allowed = (
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Constant,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.FloorDiv,
+        ast.Mod,
+        ast.Pow,
+        ast.LShift,
+        ast.RShift,
+        ast.BitOr,
+        ast.BitAnd,
+        ast.BitXor,
+        ast.USub,
+        ast.UAdd,
+        ast.Call,
+        ast.Name,
+        ast.Load,
+    )
     for node in ast.walk(tree):
         if not isinstance(node, allowed):
             raise ValueError(f"Disallowed expression in macro: {expr}")
@@ -58,10 +80,11 @@ def _eval_int_expr(expr: str, names: Dict[str, int] | None = None) -> int:
 def parse_macros(text: str) -> Dict[str, int]:
     macros: Dict[str, int] = {}
     raw_exprs: Dict[str, str] = {}
+    text = re.sub(r"\\\s*\n\s*", " ", text)
     for line in text.splitlines():
         if not line.lstrip().startswith("#define"):
             continue
-        if re.match(r"^\s*#define\s+\w+\s*\(", line):
+        if re.match(r"^\s*#define\s+\w+\(", line):
             continue  # Skip function-like macros.
         match = re.match(r"^\s*#define\s+(\w+)\s+(.+)$", line)
         if not match:
@@ -198,14 +221,14 @@ def generate_layout(header_path: Path = HEADER_PATH, output_path: Path = OUTPUT_
     sync_fixed_fields = [f for f in structs["CanLogSyncType"] if f.name != "header"]
 
     output = []
-    output.append('"""Auto-generated from app/CanLogBuffer.h. Do not edit manually."""')
+    output.append('"""Auto-generated from app/services/logging/CanLogBuffer.h. Do not edit manually."""')
     output.append("import struct")
     output.append("")
 
     def emit_constants():
         keys = [
             "CANLOG_VERSION",
-            "CANLOG_ENTRY_MAX_DATA_LENGTH",
+            "CLB_ENTRY_MAX_DATA_LENGTH",
             "BLOCK_SIZE",
             "LOG_BUFFER_SIZE",
             "CAN_DLC_MASK",
@@ -226,6 +249,8 @@ def generate_layout(header_path: Path = HEADER_PATH, output_path: Path = OUTPUT_
         for key in keys:
             if key in macros:
                 output.append(f"{key} = {macros[key]}")
+        if "CANLOG_ENTRY_MAX_DATA_LENGTH" not in macros and "CLB_ENTRY_MAX_DATA_LENGTH" in macros:
+            output.append("CANLOG_ENTRY_MAX_DATA_LENGTH = CLB_ENTRY_MAX_DATA_LENGTH")
         output.append("")
 
     def emit_struct(name: str, label: str) -> None:

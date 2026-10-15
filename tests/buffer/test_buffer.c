@@ -39,7 +39,6 @@ int main(void)
     RUN_TEST(test_full_count_requires_isFull_update__KNOWN_ISSUE);
     RUN_TEST(test_overflow_increments_elementCount_past_capacity__KNOWN_ISSUE);
 
-
     return UNITY_END();
 }
 
@@ -51,7 +50,7 @@ rb_init(RingBuffer *rb, void *mem, uint32_t capacity, uint32_t elem_size)
     rb->tail         = 0;
     rb->bufferLength = capacity;
     rb->elementSize  = elem_size;
-    rb->stride  = elem_size;
+    rb->stride       = elem_size;
     rb->elementCount = 0;
     rb->isFull       = 0; /* Note: implementation never updates this */
     memset(mem, 0, capacity * elem_size);

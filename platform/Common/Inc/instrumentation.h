@@ -1,0 +1,36 @@
+#pragma once
+
+#include <stdint.h>
+#include "ErrorContext.h"
+
+#define INSTR_ENABLED        1
+#define INSTR_PERSIST_ACTIVE 1
+
+#define COMPONENT_TRACE_NONE         0U
+#define COMPONENT_TRACE_FILEHANDLER  1U
+#define COMPONENT_TRACE_FDCANMSGPORT 2U
+
+#ifndef COMPONENT_TRACE
+#define COMPONENT_TRACE COMPONENT_TRACE_NONE
+#endif
+
+/* Human-readable name of the selected component, for diagnostics output. */
+#if COMPONENT_TRACE == COMPONENT_TRACE_FILEHANDLER
+#define COMPONENT_TRACE_NAME "filehandler"
+#elif COMPONENT_TRACE == COMPONENT_TRACE_FDCANMSGPORT
+#define COMPONENT_TRACE_NAME "fdcanmsgport"
+#else
+#define COMPONENT_TRACE_NAME "none"
+#endif
+
+#define INSTR_E_OK     0U
+#define INSTR_E_NOT_OK 1U
+
+typedef uint8_t InstrErrorType;
+
+void Instrumentation_Init(void);
+
+InstrErrorType
+Instrumentation_SerializeHook(const uint8_t **buf, uint32_t *size);
+
+void Instrumentation_ErrorHandlerHook(ErrorContextType *context);

@@ -12,21 +12,22 @@
 
 #include "Sd.h"
 
-#define MMC_SPI_MAX_DEVICES		1U
+#define MMC_SPI_MAX_DEVICES 1U
 
-#define MMC_CARD_TYPE_MMCV3		1U
-#define MMC_CARD_TYPE_SDV1		2U
-#define MMC_CARD_TYPE_SDV2PLUS	4U
+#define MMC_CARD_TYPE_MMCV3    1U
+#define MMC_CARD_TYPE_SDV1     2U
+#define MMC_CARD_TYPE_SDV2PLUS 4U
 
 typedef DSTATUS MmcStatusType;
 
-typedef struct {
-    uint8_t pdrv;           /*!< Physical drive number */
-    uint8_t cs_pin;      	/*!< Chip select pin */
-    uint8_t initialized;    /*!< Is the device initialized? */
-    uint8_t in_use;         /*!< Is the device in use? */
+typedef struct
+{
+    uint8_t pdrv; /*!< Physical drive number */
+    uint8_t cs_pin; /*!< Chip select pin */
+    uint8_t initialized; /*!< Is the device initialized? */
+    uint8_t in_use; /*!< Is the device in use? */
     MmcStatusType status;
-    uint32_t cardSize;			/*!< size of the card in bytes */
+    uint32_t cardSize; /*!< size of the card in bytes */
     uint32_t sectorSize;
     uint32_t blockSize;
     uint32_t sectorCount;
@@ -37,16 +38,22 @@ typedef struct {
  */
 uint8_t MMCAdapter_initialize(void);
 
+/**
+ * \brief Copies the cached decoded CID (card identity) captured during
+ * initialization. Returns SD_E_OK when a valid identity is available.
+ */
+uint8_t MMCAdapter_GetCardId(SdCidRegisterType *cid);
+
 uint8_t MMCAdapter_read(
-		BYTE *buff,		/*!< Data buffer to store read data */
-		LBA_t sector,	/*!< Start sector in LBA */
-		UINT count		/*!< Number of sectors to read */
+    BYTE *buff, /*!< Data buffer to store read data */
+    LBA_t sector, /*!< Start sector in LBA */
+    UINT count /*!< Number of sectors to read */
 );
 
 uint8_t MMCAdapter_write(
-		const BYTE *buff,	/*!< Data to be written */
-		LBA_t sector,		/*!< Start sector in LBA */
-		UINT count			/*!< Number of sectors to write */
+    const BYTE *buff, /*!< Data to be written */
+    LBA_t sector, /*!< Start sector in LBA */
+    UINT count /*!< Number of sectors to write */
 );
 
 /**

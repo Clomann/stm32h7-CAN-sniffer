@@ -11,7 +11,6 @@
         "fs_custom.h": "c",
         "commtypes.h": "c",
         "commmessages.h": "c",
-        "utils_mpu.h": "c",
         "stm32h7xx_hal.h": "c"
     },
     "cortex-debug.openocdPath": "/usr/local/bin/openocd",

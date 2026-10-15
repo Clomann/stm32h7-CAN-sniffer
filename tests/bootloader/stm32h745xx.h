@@ -1,0 +1,13 @@
+#pragma once
+
+#include "flash_test_config.h"
+
+#define FLASH_BASE        (TEST_FLASH_BASE)
+#define FLASH_SIZE        (TEST_FLASH_SIZE)
+#define FLASH_END         (TEST_FLASH_BASE + TEST_FLASH_SIZE - 1u)
+#define FLASH_SECTOR_SIZE (TEST_FLASH_SECTOR_SIZE)
+
+#define FLASH_BANK1_BASE (FLASH_BASE)
+#define FLASH_BANK2_BASE (FLASH_BASE + (FLASH_SIZE / 2u))
+
+#define FLASH_NB_32BITWORD_IN_FLASHWORD (TEST_FLASH_PROG_WORDS)

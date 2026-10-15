@@ -55,5 +55,5 @@ typedef struct
     int dummy;
 } DIR;
 
-#    define AM_DIR 0x10
+#define AM_DIR 0x10
 #endif
