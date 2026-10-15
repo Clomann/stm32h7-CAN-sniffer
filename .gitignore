@@ -17,6 +17,8 @@ tests/build/
 
 .vscode/c_cpp_properties.json
 
+.venv
+
 CMakeCache.txt
 CMakeFiles/*
 */CMakeFiles/*
