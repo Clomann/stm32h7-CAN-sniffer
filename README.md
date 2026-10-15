@@ -12,7 +12,7 @@ This project implements the software for a device that logs CAN traffic on two C
 
 - Role: solo firmware engineer (FreeRTOS + STM32H745)
 - Built: dual-channel CAN logger with 3-stage buffering, on-board HTTP config UI, SD persistence
-- Result: sustained 2×1 Mbit/s capture for 6 h with zero frame loss; SD wear limited via rotating logs
+- Result: sustained 2×1 Mbit/s capture for 6 h with zero frame loss ([losslessness tests](doc/measurements/losslessnes/)); SD wear limited via rotating logs
 - Tooling: gcc/FreeRTOS, custom comm drivers, lightweight web stack
 
 **Table of contents**
@@ -57,40 +57,7 @@ The project targets a NUCLEO-144 STM32H745ZI discovery board. It uses GPIOs to i
 
 It is built using CMake and Make with the GCC toolchain.
 
-This section briefly explains how to build and download the firmware using the tool configuration included in this project.
-
-## Run unit tests
-
-From the `tests` directory, generate and build the test binaries:
-
-```sh
-cmake --preset Release_CM7 --fresh -B build/application \
-  -DPYTHON_EXE="$PWD/.env/bin/python" \
-  -DMCUBOOT_PYTHON="$PWD/.env/bin/python"
-cmake --build build/application -j
-
-cmake --preset "Release_CM4" -B ./build/application \
-  -DPYTHON_EXE="$PWD/.env/bin/python" \
-  -DMCUBOOT_PYTHON="$PWD/.env/bin/python"
-cmake --build build/application -j
-```
-
-and for the bootloader:
-
-```sh
-cmake --preset "Release_CM7_Boot" -B ./build/bootloader
-cmake --build build/bootloader -j
-```
-
-Run the tests:
-
-```sh
-ctest --test-dir build
-```
-
-## Verify logging
-
-See [Lossless logging validation](doc/arc42-template-EN.md#lossless-logging-validation) for the end-to-end verification workflow.
+This section explains step by step how to build, test and download the firmware using the tool configuration included in this project.
 
 ## System overview
 
@@ -115,60 +82,121 @@ The following tool versions are used to develop, debug and run the program on th
 | cmake | 3.28.1 | build |
 | make | 3.81 | build |
 | GNU Tools for STM32 | 13.3.1 | build/ debug |
+| Python | 3.x | build (image signing) |
+| host C compiler (gcc or clang) | | unit tests |
 | OpenOCD | 0.12.0 | download/ debug |
+| STM32CubeProgrammer CLI | | download |
 | Cppcheck | 2.17.1 | develop |
 | clang-format | 18.1.8 | develop |
 
-## Build the code
+`arm-none-eabi-gcc`, `cmake`, `make` and `python3` must be on your `PATH`.
 
-To create the software, you can use the following command from the repo's root directory:
+## Build step by step
+
+Run all commands from the repo's root directory.
+
+### 1. Clone the repository and its submodules
+
+The STM32 HAL and several libraries are git submodules. CMake does not initialize them yet:
 
 ```sh
-cmake --preset "Release_CM4" -B ./build/application && make -C ./build/application -B
+git clone https://github.com/Clomann/stm32h7-CAN-sniffer.git
+cd stm32h7-CAN-sniffer
+
+git submodule sync --recursive
+git submodule update --init --depth 1 libs/STM32_HAL/STM32H7
+git submodule update --init --recursive libs/coreJSON
+git submodule update --init libs/lwip-tcpip
+git submodule update --init --recursive libs/mbedtls
+git submodule update --init --depth 1 libs/mcuboot
 ```
 
-and
+> **NOTE**: Do not use `git clone --recursive` or `git submodule update --init --recursive` for all submodules: this also pulls nested submodules (e.g. of MCUboot) whose sources break the build.
+
+FreeRTOS and lwrb are fetched by CMake during the first configure.
+
+### 2. Install the Python dependencies
+
+The build signs and encrypts the application image with MCUboot's `imgtool`, which needs a few Python packages. Install them into a virtual environment and keep it activated for the next steps:
 
 ```sh
-cmake --preset "Release_CM7" -B ./build/application && make -C ./build/application -B
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
 ```
 
+### 3. Generate the MCUboot keys
+
+The bootloader only boots application images signed with its key. Keys are kept in `.keys/` and are never committed, so create your own once:
+
 ```sh
-cmake --preset "Release_CM7_Boot" -B ./build/bootloader && make -C ./build/bootloader -B   
+mkdir -p .keys
+python3 ./libs/mcuboot/scripts/imgtool.py keygen -k .keys/sign-ecdsa-p256.priv.pem -t ecdsa-p256
+python3 ./libs/mcuboot/scripts/imgtool.py keygen -k .keys/enc-ecies-p256.priv.pem -t ecdsa-p256
+python3 ./libs/mcuboot/scripts/imgtool.py getpub -k .keys/enc-ecies-p256.priv.pem -e pem -o .keys/enc-ecies-p256.pub.pem
 ```
 
-Running this command might take a while because the following dependencies are pulled while generating the configuration:
+Without these keys, all CM7 presets fail during configure with `Signing key PEM not found`. Bootloader and application must be built with the same keys. See [CONTRIBUTING.md](CONTRIBUTING.md#sign-and-encrypt-image-using-mcuboot) for details.
 
-- FreeRTOS (see [FreeRTOS on github](https://github.com/FreeRTOS/FreeRTOS-LTS.git))
-- lwrb (see [lwrb on github](https://github.com/MaJerle/lwrb.git))
+### 4. Build the firmware
 
-To build the actual code, run the following from the root directory:
-
-```sh
-make -C build -j4
-``` 
-
-Alternatively, use the CMake workflow and run
+Build the CM7 bootloader, the CM7 application and the CM4 application:
 
 ```sh
-cmake --workflow --preset release-cm4 &&
-cmake --workflow --preset release-cm7
+cmake --fresh --preset Release_CM7_Boot -B ./build/bootloader && make -C ./build/bootloader -B -j
+cmake --fresh --preset Release_CM7 -B ./build/application && make -C ./build/application -B -j
+cmake --fresh --preset Release_CM4 -B ./build/application && make -C ./build/application -B -j
 ```
 
-to generate the configuration and start the build in one go.
+The first configure takes a while because FreeRTOS and lwrb are downloaded. The CM7 and CM4 applications share the build directory `build/application`, so `--fresh` is required when switching between them. All binaries are written to `_bin/Release/`.
 
-## Download the code
+| Configure preset | Builds |
+|-|-|
+| `Release_CM7_Boot` | CM7 bootloader (MCUboot) |
+| `Release_CM7` | CM7 application, signed and encrypted |
+| `Release_CM4` | CM4 application |
+| `Pre_Release_CM7` | CM7 application for the soak test before a release (see [CONTRIBUTING.md](CONTRIBUTING.md#soak-test)) |
 
-You can run the commands
+`Pre_Release_CM7` also writes to `_bin/Release/` and replaces the application image of `Release_CM7`.
 
-> STM32_Programmer_CLI -c port=SWD -d _bin/Debug/SPI_FullDuplex_ComDMA_CM7.elf 0x08000000 -rst
+Alternatively, the workflow presets `release-cm7-boot`, `release-cm7`, `release-cm4` and `pre-release-test` configure and build in one step, each in its own build directory `build/<preset>`, e.g. `cmake --workflow --preset release-cm7`. See [CONTRIBUTING.md](CONTRIBUTING.md#build-presets) for all presets and their options.
 
-and
+### 5. Run the unit tests
 
-> STM32_Programmer_CLI -c port=SWD -d _bin/Debug/SPI_FullDuplex_ComDMA_CM4.elf 0x08100000 -rst
+The unit tests run on the host and need the CM7 application image from step 4:
 
-from the root directory.
+```sh
+cmake -S tests --preset tests-default
+cmake --build tests/build/tests-default -j
+ctest --test-dir tests/build/tests-default --output-on-failure
+```
 
+Use the preset `tests-encryption` to also run the bootloader tests with image encryption enabled.
+
+Alternatively, the workflow presets configure and build the tests in one step. They do not run the tests, so call `ctest` afterwards:
+
+```sh
+(cd tests && cmake --workflow --preset tests-default-workflow)
+ctest --test-dir tests/build/tests-default --output-on-failure
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#testing) for details.
+
+### 6. Flash the firmware
+
+Flash the bootloader, the signed CM7 application and the CM4 application:
+
+```sh
+STM32_Programmer_CLI -c port=SWD -d _bin/Release/SPI_FullDuplex_ComDMA_CM7_boot.elf 0x08000000 -rst
+STM32_Programmer_CLI -c port=SWD -d _bin/Release/SPI_FullDuplex_ComDMA_CM7_app-signed.bin 0x08020000 -rst
+STM32_Programmer_CLI -c port=SWD -d _bin/Release/SPI_FullDuplex_ComDMA_CM4_app.elf 0x08100000 -rst
+```
+
+In VS Code, the task `Flash CM7 & CM4 (Release)` does the same (see [CONTRIBUTING.md](CONTRIBUTING.md#flashing-and-debugging-in-vs-code)).
+
+## Verify logging
+
+See [Lossless logging validation](doc/arc42-template-EN.md#lossless-logging-validation) for the end-to-end verification workflow.
 
 ## Access the web GUI
 
