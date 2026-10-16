@@ -118,9 +118,8 @@
     {
       "label": "Start OpenOCD",
       "type": "shell",
-      "command": "/usr/local/bin/openocd",
+      "command": "openocd",
       "args": [
-        "-s", "/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts/",
         "-f", "interface/stlink-dap.cfg",
         "-f", "target/stm32h7x_dual_bank.cfg",
         "-c", "adapter speed 1000",
